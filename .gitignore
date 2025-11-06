@@ -41,6 +41,8 @@ assets/*.wav
 *.json
 !requirements.json
 !package.json
+credentials/
+*.pickle
 
 # IDE
 .vscode/

@@ -286,6 +286,60 @@ class DropboxHandler:
 
         return uploaded_paths
 
+    def get_shared_link(self, dropbox_path: str) -> Optional[str]:
+        """
+        Get or create a shared link for a Dropbox file.
+
+        Args:
+            dropbox_path: Dropbox file path
+
+        Returns:
+            Public shared link URL, or None on failure
+        """
+        try:
+            # Try to get existing shared links
+            links = self.dbx.sharing_list_shared_links(path=dropbox_path)
+
+            if links.links:
+                # Use existing link
+                url = links.links[0].url
+                # Convert to direct download URL (replace ?dl=0 with ?dl=1)
+                if '?dl=0' in url:
+                    url = url.replace('?dl=0', '?dl=1')
+                elif '?dl=1' not in url:
+                    url = url + '?dl=1'
+                return url
+            else:
+                # Create new shared link
+                settings = dropbox.sharing.SharedLinkSettings(requested_visibility=dropbox.sharing.RequestedVisibility.public)
+                link = self.dbx.sharing_create_shared_link_with_settings(dropbox_path, settings)
+                url = link.url
+                # Convert to direct download URL
+                if '?dl=0' in url:
+                    url = url.replace('?dl=0', '?dl=1')
+                elif '?dl=1' not in url:
+                    url = url + '?dl=1'
+                return url
+
+        except ApiError as e:
+            # Check if error is because shared link already exists
+            if hasattr(e.error, 'shared_link_already_exists'):
+                # Try to list links again
+                try:
+                    links = self.dbx.sharing_list_shared_links(path=dropbox_path)
+                    if links.links:
+                        url = links.links[0].url
+                        if '?dl=0' in url:
+                            url = url.replace('?dl=0', '?dl=1')
+                        elif '?dl=1' not in url:
+                            url = url + '?dl=1'
+                        return url
+                except:
+                    pass
+
+            print(f"[ERROR] Failed to get shared link: {e}")
+            return None
+
 
 if __name__ == '__main__':
     # Test the Dropbox handler
