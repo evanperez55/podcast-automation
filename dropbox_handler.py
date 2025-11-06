@@ -3,6 +3,7 @@
 import dropbox
 from dropbox.exceptions import ApiError
 from pathlib import Path
+from typing import Optional, List
 from config import Config
 from tqdm import tqdm
 import re
@@ -286,19 +287,27 @@ class DropboxHandler:
 
         return uploaded_paths
 
-    def get_shared_link(self, dropbox_path: str) -> Optional[str]:
+    def get_shared_link(self, dropbox_path) -> Optional[str]:
         """
         Get or create a shared link for a Dropbox file.
 
         Args:
-            dropbox_path: Dropbox file path
+            dropbox_path: Dropbox file path (string) or FileMetadata object
 
         Returns:
             Public shared link URL, or None on failure
         """
+        # Handle both string paths and FileMetadata objects
+        if hasattr(dropbox_path, 'path_display'):
+            # It's a FileMetadata object
+            path = dropbox_path.path_display
+        else:
+            # It's a string
+            path = dropbox_path
+
         try:
             # Try to get existing shared links
-            links = self.dbx.sharing_list_shared_links(path=dropbox_path)
+            links = self.dbx.sharing_list_shared_links(path=path)
 
             if links.links:
                 # Use existing link
@@ -312,7 +321,7 @@ class DropboxHandler:
             else:
                 # Create new shared link
                 settings = dropbox.sharing.SharedLinkSettings(requested_visibility=dropbox.sharing.RequestedVisibility.public)
-                link = self.dbx.sharing_create_shared_link_with_settings(dropbox_path, settings)
+                link = self.dbx.sharing_create_shared_link_with_settings(path, settings)
                 url = link.url
                 # Convert to direct download URL
                 if '?dl=0' in url:
@@ -326,7 +335,7 @@ class DropboxHandler:
             if hasattr(e.error, 'shared_link_already_exists'):
                 # Try to list links again
                 try:
-                    links = self.dbx.sharing_list_shared_links(path=dropbox_path)
+                    links = self.dbx.sharing_list_shared_links(path=path)
                     if links.links:
                         url = links.links[0].url
                         if '?dl=0' in url:

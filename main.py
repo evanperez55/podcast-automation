@@ -402,6 +402,9 @@ class PodcastAutomation:
             print("-" * 60)
 
             try:
+                # Extract episode number
+                episode_number = self.dropbox.extract_episode_number(audio_file.name) or 0
+
                 # Get or create shared link for the MP3
                 print("Creating shared link for episode...")
                 audio_url = self.dropbox.get_shared_link(finished_path)
@@ -414,7 +417,6 @@ class PodcastAutomation:
                     mp3_file_size = os.path.getsize(mp3_path)
 
                     # Get duration from transcript
-                    import json
                     transcript_file = transcript_path
                     with open(transcript_file, 'r', encoding='utf-8') as f:
                         transcript_data = json.load(f)
