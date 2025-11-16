@@ -14,8 +14,15 @@ class Config:
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
     ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
 
-    # Dropbox
+    # Dropbox - Short-lived access token (deprecated)
     DROPBOX_ACCESS_TOKEN = os.getenv('DROPBOX_ACCESS_TOKEN')
+
+    # Dropbox - OAuth credentials (recommended for auto-refresh)
+    DROPBOX_APP_KEY = os.getenv('DROPBOX_APP_KEY')
+    DROPBOX_APP_SECRET = os.getenv('DROPBOX_APP_SECRET')
+    DROPBOX_REFRESH_TOKEN = os.getenv('DROPBOX_REFRESH_TOKEN')
+
+    # Dropbox paths
     DROPBOX_FOLDER_PATH = os.getenv('DROPBOX_FOLDER_PATH', '/Fake Problems Podcast/new_raw_files')
     DROPBOX_FINISHED_FOLDER = os.getenv('DROPBOX_FINISHED_FOLDER', '/Fake Problems Podcast/finished_files')
     DROPBOX_EDITED_FOLDER = os.getenv('DROPBOX_EDITED_FOLDER', '/Fake Problems Podcast/edited_files')

@@ -13,12 +13,25 @@ class DropboxHandler:
     """Handle Dropbox operations for podcast episodes."""
 
     def __init__(self):
-        """Initialize Dropbox client."""
-        if not Config.DROPBOX_ACCESS_TOKEN:
-            raise ValueError("DROPBOX_ACCESS_TOKEN not configured")
-
-        self.dbx = dropbox.Dropbox(Config.DROPBOX_ACCESS_TOKEN)
-        print(f"[OK] Connected to Dropbox")
+        """Initialize Dropbox client with automatic token refresh support."""
+        # Try OAuth refresh token first (recommended - never expires)
+        if Config.DROPBOX_REFRESH_TOKEN and Config.DROPBOX_APP_KEY and Config.DROPBOX_APP_SECRET:
+            self.dbx = dropbox.Dropbox(
+                app_key=Config.DROPBOX_APP_KEY,
+                app_secret=Config.DROPBOX_APP_SECRET,
+                oauth2_refresh_token=Config.DROPBOX_REFRESH_TOKEN
+            )
+            print(f"[OK] Connected to Dropbox (using auto-refresh token)")
+        # Fall back to short-lived access token
+        elif Config.DROPBOX_ACCESS_TOKEN:
+            self.dbx = dropbox.Dropbox(Config.DROPBOX_ACCESS_TOKEN)
+            print(f"[OK] Connected to Dropbox (using short-lived token)")
+            print(f"[INFO] Consider setting up OAuth refresh token with: python setup_dropbox_oauth.py")
+        else:
+            raise ValueError(
+                "Dropbox credentials not configured!\n"
+                "Either set DROPBOX_ACCESS_TOKEN or run: python setup_dropbox_oauth.py"
+            )
 
     def list_episodes(self, folder_path=None):
         """
@@ -286,6 +299,30 @@ class DropboxHandler:
                 uploaded_paths.append(dropbox_path)
 
         return uploaded_paths
+
+    def upload_transcription(self, transcription_path, episode_folder_name=None):
+        """
+        Upload transcription file to Dropbox transcriptions folder.
+
+        Args:
+            transcription_path: Path to transcription JSON file
+            episode_folder_name: Optional folder name for organizing transcriptions (e.g., 'ep_1')
+
+        Returns:
+            Dropbox path or None on failure
+        """
+        transcription_path = Path(transcription_path)
+
+        # Create transcriptions folder structure
+        if episode_folder_name:
+            transcriptions_folder = f"/podcast/transcriptions/{episode_folder_name}"
+        else:
+            transcriptions_folder = "/podcast/transcriptions"
+
+        dropbox_path = f"{transcriptions_folder}/{transcription_path.name}"
+
+        metadata = self.upload_file(transcription_path, dropbox_path, overwrite=True)
+        return dropbox_path if metadata else None
 
     def get_shared_link(self, dropbox_path) -> Optional[str]:
         """

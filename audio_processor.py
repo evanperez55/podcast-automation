@@ -64,9 +64,9 @@ class AudioProcessor:
         print(f"Applying censorship to: {audio_file_path.name}")
         print(f"  Censoring {len(censor_timestamps)} items...")
 
-        # Load audio
+        # Load audio (supports any format FFmpeg can handle)
         print(f"  Loading audio file...")
-        audio = AudioSegment.from_wav(str(audio_file_path))
+        audio = AudioSegment.from_file(str(audio_file_path))
         audio_duration = len(audio) / 1000  # Convert to seconds
 
         print(f"  Audio duration: {audio_duration:.1f}s")
@@ -127,8 +127,8 @@ class AudioProcessor:
         if not audio_file_path.exists():
             raise FileNotFoundError(f"Audio file not found: {audio_file_path}")
 
-        # Load audio
-        audio = AudioSegment.from_wav(str(audio_file_path))
+        # Load audio (supports any format FFmpeg can handle)
+        audio = AudioSegment.from_file(str(audio_file_path))
 
         # Extract clip
         start_ms = int(start_seconds * 1000)
@@ -207,8 +207,8 @@ class AudioProcessor:
 
         print(f"Converting to MP3: {wav_file_path.name}")
 
-        # Load and export as MP3
-        audio = AudioSegment.from_wav(str(wav_file_path))
+        # Load and export as MP3 (supports any format FFmpeg can handle)
+        audio = AudioSegment.from_file(str(wav_file_path))
         audio.export(str(output_path), format="mp3", bitrate=bitrate)
 
         print(f"[OK] MP3 saved to: {output_path}")

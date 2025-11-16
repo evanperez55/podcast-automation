@@ -35,6 +35,7 @@ env/
 downloads/
 output/
 clips/
+historical_ep/
 assets/*.wav
 
 # API credentials

@@ -46,10 +46,17 @@ class YouTubeUploader:
         # If no valid credentials, authenticate
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                # Refresh expired credentials
+                # Try to refresh expired credentials
                 print("[INFO] Refreshing YouTube credentials...")
-                creds.refresh(Request())
-            else:
+                try:
+                    creds.refresh(Request())
+                    print("[OK] Token refreshed successfully!")
+                except Exception as refresh_error:
+                    print(f"[WARNING] Token refresh failed: {refresh_error}")
+                    print("[INFO] Will re-authenticate with OAuth flow...")
+                    creds = None  # Force re-authentication
+
+            if not creds or not creds.valid:
                 # Run OAuth flow for new credentials
                 if not self.CREDENTIALS_PATH.exists():
                     raise FileNotFoundError(

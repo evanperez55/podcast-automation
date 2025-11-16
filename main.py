@@ -292,12 +292,23 @@ class PodcastAutomation:
             print(f"Latest episode: {latest['name']}")
             audio_file = self.dropbox.download_episode(latest['path'])
 
+        # Extract episode number for folder organization
+        episode_number = self.dropbox.extract_episode_number(audio_file.name)
+        if episode_number:
+            episode_folder = f"ep_{episode_number}"
+        else:
+            episode_folder = f"ep_{audio_file.stem}_{timestamp}"
+
+        # Create episode output subfolder
+        episode_output_dir = Config.OUTPUT_DIR / episode_folder
+        episode_output_dir.mkdir(exist_ok=True, parents=True)
+
         print()
 
         # Step 2: Transcribe with Whisper
         print("STEP 2: TRANSCRIBING WITH WHISPER")
         print("-" * 60)
-        transcript_path = Config.OUTPUT_DIR / f"{audio_file.stem}_{timestamp}_transcript.json"
+        transcript_path = episode_output_dir / f"{audio_file.stem}_{timestamp}_transcript.json"
         transcript_data = self.transcriber.transcribe(audio_file, transcript_path)
         print()
 
@@ -307,7 +318,7 @@ class PodcastAutomation:
         analysis = self.editor.analyze_content(transcript_data)
 
         # Save analysis
-        analysis_path = Config.OUTPUT_DIR / f"{audio_file.stem}_{timestamp}_analysis.json"
+        analysis_path = episode_output_dir / f"{audio_file.stem}_{timestamp}_analysis.json"
         with open(analysis_path, 'w', encoding='utf-8') as f:
             json.dump(analysis, f, indent=2, ensure_ascii=False)
         print(f"[OK] Analysis saved to: {analysis_path}")
@@ -316,7 +327,7 @@ class PodcastAutomation:
         # Step 4: Apply censorship
         print("STEP 4: APPLYING CENSORSHIP")
         print("-" * 60)
-        censored_audio_path = Config.OUTPUT_DIR / f"{audio_file.stem}_{timestamp}_censored.wav"
+        censored_audio_path = episode_output_dir / f"{audio_file.stem}_{timestamp}_censored.wav"
         censored_audio = self.audio_processor.apply_censorship(
             audio_file,
             analysis.get('censor_timestamps', []),
@@ -327,8 +338,8 @@ class PodcastAutomation:
         # Step 5: Create clips
         print("STEP 5: CREATING CLIPS")
         print("-" * 60)
-        clip_dir = Config.CLIPS_DIR / f"{audio_file.stem}_{timestamp}"
-        clip_dir.mkdir(exist_ok=True)
+        clip_dir = Config.CLIPS_DIR / episode_folder
+        clip_dir.mkdir(exist_ok=True, parents=True)
 
         clip_paths = self.audio_processor.create_clips(
             censored_audio,
@@ -386,7 +397,6 @@ class PodcastAutomation:
 
             # Upload clips to clips folder
             print("\nUploading clips to Dropbox...")
-            episode_folder = f"ep_{self.dropbox.extract_episode_number(audio_file.name) or 'unknown'}"
             uploaded_clip_paths = self.dropbox.upload_clips(clip_paths, episode_folder_name=episode_folder)
 
             if uploaded_clip_paths:
@@ -402,9 +412,6 @@ class PodcastAutomation:
             print("-" * 60)
 
             try:
-                # Extract episode number
-                episode_number = self.dropbox.extract_episode_number(audio_file.name) or 0
-
                 # Get or create shared link for the MP3
                 print("Creating shared link for episode...")
                 audio_url = self.dropbox.get_shared_link(finished_path)
@@ -465,7 +472,6 @@ class PodcastAutomation:
         print("-" * 60)
 
         social_media_results = {}
-        episode_number = self.dropbox.extract_episode_number(audio_file.name) or 0
 
         if self.test_mode:
             print("[TEST MODE] Skipping social media uploads")
@@ -502,7 +508,7 @@ class PodcastAutomation:
         }
 
         # Save results summary
-        results_path = Config.OUTPUT_DIR / f"{audio_file.stem}_{timestamp}_results.json"
+        results_path = episode_output_dir / f"{audio_file.stem}_{timestamp}_results.json"
         with open(results_path, 'w', encoding='utf-8') as f:
             json.dump(results, f, indent=2, ensure_ascii=False)
 
