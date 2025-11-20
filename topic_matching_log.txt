@@ -1,0 +1,122 @@
+============================================================
+TOPIC MATCHING ANALYSIS
+============================================================
+
+[INFO] Loading topics and episodes...
+[OK] Loaded 955 topics
+[OK] Loaded 24 episodes
+
+[INFO] Starting semantic matching with Claude AI...
+[INFO] Processing 955 topics in 20 batches of 50
+
+[INFO] Processing batch 1/20 (topics 1-50)
+[ERROR] Claude API call failed: Expecting ',' delimiter: line 376 column 20 (char 12137)
+[ERROR] Batch 1 failed: Expecting ',' delimiter: line 376 column 20 (char 12137)
+
+[INFO] Processing batch 2/20 (topics 51-100)
+[ERROR] Claude API call failed: Expecting ',' delimiter: line 385 column 19 (char 12490)
+[ERROR] Batch 2 failed: Expecting ',' delimiter: line 385 column 19 (char 12490)
+
+[INFO] Processing batch 3/20 (topics 101-150)
+[ERROR] Claude API call failed: Expecting ',' delimiter: line 367 column 19 (char 12456)
+[ERROR] Batch 3 failed: Expecting ',' delimiter: line 367 column 19 (char 12456)
+
+[INFO] Processing batch 4/20 (topics 151-200)
+[ERROR] Claude API call failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAJq18dCUAZeSVK53F'}
+[ERROR] Batch 4 failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAJq18dCUAZeSVK53F'}
+
+[INFO] Processing batch 5/20 (topics 201-250)
+[ERROR] Claude API call failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAKCaczKPKGBJLVXvX'}
+[ERROR] Batch 5 failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAKCaczKPKGBJLVXvX'}
+
+[INFO] Processing batch 6/20 (topics 251-300)
+[ERROR] Claude API call failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAKaQCUCpnZdUjGL8a'}
+[ERROR] Batch 6 failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAKaQCUCpnZdUjGL8a'}
+
+[INFO] Processing batch 7/20 (topics 301-350)
+[ERROR] Claude API call failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAKyhyet8znAGNEwNN'}
+[ERROR] Batch 7 failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAKyhyet8znAGNEwNN'}
+
+[INFO] Processing batch 8/20 (topics 351-400)
+[ERROR] Claude API call failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLALLnW1KVSAeM7yFH4'}
+[ERROR] Batch 8 failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLALLnW1KVSAeM7yFH4'}
+
+[INFO] Processing batch 9/20 (topics 401-450)
+[ERROR] Claude API call failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLALmqQeYhe1BjnR8E5'}
+[ERROR] Batch 9 failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLALmqQeYhe1BjnR8E5'}
+
+[INFO] Processing batch 10/20 (topics 451-500)
+[ERROR] Claude API call failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAMBPNw7zqrAcdNFj4'}
+[ERROR] Batch 10 failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAMBPNw7zqrAcdNFj4'}
+
+[INFO] Processing batch 11/20 (topics 501-550)
+[ERROR] Claude API call failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAMoLwExRkA8GYthDN'}
+[ERROR] Batch 11 failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAMoLwExRkA8GYthDN'}
+
+[INFO] Processing batch 12/20 (topics 551-600)
+[ERROR] Claude API call failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLANK6xBPx2tRVLQYHQ'}
+[ERROR] Batch 12 failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLANK6xBPx2tRVLQYHQ'}
+
+[INFO] Processing batch 13/20 (topics 601-650)
+[ERROR] Claude API call failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAPEfTyuN45LPPYSy7'}
+[ERROR] Batch 13 failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAPEfTyuN45LPPYSy7'}
+
+[INFO] Processing batch 14/20 (topics 651-700)
+[ERROR] Claude API call failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAPjvmpT35Ka3vrpn3'}
+[ERROR] Batch 14 failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAPjvmpT35Ka3vrpn3'}
+
+[INFO] Processing batch 15/20 (topics 701-750)
+[ERROR] Claude API call failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAQ71SqgfDF1d6tj9j'}
+[ERROR] Batch 15 failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAQ71SqgfDF1d6tj9j'}
+
+[INFO] Processing batch 16/20 (topics 751-800)
+[ERROR] Claude API call failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAQWooZ227yTwYBB1U'}
+[ERROR] Batch 16 failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAQWooZ227yTwYBB1U'}
+
+[INFO] Processing batch 17/20 (topics 801-850)
+[ERROR] Claude API call failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAQt8trLrNfiW9kGTm'}
+[ERROR] Batch 17 failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAQt8trLrNfiW9kGTm'}
+
+[INFO] Processing batch 18/20 (topics 851-900)
+[ERROR] Claude API call failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLARDj1S9FB7TVs5Zi5'}
+[ERROR] Batch 18 failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLARDj1S9FB7TVs5Zi5'}
+
+[INFO] Processing batch 19/20 (topics 901-950)
+[ERROR] Claude API call failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLARemq1cxKgKaxkiLo'}
+[ERROR] Batch 19 failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLARemq1cxKgKaxkiLo'}
+
+[INFO] Processing batch 20/20 (topics 951-955)
+[ERROR] Claude API call failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAS2M2X4eCrQccjpnc'}
+[ERROR] Batch 20 failed: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CVJLAS2M2X4eCrQccjpnc'}
+
+[OK] Matching complete: 955 topics processed
+
+[INFO] Generating analysis report...
+[OK] Saved to topic_data\topic_matching_analysis.json
+
+============================================================
+ANALYSIS SUMMARY
+============================================================
+Total topics analyzed: 955
+Topics matched: 0 (0.0%)
+Topics unmatched: 955
+Potential duplicates found: 3
+
+[TOP 10 MOST CONFIDENT MATCHES]
+
+[POTENTIAL DUPLICATE TOPICS]
+Topic 65: Podcast 2022-03-09...
+  - Similar to #91 (83% match): Podcast 2023-03-16...
+
+Topic 241: Pet peeve - people getting into meetings early...
+  - Similar to #255 (85% match): Pet peeve, people starting meetings early...
+
+Topic 590: Cat 1 - you use your money for your...
+  - Similar to #591 (84% match): Cat 2 - use your money for not you...
+  - Similar to #592 (82% match): Cat 3 use not your money for your...
+  - Similar to #593 (79% match): Cat 4 - use not your money for not you...
+
+============================================================
+
+All results saved to: C:\Users\evanp\projects\podcast-automation\topic_data\topic_matching_analysis.json
+============================================================

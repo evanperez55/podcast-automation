@@ -1,0 +1,43 @@
+COMPREHENSIVE TOPIC ANALYSIS REPORT
+======================================================================
+
+DATA EXTRACTED:
+  - Google Doc Topics: 955 topics
+  - Episodes Analyzed: 24 episodes (1-24)
+
+MATCHING RESULTS:
+  - Topics Matched: 3 (0.31%)
+  - Topics Unmatched: 952
+  - Potential Duplicates: 3
+
+TOP 3 MATCHED TOPICS:
+  1. Can women be pedophiles?
+     Episodes: [18] | Confidence: 0.9
+  2. Snake church
+     Episodes: [18] | Confidence: 0.9
+  3. Pediatric urology
+     Episodes: [20] | Confidence: 0.9
+
+FIRST 15 TOPICS FROM GOOGLE DOC:
+  1. 3Recurring segments:
+  2. Moments that made you tear up and/or ufull on sob like a bit
+  3. One big story a month to follow
+  4. Pet Peeves and/or experiencing one of 678-3890your pet peeve
+  5. Anxiety ridden experiences
+  6. Things you wish you knew before going into it
+  7. Beginning of podcast notes dump:
+  8. Man who was dwarf and giant
+  9. Grocery delivery tons of produce
+  10. Us police killed 1176 people in 2022 making it the world rec
+  11. Guy in court for wife disappearing is having his Google sear
+  12. Less than 1% of nuns are under 40 and the average nun is 80%
+  13. Florida monkeys with transmissble herpes that can kill
+  14. Bear kills moose during wedding
+  15. Cave crawler anxiety
+
+FILES CREATED:
+  - topic_data/google_doc_topics.json (163 KB)
+  - topic_data/episode_summaries.json (59 KB)
+  - topic_data/topic_matching_analysis.json (267 KB)
+  - TOPIC_ANALYSIS_SUMMARY.md
+

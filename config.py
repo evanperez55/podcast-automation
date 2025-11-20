@@ -51,6 +51,9 @@ class Config:
     TIKTOK_CLIENT_SECRET = os.getenv('TIKTOK_CLIENT_SECRET')
     TIKTOK_ACCESS_TOKEN = os.getenv('TIKTOK_ACCESS_TOKEN')
 
+    # Google Docs Topic Tracker
+    GOOGLE_DOC_ID = os.getenv('GOOGLE_DOC_ID')
+
     # Podcast Settings
     PODCAST_NAME = os.getenv('PODCAST_NAME', 'Fake Problems Podcast')
     BEEP_SOUND_PATH = os.getenv('BEEP_SOUND_PATH', './assets/beep.wav')

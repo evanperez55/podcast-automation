@@ -11,6 +11,7 @@ from transcription import Transcriber
 from content_editor import ContentEditor
 from audio_processor import AudioProcessor
 from video_converter import VideoConverter
+from google_docs_tracker import GoogleDocsTopicTracker
 from uploaders import (
     YouTubeUploader,
     InstagramUploader,
@@ -62,6 +63,14 @@ class PodcastAutomation:
 
         # Initialize social media uploaders (optional)
         self.uploaders = self._init_uploaders()
+
+        # Initialize Google Docs topic tracker (optional)
+        try:
+            self.topic_tracker = GoogleDocsTopicTracker()
+            print("[OK] Google Docs topic tracker initialized")
+        except (ValueError, FileNotFoundError) as e:
+            print(f"[INFO] Google Docs topic tracker not available: {str(e).split(chr(10))[0]}")
+            self.topic_tracker = None
 
         print()
 
@@ -324,6 +333,22 @@ class PodcastAutomation:
         print(f"[OK] Analysis saved to: {analysis_path}")
         print()
 
+        # Step 3.5: Update Google Docs topic tracker
+        topic_tracker_results = {}
+        if self.topic_tracker and episode_number:
+            # Get full transcript text for topic matching
+            full_transcript = " ".join([seg.get('text', '') for seg in transcript_data.get('segments', [])])
+            episode_summary = analysis.get('episode_summary', '')
+
+            topic_tracker_results = self.topic_tracker.update_topics_for_episode(
+                transcript_text=full_transcript,
+                episode_summary=episode_summary,
+                episode_number=episode_number
+            )
+        elif not self.topic_tracker:
+            print("[INFO] Google Docs topic tracker not configured - skipping")
+        print()
+
         # Step 4: Apply censorship
         print("STEP 4: APPLYING CENSORSHIP")
         print("-" * 60)
@@ -504,7 +529,8 @@ class PodcastAutomation:
             'social_captions': analysis.get('social_captions'),
             'best_clips_info': analysis.get('best_clips'),
             'censor_count': len(analysis.get('censor_timestamps', [])),
-            'social_media_results': social_media_results
+            'social_media_results': social_media_results,
+            'topic_tracker_results': topic_tracker_results
         }
 
         # Save results summary

@@ -24,6 +24,12 @@ google-auth-httplib2==0.2.0
 requests==2.31.0
 tweepy==4.14.0
 
+# Reddit API (for topic scraping)
+praw==7.7.1
+
+# Notion API (for topic management)
+# Uses requests (already included above)
+
 # Utilities
 tqdm==4.66.1
 pyyaml==6.0.1

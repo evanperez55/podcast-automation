@@ -4,12 +4,20 @@ Automated production pipeline for podcast processing, including transcription, c
 
 ## 🌟 Features
 
+### Core Automation
 - **Automated Transcription** - Local Whisper model with GPU acceleration
 - **AI Content Analysis** - Claude AI identifies content to censor and best moments
 - **Smart Censorship** - Automatic beep censorship at precise timestamps
 - **Clip Generation** - Creates 30-second clips of best moments for social media
 - **Dropbox Integration** - Download raw files, upload finished episodes and clips
 - **Social Media Ready** - Generates captions for YouTube, Instagram, Twitter
+
+### Topic Engine (NEW!)
+- **AI-Powered Topic Curation** - Scrapes 100+ topics/week from Reddit ([Quick Start](QUICKSTART_TOPIC_ENGINE.md))
+- **Viral Potential Scoring** - Claude rates each topic 0-10 for engagement
+- **Smart Categorization** - Organizes topics by proven success patterns
+- **Episode Planning** - Suggests balanced topic mix for each episode
+- **Google Docs Integration** - Auto-tracks discussed topics ([Setup Guide](GOOGLE_DOCS_TOPIC_TRACKER.md))
 
 ## 🚀 Quick Start
 
