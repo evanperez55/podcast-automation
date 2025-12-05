@@ -6,8 +6,14 @@ from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 import json
+import re
 
 from config import Config
+
+# Register namespaces to preserve prefixes during parsing/writing
+ET.register_namespace('itunes', 'http://www.itunes.com/dtds/podcast-1.0.dtd')
+ET.register_namespace('content', 'http://purl.org/rss/1.0/modules/content/')
+ET.register_namespace('atom', 'http://www.w3.org/2005/Atom')
 
 
 class RSSFeedGenerator:
@@ -195,13 +201,20 @@ class RSSFeedGenerator:
         if output_path is None:
             output_path = self.feed_path
 
-        # Convert to string with pretty formatting
-        rough_string = ET.tostring(rss, encoding='utf-8')
-        reparsed = minidom.parseString(rough_string)
-        pretty_xml = reparsed.toprettyxml(indent="  ", encoding='utf-8')
+        # Convert to string - use unicode string first
+        rough_string = ET.tostring(rss, encoding='unicode')
+
+        # Add XML declaration manually
+        xml_declaration = '<?xml version="1.0" encoding="utf-8"?>\n'
+
+        # Simple pretty printing without minidom (avoids namespace issues)
+        # Add newlines after tags for readability
+        pretty_xml = rough_string
+        pretty_xml = re.sub(r'><', '>\n<', pretty_xml)
 
         # Write to file
-        with open(output_path, 'wb') as f:
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(xml_declaration)
             f.write(pretty_xml)
 
         print(f"[OK] RSS feed saved to: {output_path}")

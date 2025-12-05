@@ -64,13 +64,10 @@ class PodcastAutomation:
         # Initialize social media uploaders (optional)
         self.uploaders = self._init_uploaders()
 
-        # Initialize Google Docs topic tracker (optional)
-        try:
-            self.topic_tracker = GoogleDocsTopicTracker()
-            print("[OK] Google Docs topic tracker initialized")
-        except (ValueError, FileNotFoundError) as e:
-            print(f"[INFO] Google Docs topic tracker not available: {str(e).split(chr(10))[0]}")
-            self.topic_tracker = None
+        # Initialize Google Docs topic tracker (optional) - DISABLED FOR NOW
+        # TODO: Re-enable after fixing Google OAuth credentials
+        self.topic_tracker = None
+        print("[INFO] Google Docs topic tracker disabled")
 
         print()
 
@@ -120,7 +117,8 @@ class PodcastAutomation:
         episode_number: int,
         mp3_path: Path,
         video_clip_paths: list,
-        analysis: dict
+        analysis: dict,
+        full_episode_video_path: str = None
     ) -> dict:
         """
         Upload episode and clips to configured social media platforms.
@@ -130,6 +128,7 @@ class PodcastAutomation:
             mp3_path: Path to processed MP3 file
             video_clip_paths: List of paths to video clip files
             analysis: Analysis data from Claude
+            full_episode_video_path: Path to full episode video for YouTube
 
         Returns:
             Dictionary with upload results for each platform
@@ -137,16 +136,46 @@ class PodcastAutomation:
         results = {}
         social_captions = analysis.get('social_captions', {})
         episode_summary = analysis.get('episode_summary', '')
+        episode_title = analysis.get('episode_title', f'Episode {episode_number}')
         best_clips = analysis.get('best_clips', [])
 
         # YouTube uploads
         if 'youtube' in self.uploaders:
             print("\n[YouTube] Uploading content...")
-            youtube_results = {}
+            youtube_results = {'clips': [], 'full_episode': None}
+
+            # Upload full episode first
+            if full_episode_video_path:
+                print(f"\n[INFO] Uploading full episode to YouTube...")
+                full_title = f"{Config.PODCAST_NAME} - Episode {episode_number}: {episode_title}"
+                full_description = f"{episode_summary}\n\n{social_captions.get('youtube', '')}"
+                tags = [Config.PODCAST_NAME, 'podcast', 'comedy', f'episode{episode_number}']
+
+                if self.test_mode:
+                    print(f"[TEST MODE] Would upload full episode: {full_episode_video_path}")
+                    youtube_results['full_episode'] = {'status': 'test_mode', 'title': full_title}
+                else:
+                    try:
+                        full_episode_result = self.uploaders['youtube'].upload_episode(
+                            video_path=str(full_episode_video_path),
+                            title=full_title[:100],  # YouTube title limit
+                            description=full_description,
+                            tags=tags,
+                            privacy_status='public'
+                        )
+                        if full_episode_result:
+                            youtube_results['full_episode'] = full_episode_result
+                            print(f"[OK] Full episode uploaded: {full_episode_result.get('video_url', 'Unknown URL')}")
+                        else:
+                            print("[ERROR] Failed to upload full episode")
+                            youtube_results['full_episode'] = {'status': 'failed'}
+                    except Exception as e:
+                        print(f"[ERROR] YouTube full episode upload error: {e}")
+                        youtube_results['full_episode'] = {'status': 'error', 'error': str(e)}
 
             # Upload clips as Shorts
             if video_clip_paths:
-                print(f"[INFO] Uploading {len(video_clip_paths)} clips as YouTube Shorts...")
+                print(f"\n[INFO] Uploading {len(video_clip_paths)} clips as YouTube Shorts...")
                 for i, video_path in enumerate(video_clip_paths[:3], 1):
                     if i - 1 < len(best_clips):
                         clip_info = best_clips[i - 1]
@@ -157,13 +186,32 @@ class PodcastAutomation:
                             clip_info=clip_info
                         )
 
-                        print(f"\n[INFO] Uploading Clip {i}: {clip_info.get('title', 'Clip')}")
-                        # Note: Actual upload would happen here
-                        # Leaving as manual for now to avoid accidental uploads during testing
-                        print(f"[INFO] Video ready: {video_path}")
-                        print("[INFO] Ready to upload (upload code commented out for safety)")
+                        clip_title = clip_info.get('suggested_title', f'Clip {i}')
+                        print(f"\n[INFO] Uploading Clip {i}: {clip_title}")
 
-            results['youtube'] = {'status': 'videos_ready', 'clips': len(video_clip_paths)}
+                        if self.test_mode:
+                            print(f"[TEST MODE] Would upload: {video_path}")
+                            youtube_results['clips'].append({'status': 'test_mode', 'title': clip_title})
+                        else:
+                            try:
+                                upload_result = self.uploaders['youtube'].upload_short(
+                                    video_path=str(video_path),
+                                    title=metadata['title'],
+                                    description=metadata['description'],
+                                    tags=metadata['tags'],
+                                    privacy_status='public'
+                                )
+                                if upload_result:
+                                    youtube_results['clips'].append(upload_result)
+                                    print(f"[OK] Uploaded: {upload_result.get('video_url', 'Unknown URL')}")
+                                else:
+                                    print(f"[ERROR] Failed to upload clip {i}")
+                                    youtube_results['clips'].append({'status': 'failed', 'title': clip_title})
+                            except Exception as e:
+                                print(f"[ERROR] YouTube upload error: {e}")
+                                youtube_results['clips'].append({'status': 'error', 'error': str(e)})
+
+            results['youtube'] = youtube_results
 
         # Twitter posts
         if 'twitter' in self.uploaders:
@@ -391,6 +439,26 @@ class PodcastAutomation:
             print("[INFO] No clips to convert")
         print()
 
+        # Step 5.6: Convert full episode to video for YouTube
+        print("STEP 5.6: CONVERTING FULL EPISODE TO VIDEO")
+        print("-" * 60)
+        full_episode_video_path = None
+        if self.video_converter:
+            print("[INFO] Creating horizontal video (1920x1080) for YouTube...")
+            print("[INFO] This may take several minutes for long episodes...")
+            full_episode_video_path = self.video_converter.create_episode_video(
+                audio_path=str(censored_audio),
+                output_path=str(episode_output_dir / f"{audio_file.stem}_{timestamp}_episode.mp4"),
+                format_type='horizontal'
+            )
+            if full_episode_video_path:
+                print(f"[OK] Full episode video created: {full_episode_video_path}")
+            else:
+                print("[WARNING] Failed to create full episode video")
+        else:
+            print("[INFO] Video converter not available - skipping full episode video")
+        print()
+
         # Step 6: Convert to MP3 for uploading
         print("STEP 6: CONVERTING TO MP3")
         print("-" * 60)
@@ -410,9 +478,14 @@ class PodcastAutomation:
         else:
             # Upload censored MP3 to finished_files folder
             print("Uploading censored audio to finished_files...")
+            # Use episode title for filename (sanitize for filesystem)
+            episode_title = analysis.get('episode_title', f'Episode {episode_number}')
+            safe_title = "".join(c for c in episode_title if c.isalnum() or c in (' ', '-', '_')).strip()
+            safe_title = safe_title.replace(' ', '_')
+            finished_filename = f"Ep{episode_number}_{safe_title}.mp3"
             finished_path = self.dropbox.upload_finished_episode(
                 mp3_path,
-                episode_name=f"{audio_file.stem}_censored.mp3"
+                episode_name=finished_filename
             )
 
             if finished_path:
@@ -509,18 +582,25 @@ class PodcastAutomation:
                 episode_number=episode_number,
                 mp3_path=mp3_path,
                 video_clip_paths=video_clip_paths,
-                analysis=analysis
+                analysis=analysis,
+                full_episode_video_path=full_episode_video_path
             )
 
         print()
 
+        # Get episode title from analysis or generate default
+        episode_title = analysis.get('episode_title', f"Episode {episode_number}")
+
         # Prepare results
         results = {
+            'episode_number': episode_number,
+            'episode_title': episode_title,
             'original_audio': str(audio_file),
             'transcript': str(transcript_path),
             'analysis': str(analysis_path),
             'censored_audio_wav': str(censored_audio),
             'censored_audio_mp3': str(mp3_path),
+            'full_episode_video': str(full_episode_video_path) if full_episode_video_path else None,
             'clips': [str(p) for p in clip_paths],
             'video_clips': [str(p) for p in video_clip_paths],
             'dropbox_finished_path': finished_path,
@@ -544,6 +624,8 @@ class PodcastAutomation:
         print()
         print(f"All outputs saved to: {Config.OUTPUT_DIR}")
         print(f"Results summary: {results_path}")
+        print()
+        print(f"Episode {episode_number}: \"{episode_title}\"")
         print()
         print(f"Episode Summary:")
         print(f"   {results['episode_summary']}")

@@ -3,21 +3,18 @@
 import json
 from pathlib import Path
 from typing import List, Dict
-import anthropic
+from ollama_client import Ollama
 from config import Config
 from datetime import datetime
 
 
 class TopicScorer:
-    """Score topics using Claude AI based on Fake Problems success criteria."""
+    """Score topics using Ollama (local LLM) based on Fake Problems success criteria."""
 
     def __init__(self):
-        """Initialize Claude client."""
-        if not Config.ANTHROPIC_API_KEY:
-            raise ValueError("ANTHROPIC_API_KEY not configured")
-
-        self.client = anthropic.Anthropic(api_key=Config.ANTHROPIC_API_KEY)
-        print("[OK] Claude AI topic scorer ready")
+        """Initialize Ollama client."""
+        self.client = Ollama()
+        print("[OK] Ollama AI topic scorer ready (FREE)")
 
     def score_topics(self, topics: List[Dict], batch_size: int = 10) -> List[Dict]:
         """
@@ -136,7 +133,7 @@ Return ONLY the JSON array."""
 
         try:
             response = self.client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="llama3.2",
                 max_tokens=4000,
                 temperature=0.2,
                 messages=[{"role": "user", "content": prompt}]

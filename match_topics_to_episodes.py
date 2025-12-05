@@ -2,17 +2,18 @@
 
 import json
 from pathlib import Path
-import anthropic
+from ollama_client import Ollama
 from config import Config
 from typing import List, Dict
 
 
 class TopicMatcher:
-    """Match topics to episodes using Claude AI."""
+    """Match topics to episodes using Ollama (local LLM)."""
 
     def __init__(self):
-        """Initialize the topic matcher."""
-        self.anthropic_client = anthropic.Anthropic(api_key=Config.ANTHROPIC_API_KEY)
+        """Initialize the topic matcher with Ollama."""
+        self.ollama_client = Ollama()
+        print(f"[OK] Topic matcher ready with Ollama (FREE)")
 
     def load_topics(self) -> List[Dict]:
         """Load topics from JSON file."""
@@ -176,8 +177,8 @@ Return ONLY a JSON array with this exact structure:
 Return the JSON array now:"""
 
         try:
-            response = self.anthropic_client.messages.create(
-                model="claude-sonnet-4-20250514",
+            response = self.ollama_client.messages.create(
+                model="llama3.2",
                 max_tokens=4000,
                 temperature=0.1,
                 messages=[{

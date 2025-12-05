@@ -58,16 +58,17 @@ class VideoConverter:
         output_path = Path(output_path)
 
         # Determine resolution based on format type
+        # Using 720p for horizontal since it's just a static logo - faster encoding, smaller files
         if resolution:
             width, height = resolution
         elif format_type == 'horizontal':
-            width, height = 1920, 1080  # YouTube, Twitter
+            width, height = 1280, 720  # YouTube (720p is fine for static logo)
         elif format_type == 'vertical':
-            width, height = 1080, 1920  # Reels, TikTok, Shorts
+            width, height = 720, 1280  # Reels, TikTok, Shorts (720p vertical)
         elif format_type == 'square':
-            width, height = 1080, 1080  # Instagram square
+            width, height = 720, 720  # Instagram square
         else:
-            width, height = 1920, 1080  # Default to horizontal
+            width, height = 1280, 720  # Default to horizontal 720p
 
         print(f"[INFO] Converting audio to {format_type} video ({width}x{height})")
         print(f"[INFO] Input: {audio_path.name}")
@@ -91,12 +92,12 @@ class VideoConverter:
         ]
 
         try:
-            # Run ffmpeg
+            # Run ffmpeg (longer timeout for full episodes)
             result = subprocess.run(
                 command,
                 capture_output=True,
                 text=True,
-                timeout=300  # 5 minute timeout
+                timeout=7200  # 2 hour timeout for long episodes
             )
 
             if result.returncode == 0:

@@ -9,7 +9,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from pathlib import Path
-import anthropic
+from ollama_client import Ollama
 from config import Config
 
 # Google Docs API scopes
@@ -23,7 +23,8 @@ class GoogleDocsTopicTracker:
         """Initialize Google Docs API client."""
         self.creds = None
         self.service = None
-        self.anthropic_client = anthropic.Anthropic(api_key=Config.ANTHROPIC_API_KEY)
+        self.ollama_client = Ollama()
+        print("[OK] Google Docs tracker using Ollama (FREE)")
 
         if not Config.GOOGLE_DOC_ID:
             raise ValueError(
@@ -46,8 +47,13 @@ class GoogleDocsTopicTracker:
         # If credentials are invalid or don't exist, authenticate
         if not self.creds or not self.creds.valid:
             if self.creds and self.creds.expired and self.creds.refresh_token:
-                self.creds.refresh(Request())
-            else:
+                try:
+                    self.creds.refresh(Request())
+                except Exception as e:
+                    print(f"[INFO] Token refresh failed, re-authenticating: {e}")
+                    self.creds = None  # Force re-authentication
+
+            if not self.creds:
                 if not creds_path.exists():
                     raise FileNotFoundError(
                         f"Google Docs credentials file not found: {creds_path}\n"
@@ -192,8 +198,8 @@ Return ONLY a JSON array with this exact structure:
 Remember: Return ONLY the JSON array, no other text."""
 
         try:
-            response = self.anthropic_client.messages.create(
-                model="claude-sonnet-4-20250514",
+            response = self.ollama_client.messages.create(
+                model="llama3.2",
                 max_tokens=2000,
                 temperature=0.1,
                 messages=[{

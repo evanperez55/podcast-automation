@@ -1,20 +1,17 @@
-"""Content editing using Claude AI to identify problematic content and best moments."""
+"""Content editing using OpenAI GPT-4 to identify problematic content and best moments."""
 
-import anthropic
+import openai
 import json
 from config import Config
 
 
 class ContentEditor:
-    """Use Claude to analyze transcript and identify content to censor and best clips."""
+    """Use OpenAI GPT-4 to analyze transcript and identify content to censor and best clips."""
 
     def __init__(self):
-        """Initialize Anthropic Claude client."""
-        if not Config.ANTHROPIC_API_KEY:
-            raise ValueError("ANTHROPIC_API_KEY not configured")
-
-        self.client = anthropic.Anthropic(api_key=Config.ANTHROPIC_API_KEY)
-        print(f"[OK] Claude AI ready")
+        """Initialize OpenAI client."""
+        self.client = openai.OpenAI(api_key=Config.OPENAI_API_KEY)
+        print(f"[OK] OpenAI GPT-4 ready")
 
     def analyze_content(self, transcript_data):
         """
@@ -30,32 +27,32 @@ class ContentEditor:
             - episode_summary: Summary of the episode
             - social_captions: Suggested captions for social media
         """
-        print("Analyzing content with Claude...")
+        print("Analyzing content with OpenAI GPT-4...")
 
-        # Prepare transcript text with timestamps for Claude
+        # Prepare transcript text with timestamps for the LLM
         words = transcript_data.get('words', [])
         segments = transcript_data.get('segments', [])
 
         # Create a readable version with timestamps
         timestamped_text = self._format_transcript_for_analysis(words, segments)
 
-        # Build the prompt for Claude
+        # Build the prompt for the LLM
         prompt = self._build_analysis_prompt(timestamped_text)
 
         try:
-            # Call Claude API
-            response = self.client.messages.create(
-                model="claude-sonnet-4-20250514",  # Latest Claude model
+            # Call OpenAI API
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
                 max_tokens=4000,
-                temperature=0.3,  # Lower temperature for more consistent output
+                temperature=0.3,
                 messages=[{
                     "role": "user",
                     "content": prompt
                 }]
             )
 
-            # Parse Claude's response
-            response_text = response.content[0].text
+            # Parse GPT-4's response
+            response_text = response.choices[0].message.content
             analysis = self._parse_claude_response(response_text)
 
             print(f"[OK] Content analysis complete")
@@ -65,7 +62,7 @@ class ContentEditor:
             return analysis
 
         except Exception as e:
-            print(f"[ERROR] Claude analysis error: {e}")
+            print(f"[ERROR] OpenAI analysis error: {e}")
             raise
 
     def _format_transcript_for_analysis(self, words, segments):
@@ -114,10 +111,18 @@ class ContentEditor:
 
    For each clip, provide start/end timestamps and explain why it's interesting.
 
-3. **WRITE EPISODE SUMMARY:**
+3. **CREATE A FUNNY EPISODE TITLE:**
+   Generate a catchy, humorous episode title that:
+   - Is derived from the funniest or most memorable quote/moment in the episode
+   - Should be something one of the hosts actually said (or close to it)
+   - Can be absurd, out-of-context, or ironically serious
+   - Should make people curious to listen
+   - Examples of good titles: "I'm Basically a Godfather Now", "Healthcare is a Scam and I Can Prove It", "POV: You Don't Know What POV Means"
+
+4. **WRITE EPISODE SUMMARY:**
    Write a 2-3 sentence summary of the episode's main topics and themes.
 
-4. **CREATE SOCIAL MEDIA CAPTIONS:**
+5. **CREATE SOCIAL MEDIA CAPTIONS:**
    Write engaging captions for:
    - YouTube (description format, 2-3 paragraphs)
    - Instagram/TikTok (short, punchy, with emojis)
@@ -132,6 +137,7 @@ class ContentEditor:
 Please respond with ONLY valid JSON in this exact format:
 
 {{
+  "episode_title": "Funny episode title derived from a quote or moment",
   "censor_timestamps": [
     {{
       "timestamp": "HH:MM:SS",

@@ -64,7 +64,7 @@ class NotionTopicManager:
         """
         # Build properties
         properties = {
-            "Topic": {
+            "Name": {
                 "title": [
                     {
                         "text": {
@@ -154,9 +154,44 @@ class NotionTopicManager:
 
         return response.json()
 
+    def get_all_existing_topics(self) -> Dict[str, str]:
+        """
+        Get all existing topics from Notion database.
+
+        Returns:
+            Dictionary mapping topic text to page ID
+        """
+        existing = {}
+        has_more = True
+        start_cursor = None
+
+        while has_more:
+            data = {}
+            if start_cursor:
+                data["start_cursor"] = start_cursor
+
+            response = requests.post(
+                f"{self.base_url}/databases/{self.database_id}/query",
+                headers=self.headers,
+                json=data
+            )
+            result = response.json()
+
+            for page in result.get('results', []):
+                # Get the topic name from title property
+                title_prop = page['properties'].get('Name', {})
+                if title_prop.get('title'):
+                    topic_text = title_prop['title'][0]['text']['content']
+                    existing[topic_text] = page['id']
+
+            has_more = result.get('has_more', False)
+            start_cursor = result.get('next_cursor')
+
+        return existing
+
     def bulk_create_topics(self, topics: List[Dict]) -> List[Dict]:
         """
-        Create multiple topics in Notion.
+        Create multiple topics in Notion, skipping duplicates.
 
         Args:
             topics: List of topic dictionaries
@@ -164,24 +199,39 @@ class NotionTopicManager:
         Returns:
             List of created page objects
         """
+        # First, get all existing topics
+        print("[INFO] Checking for existing topics...")
+        existing_topics = self.get_all_existing_topics()
+        print(f"[INFO] Found {len(existing_topics)} existing topics")
+
         created = []
+        skipped = []
         total = len(topics)
 
         print(f"[INFO] Creating {total} topics in Notion...")
 
         for i, topic in enumerate(topics, 1):
+            topic_text = topic.get('topic', '')
+
+            # Skip if already exists
+            if topic_text in existing_topics:
+                skipped.append(topic_text)
+                if i % 10 == 0:
+                    print(f"[INFO] Processed {i}/{total} topics (skipped {len(skipped)} duplicates)...")
+                continue
+
             try:
                 result = self.create_topic(topic)
                 created.append(result)
 
                 if i % 10 == 0:
-                    print(f"[INFO] Created {i}/{total} topics...")
+                    print(f"[INFO] Created {len(created)}/{total} topics (skipped {len(skipped)} duplicates)...")
 
             except Exception as e:
-                print(f"[ERROR] Failed to create topic: {topic.get('topic', 'Unknown')}")
+                print(f"[ERROR] Failed to create topic: {topic_text}")
                 print(f"  Error: {e}")
 
-        print(f"[OK] Created {len(created)}/{total} topics")
+        print(f"[OK] Created {len(created)} new topics, skipped {len(skipped)} duplicates")
         return created
 
     def query_database(

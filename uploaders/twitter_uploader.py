@@ -73,7 +73,11 @@ class TwitterUploader:
             Dictionary with tweet info, or None if post failed
         """
         print(f"[INFO] Posting to Twitter/X")
-        print(f"[INFO] Text: {text[:100]}...")
+        # Handle Windows console encoding issues
+        try:
+            print(f"[INFO] Text: {text[:100]}...")
+        except UnicodeEncodeError:
+            print(f"[INFO] Text: {text[:100].encode('ascii', 'replace').decode('ascii')}...")
 
         media_ids = []
 

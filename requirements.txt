@@ -4,8 +4,7 @@
 python-dotenv==1.0.0
 
 # AI/ML packages
-openai==2.7.1  # For potential future API use
-anthropic==0.72.0
+# anthropic==0.72.0  # NO LONGER NEEDED - Using Ollama (local, free)
 openai-whisper==20231117  # Local Whisper transcription
 torch==2.1.0  # Required by Whisper
 torchaudio==2.1.0  # Required by Whisper
