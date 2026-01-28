@@ -294,7 +294,7 @@ class RSSFeedGenerator:
         self.add_episode(
             rss=rss,
             episode_number=episode_number,
-            title=episode_data.get('title', f"Episode {episode_number}"),
+            title=episode_data.get('title', f"Episode #{episode_number}"),
             description=episode_data.get('description', ''),
             audio_url=episode_data.get('audio_url'),
             audio_file_size=episode_data.get('audio_file_size'),

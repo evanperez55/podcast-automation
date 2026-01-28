@@ -147,7 +147,7 @@ class PodcastAutomation:
             # Upload full episode first
             if full_episode_video_path:
                 print(f"\n[INFO] Uploading full episode to YouTube...")
-                full_title = f"{Config.PODCAST_NAME} - Episode {episode_number}: {episode_title}"
+                full_title = f"Episode #{episode_number} - {episode_title}"
                 full_description = f"{episode_summary}\n\n{social_captions.get('youtube', '')}"
                 tags = [Config.PODCAST_NAME, 'podcast', 'comedy', f'episode{episode_number}']
 
@@ -481,8 +481,7 @@ class PodcastAutomation:
             # Use episode title for filename (sanitize for filesystem)
             episode_title = analysis.get('episode_title', f'Episode {episode_number}')
             safe_title = "".join(c for c in episode_title if c.isalnum() or c in (' ', '-', '_')).strip()
-            safe_title = safe_title.replace(' ', '_')
-            finished_filename = f"Ep{episode_number}_{safe_title}.mp3"
+            finished_filename = f"Episode #{episode_number} - {safe_title}.mp3"
             finished_path = self.dropbox.upload_finished_episode(
                 mp3_path,
                 episode_name=finished_filename
@@ -529,9 +528,8 @@ class PodcastAutomation:
 
                     # Generate episode title and description
                     episode_summary = analysis.get('episode_summary', '')
-                    episode_title = f"Episode {episode_number}"
-                    if analysis.get('episode_title'):
-                        episode_title = analysis.get('episode_title')
+                    ai_title = analysis.get('episode_title', '')
+                    episode_title = f"Episode #{episode_number} - {ai_title}" if ai_title else f"Episode #{episode_number}"
 
                     # Extract keywords from social captions
                     keywords = []
@@ -553,7 +551,13 @@ class PodcastAutomation:
 
                     print(f"[OK] RSS feed updated successfully!")
                     print(f"[INFO] Feed location: {rss_feed_path}")
-                    print(f"[INFO] Upload this file to a public URL for Spotify to access")
+
+                    # Upload RSS feed to Dropbox
+                    print("Uploading RSS feed to Dropbox...")
+                    rss_dropbox_path = "/podcast/podcast_feed.xml"
+                    self.dropbox.upload_file(rss_feed_path, rss_dropbox_path, overwrite=True)
+                    print(f"[OK] RSS feed uploaded to Dropbox: {rss_dropbox_path}")
+                    print(f"[INFO] Spotify will check for updates within 2-8 hours")
 
                 else:
                     print("[WARNING] Could not create shared link for RSS feed")

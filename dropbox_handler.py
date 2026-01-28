@@ -342,44 +342,45 @@ class DropboxHandler:
             # It's a string
             path = dropbox_path
 
+        def convert_to_direct_download(url):
+            """Convert Dropbox URL to direct download format."""
+            if 'dl=0' in url:
+                url = url.replace('dl=0', 'dl=1')
+            elif 'dl=1' not in url:
+                url = url + '?dl=1'
+            return url
+
         try:
             # Try to get existing shared links
             links = self.dbx.sharing_list_shared_links(path=path)
 
-            if links.links:
-                # Use existing link
-                url = links.links[0].url
-                # Convert to direct download URL (replace ?dl=0 with ?dl=1)
-                if '?dl=0' in url:
-                    url = url.replace('?dl=0', '?dl=1')
-                elif '?dl=1' not in url:
-                    url = url + '?dl=1'
-                return url
-            else:
-                # Create new shared link
-                settings = dropbox.sharing.SharedLinkSettings(requested_visibility=dropbox.sharing.RequestedVisibility.public)
-                link = self.dbx.sharing_create_shared_link_with_settings(path, settings)
-                url = link.url
-                # Convert to direct download URL
-                if '?dl=0' in url:
-                    url = url.replace('?dl=0', '?dl=1')
-                elif '?dl=1' not in url:
-                    url = url + '?dl=1'
-                return url
+            # Check for file-specific links (contain /fi/ not /fo/)
+            file_link = None
+            for link in links.links:
+                if '/scl/fi/' in link.url:
+                    file_link = link.url
+                    break
+
+            if file_link:
+                return convert_to_direct_download(file_link)
+
+            # No file-specific link exists, create one
+            settings = dropbox.sharing.SharedLinkSettings(requested_visibility=dropbox.sharing.RequestedVisibility.public)
+            link = self.dbx.sharing_create_shared_link_with_settings(path, settings)
+            return convert_to_direct_download(link.url)
 
         except ApiError as e:
             # Check if error is because shared link already exists
             if hasattr(e.error, 'shared_link_already_exists'):
-                # Try to list links again
+                # Try to list links again and find file-specific one
                 try:
                     links = self.dbx.sharing_list_shared_links(path=path)
+                    for link in links.links:
+                        if '/scl/fi/' in link.url:
+                            return convert_to_direct_download(link.url)
+                    # Fall back to first link if no file-specific one found
                     if links.links:
-                        url = links.links[0].url
-                        if '?dl=0' in url:
-                            url = url.replace('?dl=0', '?dl=1')
-                        elif '?dl=1' not in url:
-                            url = url + '?dl=1'
-                        return url
+                        return convert_to_direct_download(links.links[0].url)
                 except:
                     pass
 

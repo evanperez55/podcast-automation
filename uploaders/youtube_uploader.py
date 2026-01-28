@@ -361,13 +361,13 @@ def create_episode_metadata(
 
     if clip_info:
         # For Shorts/clips
-        title = f"{podcast_name} - Ep {episode_number}: {clip_info.get('title', 'Clip')}"
+        title = f"Episode #{episode_number} - {clip_info.get('title', 'Clip')}"
         description = f"{clip_info.get('description', '')}\n\n"
-        description += f"From Episode {episode_number} of {podcast_name}\n\n"
+        description += f"From Episode #{episode_number} of {podcast_name}\n\n"
         description += social_captions.get('youtube', episode_summary)
     else:
         # For full episodes
-        title = f"{podcast_name} - Episode {episode_number}"
+        title = f"Episode #{episode_number}"
         description = f"{episode_summary}\n\n"
         description += social_captions.get('youtube', '')
 
