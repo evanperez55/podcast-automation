@@ -54,6 +54,9 @@ class Config:
     # Google Docs Topic Tracker
     GOOGLE_DOC_ID = os.getenv('GOOGLE_DOC_ID')
 
+    # HuggingFace (for pyannote speaker diarization)
+    HF_TOKEN = os.getenv('HF_TOKEN')
+
     # Podcast Settings
     PODCAST_NAME = os.getenv('PODCAST_NAME', 'Fake Problems Podcast')
     BEEP_SOUND_PATH = os.getenv('BEEP_SOUND_PATH', './assets/beep.wav')
@@ -63,14 +66,36 @@ class Config:
     FFPROBE_PATH = os.getenv('FFPROBE_PATH', 'C:\\ffmpeg\\bin\\ffprobe.exe')
 
     # Content Filtering Rules
-    NAMES_TO_REMOVE = ['Joey', 'Evan', 'Dom']
-    SLURS_TO_REMOVE = [
-        # Racial slurs (list common ones - Claude will help identify more)
-        'n-word', 'n****r', 'n***a',
-        # Homophobic slurs
-        'f****t', 'f*g', 'd*ke',
-        # Add more as needed
+    # First names and full names of hosts to censor
+    NAMES_TO_REMOVE = [
+        # First names
+        'Joey', 'Evan', 'Dom', 'Dominique',
+        # Full names (for enhanced detection)
+        'Evan Perez', 'Joey Gross', 'Dominique Karolczak',
+        # Common variations
+        'Perez', 'Gross', 'Karolczak'
     ]
+
+    # Words to censor - use ACTUAL spellings so they match the transcript
+    # These are searched directly in the Whisper transcript (case-insensitive)
+    WORDS_TO_CENSOR = [
+        # Homophobic slurs
+        'fag', 'fags', 'faggot', 'faggots', 'dyke', 'dykes',
+
+        # Racial slurs
+        'nigga', 'niggas', 'nigger', 'niggers',
+        'chink', 'chinks',
+        'spic', 'spics',
+        'wetback', 'wetbacks',
+        'kike', 'kikes',
+        'gook', 'gooks',
+
+        # Ableist slurs
+        'retard', 'retards', 'retarded',
+    ]
+
+    # Legacy - kept for backwards compatibility
+    SLURS_TO_REMOVE = []
 
     # Clip Settings
     CLIP_MIN_DURATION = 15  # seconds

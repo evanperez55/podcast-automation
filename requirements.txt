@@ -6,6 +6,7 @@ python-dotenv==1.0.0
 # AI/ML packages
 # anthropic==0.72.0  # NO LONGER NEEDED - Using Ollama (local, free)
 openai-whisper==20231117  # Local Whisper transcription
+whisperx==3.1.6  # WhisperX for speaker diarization + word alignment
 torch==2.1.0  # Required by Whisper
 torchaudio==2.1.0  # Required by Whisper
 
