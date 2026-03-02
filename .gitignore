@@ -55,7 +55,22 @@ credentials/
 # OS
 .DS_Store
 Thumbs.db
+nul
 *.log
+*.png
+!assets/podcast_logo.png
+
+# Screenshots
+Screenshot*.png
+
+# Ad-hoc/one-off scripts (not part of core pipeline)
+test_ollama.py
+test_ollama_fixed.py
+test_notion_connection.py
+check_topic_analysis.py
+delete_all_notion_topics.py
+generate_logo.py
+mark_topics_historical.py
 
 # Large audio files
 *.wav
