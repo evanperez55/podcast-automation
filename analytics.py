@@ -20,7 +20,7 @@ class AnalyticsCollector:
 
     def __init__(self):
         """Initialize analytics collector."""
-        self.enabled = os.getenv("ANALYTICS_ENABLED", "false").lower() == "true"
+        self.enabled = os.getenv("ANALYTICS_ENABLED", "true").lower() == "true"
         self.analytics_dir = Config.BASE_DIR / "topic_data" / "analytics"
         self.analytics_dir.mkdir(parents=True, exist_ok=True)
 

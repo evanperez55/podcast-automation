@@ -102,10 +102,10 @@ class Config:
     THUMBNAIL_BADGE_COLOR = os.getenv("THUMBNAIL_BADGE_COLOR", "#e94560")
 
     # Analytics Feedback Loop
-    ANALYTICS_ENABLED = os.getenv("ANALYTICS_ENABLED", "false").lower() == "true"
+    ANALYTICS_ENABLED = os.getenv("ANALYTICS_ENABLED", "true").lower() == "true"
 
     # Audiogram Waveforms
-    USE_AUDIOGRAM = os.getenv("USE_AUDIOGRAM", "false").lower() == "true"
+    USE_AUDIOGRAM = os.getenv("USE_AUDIOGRAM", "true").lower() == "true"
     AUDIOGRAM_BG_COLOR = os.getenv("AUDIOGRAM_BG_COLOR", "0x1a1a2e")
     AUDIOGRAM_WAVE_COLOR = os.getenv("AUDIOGRAM_WAVE_COLOR", "0xe94560")
 

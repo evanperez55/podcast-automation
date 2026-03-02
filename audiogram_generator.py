@@ -18,7 +18,7 @@ class AudiogramGenerator:
     """Generate audiogram waveform videos from audio files using FFmpeg."""
 
     def __init__(self):
-        self.enabled = os.getenv("USE_AUDIOGRAM", "false").lower() == "true"
+        self.enabled = os.getenv("USE_AUDIOGRAM", "true").lower() == "true"
         self.bg_color = os.getenv("AUDIOGRAM_BG_COLOR", "0x1a1a2e")
         self.wave_color = os.getenv("AUDIOGRAM_WAVE_COLOR", "0xe94560")
         self.ffmpeg_path = Config.FFMPEG_PATH
