@@ -1,169 +1,31 @@
-"""Spotify uploader for podcast episodes."""
+"""Spotify uploader for podcast episodes via RSS feed.
 
-import requests
-import base64
+Spotify for Podcasters uses RSS feeds for podcast distribution.
+This module manages RSS feed generation and updates. No Spotify API needed.
+"""
+
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 from config import Config
 from rss_feed_generator import RSSFeedGenerator
+from logger import logger
 
 
 class SpotifyUploader:
     """
-    Handle Spotify podcast uploads.
+    Handle Spotify podcast distribution via RSS feed.
 
-    Note: Spotify for Podcasters primarily uses RSS feeds for podcast distribution.
-    This module provides helper functions for managing podcast metadata and
-    generating RSS feed entries.
+    Spotify for Podcasters crawls your RSS feed to discover new episodes.
+    No API credentials are required — just an RSS feed hosted at a public URL.
 
-    For direct uploads, you'll need to use Spotify for Podcasters dashboard:
-    https://podcasters.spotify.com
+    For dashboard access: https://podcasters.spotify.com
     """
 
-    # Spotify API base URLs
-    API_BASE = "https://api.spotify.com/v1"
-    ACCOUNTS_BASE = "https://accounts.spotify.com/api"
-
     def __init__(self):
-        """Initialize Spotify uploader."""
-        self.client_id = Config.SPOTIFY_CLIENT_ID
-        self.client_secret = Config.SPOTIFY_CLIENT_SECRET
-        self.show_id = Config.SPOTIFY_SHOW_ID
-        self.access_token = None
-
-        # Initialize RSS feed generator
+        """Initialize Spotify uploader (RSS-only, no API credentials needed)."""
         self.rss_generator = RSSFeedGenerator()
-
-        if not self.client_id or self.client_id == 'your_spotify_client_id_here':
-            raise ValueError(
-                "Spotify client ID not configured in .env file.\n"
-                "Please follow the setup instructions:\n"
-                "1. Go to https://developer.spotify.com/dashboard\n"
-                "2. Create an app and get client credentials\n"
-                "3. Add SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to .env\n"
-                "4. Add your show's SPOTIFY_SHOW_ID to .env\n\n"
-                "Note: Spotify podcasts are typically managed via RSS feeds.\n"
-                "For episode uploads, use Spotify for Podcasters:\n"
-                "https://podcasters.spotify.com"
-            )
-
-        # Authenticate
-        self._authenticate()
-
-    def _authenticate(self):
-        """Authenticate with Spotify API using Client Credentials flow."""
-        print("[INFO] Authenticating with Spotify API...")
-
-        # Encode credentials
-        auth_str = f"{self.client_id}:{self.client_secret}"
-        auth_bytes = auth_str.encode('utf-8')
-        auth_base64 = base64.b64encode(auth_bytes).decode('utf-8')
-
-        # Request access token
-        headers = {
-            'Authorization': f'Basic {auth_base64}',
-            'Content-Type': 'application/x-www-form-urlencoded'
-        }
-
-        data = {
-            'grant_type': 'client_credentials'
-        }
-
-        try:
-            response = requests.post(
-                'https://accounts.spotify.com/api/token',
-                headers=headers,
-                data=data
-            )
-            response.raise_for_status()
-            token_data = response.json()
-
-            self.access_token = token_data.get('access_token')
-            print("[OK] Spotify authentication successful")
-
-        except requests.exceptions.RequestException as e:
-            print(f"[ERROR] Spotify authentication failed: {e}")
-            raise
-
-    def get_show_info(self) -> Optional[Dict[str, Any]]:
-        """
-        Get information about the podcast show.
-
-        Returns:
-            Dictionary with show information
-        """
-        if not self.show_id or self.show_id == 'your_show_id_here':
-            print("[WARNING] Spotify show ID not configured")
-            return None
-
-        endpoint = f"{self.API_BASE}/shows/{self.show_id}"
-        headers = {
-            'Authorization': f'Bearer {self.access_token}'
-        }
-
-        try:
-            response = requests.get(endpoint, headers=headers)
-            response.raise_for_status()
-            show_data = response.json()
-
-            return {
-                'id': show_data.get('id'),
-                'name': show_data.get('name'),
-                'publisher': show_data.get('publisher'),
-                'description': show_data.get('description'),
-                'total_episodes': show_data.get('total_episodes'),
-                'url': show_data.get('external_urls', {}).get('spotify')
-            }
-
-        except requests.exceptions.RequestException as e:
-            print(f"[ERROR] Failed to get show info: {e}")
-            return None
-
-    def get_episodes(self, limit: int = 20) -> Optional[list]:
-        """
-        Get episodes from the podcast show.
-
-        Args:
-            limit: Number of episodes to retrieve (max 50)
-
-        Returns:
-            List of episode dictionaries
-        """
-        if not self.show_id or self.show_id == 'your_show_id_here':
-            print("[WARNING] Spotify show ID not configured")
-            return None
-
-        endpoint = f"{self.API_BASE}/shows/{self.show_id}/episodes"
-        headers = {
-            'Authorization': f'Bearer {self.access_token}'
-        }
-        params = {
-            'limit': min(limit, 50)
-        }
-
-        try:
-            response = requests.get(endpoint, headers=headers, params=params)
-            response.raise_for_status()
-            data = response.json()
-
-            episodes = []
-            for ep in data.get('items', []):
-                episodes.append({
-                    'id': ep.get('id'),
-                    'name': ep.get('name'),
-                    'description': ep.get('description'),
-                    'release_date': ep.get('release_date'),
-                    'duration_ms': ep.get('duration_ms'),
-                    'url': ep.get('external_urls', {}).get('spotify')
-                })
-
-            return episodes
-
-        except requests.exceptions.RequestException as e:
-            print(f"[ERROR] Failed to get episodes: {e}")
-            return None
 
     def generate_rss_item(
         self,
@@ -173,13 +35,10 @@ class SpotifyUploader:
         audio_url: str,
         audio_file_size: int,
         duration_seconds: int,
-        pub_date: Optional[datetime] = None
+        pub_date: Optional[datetime] = None,
     ) -> str:
         """
         Generate an RSS feed item for a podcast episode.
-
-        This can be added to your podcast's RSS feed for distribution to Spotify
-        and other podcast platforms.
 
         Args:
             episode_number: Episode number
@@ -204,8 +63,8 @@ class SpotifyUploader:
 
         # Format pub date as RFC 2822
         pub_date_str = pub_date.strftime("%a, %d %b %Y %H:%M:%S %z")
-        if not pub_date_str.endswith(('+0000', '-0000')):
-            pub_date_str += ' +0000'
+        if not pub_date_str.endswith(("+0000", "-0000")):
+            pub_date_str += " +0000"
 
         rss_item = f"""
     <item>
@@ -224,13 +83,10 @@ class SpotifyUploader:
         return rss_item
 
     def create_episode_metadata(
-        self,
-        episode_number: int,
-        summary: str,
-        duration_seconds: int
+        self, episode_number: int, summary: str, duration_seconds: int
     ) -> Dict[str, Any]:
         """
-        Create episode metadata for Spotify upload.
+        Create episode metadata for RSS feed.
 
         Args:
             episode_number: Episode number
@@ -241,14 +97,14 @@ class SpotifyUploader:
             Dictionary with episode metadata
         """
         return {
-            'title': f"{Config.PODCAST_NAME} - Episode {episode_number}",
-            'description': summary,
-            'episode_number': episode_number,
-            'season_number': 1,  # Adjust as needed
-            'episode_type': 'full',  # 'full', 'trailer', or 'bonus'
-            'explicit': False,
-            'duration_seconds': duration_seconds,
-            'language': 'en'
+            "title": f"{Config.PODCAST_NAME} - Episode {episode_number}",
+            "description": summary,
+            "episode_number": episode_number,
+            "season_number": 1,
+            "episode_type": "full",
+            "explicit": False,
+            "duration_seconds": duration_seconds,
+            "language": "en",
         }
 
     def update_rss_feed(
@@ -260,7 +116,7 @@ class SpotifyUploader:
         audio_file_size: int,
         duration_seconds: int,
         pub_date: Optional[datetime] = None,
-        keywords: Optional[List[str]] = None
+        keywords: Optional[List[str]] = None,
     ) -> Path:
         """
         Update RSS feed with new episode.
@@ -278,57 +134,40 @@ class SpotifyUploader:
         Returns:
             Path to updated RSS feed file
         """
-        print("[INFO] Updating RSS feed...")
+        logger.info("Updating RSS feed...")
 
         # Load or create podcast metadata
         metadata = self.rss_generator.load_podcast_metadata()
 
         if not metadata:
-            print("[INFO] No podcast metadata found, using defaults")
-            # Try to get show info from Spotify
-            show_info = self.get_show_info()
-            if show_info:
-                metadata = {
-                    'title': show_info.get('name', Config.PODCAST_NAME),
-                    'description': show_info.get('description', ''),
-                    'author': show_info.get('publisher', ''),
-                    'website_url': show_info.get('url', ''),
-                    'email': '',  # Need to set this
-                    'categories': ['Comedy'],  # Default, can be changed
-                    'language': 'en-us',
-                    'artwork_url': show_info.get('images', [{}])[0].get('url'),
-                    'explicit': show_info.get('explicit', False)
-                }
-            else:
-                # Use config defaults
-                metadata = {
-                    'title': Config.PODCAST_NAME,
-                    'description': 'A podcast about fake problems',
-                    'author': 'Podcast Host',
-                    'website_url': '',
-                    'email': 'podcast@example.com',
-                    'categories': ['Comedy'],
-                    'language': 'en-us',
-                    'artwork_url': None,
-                    'explicit': False
-                }
+            logger.info("No podcast metadata found, using defaults")
+            metadata = {
+                "title": Config.PODCAST_NAME,
+                "description": "A podcast about fake problems",
+                "author": "Podcast Host",
+                "website_url": "",
+                "email": "podcast@example.com",
+                "categories": ["Comedy"],
+                "language": "en-us",
+                "artwork_url": None,
+                "explicit": False,
+            }
 
         # Episode data
         episode_data = {
-            'episode_number': episode_number,
-            'title': episode_title,
-            'description': episode_description,
-            'audio_url': audio_url,
-            'audio_file_size': audio_file_size,
-            'duration_seconds': duration_seconds,
-            'pub_date': pub_date or datetime.now(),
-            'keywords': keywords
+            "episode_number": episode_number,
+            "title": episode_title,
+            "description": episode_description,
+            "audio_url": audio_url,
+            "audio_file_size": audio_file_size,
+            "duration_seconds": duration_seconds,
+            "pub_date": pub_date or datetime.now(),
+            "keywords": keywords,
         }
 
         # Update feed
         rss = self.rss_generator.update_or_create_feed(
-            episode_data=episode_data,
-            podcast_metadata=metadata
+            episode_data=episode_data, podcast_metadata=metadata
         )
 
         # Save feed
@@ -337,7 +176,7 @@ class SpotifyUploader:
         # Save metadata for future use
         self.rss_generator.save_podcast_metadata(metadata)
 
-        print(f"[OK] RSS feed updated: {self.rss_generator.feed_path}")
+        logger.info("RSS feed updated: %s", self.rss_generator.feed_path)
         return self.rss_generator.feed_path
 
     def setup_podcast_metadata(
@@ -349,7 +188,7 @@ class SpotifyUploader:
         website_url: str,
         categories: List[str],
         artwork_url: Optional[str] = None,
-        explicit: bool = False
+        explicit: bool = False,
     ):
         """
         Set up podcast metadata for RSS feed generation.
@@ -365,20 +204,20 @@ class SpotifyUploader:
             explicit: Whether podcast contains explicit content
         """
         metadata = {
-            'title': title,
-            'description': description,
-            'author': author,
-            'email': email,
-            'website_url': website_url,
-            'categories': categories,
-            'language': 'en-us',
-            'artwork_url': artwork_url,
-            'explicit': explicit
+            "title": title,
+            "description": description,
+            "author": author,
+            "email": email,
+            "website_url": website_url,
+            "categories": categories,
+            "language": "en-us",
+            "artwork_url": artwork_url,
+            "explicit": explicit,
         }
 
         self.rss_generator.save_podcast_metadata(metadata)
-        print("[OK] Podcast metadata saved")
-        print(f"[INFO] Metadata saved to: {self.rss_generator.metadata_path}")
+        logger.info("Podcast metadata saved")
+        logger.info("Metadata saved to: %s", self.rss_generator.metadata_path)
 
     def validate_rss_feed(self) -> Dict[str, Any]:
         """
@@ -389,27 +228,6 @@ class SpotifyUploader:
         """
         return self.rss_generator.validate_feed()
 
-    def get_episode_analytics(self, episode_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Get analytics for a specific episode.
-
-        Note: This requires special Spotify for Podcasters API access.
-
-        Args:
-            episode_id: Spotify episode ID
-
-        Returns:
-            Dictionary with analytics data (if available)
-        """
-        print("[INFO] Episode analytics require Spotify for Podcasters API access")
-        print("[INFO] Visit https://podcasters.spotify.com for analytics")
-
-        # Placeholder for future analytics integration
-        return {
-            'note': 'Analytics available via Spotify for Podcasters dashboard',
-            'url': f'https://podcasters.spotify.com/pod/show/{self.show_id}/episodes/{episode_id}'
-        }
-
     def generate_podcast_rss_feed(
         self,
         episodes_data: list,
@@ -419,7 +237,7 @@ class SpotifyUploader:
         podcast_email: str,
         podcast_category: str = "Comedy",
         podcast_image_url: Optional[str] = None,
-        podcast_website: Optional[str] = None
+        podcast_website: Optional[str] = None,
     ) -> str:
         """
         Generate a complete RSS feed for the podcast.
@@ -444,7 +262,7 @@ class SpotifyUploader:
     <channel>
         <title>{podcast_title}</title>
         <description>{podcast_description}</description>
-        <link>{podcast_website or ''}</link>
+        <link>{podcast_website or ""}</link>
         <language>en-us</language>
         <copyright>Copyright {datetime.now().year} {podcast_author}</copyright>
         <itunes:author>{podcast_author}</itunes:author>
@@ -462,7 +280,7 @@ class SpotifyUploader:
         <image>
             <url>{podcast_image_url}</url>
             <title>{podcast_title}</title>
-            <link>{podcast_website or ''}</link>
+            <link>{podcast_website or ""}</link>
         </image>"""
 
         rss_header += "\n"
@@ -484,7 +302,7 @@ def create_spotify_episode_data(
     episode_summary: str,
     audio_url: str,
     audio_file_path: str,
-    duration_seconds: int
+    duration_seconds: int,
 ) -> Dict[str, Any]:
     """
     Create episode data for RSS feed generation.
@@ -503,11 +321,11 @@ def create_spotify_episode_data(
     file_size = audio_path.stat().st_size if audio_path.exists() else 0
 
     return {
-        'episode_number': episode_number,
-        'title': f"{Config.PODCAST_NAME} - Episode {episode_number}",
-        'description': episode_summary,
-        'audio_url': audio_url,
-        'audio_file_size': file_size,
-        'duration_seconds': duration_seconds,
-        'pub_date': datetime.now()
+        "episode_number": episode_number,
+        "title": f"{Config.PODCAST_NAME} - Episode {episode_number}",
+        "description": episode_summary,
+        "audio_url": audio_url,
+        "audio_file_size": file_size,
+        "duration_seconds": duration_seconds,
+        "pub_date": datetime.now(),
     }

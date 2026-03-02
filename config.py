@@ -1,113 +1,173 @@
 """Configuration management for podcast automation."""
 
 import os
+import shutil
 from dotenv import load_dotenv
 from pathlib import Path
 
 # Load environment variables
 load_dotenv()
 
+
+def _detect_ffmpeg():
+    """Auto-detect FFmpeg from PATH, fall back to env var or default."""
+    env_path = os.getenv("FFMPEG_PATH")
+    if env_path and os.path.exists(env_path):
+        return env_path
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+    return "C:\\ffmpeg\\bin\\ffmpeg.exe"
+
+
+def _detect_ffprobe():
+    """Auto-detect FFprobe from PATH, fall back to env var or default."""
+    env_path = os.getenv("FFPROBE_PATH")
+    if env_path and os.path.exists(env_path):
+        return env_path
+    found = shutil.which("ffprobe")
+    if found:
+        return found
+    return "C:\\ffmpeg\\bin\\ffprobe.exe"
+
+
 class Config:
     """Central configuration for podcast automation."""
 
     # API Keys
-    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-    ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
     # Dropbox - Short-lived access token (deprecated)
-    DROPBOX_ACCESS_TOKEN = os.getenv('DROPBOX_ACCESS_TOKEN')
+    DROPBOX_ACCESS_TOKEN = os.getenv("DROPBOX_ACCESS_TOKEN")
 
     # Dropbox - OAuth credentials (recommended for auto-refresh)
-    DROPBOX_APP_KEY = os.getenv('DROPBOX_APP_KEY')
-    DROPBOX_APP_SECRET = os.getenv('DROPBOX_APP_SECRET')
-    DROPBOX_REFRESH_TOKEN = os.getenv('DROPBOX_REFRESH_TOKEN')
+    DROPBOX_APP_KEY = os.getenv("DROPBOX_APP_KEY")
+    DROPBOX_APP_SECRET = os.getenv("DROPBOX_APP_SECRET")
+    DROPBOX_REFRESH_TOKEN = os.getenv("DROPBOX_REFRESH_TOKEN")
 
     # Dropbox paths
-    DROPBOX_FOLDER_PATH = os.getenv('DROPBOX_FOLDER_PATH', '/Fake Problems Podcast/new_raw_files')
-    DROPBOX_FINISHED_FOLDER = os.getenv('DROPBOX_FINISHED_FOLDER', '/Fake Problems Podcast/finished_files')
-    DROPBOX_EDITED_FOLDER = os.getenv('DROPBOX_EDITED_FOLDER', '/Fake Problems Podcast/edited_files')
+    DROPBOX_FOLDER_PATH = os.getenv(
+        "DROPBOX_FOLDER_PATH", "/Fake Problems Podcast/new_raw_files"
+    )
+    DROPBOX_FINISHED_FOLDER = os.getenv(
+        "DROPBOX_FINISHED_FOLDER", "/Fake Problems Podcast/finished_files"
+    )
+    DROPBOX_EDITED_FOLDER = os.getenv(
+        "DROPBOX_EDITED_FOLDER", "/Fake Problems Podcast/edited_files"
+    )
 
     # YouTube
-    YOUTUBE_CLIENT_ID = os.getenv('YOUTUBE_CLIENT_ID')
-    YOUTUBE_CLIENT_SECRET = os.getenv('YOUTUBE_CLIENT_SECRET')
+    YOUTUBE_CLIENT_ID = os.getenv("YOUTUBE_CLIENT_ID")
+    YOUTUBE_CLIENT_SECRET = os.getenv("YOUTUBE_CLIENT_SECRET")
 
-    # Spotify
-    SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
-    SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
-    SPOTIFY_SHOW_ID = os.getenv('SPOTIFY_SHOW_ID')
+    # Spotify (RSS-only, no API credentials needed)
 
     # Twitter
-    TWITTER_API_KEY = os.getenv('TWITTER_API_KEY')
-    TWITTER_API_SECRET = os.getenv('TWITTER_API_SECRET')
-    TWITTER_ACCESS_TOKEN = os.getenv('TWITTER_ACCESS_TOKEN')
-    TWITTER_ACCESS_SECRET = os.getenv('TWITTER_ACCESS_SECRET')
+    TWITTER_API_KEY = os.getenv("TWITTER_API_KEY")
+    TWITTER_API_SECRET = os.getenv("TWITTER_API_SECRET")
+    TWITTER_ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
+    TWITTER_ACCESS_SECRET = os.getenv("TWITTER_ACCESS_SECRET")
 
     # Instagram
-    INSTAGRAM_ACCESS_TOKEN = os.getenv('INSTAGRAM_ACCESS_TOKEN')
-    INSTAGRAM_ACCOUNT_ID = os.getenv('INSTAGRAM_ACCOUNT_ID')
+    INSTAGRAM_ACCESS_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
+    INSTAGRAM_ACCOUNT_ID = os.getenv("INSTAGRAM_ACCOUNT_ID")
 
     # TikTok
-    TIKTOK_CLIENT_KEY = os.getenv('TIKTOK_CLIENT_KEY')
-    TIKTOK_CLIENT_SECRET = os.getenv('TIKTOK_CLIENT_SECRET')
-    TIKTOK_ACCESS_TOKEN = os.getenv('TIKTOK_ACCESS_TOKEN')
+    TIKTOK_CLIENT_KEY = os.getenv("TIKTOK_CLIENT_KEY")
+    TIKTOK_CLIENT_SECRET = os.getenv("TIKTOK_CLIENT_SECRET")
+    TIKTOK_ACCESS_TOKEN = os.getenv("TIKTOK_ACCESS_TOKEN")
 
     # Google Docs Topic Tracker
-    GOOGLE_DOC_ID = os.getenv('GOOGLE_DOC_ID')
+    GOOGLE_DOC_ID = os.getenv("GOOGLE_DOC_ID")
 
     # HuggingFace (for pyannote speaker diarization)
-    HF_TOKEN = os.getenv('HF_TOKEN')
+    HF_TOKEN = os.getenv("HF_TOKEN")
 
     # Podcast Settings
-    PODCAST_NAME = os.getenv('PODCAST_NAME', 'Fake Problems Podcast')
-    BEEP_SOUND_PATH = os.getenv('BEEP_SOUND_PATH', './assets/beep.wav')
+    PODCAST_NAME = os.getenv("PODCAST_NAME", "Fake Problems Podcast")
+    BEEP_SOUND_PATH = os.getenv("BEEP_SOUND_PATH", "./assets/beep.wav")
 
-    # FFmpeg path (for Windows compatibility)
-    FFMPEG_PATH = os.getenv('FFMPEG_PATH', 'C:\\ffmpeg\\bin\\ffmpeg.exe')
-    FFPROBE_PATH = os.getenv('FFPROBE_PATH', 'C:\\ffmpeg\\bin\\ffprobe.exe')
+    # FFmpeg path (auto-detected from PATH, env, or default)
+    FFMPEG_PATH = _detect_ffmpeg()
+    FFPROBE_PATH = _detect_ffprobe()
 
     # Content Filtering Rules
     # First names and full names of hosts to censor
     NAMES_TO_REMOVE = [
         # First names
-        'Joey', 'Evan', 'Dom', 'Dominique',
+        "Joey",
+        "Evan",
+        "Dom",
+        "Dominique",
         # Full names (for enhanced detection)
-        'Evan Perez', 'Joey Gross', 'Dominique Karolczak',
+        "Evan Perez",
+        "Joey Gross",
+        "Dominique Karolczak",
         # Common variations
-        'Perez', 'Gross', 'Karolczak'
+        "Perez",
+        "Gross",
+        "Karolczak",
     ]
 
     # Words to censor - use ACTUAL spellings so they match the transcript
     # These are searched directly in the Whisper transcript (case-insensitive)
     WORDS_TO_CENSOR = [
         # Homophobic slurs
-        'fag', 'fags', 'faggot', 'faggots', 'dyke', 'dykes',
-
+        "fag",
+        "fags",
+        "faggot",
+        "faggots",
+        "dyke",
+        "dykes",
         # Racial slurs
-        'nigga', 'niggas', 'nigger', 'niggers',
-        'chink', 'chinks',
-        'spic', 'spics',
-        'wetback', 'wetbacks',
-        'kike', 'kikes',
-        'gook', 'gooks',
-
+        "nigga",
+        "niggas",
+        "nigger",
+        "niggers",
+        "chink",
+        "chinks",
+        "spic",
+        "spics",
+        "wetback",
+        "wetbacks",
+        "kike",
+        "kikes",
+        "gook",
+        "gooks",
         # Ableist slurs
-        'retard', 'retards', 'retarded',
+        "retard",
+        "retards",
+        "retarded",
     ]
 
     # Legacy - kept for backwards compatibility
     SLURS_TO_REMOVE = []
+
+    # Audio Settings
+    MP3_BITRATE = os.getenv("MP3_BITRATE", "192k")
+    WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
+    CLIP_FADE_MS = int(os.getenv("CLIP_FADE_MS", "100"))
+    LUFS_TARGET = float(os.getenv("LUFS_TARGET", "-16"))
 
     # Clip Settings
     CLIP_MIN_DURATION = 15  # seconds
     CLIP_MAX_DURATION = 30  # seconds
     NUM_CLIPS = 3  # Number of clips to generate per episode
 
+    # Video Resolution Settings
+    HORIZONTAL_RESOLUTION = (1280, 720)
+    VERTICAL_RESOLUTION = (720, 1280)
+    SQUARE_RESOLUTION = (720, 720)
+
+    # Ollama Settings
+    OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
     # Working Directories
     BASE_DIR = Path(__file__).parent
-    DOWNLOAD_DIR = BASE_DIR / 'downloads'
-    OUTPUT_DIR = BASE_DIR / 'output'
-    CLIPS_DIR = BASE_DIR / 'clips'
-    ASSETS_DIR = BASE_DIR / 'assets'
+    DOWNLOAD_DIR = BASE_DIR / "downloads"
+    OUTPUT_DIR = BASE_DIR / "output"
+    CLIPS_DIR = BASE_DIR / "clips"
+    ASSETS_DIR = BASE_DIR / "assets"
 
     @classmethod
     def create_directories(cls):
@@ -121,8 +181,7 @@ class Config:
     def validate(cls):
         """Validate that required configuration is present."""
         required = {
-            'OPENAI_API_KEY': cls.OPENAI_API_KEY,
-            'ANTHROPIC_API_KEY': cls.ANTHROPIC_API_KEY,
+            "OPENAI_API_KEY": cls.OPENAI_API_KEY,
         }
 
         missing = [key for key, value in required.items() if not value]

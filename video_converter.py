@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 from typing import Optional, List
 from config import Config
+from logger import logger
 
 
 class VideoConverter:
@@ -16,7 +17,7 @@ class VideoConverter:
         Args:
             logo_path: Path to logo/artwork image (defaults to assets/podcast_logo.jpg)
         """
-        self.logo_path = logo_path or str(Config.ASSETS_DIR / 'podcast_logo.jpg')
+        self.logo_path = logo_path or str(Config.ASSETS_DIR / "podcast_logo.jpg")
 
         # Verify logo exists
         if not Path(self.logo_path).exists():
@@ -32,8 +33,8 @@ class VideoConverter:
         self,
         audio_path: str,
         output_path: Optional[str] = None,
-        format_type: str = 'horizontal',
-        resolution: Optional[tuple] = None
+        format_type: str = "horizontal",
+        resolution: Optional[tuple] = None,
     ) -> Optional[str]:
         """
         Convert audio file to video with static logo image.
@@ -49,46 +50,54 @@ class VideoConverter:
         """
         audio_path = Path(audio_path)
         if not audio_path.exists():
-            print(f"[ERROR] Audio file not found: {audio_path}")
+            logger.error("Audio file not found: %s", audio_path)
             return None
 
         # Determine output path
         if not output_path:
-            output_path = audio_path.with_suffix('.mp4')
+            output_path = audio_path.with_suffix(".mp4")
         output_path = Path(output_path)
 
-        # Determine resolution based on format type
-        # Using 720p for horizontal since it's just a static logo - faster encoding, smaller files
+        # Determine resolution based on format type using Config values
         if resolution:
             width, height = resolution
-        elif format_type == 'horizontal':
-            width, height = 1280, 720  # YouTube (720p is fine for static logo)
-        elif format_type == 'vertical':
-            width, height = 720, 1280  # Reels, TikTok, Shorts (720p vertical)
-        elif format_type == 'square':
-            width, height = 720, 720  # Instagram square
+        elif format_type == "horizontal":
+            width, height = Config.HORIZONTAL_RESOLUTION
+        elif format_type == "vertical":
+            width, height = Config.VERTICAL_RESOLUTION
+        elif format_type == "square":
+            width, height = Config.SQUARE_RESOLUTION
         else:
-            width, height = 1280, 720  # Default to horizontal 720p
+            width, height = Config.HORIZONTAL_RESOLUTION
 
-        print(f"[INFO] Converting audio to {format_type} video ({width}x{height})")
-        print(f"[INFO] Input: {audio_path.name}")
-        print(f"[INFO] Output: {output_path.name}")
+        logger.info("Converting audio to %s video (%dx%d)", format_type, width, height)
+        logger.debug("Input: %s", audio_path.name)
+        logger.debug("Output: %s", output_path.name)
 
         # FFmpeg command to create video from audio + static image
         command = [
             self.ffmpeg_path,
-            '-loop', '1',  # Loop the image
-            '-i', str(self.logo_path),  # Input image
-            '-i', str(audio_path),  # Input audio
-            '-c:v', 'libx264',  # Video codec
-            '-tune', 'stillimage',  # Optimize for still image
-            '-c:a', 'aac',  # Audio codec
-            '-b:a', '192k',  # Audio bitrate
-            '-pix_fmt', 'yuv420p',  # Pixel format (compatible with most players)
-            '-vf', f'scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2',  # Scale and pad
-            '-shortest',  # End when audio ends
-            '-y',  # Overwrite output file
-            str(output_path)
+            "-loop",
+            "1",  # Loop the image
+            "-i",
+            str(self.logo_path),  # Input image
+            "-i",
+            str(audio_path),  # Input audio
+            "-c:v",
+            "libx264",  # Video codec
+            "-tune",
+            "stillimage",  # Optimize for still image
+            "-c:a",
+            "aac",  # Audio codec
+            "-b:a",
+            "192k",  # Audio bitrate
+            "-pix_fmt",
+            "yuv420p",  # Pixel format (compatible with most players)
+            "-vf",
+            f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2",  # Scale and pad
+            "-shortest",  # End when audio ends
+            "-y",  # Overwrite output file
+            str(output_path),
         ]
 
         try:
@@ -97,29 +106,148 @@ class VideoConverter:
                 command,
                 capture_output=True,
                 text=True,
-                timeout=7200  # 2 hour timeout for long episodes
+                timeout=7200,  # 2 hour timeout for long episodes
             )
 
             if result.returncode == 0:
-                print(f"[OK] Video created: {output_path}")
+                logger.info("Video created: %s", output_path)
                 return str(output_path)
             else:
-                print(f"[ERROR] FFmpeg failed:")
-                print(result.stderr)
+                logger.error("FFmpeg failed: %s", result.stderr)
                 return None
 
         except subprocess.TimeoutExpired:
-            print("[ERROR] Video conversion timed out")
+            logger.error("Video conversion timed out")
             return None
         except Exception as e:
-            print(f"[ERROR] Video conversion failed: {e}")
+            logger.error("Video conversion failed: %s", e)
             return None
+
+    def audio_to_video_with_subtitles(
+        self,
+        audio_path: str,
+        srt_path: str,
+        output_path: Optional[str] = None,
+        format_type: str = "vertical",
+        resolution: Optional[tuple] = None,
+    ) -> Optional[str]:
+        """
+        Convert audio file to video with static logo and burned-in subtitles.
+
+        Args:
+            audio_path: Path to audio file
+            srt_path: Path to SRT subtitle file
+            output_path: Path for output video
+            format_type: Video format type
+            resolution: Custom resolution tuple
+
+        Returns:
+            Path to created video file, or None if failed
+        """
+        audio_path = Path(audio_path)
+        srt_path = Path(srt_path)
+
+        if not audio_path.exists():
+            logger.error("Audio file not found: %s", audio_path)
+            return None
+        if not srt_path.exists():
+            logger.warning(
+                "SRT file not found: %s, falling back to no subtitles", srt_path
+            )
+            return self.audio_to_video(
+                str(audio_path), output_path, format_type, resolution
+            )
+
+        if not output_path:
+            output_path = audio_path.with_suffix(".mp4")
+        output_path = Path(output_path)
+
+        if resolution:
+            width, height = resolution
+        elif format_type == "horizontal":
+            width, height = Config.HORIZONTAL_RESOLUTION
+        elif format_type == "vertical":
+            width, height = Config.VERTICAL_RESOLUTION
+        elif format_type == "square":
+            width, height = Config.SQUARE_RESOLUTION
+        else:
+            width, height = Config.HORIZONTAL_RESOLUTION
+
+        logger.info(
+            "Converting audio to %s video with subtitles (%dx%d)",
+            format_type,
+            width,
+            height,
+        )
+
+        # Handle Windows path escaping for FFmpeg subtitle filter
+        srt_str = str(srt_path).replace("\\", "/").replace(":", "\\:")
+
+        # Build video filter with scale, pad, and subtitle burn-in
+        subtitle_style = "FontSize=24,FontName=Arial,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Outline=2,Alignment=2"
+        vf_filter = (
+            f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,"
+            f"subtitles='{srt_str}':force_style='{subtitle_style}'"
+        )
+
+        command = [
+            self.ffmpeg_path,
+            "-loop",
+            "1",
+            "-i",
+            str(self.logo_path),
+            "-i",
+            str(audio_path),
+            "-c:v",
+            "libx264",
+            "-tune",
+            "stillimage",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-pix_fmt",
+            "yuv420p",
+            "-vf",
+            vf_filter,
+            "-shortest",
+            "-y",
+            str(output_path),
+        ]
+
+        try:
+            result = subprocess.run(
+                command, capture_output=True, text=True, timeout=7200
+            )
+
+            if result.returncode == 0:
+                logger.info("Video with subtitles created: %s", output_path)
+                return str(output_path)
+            else:
+                logger.warning(
+                    "Subtitle burn failed, falling back to no subtitles: %s",
+                    result.stderr[:200],
+                )
+                return self.audio_to_video(
+                    str(audio_path), str(output_path), format_type, resolution
+                )
+
+        except subprocess.TimeoutExpired:
+            logger.error("Video conversion with subtitles timed out")
+            return None
+        except Exception as e:
+            logger.warning("Subtitle video conversion failed, falling back: %s", e)
+            return self.audio_to_video(
+                str(audio_path), str(output_path), format_type, resolution
+            )
 
     def convert_clips_to_videos(
         self,
         clip_paths: List[str],
-        format_type: str = 'vertical',
-        output_dir: Optional[str] = None
+        format_type: str = "vertical",
+        output_dir: Optional[str] = None,
+        srt_paths: Optional[List[Optional[str]]] = None,
     ) -> List[str]:
         """
         Convert multiple audio clips to videos.
@@ -128,39 +256,53 @@ class VideoConverter:
             clip_paths: List of paths to audio clips
             format_type: 'horizontal', 'vertical', or 'square'
             output_dir: Directory for output videos (defaults to same as clips)
+            srt_paths: Optional list of SRT file paths (one per clip, None for no subtitles)
 
         Returns:
             List of paths to created video files
         """
         video_paths = []
 
-        for clip_path in clip_paths:
+        for i, clip_path in enumerate(clip_paths):
             clip_path = Path(clip_path)
 
             # Determine output path
             if output_dir:
-                output_path = Path(output_dir) / clip_path.with_suffix('.mp4').name
+                output_path = Path(output_dir) / clip_path.with_suffix(".mp4").name
             else:
-                output_path = clip_path.with_suffix('.mp4')
+                output_path = clip_path.with_suffix(".mp4")
 
-            # Convert to video
-            video_path = self.audio_to_video(
-                audio_path=str(clip_path),
-                output_path=str(output_path),
-                format_type=format_type
-            )
+            # Check if we have subtitles for this clip
+            srt_path = None
+            if srt_paths and i < len(srt_paths):
+                srt_path = srt_paths[i]
+
+            # Convert to video (with or without subtitles)
+            if srt_path:
+                video_path = self.audio_to_video_with_subtitles(
+                    audio_path=str(clip_path),
+                    srt_path=srt_path,
+                    output_path=str(output_path),
+                    format_type=format_type,
+                )
+            else:
+                video_path = self.audio_to_video(
+                    audio_path=str(clip_path),
+                    output_path=str(output_path),
+                    format_type=format_type,
+                )
 
             if video_path:
                 video_paths.append(video_path)
 
-        print(f"\n[OK] Created {len(video_paths)}/{len(clip_paths)} videos")
+        logger.info("Created %d/%d videos", len(video_paths), len(clip_paths))
         return video_paths
 
     def create_episode_video(
         self,
         audio_path: str,
         output_path: Optional[str] = None,
-        format_type: str = 'horizontal'
+        format_type: str = "horizontal",
     ) -> Optional[str]:
         """
         Create a video for a full episode.
@@ -173,13 +315,11 @@ class VideoConverter:
         Returns:
             Path to created video file, or None if failed
         """
-        print("\n[INFO] Creating full episode video...")
-        print("[INFO] This may take a few minutes for long episodes...")
+        logger.info("Creating full episode video...")
+        logger.info("This may take a few minutes for long episodes...")
 
         return self.audio_to_video(
-            audio_path=audio_path,
-            output_path=output_path,
-            format_type=format_type
+            audio_path=audio_path, output_path=output_path, format_type=format_type
         )
 
 
@@ -196,18 +336,16 @@ def get_video_duration(video_path: str) -> Optional[float]:
     try:
         command = [
             Config.FFPROBE_PATH,
-            '-v', 'error',
-            '-show_entries', 'format=duration',
-            '-of', 'default=noprint_wrappers=1:nokey=1',
-            str(video_path)
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            str(video_path),
         ]
 
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
+        result = subprocess.run(command, capture_output=True, text=True, timeout=10)
 
         if result.returncode == 0:
             return float(result.stdout.strip())

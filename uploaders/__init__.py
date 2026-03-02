@@ -7,14 +7,14 @@ from .twitter_uploader import TwitterUploader, create_twitter_caption
 from .spotify_uploader import SpotifyUploader, create_spotify_episode_data
 
 __all__ = [
-    'YouTubeUploader',
-    'InstagramUploader',
-    'TikTokUploader',
-    'TwitterUploader',
-    'SpotifyUploader',
-    'create_episode_metadata',
-    'create_instagram_caption',
-    'create_tiktok_caption',
-    'create_twitter_caption',
-    'create_spotify_episode_data',
+    "YouTubeUploader",
+    "InstagramUploader",
+    "TikTokUploader",
+    "TwitterUploader",
+    "SpotifyUploader",
+    "create_episode_metadata",
+    "create_instagram_caption",
+    "create_tiktok_caption",
+    "create_twitter_caption",
+    "create_spotify_episode_data",
 ]

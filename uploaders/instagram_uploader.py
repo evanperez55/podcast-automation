@@ -2,10 +2,11 @@
 
 import time
 import requests
-from pathlib import Path
 from typing import Optional, Dict, Any
 
 from config import Config
+from logger import logger
+from retry_utils import retry_with_backoff
 
 
 class InstagramUploader:
@@ -19,7 +20,10 @@ class InstagramUploader:
         self.access_token = Config.INSTAGRAM_ACCESS_TOKEN
         self.account_id = Config.INSTAGRAM_ACCOUNT_ID
 
-        if not self.access_token or self.access_token == 'your_instagram_access_token_here':
+        if (
+            not self.access_token
+            or self.access_token == "your_instagram_access_token_here"
+        ):
             raise ValueError(
                 "Instagram access token not configured in .env file.\n"
                 "Please follow the setup instructions:\n"
@@ -29,7 +33,7 @@ class InstagramUploader:
                 "4. Add INSTAGRAM_ACCESS_TOKEN and INSTAGRAM_ACCOUNT_ID to .env"
             )
 
-        if not self.account_id or self.account_id == 'your_instagram_account_id_here':
+        if not self.account_id or self.account_id == "your_instagram_account_id_here":
             raise ValueError(
                 "Instagram account ID not configured in .env file.\n"
                 "Add INSTAGRAM_ACCOUNT_ID to .env"
@@ -40,7 +44,7 @@ class InstagramUploader:
         video_url: str,
         caption: str,
         share_to_feed: bool = True,
-        cover_url: Optional[str] = None
+        cover_url: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Upload a video as an Instagram Reel.
@@ -64,44 +68,54 @@ class InstagramUploader:
         Returns:
             Dictionary with Reel ID and permalink, or None if upload failed
         """
-        print(f"[INFO] Uploading Reel to Instagram")
-        print(f"[INFO] Caption: {caption[:80]}...")
+        logger.info("Uploading Reel to Instagram")
+        logger.info("Caption: %s...", caption[:80])
 
         # Step 1: Create Reel container
         container_id = self._create_reel_container(
             video_url=video_url,
             caption=caption,
             share_to_feed=share_to_feed,
-            cover_url=cover_url
+            cover_url=cover_url,
         )
 
         if not container_id:
-            print("[ERROR] Failed to create Reel container")
+            logger.error("Failed to create Reel container")
             return None
 
         # Step 2: Wait for video to be processed
-        print("[INFO] Waiting for Instagram to process the video...")
+        logger.info("Waiting for Instagram to process the video...")
         if not self._wait_for_container_ready(container_id):
-            print("[ERROR] Video processing failed or timed out")
+            logger.error("Video processing failed or timed out")
             return None
 
         # Step 3: Publish the Reel
         result = self._publish_reel(container_id)
 
         if result:
-            print(f"[OK] Reel uploaded successfully!")
-            print(f"[OK] Reel ID: {result['id']}")
-            if result.get('permalink'):
-                print(f"[OK] Reel URL: {result['permalink']}")
+            logger.info("Reel uploaded successfully!")
+            logger.info("Reel ID: %s", result["id"])
+            if result.get("permalink"):
+                logger.info("Reel URL: %s", result["permalink"])
 
         return result
 
+    @retry_with_backoff(
+        max_retries=3,
+        base_delay=2.0,
+        retryable_exceptions=(
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+            ConnectionError,
+            TimeoutError,
+        ),
+    )
     def _create_reel_container(
         self,
         video_url: str,
         caption: str,
         share_to_feed: bool,
-        cover_url: Optional[str]
+        cover_url: Optional[str],
     ) -> Optional[str]:
         """
         Create a Reel media container.
@@ -118,36 +132,33 @@ class InstagramUploader:
         endpoint = f"{self.API_BASE}/{self.account_id}/media"
 
         params = {
-            'media_type': 'REELS',
-            'video_url': video_url,
-            'caption': caption[:2200],  # Instagram max caption length
-            'share_to_feed': share_to_feed,
-            'access_token': self.access_token
+            "media_type": "REELS",
+            "video_url": video_url,
+            "caption": caption[:2200],  # Instagram max caption length
+            "share_to_feed": share_to_feed,
+            "access_token": self.access_token,
         }
 
         if cover_url:
-            params['cover_url'] = cover_url
+            params["cover_url"] = cover_url
 
         try:
             response = requests.post(endpoint, params=params)
             response.raise_for_status()
             data = response.json()
 
-            container_id = data.get('id')
-            print(f"[OK] Reel container created: {container_id}")
+            container_id = data.get("id")
+            logger.info("Reel container created: %s", container_id)
             return container_id
 
-        except requests.exceptions.RequestException as e:
-            print(f"[ERROR] Failed to create Reel container: {e}")
-            if hasattr(e, 'response') and e.response is not None:
-                print(f"[ERROR] Response: {e.response.text}")
+        except requests.exceptions.HTTPError as e:
+            logger.error("Failed to create Reel container: %s", e)
+            if hasattr(e, "response") and e.response is not None:
+                logger.error("Response: %s", e.response.text)
             return None
 
     def _wait_for_container_ready(
-        self,
-        container_id: str,
-        max_wait: int = 300,
-        check_interval: int = 5
+        self, container_id: str, max_wait: int = 300, check_interval: int = 5
     ) -> bool:
         """
         Wait for Instagram to process the video container.
@@ -161,42 +172,53 @@ class InstagramUploader:
             True if ready, False if failed or timed out
         """
         endpoint = f"{self.API_BASE}/{container_id}"
-        params = {
-            'fields': 'status_code,status',
-            'access_token': self.access_token
-        }
+        params = {"fields": "status_code,status", "access_token": self.access_token}
 
         elapsed = 0
+        current_interval = 3  # Start at 3s, grow with backoff
         while elapsed < max_wait:
             try:
                 response = requests.get(endpoint, params=params)
                 response.raise_for_status()
                 data = response.json()
 
-                status_code = data.get('status_code')
-                status = data.get('status', 'UNKNOWN')
+                status_code = data.get("status_code")
+                status = data.get("status", "UNKNOWN")
 
-                if status_code == 'FINISHED':
-                    print("[OK] Video processing complete")
+                if status_code == "FINISHED":
+                    logger.info("Video processing complete")
                     return True
-                elif status_code == 'ERROR':
-                    print(f"[ERROR] Video processing failed: {status}")
+                elif status_code == "ERROR":
+                    logger.error("Video processing failed: %s", status)
                     return False
-                elif status_code == 'IN_PROGRESS':
-                    print(f"[INFO] Processing... ({elapsed}s elapsed)")
+                elif status_code == "IN_PROGRESS":
+                    logger.info("Processing... (%ss elapsed)", elapsed)
                 else:
-                    print(f"[INFO] Status: {status_code} ({elapsed}s elapsed)")
+                    logger.info("Status: %s (%ss elapsed)", status_code, elapsed)
 
-                time.sleep(check_interval)
-                elapsed += check_interval
+                time.sleep(current_interval)
+                elapsed += current_interval
+                current_interval = min(
+                    current_interval * 1.5, 30
+                )  # Exponential backoff, cap 30s
 
             except requests.exceptions.RequestException as e:
-                print(f"[ERROR] Failed to check status: {e}")
+                logger.error("Failed to check status: %s", e)
                 return False
 
-        print(f"[ERROR] Processing timed out after {max_wait}s")
+        logger.error("Processing timed out after %ss", max_wait)
         return False
 
+    @retry_with_backoff(
+        max_retries=3,
+        base_delay=2.0,
+        retryable_exceptions=(
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+            ConnectionError,
+            TimeoutError,
+        ),
+    )
     def _publish_reel(self, container_id: str) -> Optional[Dict[str, Any]]:
         """
         Publish a processed Reel container.
@@ -208,31 +230,24 @@ class InstagramUploader:
             Dictionary with Reel ID and permalink, or None if failed
         """
         endpoint = f"{self.API_BASE}/{self.account_id}/media_publish"
-        params = {
-            'creation_id': container_id,
-            'access_token': self.access_token
-        }
+        params = {"creation_id": container_id, "access_token": self.access_token}
 
         try:
             response = requests.post(endpoint, params=params)
             response.raise_for_status()
             data = response.json()
 
-            reel_id = data.get('id')
+            reel_id = data.get("id")
 
             # Get permalink
             permalink = self._get_media_permalink(reel_id)
 
-            return {
-                'id': reel_id,
-                'permalink': permalink,
-                'status': 'success'
-            }
+            return {"id": reel_id, "permalink": permalink, "status": "success"}
 
-        except requests.exceptions.RequestException as e:
-            print(f"[ERROR] Failed to publish Reel: {e}")
-            if hasattr(e, 'response') and e.response is not None:
-                print(f"[ERROR] Response: {e.response.text}")
+        except requests.exceptions.HTTPError as e:
+            logger.error("Failed to publish Reel: %s", e)
+            if hasattr(e, "response") and e.response is not None:
+                logger.error("Response: %s", e.response.text)
             return None
 
     def _get_media_permalink(self, media_id: str) -> Optional[str]:
@@ -246,25 +261,19 @@ class InstagramUploader:
             Permalink URL if successful, None otherwise
         """
         endpoint = f"{self.API_BASE}/{media_id}"
-        params = {
-            'fields': 'permalink',
-            'access_token': self.access_token
-        }
+        params = {"fields": "permalink", "access_token": self.access_token}
 
         try:
             response = requests.get(endpoint, params=params)
             response.raise_for_status()
             data = response.json()
-            return data.get('permalink')
+            return data.get("permalink")
 
         except requests.exceptions.RequestException:
             return None
 
     def upload_reel_from_dropbox(
-        self,
-        dropbox_path: str,
-        caption: str,
-        share_to_feed: bool = True
+        self, dropbox_path: str, caption: str, share_to_feed: bool = True
     ) -> Optional[Dict[str, Any]]:
         """
         Upload a Reel using a Dropbox shared link.
@@ -281,10 +290,10 @@ class InstagramUploader:
         """
         # Note: This requires Dropbox handler integration
         # For now, this is a placeholder that expects a direct link
-        print("[INFO] To upload from Dropbox, you need to:")
-        print("1. Get a public shared link for the video")
-        print("2. Replace 'dl=0' with 'dl=1' in the URL")
-        print("3. Use upload_reel() with that URL")
+        logger.info("To upload from Dropbox, you need to:")
+        logger.info("1. Get a public shared link for the video")
+        logger.info("2. Replace 'dl=0' with 'dl=1' in the URL")
+        logger.info("3. Use upload_reel() with that URL")
 
         return None
 
@@ -297,8 +306,8 @@ class InstagramUploader:
         """
         endpoint = f"{self.API_BASE}/{self.account_id}"
         params = {
-            'fields': 'id,username,name,profile_picture_url,followers_count,media_count',
-            'access_token': self.access_token
+            "fields": "id,username,name,profile_picture_url,followers_count,media_count",
+            "access_token": self.access_token,
         }
 
         try:
@@ -307,7 +316,7 @@ class InstagramUploader:
             return response.json()
 
         except requests.exceptions.RequestException as e:
-            print(f"[ERROR] Failed to get account info: {e}")
+            logger.error("Failed to get account info: %s", e)
             return None
 
 
@@ -315,7 +324,7 @@ def create_instagram_caption(
     episode_number: int,
     clip_title: str,
     social_caption: str,
-    hashtags: Optional[list] = None
+    hashtags: Optional[list] = None,
 ) -> str:
     """
     Create an Instagram Reel caption.
@@ -336,17 +345,17 @@ def create_instagram_caption(
     # Default hashtags if none provided
     if not hashtags:
         hashtags = [
-            'podcast',
-            'comedy',
-            'funny',
-            'podcastclips',
-            'fakeproblems',
-            'humor',
-            'reels',
-            'podcastrecommendations'
+            "podcast",
+            "comedy",
+            "funny",
+            "podcastclips",
+            "fakeproblems",
+            "humor",
+            "reels",
+            "podcastrecommendations",
         ]
 
     # Add hashtags
-    caption += ' '.join(f'#{tag}' for tag in hashtags)
+    caption += " ".join(f"#{tag}" for tag in hashtags)
 
     return caption[:2200]  # Instagram max caption length

@@ -1,7 +1,6 @@
 """RSS feed generator for podcast distribution."""
 
 import xml.etree.ElementTree as ET
-from xml.dom import minidom
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any, Optional
@@ -9,11 +8,12 @@ import json
 import re
 
 from config import Config
+from logger import logger
 
 # Register namespaces to preserve prefixes during parsing/writing
-ET.register_namespace('itunes', 'http://www.itunes.com/dtds/podcast-1.0.dtd')
-ET.register_namespace('content', 'http://purl.org/rss/1.0/modules/content/')
-ET.register_namespace('atom', 'http://www.w3.org/2005/Atom')
+ET.register_namespace("itunes", "http://www.itunes.com/dtds/podcast-1.0.dtd")
+ET.register_namespace("content", "http://purl.org/rss/1.0/modules/content/")
+ET.register_namespace("atom", "http://www.w3.org/2005/Atom")
 
 
 class RSSFeedGenerator:
@@ -29,9 +29,9 @@ class RSSFeedGenerator:
         if feed_path:
             self.feed_path = Path(feed_path)
         else:
-            self.feed_path = Config.OUTPUT_DIR / 'podcast_feed.xml'
+            self.feed_path = Config.OUTPUT_DIR / "podcast_feed.xml"
 
-        self.metadata_path = Config.OUTPUT_DIR / 'podcast_metadata.json'
+        self.metadata_path = Config.OUTPUT_DIR / "podcast_metadata.json"
 
     def create_feed(
         self,
@@ -43,7 +43,7 @@ class RSSFeedGenerator:
         categories: List[str],
         language: str = "en-us",
         artwork_url: Optional[str] = None,
-        explicit: bool = False
+        explicit: bool = False,
     ) -> ET.Element:
         """
         Create new RSS feed structure.
@@ -63,44 +63,49 @@ class RSSFeedGenerator:
             RSS feed root element
         """
         # Create RSS root
-        rss = ET.Element('rss', {
-            'version': '2.0',
-            'xmlns:itunes': 'http://www.itunes.com/dtds/podcast-1.0.dtd',
-            'xmlns:content': 'http://purl.org/rss/1.0/modules/content/',
-            'xmlns:atom': 'http://www.w3.org/2005/Atom'
-        })
+        rss = ET.Element(
+            "rss",
+            {
+                "version": "2.0",
+                "xmlns:itunes": "http://www.itunes.com/dtds/podcast-1.0.dtd",
+                "xmlns:content": "http://purl.org/rss/1.0/modules/content/",
+                "xmlns:atom": "http://www.w3.org/2005/Atom",
+            },
+        )
 
         # Create channel
-        channel = ET.SubElement(rss, 'channel')
+        channel = ET.SubElement(rss, "channel")
 
         # Basic metadata
-        ET.SubElement(channel, 'title').text = title
-        ET.SubElement(channel, 'description').text = description
-        ET.SubElement(channel, 'link').text = website_url
-        ET.SubElement(channel, 'language').text = language
-        ET.SubElement(channel, 'copyright').text = f"Copyright {datetime.now().year} {author}"
+        ET.SubElement(channel, "title").text = title
+        ET.SubElement(channel, "description").text = description
+        ET.SubElement(channel, "link").text = website_url
+        ET.SubElement(channel, "language").text = language
+        ET.SubElement(
+            channel, "copyright"
+        ).text = f"Copyright {datetime.now().year} {author}"
 
         # iTunes-specific tags
-        ET.SubElement(channel, 'itunes:author').text = author
-        ET.SubElement(channel, 'itunes:summary').text = description
-        ET.SubElement(channel, 'itunes:explicit').text = 'yes' if explicit else 'no'
+        ET.SubElement(channel, "itunes:author").text = author
+        ET.SubElement(channel, "itunes:summary").text = description
+        ET.SubElement(channel, "itunes:explicit").text = "yes" if explicit else "no"
 
         # Owner
-        owner = ET.SubElement(channel, 'itunes:owner')
-        ET.SubElement(owner, 'itunes:name').text = author
-        ET.SubElement(owner, 'itunes:email').text = email
+        owner = ET.SubElement(channel, "itunes:owner")
+        ET.SubElement(owner, "itunes:name").text = author
+        ET.SubElement(owner, "itunes:email").text = email
 
         # Artwork
         if artwork_url:
-            ET.SubElement(channel, 'itunes:image', {'href': artwork_url})
-            image = ET.SubElement(channel, 'image')
-            ET.SubElement(image, 'url').text = artwork_url
-            ET.SubElement(image, 'title').text = title
-            ET.SubElement(image, 'link').text = website_url
+            ET.SubElement(channel, "itunes:image", {"href": artwork_url})
+            image = ET.SubElement(channel, "image")
+            ET.SubElement(image, "url").text = artwork_url
+            ET.SubElement(image, "title").text = title
+            ET.SubElement(image, "link").text = website_url
 
         # Categories
         for category in categories:
-            ET.SubElement(channel, 'itunes:category', {'text': category})
+            ET.SubElement(channel, "itunes:category", {"text": category})
 
         return rss
 
@@ -117,7 +122,7 @@ class RSSFeedGenerator:
         episode_type: str = "full",
         season_number: Optional[int] = None,
         explicit: bool = False,
-        keywords: Optional[List[str]] = None
+        keywords: Optional[List[str]] = None,
     ) -> ET.Element:
         """
         Add episode to RSS feed.
@@ -139,22 +144,22 @@ class RSSFeedGenerator:
         Returns:
             Created item element
         """
-        channel = rss.find('channel')
+        channel = rss.find("channel")
 
         # Create item (episode)
-        item = ET.SubElement(channel, 'item')
+        item = ET.SubElement(channel, "item")
 
         # Basic metadata
-        ET.SubElement(item, 'title').text = title
-        ET.SubElement(item, 'description').text = description
-        ET.SubElement(item, 'itunes:summary').text = description
+        ET.SubElement(item, "title").text = title
+        ET.SubElement(item, "description").text = description
+        ET.SubElement(item, "itunes:summary").text = description
 
         # Episode details
-        ET.SubElement(item, 'itunes:episode').text = str(episode_number)
+        ET.SubElement(item, "itunes:episode").text = str(episode_number)
         if season_number:
-            ET.SubElement(item, 'itunes:season').text = str(season_number)
-        ET.SubElement(item, 'itunes:episodeType').text = episode_type
-        ET.SubElement(item, 'itunes:explicit').text = 'yes' if explicit else 'no'
+            ET.SubElement(item, "itunes:season").text = str(season_number)
+        ET.SubElement(item, "itunes:episodeType").text = episode_type
+        ET.SubElement(item, "itunes:explicit").text = "yes" if explicit else "no"
 
         # Duration (format: HH:MM:SS or MM:SS)
         hours = duration_seconds // 3600
@@ -164,29 +169,29 @@ class RSSFeedGenerator:
             duration_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
         else:
             duration_str = f"{minutes:02d}:{seconds:02d}"
-        ET.SubElement(item, 'itunes:duration').text = duration_str
+        ET.SubElement(item, "itunes:duration").text = duration_str
 
         # Audio enclosure
-        ET.SubElement(item, 'enclosure', {
-            'url': audio_url,
-            'length': str(audio_file_size),
-            'type': 'audio/mpeg'
-        })
+        ET.SubElement(
+            item,
+            "enclosure",
+            {"url": audio_url, "length": str(audio_file_size), "type": "audio/mpeg"},
+        )
 
         # Publication date (RFC 822 format)
-        pub_date_str = pub_date.strftime('%a, %d %b %Y %H:%M:%S %z')
-        if not pub_date_str.endswith(('+0000', '-0000')):
+        pub_date_str = pub_date.strftime("%a, %d %b %Y %H:%M:%S %z")
+        if not pub_date_str.endswith(("+0000", "-0000")):
             # Add timezone if not present
-            pub_date_str = pub_date.strftime('%a, %d %b %Y %H:%M:%S +0000')
-        ET.SubElement(item, 'pubDate').text = pub_date_str
+            pub_date_str = pub_date.strftime("%a, %d %b %Y %H:%M:%S +0000")
+        ET.SubElement(item, "pubDate").text = pub_date_str
 
         # GUID (unique identifier)
         guid = f"episode-{episode_number}"
-        ET.SubElement(item, 'guid', {'isPermaLink': 'false'}).text = guid
+        ET.SubElement(item, "guid", {"isPermaLink": "false"}).text = guid
 
         # Keywords
         if keywords:
-            ET.SubElement(item, 'itunes:keywords').text = ', '.join(keywords)
+            ET.SubElement(item, "itunes:keywords").text = ", ".join(keywords)
 
         return item
 
@@ -202,7 +207,7 @@ class RSSFeedGenerator:
             output_path = self.feed_path
 
         # Convert to string - use unicode string first
-        rough_string = ET.tostring(rss, encoding='unicode')
+        rough_string = ET.tostring(rss, encoding="unicode")
 
         # Add XML declaration manually
         xml_declaration = '<?xml version="1.0" encoding="utf-8"?>\n'
@@ -210,14 +215,14 @@ class RSSFeedGenerator:
         # Simple pretty printing without minidom (avoids namespace issues)
         # Add newlines after tags for readability
         pretty_xml = rough_string
-        pretty_xml = re.sub(r'><', '>\n<', pretty_xml)
+        pretty_xml = re.sub(r"><", ">\n<", pretty_xml)
 
         # Write to file
-        with open(output_path, 'w', encoding='utf-8') as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             f.write(xml_declaration)
             f.write(pretty_xml)
 
-        print(f"[OK] RSS feed saved to: {output_path}")
+        logger.info("RSS feed saved to: %s", output_path)
 
     def load_feed(self, feed_path: Optional[Path] = None) -> Optional[ET.Element]:
         """
@@ -239,9 +244,7 @@ class RSSFeedGenerator:
         return tree.getroot()
 
     def update_or_create_feed(
-        self,
-        episode_data: Dict[str, Any],
-        podcast_metadata: Dict[str, Any]
+        self, episode_data: Dict[str, Any], podcast_metadata: Dict[str, Any]
     ) -> ET.Element:
         """
         Update existing feed or create new one with episode.
@@ -257,53 +260,57 @@ class RSSFeedGenerator:
         rss = self.load_feed()
 
         if rss is None:
-            print("[INFO] Creating new RSS feed...")
+            logger.info("Creating new RSS feed...")
             rss = self.create_feed(
-                title=podcast_metadata.get('title', 'My Podcast'),
-                description=podcast_metadata.get('description', ''),
-                website_url=podcast_metadata.get('website_url', ''),
-                author=podcast_metadata.get('author', ''),
-                email=podcast_metadata.get('email', ''),
-                categories=podcast_metadata.get('categories', ['Comedy']),
-                language=podcast_metadata.get('language', 'en-us'),
-                artwork_url=podcast_metadata.get('artwork_url'),
-                explicit=podcast_metadata.get('explicit', False)
+                title=podcast_metadata.get("title", "My Podcast"),
+                description=podcast_metadata.get("description", ""),
+                website_url=podcast_metadata.get("website_url", ""),
+                author=podcast_metadata.get("author", ""),
+                email=podcast_metadata.get("email", ""),
+                categories=podcast_metadata.get("categories", ["Comedy"]),
+                language=podcast_metadata.get("language", "en-us"),
+                artwork_url=podcast_metadata.get("artwork_url"),
+                explicit=podcast_metadata.get("explicit", False),
             )
-            print("[OK] New RSS feed created")
+            logger.info("New RSS feed created")
         else:
-            print("[INFO] Updating existing RSS feed...")
+            logger.info("Updating existing RSS feed...")
 
         # Check if episode already exists
-        channel = rss.find('channel')
+        channel = rss.find("channel")
         existing_episodes = {}
-        for item in channel.findall('item'):
-            ep_num_elem = item.find('.//{http://www.itunes.com/dtds/podcast-1.0.dtd}episode')
+        for item in channel.findall("item"):
+            ep_num_elem = item.find(
+                ".//{http://www.itunes.com/dtds/podcast-1.0.dtd}episode"
+            )
             if ep_num_elem is not None:
                 existing_episodes[int(ep_num_elem.text)] = item
 
-        episode_number = episode_data.get('episode_number')
+        episode_number = episode_data.get("episode_number")
 
         # Remove existing episode if present (we'll re-add with updated info)
         if episode_number in existing_episodes:
-            print(f"[INFO] Updating existing Episode {episode_number}")
+            logger.info("Updating existing Episode %s", episode_number)
             channel.remove(existing_episodes[episode_number])
         else:
-            print(f"[INFO] Adding new Episode {episode_number}")
+            logger.info("Adding new Episode %s", episode_number)
 
         # Add episode
         self.add_episode(
             rss=rss,
             episode_number=episode_number,
-            title=episode_data.get('title', f"Episode #{episode_number}"),
-            description=episode_data.get('description', ''),
-            audio_url=episode_data.get('audio_url'),
-            audio_file_size=episode_data.get('audio_file_size'),
-            duration_seconds=episode_data.get('duration_seconds'),
-            pub_date=episode_data.get('pub_date', datetime.now()),
-            episode_type=episode_data.get('episode_type', 'full'),
-            season_number=episode_data.get('season_number'),
-            explicit=episode_data.get('explicit', podcast_metadata.get('explicit', False)),
-            keywords=episode_data.get('keywords')
+            title=episode_data.get("title", f"Episode #{episode_number}"),
+            description=episode_data.get("description", ""),
+            audio_url=episode_data.get("audio_url"),
+            audio_file_size=episode_data.get("audio_file_size"),
+            duration_seconds=episode_data.get("duration_seconds"),
+            pub_date=episode_data.get("pub_date", datetime.now()),
+            episode_type=episode_data.get("episode_type", "full"),
+            season_number=episode_data.get("season_number"),
+            explicit=episode_data.get(
+                "explicit", podcast_metadata.get("explicit", False)
+            ),
+            keywords=episode_data.get("keywords"),
         )
 
         return rss
@@ -315,9 +322,9 @@ class RSSFeedGenerator:
         Args:
             metadata: Podcast metadata dictionary
         """
-        with open(self.metadata_path, 'w', encoding='utf-8') as f:
+        with open(self.metadata_path, "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)
-        print(f"[OK] Podcast metadata saved to: {self.metadata_path}")
+        logger.info("Podcast metadata saved to: %s", self.metadata_path)
 
     def load_podcast_metadata(self) -> Dict[str, Any]:
         """
@@ -329,7 +336,7 @@ class RSSFeedGenerator:
         if not self.metadata_path.exists():
             return {}
 
-        with open(self.metadata_path, 'r', encoding='utf-8') as f:
+        with open(self.metadata_path, "r", encoding="utf-8") as f:
             return json.load(f)
 
     def get_episode_count(self, feed_path: Optional[Path] = None) -> int:
@@ -346,12 +353,15 @@ class RSSFeedGenerator:
         if rss is None:
             return 0
 
-        channel = rss.find('channel')
-        return len(channel.findall('item'))
+        channel = rss.find("channel")
+        return len(channel.findall("item"))
 
     def validate_feed(self, feed_path: Optional[Path] = None) -> Dict[str, Any]:
         """
         Validate RSS feed and return validation results.
+
+        Checks XML well-formedness, required elements, episode-level
+        requirements, and sorts episodes by pubDate (newest first).
 
         Args:
             feed_path: Path to RSS feed file (defaults to self.feed_path)
@@ -363,42 +373,117 @@ class RSSFeedGenerator:
             feed_path = self.feed_path
 
         if not feed_path.exists():
-            return {
-                'valid': False,
-                'error': 'Feed file does not exist',
-                'warnings': []
-            }
+            return {"valid": False, "error": "Feed file does not exist", "warnings": []}
 
         warnings = []
-        rss = self.load_feed(feed_path)
-        channel = rss.find('channel')
+        errors = []
 
-        # Check required elements
-        required = ['title', 'description', 'link']
+        # XML well-formedness check
+        try:
+            tree = ET.parse(feed_path)
+            rss = tree.getroot()
+        except ET.ParseError as e:
+            return {
+                "valid": False,
+                "error": f"XML is not well-formed: {e}",
+                "warnings": [],
+            }
+
+        channel = rss.find("channel")
+        if channel is None:
+            return {
+                "valid": False,
+                "error": "Missing <channel> element",
+                "warnings": [],
+            }
+
+        # Check required channel elements
+        required = ["title", "description", "link"]
         for elem in required:
             if channel.find(elem) is None:
-                warnings.append(f"Missing required element: {elem}")
+                errors.append(f"Missing required element: {elem}")
 
         # Check iTunes required elements
         itunes_required = [
-            '{http://www.itunes.com/dtds/podcast-1.0.dtd}author',
-            '{http://www.itunes.com/dtds/podcast-1.0.dtd}image'
+            "{http://www.itunes.com/dtds/podcast-1.0.dtd}author",
+            "{http://www.itunes.com/dtds/podcast-1.0.dtd}image",
         ]
         for elem in itunes_required:
             if channel.find(elem) is None:
                 warnings.append(f"Missing iTunes element: {elem}")
 
         # Check episodes
-        items = channel.findall('item')
+        items = channel.findall("item")
         if len(items) == 0:
             warnings.append("No episodes in feed")
 
+        # Validate each episode
+        for i, item in enumerate(items):
+            title_elem = item.find("title")
+            ep_label = title_elem.text if title_elem is not None else f"Item {i + 1}"
+
+            # Enclosure is required for podcast episodes
+            enclosure = item.find("enclosure")
+            if enclosure is None:
+                errors.append(f"Episode '{ep_label}': missing <enclosure> element")
+            else:
+                if not enclosure.get("url"):
+                    errors.append(
+                        f"Episode '{ep_label}': enclosure missing 'url' attribute"
+                    )
+                if not enclosure.get("type"):
+                    warnings.append(
+                        f"Episode '{ep_label}': enclosure missing 'type' attribute"
+                    )
+
+            if item.find("pubDate") is None:
+                warnings.append(f"Episode '{ep_label}': missing <pubDate>")
+
+            if item.find("guid") is None:
+                warnings.append(f"Episode '{ep_label}': missing <guid>")
+
+        # Sort episodes by pubDate (newest first)
+        self._sort_episodes_by_date(channel)
+
         return {
-            'valid': len(warnings) == 0,
-            'warnings': warnings,
-            'episode_count': len(items),
-            'feed_path': str(feed_path)
+            "valid": len(errors) == 0,
+            "errors": errors,
+            "warnings": warnings,
+            "episode_count": len(items),
+            "feed_path": str(feed_path),
         }
+
+    def _sort_episodes_by_date(self, channel: ET.Element):
+        """
+        Sort episode items within a channel by pubDate (newest first).
+
+        Args:
+            channel: The <channel> element containing <item> elements
+        """
+        items = channel.findall("item")
+        if len(items) <= 1:
+            return
+
+        def parse_pub_date(item):
+            pub_date_elem = item.find("pubDate")
+            if pub_date_elem is None or not pub_date_elem.text:
+                return datetime.min
+            try:
+                # Parse RFC 822 date format (e.g., "Mon, 01 Jan 2026 00:00:00 +0000")
+                from email.utils import parsedate_to_datetime
+
+                return parsedate_to_datetime(pub_date_elem.text)
+            except (ValueError, TypeError):
+                return datetime.min
+
+        # Remove all items from channel
+        for item in items:
+            channel.remove(item)
+
+        # Sort newest first and re-add
+        items.sort(key=parse_pub_date, reverse=True)
+        for item in items:
+            channel.append(item)
 
 
 def format_duration(seconds: int) -> str:

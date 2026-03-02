@@ -1,30 +1,31 @@
 """YouTube uploader for podcast episodes and clips."""
 
-import os
-import json
+import time
+import ssl
 from pathlib import Path
 from typing import Optional, Dict, Any
 import pickle
 
 from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from googleapiclient.errors import HttpError
 
 from config import Config
+from logger import logger
+from retry_utils import retry_with_backoff
 
 
 class YouTubeUploader:
     """Handle YouTube uploads with OAuth2 authentication."""
 
     # YouTube API scopes
-    SCOPES = ['https://www.googleapis.com/auth/youtube.upload']
+    SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 
     # Token storage path
-    TOKEN_PATH = Config.BASE_DIR / 'credentials' / 'youtube_token.pickle'
-    CREDENTIALS_PATH = Config.BASE_DIR / 'credentials' / 'youtube_credentials.json'
+    TOKEN_PATH = Config.BASE_DIR / "credentials" / "youtube_token.pickle"
+    CREDENTIALS_PATH = Config.BASE_DIR / "credentials" / "youtube_credentials.json"
 
     def __init__(self):
         """Initialize YouTube uploader."""
@@ -40,20 +41,20 @@ class YouTubeUploader:
 
         # Load existing credentials from token file
         if self.TOKEN_PATH.exists():
-            with open(self.TOKEN_PATH, 'rb') as token:
+            with open(self.TOKEN_PATH, "rb") as token:
                 creds = pickle.load(token)
 
         # If no valid credentials, authenticate
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 # Try to refresh expired credentials
-                print("[INFO] Refreshing YouTube credentials...")
+                logger.info("Refreshing YouTube credentials...")
                 try:
                     creds.refresh(Request())
-                    print("[OK] Token refreshed successfully!")
+                    logger.info("Token refreshed successfully!")
                 except Exception as refresh_error:
-                    print(f"[WARNING] Token refresh failed: {refresh_error}")
-                    print("[INFO] Will re-authenticate with OAuth flow...")
+                    logger.warning("Token refresh failed: %s", refresh_error)
+                    logger.info("Will re-authenticate with OAuth flow...")
                     creds = None  # Force re-authentication
 
             if not creds or not creds.valid:
@@ -69,8 +70,8 @@ class YouTubeUploader:
                         f"5. Save it as: {self.CREDENTIALS_PATH}"
                     )
 
-                print("[INFO] Starting YouTube OAuth2 authentication...")
-                print("[INFO] A browser window will open for authorization")
+                logger.info("Starting YouTube OAuth2 authentication...")
+                logger.info("A browser window will open for authorization")
 
                 flow = InstalledAppFlow.from_client_secrets_file(
                     str(self.CREDENTIALS_PATH), self.SCOPES
@@ -78,13 +79,13 @@ class YouTubeUploader:
                 creds = flow.run_local_server(port=0)
 
             # Save credentials for future use
-            with open(self.TOKEN_PATH, 'wb') as token:
+            with open(self.TOKEN_PATH, "wb") as token:
                 pickle.dump(creds, token)
 
-            print("[OK] YouTube authentication successful!")
+            logger.info("YouTube authentication successful!")
 
         # Build YouTube API client
-        self.youtube = build('youtube', 'v3', credentials=creds)
+        self.youtube = build("youtube", "v3", credentials=creds)
 
     def upload_episode(
         self,
@@ -95,7 +96,7 @@ class YouTubeUploader:
         category_id: str = "22",  # People & Blogs
         privacy_status: str = "public",
         made_for_kids: bool = False,
-        thumbnail_path: Optional[str] = None
+        thumbnail_path: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Upload a full episode to YouTube.
@@ -114,78 +115,108 @@ class YouTubeUploader:
             Dictionary with video ID and URL, or None if upload failed
         """
         if not self.youtube:
-            print("[ERROR] YouTube API not authenticated")
+            logger.error("YouTube API not authenticated")
             return None
 
         video_path = Path(video_path)
         if not video_path.exists():
-            print(f"[ERROR] Video file not found: {video_path}")
+            logger.error("Video file not found: %s", video_path)
             return None
 
-        print(f"[INFO] Uploading episode to YouTube: {video_path.name}")
-        print(f"[INFO] Title: {title}")
-        print(f"[INFO] Privacy: {privacy_status}")
+        logger.info("Uploading episode to YouTube: %s", video_path.name)
+        logger.info("Title: %s", title)
+        logger.info("Privacy: %s", privacy_status)
 
         # Prepare video metadata
         body = {
-            'snippet': {
-                'title': title[:100],  # YouTube max title length
-                'description': description[:5000],  # YouTube max description length
-                'tags': tags or [],
-                'categoryId': category_id
+            "snippet": {
+                "title": title[:100],  # YouTube max title length
+                "description": description[:5000],  # YouTube max description length
+                "tags": tags or [],
+                "categoryId": category_id,
             },
-            'status': {
-                'privacyStatus': privacy_status,
-                'selfDeclaredMadeForKids': made_for_kids
-            }
+            "status": {
+                "privacyStatus": privacy_status,
+                "selfDeclaredMadeForKids": made_for_kids,
+            },
         }
 
         # Prepare media upload
         media = MediaFileUpload(
             str(video_path),
-            chunksize=10*1024*1024,  # 10 MB chunks
-            resumable=True
+            chunksize=10 * 1024 * 1024,  # 10 MB chunks
+            resumable=True,
         )
 
         try:
             # Upload video
             request = self.youtube.videos().insert(
-                part='snippet,status',
-                body=body,
-                media_body=media
+                part="snippet,status", body=body, media_body=media
             )
 
-            print("[INFO] Upload started...")
+            logger.info("Upload started...")
             response = None
+            retry_count = 0
+            max_retries = 5
             while response is None:
-                status, response = request.next_chunk()
-                if status:
-                    progress = int(status.progress() * 100)
-                    print(f"[INFO] Upload progress: {progress}%")
+                try:
+                    status, response = request.next_chunk()
+                    if status:
+                        progress = int(status.progress() * 100)
+                        logger.info("Upload progress: %s%%", progress)
+                    retry_count = 0  # Reset on success
+                except ssl.SSLError as e:
+                    retry_count += 1
+                    if retry_count > max_retries:
+                        logger.error("SSL error after %s retries: %s", max_retries, e)
+                        raise
+                    wait_time = 2**retry_count
+                    logger.warning(
+                        "SSL error, retrying in %ss (attempt %s/%s)...",
+                        wait_time,
+                        retry_count,
+                        max_retries,
+                    )
+                    time.sleep(wait_time)
+                except Exception as e:
+                    if "EOF occurred" in str(e) or "ssl" in str(e).lower():
+                        retry_count += 1
+                        if retry_count > max_retries:
+                            raise
+                        wait_time = 2**retry_count
+                        logger.warning(
+                            "Connection error, retrying in %ss (attempt %s/%s)...",
+                            wait_time,
+                            retry_count,
+                            max_retries,
+                        )
+                        time.sleep(wait_time)
+                    else:
+                        raise
 
-            video_id = response['id']
+            video_id = response["id"]
             video_url = f"https://www.youtube.com/watch?v={video_id}"
 
-            print(f"[OK] Upload complete!")
-            print(f"[OK] Video ID: {video_id}")
-            print(f"[OK] Video URL: {video_url}")
+            logger.info("Upload complete!")
+            logger.info("Video ID: %s", video_id)
+            logger.info("Video URL: %s", video_url)
 
             # Upload thumbnail if provided
             if thumbnail_path and Path(thumbnail_path).exists():
                 self._upload_thumbnail(video_id, thumbnail_path)
 
             return {
-                'video_id': video_id,
-                'video_url': video_url,
-                'title': title,
-                'status': 'success'
+                "video_id": video_id,
+                "video_url": video_url,
+                "title": title,
+                "status": "success",
             }
 
         except HttpError as e:
-            print(f"[ERROR] YouTube upload failed: {e}")
+            logger.error("YouTube upload failed: %s", e)
             return None
         except Exception as e:
-            print(f"[ERROR] Unexpected error during upload: {e}")
+            logger.error("Unexpected error during upload: %s", e)
             return None
 
     def upload_short(
@@ -194,7 +225,7 @@ class YouTubeUploader:
         title: str,
         description: str,
         tags: Optional[list] = None,
-        privacy_status: str = "public"
+        privacy_status: str = "public",
     ) -> Optional[Dict[str, Any]]:
         """
         Upload a clip as a YouTube Short.
@@ -215,7 +246,7 @@ class YouTubeUploader:
             Dictionary with video ID and URL, or None if upload failed
         """
         # Ensure #Shorts is in the title or description
-        if '#Shorts' not in title and '#Shorts' not in description:
+        if "#Shorts" not in title and "#Shorts" not in description:
             title = f"{title} #Shorts"
 
         # Use same upload method as regular video
@@ -226,9 +257,14 @@ class YouTubeUploader:
             description=description,
             tags=tags,
             privacy_status=privacy_status,
-            category_id="22"  # People & Blogs
+            category_id="22",  # People & Blogs
         )
 
+    @retry_with_backoff(
+        max_retries=3,
+        base_delay=2.0,
+        retryable_exceptions=(ConnectionError, TimeoutError, OSError),
+    )
     def _upload_thumbnail(self, video_id: str, thumbnail_path: str) -> bool:
         """
         Upload a custom thumbnail for a video.
@@ -242,37 +278,37 @@ class YouTubeUploader:
         """
         thumbnail_path = Path(thumbnail_path)
         if not thumbnail_path.exists():
-            print(f"[WARNING] Thumbnail not found: {thumbnail_path}")
+            logger.warning("Thumbnail not found: %s", thumbnail_path)
             return False
 
         try:
-            print(f"[INFO] Uploading thumbnail for video {video_id}")
+            logger.info("Uploading thumbnail for video %s", video_id)
 
             media = MediaFileUpload(
-                str(thumbnail_path),
-                mimetype='image/jpeg',
-                resumable=True
+                str(thumbnail_path), mimetype="image/jpeg", resumable=True
             )
 
-            request = self.youtube.thumbnails().set(
-                videoId=video_id,
-                media_body=media
-            )
+            request = self.youtube.thumbnails().set(videoId=video_id, media_body=media)
 
-            response = request.execute()
-            print("[OK] Thumbnail uploaded successfully")
+            request.execute()
+            logger.info("Thumbnail uploaded successfully")
             return True
 
         except HttpError as e:
-            print(f"[ERROR] Failed to upload thumbnail: {e}")
+            logger.error("Failed to upload thumbnail: %s", e)
             return False
 
+    @retry_with_backoff(
+        max_retries=3,
+        base_delay=2.0,
+        retryable_exceptions=(ConnectionError, TimeoutError, OSError),
+    )
     def update_video_metadata(
         self,
         video_id: str,
         title: Optional[str] = None,
         description: Optional[str] = None,
-        tags: Optional[list] = None
+        tags: Optional[list] = None,
     ) -> bool:
         """
         Update metadata for an existing video.
@@ -288,39 +324,32 @@ class YouTubeUploader:
         """
         try:
             # Get current video details
-            video = self.youtube.videos().list(
-                part='snippet',
-                id=video_id
-            ).execute()
+            video = self.youtube.videos().list(part="snippet", id=video_id).execute()
 
-            if not video['items']:
-                print(f"[ERROR] Video not found: {video_id}")
+            if not video["items"]:
+                logger.error("Video not found: %s", video_id)
                 return False
 
-            snippet = video['items'][0]['snippet']
+            snippet = video["items"][0]["snippet"]
 
             # Update with new values if provided
             if title:
-                snippet['title'] = title[:100]
+                snippet["title"] = title[:100]
             if description:
-                snippet['description'] = description[:5000]
+                snippet["description"] = description[:5000]
             if tags:
-                snippet['tags'] = tags
+                snippet["tags"] = tags
 
             # Update video
             self.youtube.videos().update(
-                part='snippet',
-                body={
-                    'id': video_id,
-                    'snippet': snippet
-                }
+                part="snippet", body={"id": video_id, "snippet": snippet}
             ).execute()
 
-            print(f"[OK] Updated metadata for video {video_id}")
+            logger.info("Updated metadata for video %s", video_id)
             return True
 
         except HttpError as e:
-            print(f"[ERROR] Failed to update video: {e}")
+            logger.error("Failed to update video: %s", e)
             return False
 
     def get_upload_quota_usage(self) -> Dict[str, Any]:
@@ -333,9 +362,9 @@ class YouTubeUploader:
         # Note: Quota is tracked per project in Google Cloud Console
         # This is a placeholder for quota information
         return {
-            'daily_limit': 10000,  # Default quota (units per day)
-            'upload_cost': 1600,    # Cost per video upload
-            'note': 'Check Google Cloud Console for actual usage'
+            "daily_limit": 10000,  # Default quota (units per day)
+            "upload_cost": 1600,  # Cost per video upload
+            "note": "Check Google Cloud Console for actual usage",
         }
 
 
@@ -343,7 +372,7 @@ def create_episode_metadata(
     episode_number: int,
     episode_summary: str,
     social_captions: Dict[str, str],
-    clip_info: Optional[Dict[str, Any]] = None
+    clip_info: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Create YouTube metadata from episode analysis.
@@ -361,28 +390,24 @@ def create_episode_metadata(
 
     if clip_info:
         # For Shorts/clips
-        title = f"Episode #{episode_number} - {clip_info.get('title', 'Clip')}"
+        title = f"{clip_info.get('suggested_title', clip_info.get('title', f'Episode #{episode_number} Clip'))}"
         description = f"{clip_info.get('description', '')}\n\n"
         description += f"From Episode #{episode_number} of {podcast_name}\n\n"
-        description += social_captions.get('youtube', episode_summary)
+        description += social_captions.get("youtube", episode_summary)
     else:
         # For full episodes
         title = f"Episode #{episode_number}"
         description = f"{episode_summary}\n\n"
-        description += social_captions.get('youtube', '')
+        description += social_captions.get("youtube", "")
 
     # Common tags
     tags = [
         podcast_name,
-        'podcast',
-        'comedy',
-        'humor',
-        f'episode{episode_number}',
-        'fake problems'
+        "podcast",
+        "comedy",
+        "humor",
+        f"episode{episode_number}",
+        "fake problems",
     ]
 
-    return {
-        'title': title,
-        'description': description,
-        'tags': tags
-    }
+    return {"title": title, "description": description, "tags": tags}

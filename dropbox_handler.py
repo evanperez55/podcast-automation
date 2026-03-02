@@ -3,8 +3,10 @@
 import dropbox
 from dropbox.exceptions import ApiError
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 from config import Config
+from logger import logger
+from retry_utils import retry_with_backoff
 from tqdm import tqdm
 import re
 
@@ -15,24 +17,35 @@ class DropboxHandler:
     def __init__(self):
         """Initialize Dropbox client with automatic token refresh support."""
         # Try OAuth refresh token first (recommended - never expires)
-        if Config.DROPBOX_REFRESH_TOKEN and Config.DROPBOX_APP_KEY and Config.DROPBOX_APP_SECRET:
+        if (
+            Config.DROPBOX_REFRESH_TOKEN
+            and Config.DROPBOX_APP_KEY
+            and Config.DROPBOX_APP_SECRET
+        ):
             self.dbx = dropbox.Dropbox(
                 app_key=Config.DROPBOX_APP_KEY,
                 app_secret=Config.DROPBOX_APP_SECRET,
-                oauth2_refresh_token=Config.DROPBOX_REFRESH_TOKEN
+                oauth2_refresh_token=Config.DROPBOX_REFRESH_TOKEN,
             )
-            print(f"[OK] Connected to Dropbox (using auto-refresh token)")
+            logger.info("Connected to Dropbox (using auto-refresh token)")
         # Fall back to short-lived access token
         elif Config.DROPBOX_ACCESS_TOKEN:
             self.dbx = dropbox.Dropbox(Config.DROPBOX_ACCESS_TOKEN)
-            print(f"[OK] Connected to Dropbox (using short-lived token)")
-            print(f"[INFO] Consider setting up OAuth refresh token with: python setup_dropbox_oauth.py")
+            logger.info("Connected to Dropbox (using short-lived token)")
+            logger.info(
+                "Consider setting up OAuth refresh token with: python setup_dropbox_oauth.py"
+            )
         else:
             raise ValueError(
                 "Dropbox credentials not configured!\n"
                 "Either set DROPBOX_ACCESS_TOKEN or run: python setup_dropbox_oauth.py"
             )
 
+    @retry_with_backoff(
+        max_retries=3,
+        base_delay=2.0,
+        retryable_exceptions=(ConnectionError, TimeoutError, OSError),
+    )
     def list_episodes(self, folder_path=None):
         """
         List all WAV files in the Dropbox folder.
@@ -51,21 +64,28 @@ class DropboxHandler:
 
             for entry in result.entries:
                 if isinstance(entry, dropbox.files.FileMetadata):
-                    if entry.name.lower().endswith('.wav'):
-                        episodes.append({
-                            'name': entry.name,
-                            'path': entry.path_display,
-                            'size': entry.size,
-                            'modified': entry.client_modified
-                        })
+                    if entry.name.lower().endswith(".wav"):
+                        episodes.append(
+                            {
+                                "name": entry.name,
+                                "path": entry.path_display,
+                                "size": entry.size,
+                                "modified": entry.client_modified,
+                            }
+                        )
 
-            episodes.sort(key=lambda x: x['modified'], reverse=True)
+            episodes.sort(key=lambda x: x["modified"], reverse=True)
             return episodes
 
         except ApiError as e:
-            print(f"[ERROR] Error listing Dropbox folder: {e}")
+            logger.error("Error listing Dropbox folder: %s", e)
             return []
 
+    @retry_with_backoff(
+        max_retries=3,
+        base_delay=2.0,
+        retryable_exceptions=(ConnectionError, TimeoutError, OSError),
+    )
     def download_episode(self, dropbox_path, local_path=None):
         """
         Download an episode from Dropbox.
@@ -82,26 +102,28 @@ class DropboxHandler:
             local_path = Config.DOWNLOAD_DIR / filename
 
         try:
-            print(f"Downloading: {dropbox_path}")
+            logger.info("Downloading: %s", dropbox_path)
 
             # Get file metadata for size
             metadata = self.dbx.files_get_metadata(dropbox_path)
             file_size = metadata.size
 
             # Download with progress bar
-            with open(local_path, 'wb') as f:
-                with tqdm(total=file_size, unit='B', unit_scale=True, desc='Download') as pbar:
+            with open(local_path, "wb") as f:
+                with tqdm(
+                    total=file_size, unit="B", unit_scale=True, desc="Download"
+                ) as pbar:
                     metadata, response = self.dbx.files_download(dropbox_path)
 
                     for chunk in response.iter_content(chunk_size=4096):
                         f.write(chunk)
                         pbar.update(len(chunk))
 
-            print(f"[OK] Downloaded to: {local_path}")
+            logger.info("Downloaded to: %s", local_path)
             return local_path
 
         except ApiError as e:
-            print(f"[ERROR] Error downloading file: {e}")
+            logger.error("Error downloading file: %s", e)
             return None
 
     def get_latest_episode(self):
@@ -132,10 +154,10 @@ class DropboxHandler:
         """
         # Try different patterns
         patterns = [
-            r'[Ee]pisode\s*(\d+)',  # Episode 25
-            r'[Ee]p[_\s]*(\d+)',     # Ep 25, ep_25, ep25
-            r'^(\d+)\s*[-_]',        # 25 - Title
-            r'#(\d+)',               # #25
+            r"[Ee]pisode\s*(\d+)",  # Episode 25
+            r"[Ee]p[_\s]*(\d+)",  # Ep 25, ep_25, ep25
+            r"^(\d+)\s*[-_]",  # 25 - Title
+            r"#(\d+)",  # #25
         ]
 
         for pattern in patterns:
@@ -158,7 +180,7 @@ class DropboxHandler:
         episodes = self.list_episodes()
 
         for episode in episodes:
-            ep_num = self.extract_episode_number(episode['name'])
+            ep_num = self.extract_episode_number(episode["name"])
             if ep_num == episode_number:
                 return episode
 
@@ -175,7 +197,7 @@ class DropboxHandler:
         episodes_with_numbers = []
 
         for episode in episodes:
-            ep_num = self.extract_episode_number(episode['name'])
+            ep_num = self.extract_episode_number(episode["name"])
             episodes_with_numbers.append((ep_num, episode))
 
         # Sort by episode number (None values go to end)
@@ -183,6 +205,11 @@ class DropboxHandler:
 
         return episodes_with_numbers
 
+    @retry_with_backoff(
+        max_retries=3,
+        base_delay=2.0,
+        retryable_exceptions=(ConnectionError, TimeoutError, OSError),
+    )
     def upload_file(self, local_path, dropbox_path, overwrite=False):
         """
         Upload a file to Dropbox.
@@ -198,45 +225,53 @@ class DropboxHandler:
         local_path = Path(local_path)
 
         if not local_path.exists():
-            print(f"[ERROR] Local file not found: {local_path}")
+            logger.error("Local file not found: %s", local_path)
             return None
 
         try:
-            print(f"Uploading: {local_path.name} -> {dropbox_path}")
+            logger.info("Uploading: %s -> %s", local_path.name, dropbox_path)
 
             file_size = local_path.stat().st_size
-            mode = dropbox.files.WriteMode.overwrite if overwrite else dropbox.files.WriteMode.add
+            mode = (
+                dropbox.files.WriteMode.overwrite
+                if overwrite
+                else dropbox.files.WriteMode.add
+            )
 
             # Upload with progress bar
-            with open(local_path, 'rb') as f:
-                with tqdm(total=file_size, unit='B', unit_scale=True, desc='Upload') as pbar:
+            with open(local_path, "rb") as f:
+                with tqdm(
+                    total=file_size, unit="B", unit_scale=True, desc="Upload"
+                ) as pbar:
                     # For files larger than 150MB, use upload sessions
                     if file_size > 150 * 1024 * 1024:
                         # Large file upload
-                        upload_session_start_result = self.dbx.files_upload_session_start(f.read(4 * 1024 * 1024))
+                        upload_session_start_result = (
+                            self.dbx.files_upload_session_start(f.read(4 * 1024 * 1024))
+                        )
                         pbar.update(4 * 1024 * 1024)
                         cursor = dropbox.files.UploadSessionCursor(
                             session_id=upload_session_start_result.session_id,
-                            offset=f.tell()
+                            offset=f.tell(),
                         )
 
                         commit = dropbox.files.CommitInfo(path=dropbox_path, mode=mode)
 
                         while f.tell() < file_size:
                             chunk_size = min(4 * 1024 * 1024, file_size - f.tell())
-                            if chunk_size <= 4 * 1024 * 1024 and f.tell() + chunk_size == file_size:
+                            if (
+                                chunk_size <= 4 * 1024 * 1024
+                                and f.tell() + chunk_size == file_size
+                            ):
                                 # Last chunk
                                 metadata = self.dbx.files_upload_session_finish(
-                                    f.read(chunk_size),
-                                    cursor,
-                                    commit
+                                    f.read(chunk_size), cursor, commit
                                 )
                                 pbar.update(chunk_size)
                             else:
                                 # Continue session
                                 self.dbx.files_upload_session_append_v2(
-                                    f.read(chunk_size),
-                                    cursor
+                                    f.read(chunk_size), cursor
                                 )
                                 pbar.update(chunk_size)
                                 cursor.offset = f.tell()
@@ -246,11 +281,11 @@ class DropboxHandler:
                         metadata = self.dbx.files_upload(data, dropbox_path, mode=mode)
                         pbar.update(file_size)
 
-            print(f"[OK] Uploaded to: {dropbox_path}")
+            logger.info("Uploaded to: %s", dropbox_path)
             return metadata
 
         except ApiError as e:
-            print(f"[ERROR] Error uploading file: {e}")
+            logger.error("Error uploading file: %s", e)
             return None
 
     def upload_finished_episode(self, local_audio_path, episode_name=None):
@@ -324,6 +359,11 @@ class DropboxHandler:
         metadata = self.upload_file(transcription_path, dropbox_path, overwrite=True)
         return dropbox_path if metadata else None
 
+    @retry_with_backoff(
+        max_retries=3,
+        base_delay=2.0,
+        retryable_exceptions=(ConnectionError, TimeoutError, OSError),
+    )
     def get_shared_link(self, dropbox_path) -> Optional[str]:
         """
         Get or create a shared link for a Dropbox file.
@@ -335,7 +375,7 @@ class DropboxHandler:
             Public shared link URL, or None on failure
         """
         # Handle both string paths and FileMetadata objects
-        if hasattr(dropbox_path, 'path_display'):
+        if hasattr(dropbox_path, "path_display"):
             # It's a FileMetadata object
             path = dropbox_path.path_display
         else:
@@ -344,10 +384,10 @@ class DropboxHandler:
 
         def convert_to_direct_download(url):
             """Convert Dropbox URL to direct download format."""
-            if 'dl=0' in url:
-                url = url.replace('dl=0', 'dl=1')
-            elif 'dl=1' not in url:
-                url = url + '?dl=1'
+            if "dl=0" in url:
+                url = url.replace("dl=0", "dl=1")
+            elif "dl=1" not in url:
+                url = url + "?dl=1"
             return url
 
         try:
@@ -357,7 +397,7 @@ class DropboxHandler:
             # Check for file-specific links (contain /fi/ not /fo/)
             file_link = None
             for link in links.links:
-                if '/scl/fi/' in link.url:
+                if "/scl/fi/" in link.url:
                     file_link = link.url
                     break
 
@@ -365,30 +405,32 @@ class DropboxHandler:
                 return convert_to_direct_download(file_link)
 
             # No file-specific link exists, create one
-            settings = dropbox.sharing.SharedLinkSettings(requested_visibility=dropbox.sharing.RequestedVisibility.public)
+            settings = dropbox.sharing.SharedLinkSettings(
+                requested_visibility=dropbox.sharing.RequestedVisibility.public
+            )
             link = self.dbx.sharing_create_shared_link_with_settings(path, settings)
             return convert_to_direct_download(link.url)
 
         except ApiError as e:
             # Check if error is because shared link already exists
-            if hasattr(e.error, 'shared_link_already_exists'):
+            if hasattr(e.error, "shared_link_already_exists"):
                 # Try to list links again and find file-specific one
                 try:
                     links = self.dbx.sharing_list_shared_links(path=path)
                     for link in links.links:
-                        if '/scl/fi/' in link.url:
+                        if "/scl/fi/" in link.url:
                             return convert_to_direct_download(link.url)
                     # Fall back to first link if no file-specific one found
                     if links.links:
                         return convert_to_direct_download(links.links[0].url)
-                except:
+                except Exception:
                     pass
 
-            print(f"[ERROR] Failed to get shared link: {e}")
+            logger.error("Failed to get shared link: %s", e)
             return None
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Test the Dropbox handler
     handler = DropboxHandler()
     episodes = handler.list_episodes()

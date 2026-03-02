@@ -1,10 +1,29 @@
 """Twitter/X uploader for podcast announcements and clips."""
 
+import time
 import tweepy
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 from config import Config
+from logger import logger
+from retry_utils import retry_with_backoff
+
+# Minimum interval between tweets (seconds) for rate limiting
+_MIN_TWEET_INTERVAL = 2.0
+_last_tweet_time = 0.0
+
+
+def _rate_limit_wait():
+    """Enforce minimum interval between tweets."""
+    global _last_tweet_time
+    now = time.time()
+    elapsed = now - _last_tweet_time
+    if elapsed < _MIN_TWEET_INTERVAL and _last_tweet_time > 0:
+        wait = _MIN_TWEET_INTERVAL - elapsed
+        logger.debug("Rate limit: waiting %.1fs before next tweet", wait)
+        time.sleep(wait)
+    _last_tweet_time = time.time()
 
 
 class TwitterUploader:
@@ -17,7 +36,9 @@ class TwitterUploader:
         self.access_token = Config.TWITTER_ACCESS_TOKEN
         self.access_secret = Config.TWITTER_ACCESS_SECRET
 
-        if not all([self.api_key, self.api_secret, self.access_token, self.access_secret]):
+        if not all(
+            [self.api_key, self.api_secret, self.access_token, self.access_secret]
+        ):
             raise ValueError(
                 "Twitter API credentials not configured in .env file.\n"
                 "Please follow the setup instructions:\n"
@@ -35,10 +56,7 @@ class TwitterUploader:
         # Initialize Tweepy clients
         # API v1.1 for media uploads
         auth = tweepy.OAuth1UserHandler(
-            self.api_key,
-            self.api_secret,
-            self.access_token,
-            self.access_secret
+            self.api_key, self.api_secret, self.access_token, self.access_secret
         )
         self.api_v1 = tweepy.API(auth)
 
@@ -47,14 +65,19 @@ class TwitterUploader:
             consumer_key=self.api_key,
             consumer_secret=self.api_secret,
             access_token=self.access_token,
-            access_token_secret=self.access_secret
+            access_token_secret=self.access_secret,
         )
 
+    @retry_with_backoff(
+        max_retries=3,
+        base_delay=2.0,
+        retryable_exceptions=(ConnectionError, TimeoutError, OSError),
+    )
     def post_tweet(
         self,
         text: str,
         media_paths: Optional[List[str]] = None,
-        reply_to_tweet_id: Optional[str] = None
+        reply_to_tweet_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Post a tweet with optional media.
@@ -72,12 +95,15 @@ class TwitterUploader:
         Returns:
             Dictionary with tweet info, or None if post failed
         """
-        print(f"[INFO] Posting to Twitter/X")
+        _rate_limit_wait()
+        logger.info("Posting to Twitter/X")
         # Handle Windows console encoding issues
         try:
-            print(f"[INFO] Text: {text[:100]}...")
+            logger.info("Text: %s...", text[:100])
         except UnicodeEncodeError:
-            print(f"[INFO] Text: {text[:100].encode('ascii', 'replace').decode('ascii')}...")
+            logger.info(
+                "Text: %s...", text[:100].encode("ascii", "replace").decode("ascii")
+            )
 
         media_ids = []
 
@@ -85,7 +111,7 @@ class TwitterUploader:
         if media_paths:
             media_ids = self._upload_media(media_paths)
             if not media_ids:
-                print("[ERROR] Failed to upload media")
+                logger.error("Failed to upload media")
                 return None
 
         try:
@@ -93,28 +119,33 @@ class TwitterUploader:
             response = self.client.create_tweet(
                 text=text[:280],  # Enforce character limit
                 media_ids=media_ids if media_ids else None,
-                in_reply_to_tweet_id=reply_to_tweet_id
+                in_reply_to_tweet_id=reply_to_tweet_id,
             )
 
-            tweet_id = response.data['id']
+            tweet_id = response.data["id"]
             tweet_url = f"https://twitter.com/i/web/status/{tweet_id}"
 
-            print(f"[OK] Tweet posted successfully!")
-            print(f"[OK] Tweet ID: {tweet_id}")
-            print(f"[OK] Tweet URL: {tweet_url}")
+            logger.info("Tweet posted successfully!")
+            logger.info("Tweet ID: %s", tweet_id)
+            logger.info("Tweet URL: %s", tweet_url)
 
             return {
-                'tweet_id': tweet_id,
-                'tweet_url': tweet_url,
-                'text': text,
-                'media_count': len(media_ids),
-                'status': 'success'
+                "tweet_id": tweet_id,
+                "tweet_url": tweet_url,
+                "text": text,
+                "media_count": len(media_ids),
+                "status": "success",
             }
 
         except tweepy.TweepyException as e:
-            print(f"[ERROR] Failed to post tweet: {e}")
+            logger.error("Failed to post tweet: %s", e)
             return None
 
+    @retry_with_backoff(
+        max_retries=3,
+        base_delay=2.0,
+        retryable_exceptions=(ConnectionError, TimeoutError, OSError),
+    )
     def _upload_media(self, media_paths: List[str]) -> List[str]:
         """
         Upload media files to Twitter.
@@ -130,37 +161,34 @@ class TwitterUploader:
         for media_path in media_paths[:4]:  # Twitter max 4 media items
             media_path = Path(media_path)
             if not media_path.exists():
-                print(f"[WARNING] Media file not found: {media_path}")
+                logger.warning("Media file not found: %s", media_path)
                 continue
 
             try:
-                print(f"[INFO] Uploading media: {media_path.name}")
+                logger.info("Uploading media: %s", media_path.name)
 
                 # Determine media category
-                if media_path.suffix.lower() in ['.mp4', '.mov', '.avi']:
-                    media_category = 'tweet_video'
+                if media_path.suffix.lower() in [".mp4", ".mov", ".avi"]:
+                    media_category = "tweet_video"
                 else:
-                    media_category = 'tweet_image'
+                    media_category = "tweet_image"
 
                 # Upload media using v1.1 API
                 media = self.api_v1.media_upload(
-                    filename=str(media_path),
-                    media_category=media_category
+                    filename=str(media_path), media_category=media_category
                 )
 
                 media_ids.append(media.media_id_string)
-                print(f"[OK] Media uploaded: {media.media_id_string}")
+                logger.info("Media uploaded: %s", media.media_id_string)
 
             except tweepy.TweepyException as e:
-                print(f"[ERROR] Failed to upload {media_path.name}: {e}")
+                logger.error("Failed to upload %s: %s", media_path.name, e)
                 continue
 
         return media_ids
 
     def post_thread(
-        self,
-        tweets: List[str],
-        media_paths: Optional[List[List[str]]] = None
+        self, tweets: List[str], media_paths: Optional[List[List[str]]] = None
     ) -> Optional[List[Dict[str, Any]]]:
         """
         Post a Twitter thread.
@@ -172,7 +200,7 @@ class TwitterUploader:
         Returns:
             List of tweet info dictionaries, or None if thread failed
         """
-        print(f"[INFO] Posting Twitter thread ({len(tweets)} tweets)")
+        logger.info("Posting Twitter thread (%s tweets)", len(tweets))
 
         thread_results = []
         previous_tweet_id = None
@@ -187,17 +215,17 @@ class TwitterUploader:
             result = self.post_tweet(
                 text=tweet_text,
                 media_paths=tweet_media,
-                reply_to_tweet_id=previous_tweet_id
+                reply_to_tweet_id=previous_tweet_id,
             )
 
             if not result:
-                print(f"[ERROR] Failed to post tweet {i + 1} in thread")
+                logger.error("Failed to post tweet %s in thread", i + 1)
                 return None
 
             thread_results.append(result)
-            previous_tweet_id = result['tweet_id']
+            previous_tweet_id = result["tweet_id"]
 
-        print(f"[OK] Thread posted successfully!")
+        logger.info("Thread posted successfully!")
         return thread_results
 
     def post_episode_announcement(
@@ -206,7 +234,7 @@ class TwitterUploader:
         episode_summary: str,
         youtube_url: Optional[str] = None,
         spotify_url: Optional[str] = None,
-        clip_paths: Optional[List[str]] = None
+        clip_youtube_urls: Optional[List[Dict[str, str]]] = None,
     ) -> Optional[List[Dict[str, Any]]]:
         """
         Post an episode announcement as a thread.
@@ -214,71 +242,63 @@ class TwitterUploader:
         Args:
             episode_number: Episode number
             episode_summary: Summary from Claude
-            youtube_url: Optional YouTube URL
+            youtube_url: Optional YouTube URL for full episode
             spotify_url: Optional Spotify URL
-            clip_paths: Optional list of clip video paths
+            clip_youtube_urls: Optional list of dicts with 'title' and 'url' for each clip
 
         Returns:
             List of tweet info dictionaries, or None if failed
         """
-        # Main announcement tweet
+        # Main announcement tweet with YouTube link
         main_tweet = (
             f"🎙️ New Episode Alert! 🎙️\n\n"
             f"Episode {episode_number} of {Config.PODCAST_NAME} is now live!\n\n"
-            f"{episode_summary[:180]}"  # Leave room for links
+            f"{episode_summary[:150]}"
         )
-
-        # Links tweet
-        links_parts = ["Listen now:"]
         if youtube_url:
-            links_parts.append(f"🎥 YouTube: {youtube_url}")
-        if spotify_url:
-            links_parts.append(f"🎵 Spotify: {spotify_url}")
-
-        links_tweet = "\n".join(links_parts) if len(links_parts) > 1 else None
+            main_tweet += f"\n\n{youtube_url}"
 
         # Build thread
         tweets = [main_tweet]
-        if links_tweet:
-            tweets.append(links_tweet)
+        media_list = [None]
 
-        media_list = [None] * len(tweets)  # No media for text tweets
-
-        # Add clip tweets if available
-        if clip_paths:
-            for i, clip_path in enumerate(clip_paths[:3], 1):  # Max 3 clips
-                clip_tweet = f"🎬 Clip {i} from Episode {episode_number}"
+        # Add clip tweets as YouTube links (no video upload)
+        if clip_youtube_urls:
+            for clip in clip_youtube_urls[:3]:
+                clip_tweet = f"🎬 {clip.get('title', 'Clip')}\n\n{clip['url']}"
                 tweets.append(clip_tweet)
-                media_list.append([clip_path])
+                media_list.append(None)
 
         return self.post_thread(tweets, media_list)
 
     def post_clip(
         self,
-        video_path: str,
         caption: str,
-        episode_number: int
+        episode_number: int,
+        youtube_url: Optional[str] = None,
+        video_path: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
-        Post a single clip with caption.
+        Post a single clip with caption and YouTube link.
 
         Args:
-            video_path: Path to video clip
             caption: Tweet caption
             episode_number: Episode number
+            youtube_url: YouTube Shorts URL to link to
+            video_path: Optional path to video (fallback if no YouTube URL)
 
         Returns:
             Dictionary with tweet info, or None if post failed
         """
-        # Add episode reference
         full_caption = (
-            f"{caption}\n\n"
-            f"🎙️ From Episode {episode_number} of {Config.PODCAST_NAME}"
+            f"{caption}\n\n🎙️ From Episode {episode_number} of {Config.PODCAST_NAME}"
         )
+        if youtube_url:
+            full_caption += f"\n\n{youtube_url}"
 
         return self.post_tweet(
             text=full_caption[:280],
-            media_paths=[video_path]
+            media_paths=[video_path] if video_path and not youtube_url else None,
         )
 
     def get_user_info(self) -> Optional[Dict[str, Any]]:
@@ -290,24 +310,24 @@ class TwitterUploader:
         """
         try:
             user = self.client.get_me(
-                user_fields=['description', 'created_at', 'public_metrics']
+                user_fields=["description", "created_at", "public_metrics"]
             )
 
             if user.data:
                 return {
-                    'id': user.data.id,
-                    'username': user.data.username,
-                    'name': user.data.name,
-                    'description': user.data.description,
-                    'followers': user.data.public_metrics['followers_count'],
-                    'following': user.data.public_metrics['following_count'],
-                    'tweets': user.data.public_metrics['tweet_count']
+                    "id": user.data.id,
+                    "username": user.data.username,
+                    "name": user.data.name,
+                    "description": user.data.description,
+                    "followers": user.data.public_metrics["followers_count"],
+                    "following": user.data.public_metrics["following_count"],
+                    "tweets": user.data.public_metrics["tweet_count"],
                 }
 
             return None
 
         except tweepy.TweepyException as e:
-            print(f"[ERROR] Failed to get user info: {e}")
+            logger.error("Failed to get user info: %s", e)
             return None
 
     def delete_tweet(self, tweet_id: str) -> bool:
@@ -322,18 +342,16 @@ class TwitterUploader:
         """
         try:
             self.client.delete_tweet(tweet_id)
-            print(f"[OK] Deleted tweet {tweet_id}")
+            logger.info("Deleted tweet %s", tweet_id)
             return True
 
         except tweepy.TweepyException as e:
-            print(f"[ERROR] Failed to delete tweet: {e}")
+            logger.error("Failed to delete tweet: %s", e)
             return False
 
 
 def create_twitter_caption(
-    clip_title: str,
-    social_caption: str,
-    hashtags: Optional[list] = None
+    clip_title: str, social_caption: str, hashtags: Optional[list] = None
 ) -> str:
     """
     Create a Twitter caption within character limits.
@@ -348,13 +366,13 @@ def create_twitter_caption(
     """
     # Default hashtags if none provided
     if not hashtags:
-        hashtags = ['podcast', 'comedy', 'fakeproblems']
+        hashtags = ["podcast", "comedy", "fakeproblems"]
 
     # Build caption
     caption = f"{clip_title}\n\n{social_caption}"
 
     # Add hashtags if space allows
-    hashtag_str = ' '.join(f'#{tag}' for tag in hashtags)
+    hashtag_str = " ".join(f"#{tag}" for tag in hashtags)
     full_caption = f"{caption}\n\n{hashtag_str}"
 
     # Trim if too long
