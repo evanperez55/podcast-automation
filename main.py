@@ -22,22 +22,34 @@ from uploaders import (
     SpotifyUploader,
     create_episode_metadata,
 )
+from notifications import DiscordNotifier
+from scheduler import UploadScheduler
+from blog_generator import BlogPostGenerator
+from thumbnail_generator import ThumbnailGenerator
+from analytics import AnalyticsCollector, TopicEngagementScorer
+from clip_previewer import ClipPreviewer
+from search_index import EpisodeSearchIndex
+from audiogram_generator import AudiogramGenerator
 
 
 class PodcastAutomation:
     """Main automation orchestrator."""
 
-    def __init__(self, test_mode=False, resume=False, dry_run=False):
+    def __init__(
+        self, test_mode=False, resume=False, dry_run=False, auto_approve=False
+    ):
         """Initialize all components.
 
         Args:
             test_mode: If True, skip actual uploads to Dropbox and social media
             resume: If True, resume from last checkpoint using pipeline_state
             dry_run: If True, validate pipeline wiring with mock data (no I/O)
+            auto_approve: If True, skip interactive clip approval prompt
         """
         self.test_mode = test_mode
         self.resume = resume
         self.dry_run = dry_run
+        self.auto_approve = auto_approve or test_mode or dry_run
 
         print("=" * 60)
         print("FAKE PROBLEMS PODCAST AUTOMATION")
@@ -60,6 +72,13 @@ class PodcastAutomation:
             self.video_converter = None
             self.uploaders = {}
             self.topic_tracker = None
+            self.notifier = DiscordNotifier()
+            self.scheduler = UploadScheduler()
+            self.blog_generator = BlogPostGenerator()
+            self.thumbnail_generator = ThumbnailGenerator()
+            self.clip_previewer = ClipPreviewer(auto_approve=True)
+            self.search_index = None
+            self.audiogram_generator = AudiogramGenerator()
             return
 
         # Validate configuration
@@ -87,6 +106,15 @@ class PodcastAutomation:
         # TODO: Re-enable after fixing Google OAuth credentials
         self.topic_tracker = None
         logger.info("Google Docs topic tracker disabled")
+
+        # Initialize new feature modules
+        self.notifier = DiscordNotifier()
+        self.scheduler = UploadScheduler()
+        self.blog_generator = BlogPostGenerator()
+        self.thumbnail_generator = ThumbnailGenerator()
+        self.clip_previewer = ClipPreviewer(auto_approve=self.auto_approve)
+        self.search_index = EpisodeSearchIndex()
+        self.audiogram_generator = AudiogramGenerator()
 
         print()
 
@@ -175,7 +203,12 @@ class PodcastAutomation:
             return None
 
     def _upload_youtube(
-        self, episode_number, video_clip_paths, analysis, full_episode_video_path
+        self,
+        episode_number,
+        video_clip_paths,
+        analysis,
+        full_episode_video_path,
+        publish_at=None,
     ):
         """Upload content to YouTube (full episode + clips as Shorts)."""
         if "youtube" not in self.uploaders:
@@ -215,12 +248,15 @@ class PodcastAutomation:
                 }
             else:
                 try:
+                    # If scheduling, upload as private with publishAt
+                    privacy = "private" if publish_at else "public"
                     full_episode_result = self.uploaders["youtube"].upload_episode(
                         video_path=str(full_episode_video_path),
                         title=full_title[:100],
                         description=full_description,
                         tags=tags,
-                        privacy_status="public",
+                        privacy_status=privacy,
+                        publish_at=publish_at,
                     )
                     if full_episode_result:
                         youtube_results["full_episode"] = full_episode_result
@@ -397,9 +433,38 @@ class PodcastAutomation:
         """
         results = {}
 
-        # YouTube uploads
+        # Check if scheduling is enabled
+        if self.scheduler.is_scheduling_enabled():
+            logger.info("Scheduling enabled — creating upload schedule")
+            schedule = self.scheduler.create_schedule(
+                episode_folder=f"ep_{episode_number}",
+                episode_number=episode_number,
+                analysis=analysis,
+                video_clip_paths=[str(p) for p in video_clip_paths]
+                if video_clip_paths
+                else None,
+                full_episode_video_path=str(full_episode_video_path)
+                if full_episode_video_path
+                else None,
+                mp3_path=str(mp3_path),
+            )
+            schedule_path = self.scheduler.save_schedule(
+                f"ep_{episode_number}", schedule
+            )
+            logger.info("Upload schedule saved to %s", schedule_path)
+            results["schedule"] = {
+                "path": str(schedule_path),
+                "platforms": list(schedule["platforms"].keys()),
+            }
+
+        # YouTube uploads (may use publishAt if scheduled)
+        publish_at = self.scheduler.get_youtube_publish_at()
         youtube_results = self._upload_youtube(
-            episode_number, video_clip_paths, analysis, full_episode_video_path
+            episode_number,
+            video_clip_paths,
+            analysis,
+            full_episode_video_path,
+            publish_at=publish_at,
         )
         if youtube_results:
             results["youtube"] = youtube_results
@@ -601,13 +666,29 @@ class PodcastAutomation:
         print(f"[MOCK] Step 5: Clip creation -- would create {num_clips} clip(s)")
         steps_validated += 1
 
+        print(
+            f"[MOCK] Step 5.1: Clip approval "
+            f"-- would prompt for approval (auto-approve={self.auto_approve})"
+        )
+        steps_validated += 1
+
         print(f"[MOCK] Step 5.4: Subtitles -- would generate {num_clips} SRT file(s)")
         steps_validated += 1
 
-        print(
-            f"[MOCK] Step 5.5: Video conversion "
-            f"-- would create {num_clips} vertical + 1 horizontal video"
-        )
+        audiogram_mode = self.audiogram_generator and self.audiogram_generator.enabled
+        if audiogram_mode:
+            print(
+                f"[MOCK] Step 5.5: Audiogram "
+                f"-- would create {num_clips} waveform video(s)"
+            )
+        else:
+            print(
+                f"[MOCK] Step 5.5: Video conversion "
+                f"-- would create {num_clips} vertical + 1 horizontal video"
+            )
+        steps_validated += 1
+
+        print("[MOCK] Step 5.6: Thumbnail -- would generate 1280x720 PNG")
         steps_validated += 1
 
         print(
@@ -629,7 +710,23 @@ class PodcastAutomation:
         platform_status = []
         for name in ["youtube", "twitter", "instagram", "tiktok", "spotify"]:
             platform_status.append(f"{name.capitalize()}: ready")
-        print(f"[MOCK] Step 8: Social media -- {', '.join(platform_status)}")
+        scheduling_note = ""
+        if self.scheduler.is_scheduling_enabled():
+            scheduling_note = " (scheduling enabled)"
+        print(
+            f"[MOCK] Step 8: Social media -- {', '.join(platform_status)}{scheduling_note}"
+        )
+        steps_validated += 1
+
+        blog_status = (
+            "enabled"
+            if self.blog_generator and self.blog_generator.enabled
+            else "disabled"
+        )
+        print(f"[MOCK] Step 8.5: Blog post -- {blog_status}")
+        steps_validated += 1
+
+        print("[MOCK] Step 9: Search index -- would index episode for full-text search")
         steps_validated += 1
 
         # --- Module / import validation ---
@@ -655,6 +752,20 @@ class PodcastAutomation:
         except ImportError as e:
             print(f"[WARN] Subtitle generator not available: {e}")
             warnings.append(f"Subtitle generator: {e}")
+
+        # New feature modules
+        for mod_name, mod_obj in [
+            ("Discord notifier", self.notifier),
+            ("Upload scheduler", self.scheduler),
+            ("Blog generator", self.blog_generator),
+            ("Thumbnail generator", self.thumbnail_generator),
+            ("Audiogram generator", self.audiogram_generator),
+        ]:
+            if mod_obj:
+                print(f"[OK] {mod_name} imports correctly")
+            else:
+                print(f"[WARN] {mod_name} not available")
+                warnings.append(f"{mod_name} not available")
 
         # FFmpeg
         ffmpeg_path = Config.FFMPEG_PATH
@@ -869,6 +980,24 @@ class PodcastAutomation:
                 )
         print()
 
+        # Step 5.1: Clip preview/approval (interactive unless auto-approve)
+        print("STEP 5.1: CLIP PREVIEW/APPROVAL")
+        print("-" * 60)
+        best_clips = analysis.get("best_clips", [])
+        if clip_paths and not self.auto_approve:
+            approved_indices = self.clip_previewer.preview_clips(
+                [str(p) for p in clip_paths], best_clips
+            )
+            clip_paths, best_clips = self.clip_previewer.filter_clips(
+                clip_paths, best_clips, approved_indices
+            )
+            # Update analysis with filtered clips
+            analysis["best_clips"] = best_clips
+            logger.info("Approved %d clips for upload", len(clip_paths))
+        else:
+            logger.info("Auto-approving all %d clips", len(clip_paths))
+        print()
+
         # Step 5.4: Generate subtitles for clips
         print("STEP 5.4: GENERATING SUBTITLES")
         print("-" * 60)
@@ -910,8 +1039,11 @@ class PodcastAutomation:
                 )
         print()
 
-        # Step 5.5: Convert clips to videos
-        print("STEP 5.5: CONVERTING CLIPS TO VIDEOS")
+        # Step 5.5: Convert clips to videos (or audiograms if enabled)
+        if self.audiogram_generator and self.audiogram_generator.enabled:
+            print("STEP 5.5: CREATING AUDIOGRAM WAVEFORM VIDEOS")
+        else:
+            print("STEP 5.5: CONVERTING CLIPS TO VIDEOS")
         print("-" * 60)
         video_clip_paths = []
         full_episode_video_path = None
@@ -921,6 +1053,43 @@ class PodcastAutomation:
             video_clip_paths = [Path(p) for p in outputs.get("video_clip_paths", [])]
             full_episode_video_path = outputs.get("full_episode_video_path")
             logger.info("[RESUME] Skipping video conversion (already completed)")
+        elif (
+            self.audiogram_generator and self.audiogram_generator.enabled and clip_paths
+        ):
+            logger.info("Creating audiogram waveform videos for clips...")
+            audiogram_srt_paths = [str(s) if s else None for s in srt_paths]
+            audiogram_results = self.audiogram_generator.create_audiogram_clips(
+                clip_paths=[str(p) for p in clip_paths],
+                format_type="vertical",
+                srt_paths=audiogram_srt_paths,
+            )
+            video_clip_paths = [Path(p) for p in audiogram_results]
+            logger.info("Created %d audiogram clips", len(video_clip_paths))
+
+            # Full episode still uses static logo (not audiogram)
+            if self.video_converter:
+                logger.info(
+                    "Creating horizontal video (16:9) for YouTube full episode..."
+                )
+                full_episode_video_path = self.video_converter.create_episode_video(
+                    audio_path=str(censored_audio),
+                    output_path=str(
+                        episode_output_dir
+                        / f"{audio_file.stem}_{timestamp}_episode.mp4"
+                    ),
+                    format_type="horizontal",
+                )
+
+            if state:
+                state.complete_step(
+                    "convert_videos",
+                    {
+                        "video_clip_paths": [str(p) for p in video_clip_paths],
+                        "full_episode_video_path": str(full_episode_video_path)
+                        if full_episode_video_path
+                        else None,
+                    },
+                )
         elif self.video_converter and clip_paths:
             logger.info("Creating vertical videos (9:16) for Shorts/Reels/TikTok...")
 
@@ -970,10 +1139,34 @@ class PodcastAutomation:
                         else None,
                     },
                 )
-        elif not self.video_converter:
+        elif not self.video_converter and not (
+            self.audiogram_generator and self.audiogram_generator.enabled
+        ):
             logger.info("Video converter not available - skipping video creation")
         else:
             logger.info("No clips to convert")
+        print()
+
+        # Step 5.6: Generate thumbnail
+        print("STEP 5.6: GENERATING THUMBNAIL")
+        print("-" * 60)
+        thumbnail_path = None
+        episode_title = analysis.get("episode_title", f"Episode {episode_number}")
+        if self.thumbnail_generator:
+            thumb_output = (
+                episode_output_dir / f"{audio_file.stem}_{timestamp}_thumbnail.png"
+            )
+            thumbnail_path = self.thumbnail_generator.generate_thumbnail(
+                episode_title=episode_title,
+                episode_number=episode_number,
+                output_path=str(thumb_output),
+            )
+            if thumbnail_path:
+                logger.info("Thumbnail generated: %s", thumbnail_path)
+            else:
+                logger.info("Thumbnail generation skipped or failed")
+        else:
+            logger.info("Thumbnail generator not available")
         print()
 
         # Step 6: Convert to MP3 for uploading
@@ -1141,6 +1334,66 @@ class PodcastAutomation:
 
         print()
 
+        # Step 8.5: Generate blog post
+        print("STEP 8.5: GENERATING BLOG POST")
+        print("-" * 60)
+        blog_post_path = None
+        if self.blog_generator and self.blog_generator.enabled:
+            if state and state.is_step_completed("blog_post"):
+                outputs = state.get_step_outputs("blog_post")
+                blog_post_path = outputs.get("blog_post_path")
+                logger.info("[RESUME] Skipping blog post (already completed)")
+            else:
+                try:
+                    markdown = self.blog_generator.generate_blog_post(
+                        transcript_data=transcript_data,
+                        analysis=analysis,
+                        episode_number=episode_number,
+                    )
+                    blog_post_path = str(
+                        self.blog_generator.save_blog_post(
+                            markdown=markdown,
+                            episode_output_dir=episode_output_dir,
+                            episode_number=episode_number,
+                            timestamp=timestamp,
+                        )
+                    )
+                    logger.info("Blog post generated: %s", blog_post_path)
+                    if state:
+                        state.complete_step(
+                            "blog_post", {"blog_post_path": blog_post_path}
+                        )
+                except Exception as e:
+                    logger.warning("Blog post generation failed: %s", e)
+        else:
+            logger.info("Blog post generation disabled or not configured")
+        print()
+
+        # Step 9: Index episode for search
+        print("STEP 9: INDEXING EPISODE FOR SEARCH")
+        print("-" * 60)
+        if self.search_index:
+            try:
+                full_transcript = " ".join(
+                    seg.get("text", "") for seg in transcript_data.get("segments", [])
+                )
+                self.search_index.index_episode(
+                    episode_number=episode_number,
+                    title=analysis.get("episode_title", f"Episode {episode_number}"),
+                    summary=analysis.get("episode_summary", ""),
+                    show_notes=analysis.get("show_notes", ""),
+                    transcript_text=full_transcript,
+                    topics=[
+                        c.get("description", "") for c in analysis.get("best_clips", [])
+                    ],
+                )
+                logger.info("Episode %s indexed for search", episode_number)
+            except Exception as e:
+                logger.warning("Search indexing failed: %s", e)
+        else:
+            logger.info("Search index not available")
+        print()
+
         # Get episode title from analysis or generate default
         episode_title = analysis.get("episode_title", f"Episode {episode_number}")
 
@@ -1168,6 +1421,8 @@ class PodcastAutomation:
             "censor_count": len(analysis.get("censor_timestamps", [])),
             "social_media_results": social_media_results,
             "topic_tracker_results": topic_tracker_results,
+            "thumbnail_path": str(thumbnail_path) if thumbnail_path else None,
+            "blog_post_path": blog_post_path,
         }
 
         # Save results summary
@@ -1268,18 +1523,184 @@ class PodcastAutomation:
         return self.process_episode(dropbox_path=episode["path"])
 
 
+def _process_with_notification(
+    automation, episode_number=None, dropbox_path=None, local_audio_path=None
+):
+    """Wrap episode processing with Discord notifications."""
+    notifier = automation.notifier
+    try:
+        if episode_number:
+            results = automation.process_episode_by_number(episode_number)
+        elif dropbox_path:
+            results = automation.process_episode(dropbox_path=dropbox_path)
+        elif local_audio_path:
+            results = automation.process_episode(local_audio_path=local_audio_path)
+        else:
+            results = automation.process_episode()
+
+        if results and notifier and notifier.enabled:
+            notifier.notify_success(results)
+        return results
+    except Exception as e:
+        if notifier and notifier.enabled:
+            ep_info = episode_number or dropbox_path or local_audio_path or "latest"
+            notifier.notify_failure(ep_info, e, step="process_episode")
+        raise
+
+
+def _run_upload_scheduled():
+    """Scan output folders for pending scheduled uploads and execute them."""
+    print("=" * 60)
+    print("EXECUTING SCHEDULED UPLOADS")
+    print("=" * 60)
+    print()
+
+    scheduler = UploadScheduler()
+    output_dir = Config.OUTPUT_DIR
+
+    if not output_dir.exists():
+        print("No output directory found")
+        return
+
+    schedule_files = list(output_dir.glob("*/upload_schedule.json"))
+    if not schedule_files:
+        print("No scheduled uploads found")
+        return
+
+    for schedule_file in schedule_files:
+        episode_folder = schedule_file.parent.name
+        schedule = scheduler.load_schedule(episode_folder)
+        if not schedule:
+            continue
+
+        pending = scheduler.get_pending_uploads(schedule)
+        if not pending:
+            logger.info("No pending uploads for %s", episode_folder)
+            continue
+
+        logger.info("Found %d pending upload(s) for %s", len(pending), episode_folder)
+        for item in pending:
+            platform = item["platform"]
+            logger.info("Uploading to %s...", platform)
+            # Actual upload would happen here using the platform uploaders
+            # For now, mark as uploaded with a placeholder
+            logger.info(
+                "[TODO] %s upload not yet automated in scheduled mode", platform
+            )
+            schedule = scheduler.mark_uploaded(
+                schedule, platform, {"status": "scheduled_upload_placeholder"}
+            )
+
+        scheduler.save_schedule(episode_folder, schedule)
+        logger.info("Updated schedule for %s", episode_folder)
+
+    print()
+    print("[DONE] Scheduled upload scan complete")
+
+
+def _run_analytics(episode_arg):
+    """Collect and display analytics for episodes."""
+    print("=" * 60)
+    print("ANALYTICS FEEDBACK LOOP")
+    print("=" * 60)
+    print()
+
+    collector = AnalyticsCollector()
+    scorer = TopicEngagementScorer()
+
+    if episode_arg == "all":
+        # Scan output dirs for episode numbers
+        output_dir = Config.OUTPUT_DIR
+        ep_dirs = sorted(output_dir.glob("ep_*"))
+        for ep_dir in ep_dirs:
+            import re as _re
+
+            match = _re.search(r"ep_(\d+)", ep_dir.name)
+            if match:
+                ep_num = int(match.group(1))
+                _collect_episode_analytics(collector, scorer, ep_num)
+    else:
+        import re as _re
+
+        match = _re.search(r"(\d+)", episode_arg)
+        if match:
+            ep_num = int(match.group(1))
+            _collect_episode_analytics(collector, scorer, ep_num)
+        else:
+            print(f"Invalid episode: {episode_arg}")
+
+
+def _collect_episode_analytics(collector, scorer, episode_number):
+    """Collect and display analytics for a single episode."""
+    print(f"\n--- Episode {episode_number} ---")
+    analytics = collector.collect_analytics(episode_number)
+    collector.save_analytics(episode_number, analytics)
+
+    score = scorer.calculate_engagement_score(analytics)
+    print(f"  Engagement score: {score}/10")
+
+    if analytics.get("youtube"):
+        yt = analytics["youtube"]
+        print(f"  YouTube: {yt.get('views', 0)} views, {yt.get('likes', 0)} likes")
+    if analytics.get("twitter"):
+        tw = analytics["twitter"]
+        print(
+            f"  Twitter: {tw.get('impressions', 0)} impressions, {tw.get('engagements', 0)} engagements"
+        )
+
+
+def _run_search(query):
+    """Search across all indexed episodes."""
+    print(f'Searching for: "{query}"')
+    print("-" * 60)
+
+    index = EpisodeSearchIndex()
+    results = index.search(query, limit=10)
+
+    if not results:
+        print("No results found")
+        return
+
+    for r in results:
+        print(f"\nEpisode {r['episode_number']}: {r['title']}")
+        print(f"  {r['snippet']}")
+
+    print(f"\n{len(results)} result(s) found")
+
+
 def main():
     """Main entry point."""
     # Check for flags
     test_mode = "--test" in sys.argv or "--test-mode" in sys.argv
     resume = "--resume" in sys.argv
     dry_run = "--dry-run" in sys.argv
+    auto_approve = "--auto-approve" in sys.argv
 
     # Strip flags from argv before parsing positional args
-    flag_args = ["--test", "--test-mode", "--resume", "--dry-run"]
+    flag_args = ["--test", "--test-mode", "--resume", "--dry-run", "--auto-approve"]
     sys.argv = [arg for arg in sys.argv if arg not in flag_args]
 
-    automation = PodcastAutomation(test_mode=test_mode, resume=resume, dry_run=dry_run)
+    # Handle commands that don't need full PodcastAutomation init
+    if len(sys.argv) > 1:
+        cmd = sys.argv[1].lower()
+
+        if cmd == "upload-scheduled":
+            _run_upload_scheduled()
+            return
+
+        if cmd == "analytics":
+            episode_arg = sys.argv[2] if len(sys.argv) > 2 else "all"
+            _run_analytics(episode_arg)
+            return
+
+        if cmd == "search" and len(sys.argv) > 2:
+            query = " ".join(sys.argv[2:])
+            _run_search(query)
+            return
+
+    automation = PodcastAutomation(
+        test_mode=test_mode, resume=resume, dry_run=dry_run, auto_approve=auto_approve
+    )
 
     # Dry run mode: validate pipeline and exit
     if dry_run:
@@ -1294,8 +1715,8 @@ def main():
             # List available episodes sorted by number
             automation.list_episodes_by_number()
         elif arg == "latest":
-            # Process latest episode
-            automation.process_episode()
+            # Process latest episode (with Discord notification)
+            _process_with_notification(automation)
         elif arg.startswith("ep") or arg.startswith("episode"):
             # Process specific episode by number
             # Support formats: ep25, episode25, ep 25, episode 25
@@ -1310,16 +1731,16 @@ def main():
                 print("Usage: python main.py ep25 or python main.py episode 25")
                 return
 
-            automation.process_episode_by_number(episode_num)
+            _process_with_notification(automation, episode_number=episode_num)
         else:
             # Process specific file (local or dropbox path)
             file_path = sys.argv[1]
             if file_path.startswith("/"):
                 # Dropbox path
-                automation.process_episode(dropbox_path=file_path)
+                _process_with_notification(automation, dropbox_path=file_path)
             else:
                 # Local file
-                automation.process_episode(local_audio_path=file_path)
+                _process_with_notification(automation, local_audio_path=file_path)
     else:
         # Interactive mode
         print("Podcast Automation - Interactive Mode")
@@ -1336,12 +1757,12 @@ def main():
         choice = input("Enter choice (1-6): ").strip()
 
         if choice == "1":
-            automation.process_episode()
+            _process_with_notification(automation)
         elif choice == "2":
             automation.list_episodes_by_number()
             episode_num = input("\nEnter episode number: ").strip()
             try:
-                automation.process_episode_by_number(int(episode_num))
+                _process_with_notification(automation, episode_number=int(episode_num))
             except ValueError:
                 print("Invalid episode number")
         elif choice == "3":
@@ -1351,10 +1772,10 @@ def main():
         elif choice == "5":
             automation.list_available_episodes()
             path = input("\nEnter Dropbox path: ").strip()
-            automation.process_episode(dropbox_path=path)
+            _process_with_notification(automation, dropbox_path=path)
         elif choice == "6":
             path = input("Enter local audio file path: ").strip()
-            automation.process_episode(local_audio_path=path)
+            _process_with_notification(automation, local_audio_path=path)
         else:
             print("Invalid choice")
 

@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import List, Dict
 from ollama_client import Ollama
-from config import Config
 from datetime import datetime
 
 
@@ -32,8 +31,10 @@ class TopicScorer:
 
         # Process in batches to optimize API usage
         for i in range(0, len(topics), batch_size):
-            batch = topics[i:i+batch_size]
-            print(f"[INFO] Scoring batch {i//batch_size + 1}/{(len(topics)-1)//batch_size + 1}...")
+            batch = topics[i : i + batch_size]
+            print(
+                f"[INFO] Scoring batch {i // batch_size + 1}/{(len(topics) - 1) // batch_size + 1}..."
+            )
 
             batch_scores = self._score_batch(batch)
             scored_topics.extend(batch_scores)
@@ -48,7 +49,7 @@ class TopicScorer:
         topic_list = []
         for idx, topic in enumerate(topics, 1):
             topic_list.append(f"{idx}. {topic['title']}")
-            if topic.get('selftext'):
+            if topic.get("selftext"):
                 topic_list.append(f"   Context: {topic['selftext'][:200]}")
 
         topic_text = "\n".join(topic_list)
@@ -136,17 +137,18 @@ Return ONLY the JSON array."""
                 model="llama3.2",
                 max_tokens=4000,
                 temperature=0.2,
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": prompt}],
             )
 
             response_text = response.content[0].text.strip()
 
             # Extract JSON from response
-            if response_text.startswith('['):
+            if response_text.startswith("["):
                 scores = json.loads(response_text)
             else:
                 import re
-                json_match = re.search(r'\[.*\]', response_text, re.DOTALL)
+
+                json_match = re.search(r"\[.*\]", response_text, re.DOTALL)
                 if json_match:
                     scores = json.loads(json_match.group(0))
                 else:
@@ -158,18 +160,33 @@ Return ONLY the JSON array."""
             for i, topic in enumerate(topics):
                 if i < len(scores):
                     score_data = scores[i]
-                    topic['score'] = {
-                        'total': score_data.get('total_score', 0),
-                        'shock_value': score_data.get('shock_value', 0),
-                        'relatability': score_data.get('relatability', 0),
-                        'absurdity': score_data.get('absurdity', 0),
-                        'title_hook': score_data.get('title_hook', 0),
-                        'visual_imagery': score_data.get('visual_imagery', 0),
-                        'reason': score_data.get('reason', ''),
-                        'category': score_data.get('category', 'uncategorized'),
-                        'recommended': score_data.get('recommended', False),
-                        'scored_at': datetime.now().isoformat()
+                    topic["score"] = {
+                        "total": score_data.get("total_score", 0),
+                        "shock_value": score_data.get("shock_value", 0),
+                        "relatability": score_data.get("relatability", 0),
+                        "absurdity": score_data.get("absurdity", 0),
+                        "title_hook": score_data.get("title_hook", 0),
+                        "visual_imagery": score_data.get("visual_imagery", 0),
+                        "reason": score_data.get("reason", ""),
+                        "category": score_data.get("category", "uncategorized"),
+                        "recommended": score_data.get("recommended", False),
+                        "scored_at": datetime.now().isoformat(),
+                        "engagement_bonus": None,
                     }
+                    # Add engagement bonus from analytics if available
+                    try:
+                        from analytics import TopicEngagementScorer
+
+                        eng_scorer = TopicEngagementScorer()
+                        # Try to find analytics for related episodes
+                        bonus = eng_scorer.get_engagement_bonus(i + 1)
+                        if bonus is not None:
+                            topic["score"]["engagement_bonus"] = bonus
+                            topic["score"]["total"] = min(
+                                10, topic["score"]["total"] + bonus * 0.1
+                            )
+                    except Exception:
+                        pass  # Analytics integration is optional
                 scored_topics.append(topic)
 
             return scored_topics
@@ -181,7 +198,9 @@ Return ONLY the JSON array."""
 
     def filter_recommended(self, scored_topics: List[Dict]) -> List[Dict]:
         """Filter to only recommended topics (score >= 6)."""
-        recommended = [t for t in scored_topics if t.get('score', {}).get('recommended', False)]
+        recommended = [
+            t for t in scored_topics if t.get("score", {}).get("recommended", False)
+        ]
         print(f"[INFO] {len(recommended)} topics recommended (score >= 6)")
         return recommended
 
@@ -189,8 +208,8 @@ Return ONLY the JSON array."""
         """Sort topics by total score (descending)."""
         return sorted(
             scored_topics,
-            key=lambda t: t.get('score', {}).get('total', 0),
-            reverse=True
+            key=lambda t: t.get("score", {}).get("total", 0),
+            reverse=True,
         )
 
     def group_by_category(self, scored_topics: List[Dict]) -> Dict[str, List[Dict]]:
@@ -198,50 +217,67 @@ Return ONLY the JSON array."""
         categories = {}
 
         for topic in scored_topics:
-            category = topic.get('score', {}).get('category', 'uncategorized')
+            category = topic.get("score", {}).get("category", "uncategorized")
             if category not in categories:
                 categories[category] = []
             categories[category].append(topic)
 
         return categories
 
-    def save_scored_topics(self, scored_topics: List[Dict], filename: str = None) -> Path:
+    def save_scored_topics(
+        self, scored_topics: List[Dict], filename: str = None
+    ) -> Path:
         """Save scored topics to JSON file."""
         if filename is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"scored_topics_{timestamp}.json"
 
-        output_dir = Path('topic_data')
+        output_dir = Path("topic_data")
         output_dir.mkdir(exist_ok=True)
 
         output_path = output_dir / filename
 
         # Calculate statistics
         total = len(scored_topics)
-        recommended = len([t for t in scored_topics if t.get('score', {}).get('recommended', False)])
-        avg_score = sum(t.get('score', {}).get('total', 0) for t in scored_topics) / max(total, 1)
+        recommended = len(
+            [t for t in scored_topics if t.get("score", {}).get("recommended", False)]
+        )
+        avg_score = sum(
+            t.get("score", {}).get("total", 0) for t in scored_topics
+        ) / max(total, 1)
 
         # Group by category
         categories = self.group_by_category(scored_topics)
 
-        with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump({
-                'scored_at': datetime.now().isoformat(),
-                'statistics': {
-                    'total_topics': total,
-                    'recommended': recommended,
-                    'average_score': round(avg_score, 2),
-                    'categories': {cat: len(topics) for cat, topics in categories.items()}
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "scored_at": datetime.now().isoformat(),
+                    "statistics": {
+                        "total_topics": total,
+                        "recommended": recommended,
+                        "average_score": round(avg_score, 2),
+                        "categories": {
+                            cat: len(topics) for cat, topics in categories.items()
+                        },
+                    },
+                    "topics_by_category": {
+                        cat: sorted(
+                            topics,
+                            key=lambda t: t.get("score", {}).get("total", 0),
+                            reverse=True,
+                        )
+                        for cat, topics in categories.items()
+                    },
+                    "all_topics_sorted": self.sort_by_score(scored_topics),
                 },
-                'topics_by_category': {
-                    cat: sorted(topics, key=lambda t: t.get('score', {}).get('total', 0), reverse=True)
-                    for cat, topics in categories.items()
-                },
-                'all_topics_sorted': self.sort_by_score(scored_topics)
-            }, f, indent=2, ensure_ascii=False)
+                f,
+                indent=2,
+                ensure_ascii=False,
+            )
 
         print(f"[OK] Saved scored topics to: {output_path}")
-        print(f"[INFO] Statistics:")
+        print("[INFO] Statistics:")
         print(f"  Total: {total}")
         print(f"  Recommended (6+): {recommended}")
         print(f"  Average score: {avg_score:.2f}")
@@ -252,20 +288,20 @@ Return ONLY the JSON array."""
 
 def score_scraped_topics(input_file: str = None):
     """Score topics from a scraped topics file."""
-    print("="*60)
+    print("=" * 60)
     print("FAKE PROBLEMS - TOPIC SCORER")
-    print("="*60)
+    print("=" * 60)
     print()
 
     # Find most recent scraped topics file if not specified
     if input_file is None:
-        topic_data_dir = Path('topic_data')
+        topic_data_dir = Path("topic_data")
         if not topic_data_dir.exists():
             print("[ERROR] No topic_data directory found")
             print("Run topic_scraper.py first to scrape topics")
             return
 
-        scraped_files = list(topic_data_dir.glob('scraped_topics_*.json'))
+        scraped_files = list(topic_data_dir.glob("scraped_topics_*.json"))
         if not scraped_files:
             print("[ERROR] No scraped topics files found")
             print("Run topic_scraper.py first to scrape topics")
@@ -275,9 +311,9 @@ def score_scraped_topics(input_file: str = None):
 
     print(f"Loading topics from: {input_file}")
 
-    with open(input_file, 'r', encoding='utf-8') as f:
+    with open(input_file, "r", encoding="utf-8") as f:
         data = json.load(f)
-        topics = data.get('topics', [])
+        topics = data.get("topics", [])
 
     print(f"[OK] Loaded {len(topics)} topics")
     print()
@@ -290,9 +326,9 @@ def score_scraped_topics(input_file: str = None):
     output_path = scorer.save_scored_topics(scored_topics)
 
     print()
-    print("="*60)
+    print("=" * 60)
     print("[SUCCESS] SCORING COMPLETE")
-    print("="*60)
+    print("=" * 60)
     print()
     print("Next step: Add top topics to Google Doc")
     print("  python topic_curator.py")
@@ -301,7 +337,8 @@ def score_scraped_topics(input_file: str = None):
     return output_path
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
+
     input_file = sys.argv[1] if len(sys.argv) > 1 else None
     score_scraped_topics(input_file)

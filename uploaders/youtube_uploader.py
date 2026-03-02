@@ -97,6 +97,7 @@ class YouTubeUploader:
         privacy_status: str = "public",
         made_for_kids: bool = False,
         thumbnail_path: Optional[str] = None,
+        publish_at: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Upload a full episode to YouTube.
@@ -140,6 +141,11 @@ class YouTubeUploader:
                 "selfDeclaredMadeForKids": made_for_kids,
             },
         }
+
+        # Add scheduled publishing if publish_at is provided
+        if publish_at:
+            body["status"]["publishAt"] = publish_at
+            logger.info("Scheduled to publish at: %s", publish_at)
 
         # Prepare media upload
         media = MediaFileUpload(

@@ -80,6 +80,35 @@ class Config:
     # Google Docs Topic Tracker
     GOOGLE_DOC_ID = os.getenv("GOOGLE_DOC_ID")
 
+    # Discord Notifications
+    DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
+
+    # Scheduling (delay in hours before uploading to each platform, 0 = immediate)
+    SCHEDULE_YOUTUBE_DELAY_HOURS = int(os.getenv("SCHEDULE_YOUTUBE_DELAY_HOURS", "0"))
+    SCHEDULE_TWITTER_DELAY_HOURS = int(os.getenv("SCHEDULE_TWITTER_DELAY_HOURS", "0"))
+    SCHEDULE_INSTAGRAM_DELAY_HOURS = int(
+        os.getenv("SCHEDULE_INSTAGRAM_DELAY_HOURS", "0")
+    )
+    SCHEDULE_TIKTOK_DELAY_HOURS = int(os.getenv("SCHEDULE_TIKTOK_DELAY_HOURS", "0"))
+
+    # Blog Post Generator
+    BLOG_ENABLED = os.getenv("BLOG_ENABLED", "true").lower() == "true"
+    BLOG_USE_OPENAI = os.getenv("BLOG_USE_OPENAI", "true").lower() == "true"
+
+    # Thumbnail Generation
+    THUMBNAIL_FONT = os.getenv("THUMBNAIL_FONT")
+    THUMBNAIL_BG_COLOR = os.getenv("THUMBNAIL_BG_COLOR", "#1a1a2e")
+    THUMBNAIL_TEXT_COLOR = os.getenv("THUMBNAIL_TEXT_COLOR", "#ffffff")
+    THUMBNAIL_BADGE_COLOR = os.getenv("THUMBNAIL_BADGE_COLOR", "#e94560")
+
+    # Analytics Feedback Loop
+    ANALYTICS_ENABLED = os.getenv("ANALYTICS_ENABLED", "false").lower() == "true"
+
+    # Audiogram Waveforms
+    USE_AUDIOGRAM = os.getenv("USE_AUDIOGRAM", "false").lower() == "true"
+    AUDIOGRAM_BG_COLOR = os.getenv("AUDIOGRAM_BG_COLOR", "0x1a1a2e")
+    AUDIOGRAM_WAVE_COLOR = os.getenv("AUDIOGRAM_WAVE_COLOR", "0xe94560")
+
     # HuggingFace (for pyannote speaker diarization)
     HF_TOKEN = os.getenv("HF_TOKEN")
 
