@@ -188,19 +188,22 @@ class PodcastAutomation:
         episode_title = analysis.get("episode_title", f"Episode {episode_number}")
         best_clips = analysis.get("best_clips", [])
 
+        show_notes = analysis.get("show_notes", "")
+        chapters = analysis.get("chapters", [])
+
         # Upload full episode first
         if full_episode_video_path:
             logger.info("Uploading full episode to YouTube...")
             full_title = f"Episode #{episode_number} - {episode_title}"
-            full_description = (
-                f"{episode_summary}\n\n{social_captions.get('youtube', '')}"
+            metadata = create_episode_metadata(
+                episode_number=episode_number,
+                episode_summary=episode_summary,
+                social_captions=social_captions,
+                show_notes=show_notes,
+                chapters=chapters,
             )
-            tags = [
-                Config.PODCAST_NAME,
-                "podcast",
-                "comedy",
-                f"episode{episode_number}",
-            ]
+            full_description = metadata["description"]
+            tags = metadata["tags"]
 
             if self.test_mode:
                 logger.info(
@@ -326,18 +329,20 @@ class PodcastAutomation:
             return {"status": "test_mode", "skipped": True}
         else:
             try:
+                twitter_caption = analysis.get("social_captions", {}).get("twitter")
                 twitter_result = self.uploaders["twitter"].post_episode_announcement(
                     episode_number=episode_number,
                     episode_summary=episode_summary,
                     youtube_url=yt_full_url,
                     clip_youtube_urls=clip_youtube_urls if clip_youtube_urls else None,
+                    twitter_caption=twitter_caption,
                 )
                 return twitter_result
             except Exception as e:
                 logger.error("Twitter upload failed: %s", e)
                 return {"error": str(e)}
 
-    def _upload_instagram(self, video_clip_paths):
+    def _upload_instagram(self, video_clip_paths, episode_number=None, analysis=None):
         """Upload clips to Instagram as Reels."""
         if "instagram" not in self.uploaders:
             return None
@@ -351,6 +356,19 @@ class PodcastAutomation:
             logger.info(
                 "Upload videos to Dropbox and get public links to enable auto-upload"
             )
+            # Log prepared captions with hook + hashtags
+            if analysis:
+                best_clips = analysis.get("best_clips", [])
+                for i, clip_info in enumerate(best_clips[: len(video_clip_paths)]):
+                    hook = clip_info.get("hook_caption", "")
+                    tags = clip_info.get("clip_hashtags", [])
+                    if hook or tags:
+                        logger.info(
+                            "  Clip %d caption: hook=%r hashtags=%s",
+                            i + 1,
+                            hook,
+                            tags,
+                        )
             return {"status": "videos_ready", "clips": len(video_clip_paths)}
         else:
             logger.info("No video clips available")
@@ -394,7 +412,11 @@ class PodcastAutomation:
             results["twitter"] = twitter_results
 
         # Instagram Reels
-        instagram_results = self._upload_instagram(video_clip_paths)
+        instagram_results = self._upload_instagram(
+            video_clip_paths,
+            episode_number=episode_number,
+            analysis=analysis,
+        )
         if instagram_results:
             results["instagram"] = instagram_results
 
@@ -406,6 +428,18 @@ class PodcastAutomation:
                     "%d vertical videos ready for TikTok", len(video_clip_paths)
                 )
                 logger.info("Ready to upload (upload code commented out for safety)")
+                # Log prepared captions with hook + hashtags
+                best_clips = analysis.get("best_clips", [])
+                for i, clip_info in enumerate(best_clips[: len(video_clip_paths)]):
+                    hook = clip_info.get("hook_caption", "")
+                    tags = clip_info.get("clip_hashtags", [])
+                    if hook or tags:
+                        logger.info(
+                            "  Clip %d caption: hook=%r hashtags=%s",
+                            i + 1,
+                            hook,
+                            tags,
+                        )
                 results["tiktok"] = {
                     "status": "videos_ready",
                     "clips": len(video_clip_paths),
@@ -508,7 +542,31 @@ class PodcastAutomation:
                 "youtube": "YT caption",
                 "instagram": "IG caption",
                 "twitter": "Tweet",
+                "tiktok": "TikTok caption",
             },
+            "show_notes": 'This episode dives into dry run testing.\n\n- Topic 1\n- Topic 2\n\nNotable quote: "Testing is believing."',
+            "chapters": [
+                {
+                    "start_timestamp": "00:00:00",
+                    "title": "Intro",
+                    "start_seconds": 0,
+                },
+                {
+                    "start_timestamp": "00:05:00",
+                    "title": "First Topic",
+                    "start_seconds": 300,
+                },
+                {
+                    "start_timestamp": "00:15:00",
+                    "title": "Second Topic",
+                    "start_seconds": 900,
+                },
+                {
+                    "start_timestamp": "00:30:00",
+                    "title": "Wrap Up",
+                    "start_seconds": 1800,
+                },
+            ],
         }
 
         num_censor = len(analysis["censor_timestamps"])
@@ -725,6 +783,17 @@ class PodcastAutomation:
             with open(analysis_path, "w", encoding="utf-8") as f:
                 json.dump(analysis, f, indent=2, ensure_ascii=False)
             logger.info("Analysis saved to: %s", analysis_path)
+
+            # Save show notes as a standalone text file
+            show_notes_text = analysis.get("show_notes", "")
+            if show_notes_text:
+                show_notes_path = (
+                    episode_output_dir / f"{audio_file.stem}_{timestamp}_show_notes.txt"
+                )
+                with open(show_notes_path, "w", encoding="utf-8") as f:
+                    f.write(show_notes_text)
+                logger.info("Show notes saved to: %s", show_notes_path)
+
             if state:
                 state.complete_step("analyze", {"analysis_path": str(analysis_path)})
         print()
@@ -991,12 +1060,23 @@ class PodcastAutomation:
 
                     # Generate episode title and description
                     episode_summary = analysis.get("episode_summary", "")
+                    show_notes = analysis.get("show_notes", "")
+                    chapters_list = analysis.get("chapters", [])
                     ai_title = analysis.get("episode_title", "")
                     episode_title = (
                         f"Episode #{episode_number} - {ai_title}"
                         if ai_title
                         else f"Episode #{episode_number}"
                     )
+
+                    # Build rich episode description for RSS
+                    rss_description = show_notes or episode_summary
+                    if chapters_list:
+                        chapter_lines = [
+                            f"{ch.get('start_timestamp', '')} {ch.get('title', '')}"
+                            for ch in chapters_list
+                        ]
+                        rss_description += "\n\nChapters:\n" + "\n".join(chapter_lines)
 
                     # Extract keywords from social captions
                     keywords = []
@@ -1007,7 +1087,7 @@ class PodcastAutomation:
                     rss_feed_path = self.uploaders["spotify"].update_rss_feed(
                         episode_number=episode_number,
                         episode_title=episode_title,
-                        episode_description=episode_summary,
+                        episode_description=rss_description,
                         audio_url=audio_url,
                         audio_file_size=mp3_file_size,
                         duration_seconds=episode_duration,
@@ -1081,6 +1161,8 @@ class PodcastAutomation:
             "dropbox_finished_path": finished_path,
             "dropbox_clip_paths": uploaded_clip_paths,
             "episode_summary": analysis.get("episode_summary"),
+            "show_notes": analysis.get("show_notes"),
+            "chapters": analysis.get("chapters"),
             "social_captions": analysis.get("social_captions"),
             "best_clips_info": analysis.get("best_clips"),
             "censor_count": len(analysis.get("censor_timestamps", [])),

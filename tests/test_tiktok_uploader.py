@@ -201,5 +201,46 @@ class TestCreateTikTokCaption:
         assert len(caption) <= 150
 
 
+class TestCreateTikTokCaptionHook:
+    """Test cases for hook_caption in create_tiktok_caption."""
+
+    def test_hook_caption_used_as_primary_text(self):
+        """Test that short hook_caption is used as primary text."""
+        caption = create_tiktok_caption(
+            clip_title="Long Clip Title That Is Boring",
+            hook_caption="Wait for it...",
+        )
+        assert "Wait for it..." in caption
+        assert "Long Clip Title" not in caption
+
+    def test_long_hook_caption_ignored(self):
+        """Test that hook_caption >= 80 chars falls back to clip_title."""
+        long_hook = "A" * 80
+        caption = create_tiktok_caption(
+            clip_title="Short Title",
+            hook_caption=long_hook,
+        )
+        assert "Short Title" in caption
+        assert long_hook not in caption
+
+    def test_hook_caption_none_uses_title(self):
+        """Test that None hook_caption uses clip_title."""
+        caption = create_tiktok_caption(
+            clip_title="Clip Title",
+            hook_caption=None,
+        )
+        assert "Clip Title" in caption
+
+    def test_hook_caption_with_custom_hashtags(self):
+        """Test hook_caption with custom hashtags."""
+        caption = create_tiktok_caption(
+            clip_title="Title",
+            hook_caption="This is wild",
+            hashtags=["custom"],
+        )
+        assert "This is wild" in caption
+        assert "#custom" in caption
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

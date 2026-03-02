@@ -222,5 +222,84 @@ class TestCreateTwitterCaption:
         assert caption.endswith("...")
 
 
+class TestPostEpisodeAnnouncementAICaption:
+    """Test cases for AI-generated twitter_caption in post_episode_announcement."""
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch.object(Config, "PODCAST_NAME", "Test Podcast")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_ai_caption_used_when_provided(self, mock_client_class, mock_api_class):
+        """Test that AI caption replaces hardcoded template when provided."""
+        uploader = TwitterUploader()
+
+        with patch.object(uploader, "post_thread") as mock_post_thread:
+            mock_post_thread.return_value = [{"tweet_id": "1"}]
+
+            uploader.post_episode_announcement(
+                episode_number=25,
+                episode_summary="Great episode!",
+                youtube_url="https://youtube.com/watch?v=123",
+                twitter_caption="This episode is fire",
+            )
+
+            call_args = mock_post_thread.call_args
+            tweets = call_args[0][0]
+            # AI caption should be the first tweet, not the hardcoded template
+            assert "This episode is fire" in tweets[0]
+            assert "New Episode Alert" not in tweets[0]
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch.object(Config, "PODCAST_NAME", "Test Podcast")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_fallback_template_when_no_caption(self, mock_client_class, mock_api_class):
+        """Test that hardcoded template is used when no AI caption provided."""
+        uploader = TwitterUploader()
+
+        with patch.object(uploader, "post_thread") as mock_post_thread:
+            mock_post_thread.return_value = [{"tweet_id": "1"}]
+
+            uploader.post_episode_announcement(
+                episode_number=25,
+                episode_summary="Great episode!",
+            )
+
+            call_args = mock_post_thread.call_args
+            tweets = call_args[0][0]
+            assert "New Episode Alert" in tweets[0]
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_ai_caption_with_youtube_url(self, mock_client_class, mock_api_class):
+        """Test that YouTube URL is appended to AI caption if space allows."""
+        uploader = TwitterUploader()
+
+        with patch.object(uploader, "post_thread") as mock_post_thread:
+            mock_post_thread.return_value = [{"tweet_id": "1"}]
+
+            short_caption = "Short tweet"
+            uploader.post_episode_announcement(
+                episode_number=25,
+                episode_summary="Summary",
+                youtube_url="https://youtube.com/watch?v=123",
+                twitter_caption=short_caption,
+            )
+
+            call_args = mock_post_thread.call_args
+            tweets = call_args[0][0]
+            assert "https://youtube.com/watch?v=123" in tweets[0]
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

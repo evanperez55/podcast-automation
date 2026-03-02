@@ -235,6 +235,7 @@ class TwitterUploader:
         youtube_url: Optional[str] = None,
         spotify_url: Optional[str] = None,
         clip_youtube_urls: Optional[List[Dict[str, str]]] = None,
+        twitter_caption: Optional[str] = None,
     ) -> Optional[List[Dict[str, Any]]]:
         """
         Post an episode announcement as a thread.
@@ -245,18 +246,29 @@ class TwitterUploader:
             youtube_url: Optional YouTube URL for full episode
             spotify_url: Optional Spotify URL
             clip_youtube_urls: Optional list of dicts with 'title' and 'url' for each clip
+            twitter_caption: Optional AI-generated tweet text (used instead of template)
 
         Returns:
             List of tweet info dictionaries, or None if failed
         """
-        # Main announcement tweet with YouTube link
-        main_tweet = (
-            f"🎙️ New Episode Alert! 🎙️\n\n"
-            f"Episode {episode_number} of {Config.PODCAST_NAME} is now live!\n\n"
-            f"{episode_summary[:150]}"
-        )
-        if youtube_url:
-            main_tweet += f"\n\n{youtube_url}"
+        if twitter_caption:
+            # Use AI-generated caption, append YouTube URL if space allows
+            main_tweet = twitter_caption
+            if youtube_url:
+                with_url = f"{twitter_caption}\n\n{youtube_url}"
+                if len(with_url) <= 280:
+                    main_tweet = with_url
+                else:
+                    main_tweet = twitter_caption[:280]
+        else:
+            # Fallback: hardcoded template
+            main_tweet = (
+                f"🎙️ New Episode Alert! 🎙️\n\n"
+                f"Episode {episode_number} of {Config.PODCAST_NAME} is now live!\n\n"
+                f"{episode_summary[:150]}"
+            )
+            if youtube_url:
+                main_tweet += f"\n\n{youtube_url}"
 
         # Build thread
         tweets = [main_tweet]

@@ -3,7 +3,11 @@
 import pytest
 from unittest.mock import Mock, patch, mock_open
 
-from uploaders.youtube_uploader import YouTubeUploader, create_episode_metadata
+from uploaders.youtube_uploader import (
+    YouTubeUploader,
+    create_episode_metadata,
+    _format_chapters_for_youtube,
+)
 
 
 class TestYouTubeUploader:
@@ -208,6 +212,123 @@ class TestCreateEpisodeMetadata:
         assert "description" in metadata
         assert "tags" in metadata
         assert isinstance(metadata["tags"], list)
+
+
+class TestFormatChaptersForYouTube:
+    """Test cases for _format_chapters_for_youtube function."""
+
+    def test_format_chapters_basic(self):
+        """Test basic chapter formatting."""
+        chapters = [
+            {"start_timestamp": "00:00:00", "title": "Intro", "start_seconds": 0},
+            {"start_timestamp": "00:05:30", "title": "Topic 1", "start_seconds": 330},
+            {"start_timestamp": "00:15:00", "title": "Topic 2", "start_seconds": 900},
+        ]
+        result = _format_chapters_for_youtube(chapters)
+        assert "0:00 Intro" in result
+        assert "5:30 Topic 1" in result
+        assert "15:00 Topic 2" in result
+
+    def test_format_chapters_with_hours(self):
+        """Test chapter formatting with hours."""
+        chapters = [
+            {"start_timestamp": "00:00:00", "title": "Intro", "start_seconds": 0},
+            {"start_timestamp": "00:30:00", "title": "Middle", "start_seconds": 1800},
+            {"start_timestamp": "01:05:00", "title": "End", "start_seconds": 3900},
+        ]
+        result = _format_chapters_for_youtube(chapters)
+        assert "1:05:00 End" in result
+
+    def test_format_chapters_too_few(self):
+        """Test that fewer than 3 chapters returns empty string."""
+        chapters = [
+            {"start_timestamp": "00:00:00", "title": "Intro", "start_seconds": 0},
+            {"start_timestamp": "00:05:00", "title": "Topic", "start_seconds": 300},
+        ]
+        result = _format_chapters_for_youtube(chapters)
+        assert result == ""
+
+    def test_format_chapters_empty(self):
+        """Test that empty chapters returns empty string."""
+        assert _format_chapters_for_youtube([]) == ""
+        assert _format_chapters_for_youtube(None) == ""
+
+    def test_format_chapters_first_not_zero(self):
+        """Test that chapters not starting at 0 returns empty string."""
+        chapters = [
+            {"start_timestamp": "00:01:00", "title": "Topic", "start_seconds": 60},
+            {"start_timestamp": "00:10:00", "title": "Topic 2", "start_seconds": 600},
+            {"start_timestamp": "00:20:00", "title": "Topic 3", "start_seconds": 1200},
+        ]
+        result = _format_chapters_for_youtube(chapters)
+        assert result == ""
+
+
+class TestCreateEpisodeMetadataShowNotes:
+    """Test cases for show_notes and chapters in create_episode_metadata."""
+
+    def test_show_notes_in_full_episode_description(self):
+        """Test that show_notes replaces episode_summary in description."""
+        metadata = create_episode_metadata(
+            episode_number=25,
+            episode_summary="Short summary",
+            social_captions={"youtube": "YouTube caption"},
+            show_notes="Detailed show notes with bullets",
+        )
+        assert "Detailed show notes with bullets" in metadata["description"]
+        assert "Short summary" not in metadata["description"]
+
+    def test_fallback_to_summary_without_show_notes(self):
+        """Test fallback to episode_summary when no show_notes."""
+        metadata = create_episode_metadata(
+            episode_number=25,
+            episode_summary="Short summary",
+            social_captions={"youtube": "YouTube caption"},
+        )
+        assert "Short summary" in metadata["description"]
+
+    def test_chapters_appended_to_description(self):
+        """Test that chapters are appended to episode description."""
+        chapters = [
+            {"start_timestamp": "00:00:00", "title": "Intro", "start_seconds": 0},
+            {"start_timestamp": "00:05:00", "title": "Topic 1", "start_seconds": 300},
+            {"start_timestamp": "00:15:00", "title": "Topic 2", "start_seconds": 900},
+        ]
+        metadata = create_episode_metadata(
+            episode_number=25,
+            episode_summary="Summary",
+            social_captions={},
+            chapters=chapters,
+        )
+        assert "Chapters:" in metadata["description"]
+        assert "Intro" in metadata["description"]
+        assert "Topic 1" in metadata["description"]
+
+    def test_hook_caption_in_clip_description(self):
+        """Test that hook_caption is prepended for clips."""
+        clip_info = {
+            "title": "Funny Moment",
+            "description": "A funny clip",
+            "hook_caption": "Wait for it...",
+        }
+        metadata = create_episode_metadata(
+            episode_number=25,
+            episode_summary="Summary",
+            social_captions={"youtube": "YouTube caption"},
+            clip_info=clip_info,
+        )
+        assert metadata["description"].startswith("Wait for it...")
+
+    def test_clip_without_hook_caption(self):
+        """Test clip description without hook_caption."""
+        clip_info = {"title": "Funny Moment", "description": "A funny clip"}
+        metadata = create_episode_metadata(
+            episode_number=25,
+            episode_summary="Summary",
+            social_captions={"youtube": "YouTube caption"},
+            clip_info=clip_info,
+        )
+        assert "A funny clip" in metadata["description"]
 
 
 if __name__ == "__main__":

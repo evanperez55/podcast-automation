@@ -392,3 +392,145 @@ class TestAnalyzeContentSignature:
 
         result = content_editor.analyze_content(transcript_data)
         assert result is not None
+
+
+class TestNewFieldDefaults:
+    """Tests for setdefault guards on new fields."""
+
+    def test_setdefault_show_notes(self, content_editor):
+        """Test that show_notes defaults to empty string."""
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = """{
+            "episode_title": "Test",
+            "censor_timestamps": [],
+            "best_clips": [],
+            "episode_summary": "Test summary",
+            "social_captions": {"youtube": "", "instagram": "", "twitter": ""}
+        }"""
+        content_editor.client.chat.completions.create = Mock(return_value=mock_response)
+        transcript_data = {"words": [], "segments": []}
+
+        result = content_editor.analyze_content(transcript_data)
+        assert result["show_notes"] == ""
+
+    def test_setdefault_chapters(self, content_editor):
+        """Test that chapters defaults to empty list."""
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = """{
+            "episode_title": "Test",
+            "censor_timestamps": [],
+            "best_clips": [],
+            "episode_summary": "Test summary",
+            "social_captions": {"youtube": "", "instagram": "", "twitter": ""}
+        }"""
+        content_editor.client.chat.completions.create = Mock(return_value=mock_response)
+        transcript_data = {"words": [], "segments": []}
+
+        result = content_editor.analyze_content(transcript_data)
+        assert result["chapters"] == []
+
+    def test_setdefault_tiktok_caption(self, content_editor):
+        """Test that tiktok caption defaults to empty string."""
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = """{
+            "episode_title": "Test",
+            "censor_timestamps": [],
+            "best_clips": [],
+            "episode_summary": "Test summary",
+            "social_captions": {"youtube": "", "instagram": "", "twitter": ""}
+        }"""
+        content_editor.client.chat.completions.create = Mock(return_value=mock_response)
+        transcript_data = {"words": [], "segments": []}
+
+        result = content_editor.analyze_content(transcript_data)
+        assert result["social_captions"]["tiktok"] == ""
+
+    def test_preserves_existing_new_fields(self, content_editor):
+        """Test that existing show_notes/chapters/tiktok are preserved."""
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = """{
+            "episode_title": "Test",
+            "censor_timestamps": [],
+            "best_clips": [],
+            "episode_summary": "Test summary",
+            "social_captions": {"youtube": "", "instagram": "", "twitter": "", "tiktok": "TikTok text"},
+            "show_notes": "Detailed notes",
+            "chapters": [{"start_timestamp": "00:00:00", "title": "Intro"}]
+        }"""
+        content_editor.client.chat.completions.create = Mock(return_value=mock_response)
+        transcript_data = {"words": [], "segments": []}
+
+        result = content_editor.analyze_content(transcript_data)
+        assert result["show_notes"] == "Detailed notes"
+        assert len(result["chapters"]) == 1
+        assert result["social_captions"]["tiktok"] == "TikTok text"
+
+
+class TestChapterParsing:
+    """Tests for chapter timestamp parsing."""
+
+    def test_parse_chapters_timestamps(self, content_editor):
+        """Test that chapter start_timestamps are converted to start_seconds."""
+        response_text = """{
+            "episode_title": "Test",
+            "censor_timestamps": [],
+            "best_clips": [],
+            "episode_summary": "Test",
+            "social_captions": {"youtube": "", "instagram": "", "twitter": ""},
+            "chapters": [
+                {"start_timestamp": "00:00:00", "title": "Intro"},
+                {"start_timestamp": "00:05:30", "title": "Topic 1"},
+                {"start_timestamp": "01:00:00", "title": "Topic 2"}
+            ]
+        }"""
+        result = content_editor._parse_claude_response(response_text)
+
+        assert result["chapters"][0]["start_seconds"] == 0
+        assert result["chapters"][1]["start_seconds"] == 330
+        assert result["chapters"][2]["start_seconds"] == 3600
+
+    def test_parse_empty_chapters(self, content_editor):
+        """Test parsing response with no chapters."""
+        response_text = """{
+            "episode_title": "Test",
+            "censor_timestamps": [],
+            "best_clips": [],
+            "episode_summary": "Test",
+            "social_captions": {"youtube": "", "instagram": "", "twitter": ""}
+        }"""
+        result = content_editor._parse_claude_response(response_text)
+        # chapters key may not exist, that's fine
+        assert result.get("chapters", []) == []
+
+
+class TestPromptNewTasks:
+    """Tests for new prompt tasks."""
+
+    def test_prompt_includes_show_notes_task(self, content_editor):
+        """Test that prompt includes show notes task."""
+        prompt = content_editor._build_analysis_prompt("transcript")
+        assert "WRITE DETAILED SHOW NOTES" in prompt
+
+    def test_prompt_includes_chapter_markers_task(self, content_editor):
+        """Test that prompt includes chapter markers task."""
+        prompt = content_editor._build_analysis_prompt("transcript")
+        assert "IDENTIFY CHAPTER MARKERS" in prompt
+
+    def test_prompt_includes_tiktok_in_captions(self, content_editor):
+        """Test that prompt includes tiktok in social captions."""
+        prompt = content_editor._build_analysis_prompt("transcript")
+        assert "tiktok" in prompt.lower()
+
+    def test_prompt_schema_includes_show_notes(self, content_editor):
+        """Test that JSON schema includes show_notes field."""
+        prompt = content_editor._build_analysis_prompt("transcript")
+        assert '"show_notes"' in prompt
+
+    def test_prompt_schema_includes_chapters(self, content_editor):
+        """Test that JSON schema includes chapters field."""
+        prompt = content_editor._build_analysis_prompt("transcript")
+        assert '"chapters"' in prompt

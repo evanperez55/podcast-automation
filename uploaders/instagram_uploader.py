@@ -325,6 +325,8 @@ def create_instagram_caption(
     clip_title: str,
     social_caption: str,
     hashtags: Optional[list] = None,
+    hook_caption: Optional[str] = None,
+    clip_hashtags: Optional[list] = None,
 ) -> str:
     """
     Create an Instagram Reel caption.
@@ -334,17 +336,25 @@ def create_instagram_caption(
         clip_title: Title of the clip
         social_caption: Caption from Claude analysis
         hashtags: Optional list of hashtags
+        hook_caption: Optional hook line to prepend (from AI per-clip analysis)
+        clip_hashtags: Optional per-clip hashtags (used if no explicit hashtags)
 
     Returns:
         Formatted caption string
     """
-    caption = f"{clip_title}\n\n"
+    caption = ""
+    if hook_caption:
+        caption += f"{hook_caption}\n\n"
+    caption += f"{clip_title}\n\n"
     caption += f"{social_caption}\n\n"
     caption += f"🎙️ From Episode {episode_number} of {Config.PODCAST_NAME}\n\n"
 
-    # Default hashtags if none provided
-    if not hashtags:
-        hashtags = [
+    # Use clip_hashtags if no explicit hashtags provided
+    effective_hashtags = hashtags
+    if not effective_hashtags and clip_hashtags:
+        effective_hashtags = clip_hashtags
+    if not effective_hashtags:
+        effective_hashtags = [
             "podcast",
             "comedy",
             "funny",
@@ -356,6 +366,6 @@ def create_instagram_caption(
         ]
 
     # Add hashtags
-    caption += " ".join(f"#{tag}" for tag in hashtags)
+    caption += " ".join(f"#{tag}" for tag in effective_hashtags)
 
     return caption[:2200]  # Instagram max caption length

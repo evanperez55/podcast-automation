@@ -331,7 +331,10 @@ class TikTokUploader:
 
 
 def create_tiktok_caption(
-    clip_title: str, social_caption: str = "", hashtags: Optional[list] = None
+    clip_title: str,
+    social_caption: str = "",
+    hashtags: Optional[list] = None,
+    hook_caption: Optional[str] = None,
 ) -> str:
     """
     Create a TikTok video title/caption (max 150 characters).
@@ -344,6 +347,7 @@ def create_tiktok_caption(
         clip_title: Title of the clip
         social_caption: Caption from Claude analysis (used as fallback)
         hashtags: Optional list of hashtags
+        hook_caption: Optional hook line from AI (used as primary text if short)
 
     Returns:
         Formatted title string (max 150 chars)
@@ -353,15 +357,20 @@ def create_tiktok_caption(
 
     hashtag_str = " ".join(f"#{tag}" for tag in hashtags)
 
-    # Try title + hashtags first
-    caption = f"{clip_title} {hashtag_str}"
+    # Use hook_caption as primary text if it's short enough
+    primary_text = clip_title
+    if hook_caption and len(hook_caption) < 80:
+        primary_text = hook_caption
+
+    # Try primary text + hashtags first
+    caption = f"{primary_text} {hashtag_str}"
     if len(caption) <= 150:
         return caption
 
-    # If too long, truncate title to fit hashtags
+    # If too long, truncate primary text to fit hashtags
     max_title_len = 150 - len(hashtag_str) - 2  # 2 for space + ellipsis
     if max_title_len > 10:
-        return f"{clip_title[:max_title_len]}… {hashtag_str}"
+        return f"{primary_text[:max_title_len]}… {hashtag_str}"
 
-    # Last resort: just truncate the title
-    return clip_title[:150]
+    # Last resort: just truncate the primary text
+    return primary_text[:150]

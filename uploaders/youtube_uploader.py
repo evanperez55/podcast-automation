@@ -368,11 +368,50 @@ class YouTubeUploader:
         }
 
 
+def _format_chapters_for_youtube(chapters: list) -> str:
+    """Format chapter markers for YouTube description.
+
+    YouTube requires at least 3 chapters, and the first must start at 0:00.
+
+    Args:
+        chapters: List of chapter dicts with 'start_timestamp' and 'title'
+
+    Returns:
+        Formatted chapters string, or empty string if requirements not met
+    """
+    if not chapters or len(chapters) < 3:
+        return ""
+
+    # Ensure first chapter starts at 0:00
+    first = chapters[0]
+    first_seconds = first.get("start_seconds", 0)
+    if first_seconds != 0:
+        return ""
+
+    lines = []
+    for ch in chapters:
+        ts = ch.get("start_timestamp", "00:00:00")
+        # Convert HH:MM:SS to M:SS or H:MM:SS for YouTube display
+        parts = ts.split(":")
+        if len(parts) == 3:
+            h, m, s = int(parts[0]), int(parts[1]), parts[2].split(".")[0]
+            if h > 0:
+                lines.append(f"{h}:{m:02d}:{s} {ch.get('title', '')}")
+            else:
+                lines.append(f"{m}:{s} {ch.get('title', '')}")
+        else:
+            lines.append(f"{ts} {ch.get('title', '')}")
+
+    return "\n".join(lines)
+
+
 def create_episode_metadata(
     episode_number: int,
     episode_summary: str,
     social_captions: Dict[str, str],
     clip_info: Optional[Dict[str, Any]] = None,
+    show_notes: Optional[str] = None,
+    chapters: Optional[list] = None,
 ) -> Dict[str, Any]:
     """
     Create YouTube metadata from episode analysis.
@@ -382,6 +421,8 @@ def create_episode_metadata(
         episode_summary: Summary from Claude analysis
         social_captions: Social media captions from Claude
         clip_info: Information about the clip (for Shorts)
+        show_notes: Detailed show notes (used for full episode description)
+        chapters: List of chapter marker dicts (used for full episode description)
 
     Returns:
         Dictionary with title, description, and tags
@@ -391,14 +432,23 @@ def create_episode_metadata(
     if clip_info:
         # For Shorts/clips
         title = f"{clip_info.get('suggested_title', clip_info.get('title', f'Episode #{episode_number} Clip'))}"
-        description = f"{clip_info.get('description', '')}\n\n"
+        hook = clip_info.get("hook_caption", "")
+        description = f"{hook}\n\n" if hook else ""
+        description += f"{clip_info.get('description', '')}\n\n"
         description += f"From Episode #{episode_number} of {podcast_name}\n\n"
         description += social_captions.get("youtube", episode_summary)
     else:
         # For full episodes
         title = f"Episode #{episode_number}"
-        description = f"{episode_summary}\n\n"
+        # Use show_notes if available, otherwise fall back to episode_summary
+        description = f"{show_notes or episode_summary}\n\n"
         description += social_captions.get("youtube", "")
+
+        # Append YouTube chapters if available
+        if chapters:
+            chapters_text = _format_chapters_for_youtube(chapters)
+            if chapters_text:
+                description += f"\n\nChapters:\n{chapters_text}"
 
     # Common tags
     tags = [

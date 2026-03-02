@@ -51,7 +51,7 @@ class ContentEditor:
             # Call OpenAI API
             response = self.client.chat.completions.create(
                 model="gpt-4o",
-                max_tokens=4000,
+                max_tokens=6000,
                 temperature=0.3,
                 messages=[{"role": "user", "content": prompt}],
             )
@@ -59,6 +59,11 @@ class ContentEditor:
             # Parse GPT-4's response
             response_text = response.choices[0].message.content
             analysis = self._parse_claude_response(response_text)
+
+            # Ensure new fields have defaults (backward compat with older responses)
+            analysis.setdefault("show_notes", "")
+            analysis.setdefault("chapters", [])
+            analysis.get("social_captions", {}).setdefault("tiktok", "")
 
             # DIRECT SEARCH: Find words to censor by searching transcript directly
             # This is more reliable than GPT-4 which can hallucinate
@@ -176,8 +181,22 @@ class ContentEditor:
 5. **CREATE SOCIAL MEDIA CAPTIONS:**
    Write engaging captions for:
    - YouTube (description format, 2-3 paragraphs)
-   - Instagram/TikTok (short, punchy, with emojis)
+   - Instagram (short, punchy, with emojis)
    - Twitter (concise, under 280 chars)
+   - TikTok (short, punchy, under 150 chars, with emojis)
+
+6. **WRITE DETAILED SHOW NOTES:**
+   Write show notes for the episode page/description:
+   - Opening paragraph (2-3 sentences setting the scene)
+   - 4-8 bullet points covering the main topics discussed
+   - 1-2 notable or funny quotes from the episode (without attributing to specific hosts by name)
+
+7. **IDENTIFY CHAPTER MARKERS:**
+   Identify 5-8 major topic transitions for chapter markers:
+   - The first chapter MUST be "00:00:00 Intro"
+   - Each chapter should have a timestamp (HH:MM:SS) and a short title (3-8 words)
+   - Chapters should mark when the conversation shifts to a new topic
+   - Space them relatively evenly throughout the episode
 
 **CRITICAL - ANONYMITY REQUIREMENT:**
    The hosts' names are being CENSORED from the audio for privacy/anonymity reasons.
@@ -222,8 +241,20 @@ Please respond with ONLY valid JSON in this exact format:
   "social_captions": {{
     "youtube": "Full YouTube description",
     "instagram": "Instagram caption with emojis",
-    "twitter": "Tweet under 280 chars"
-  }}
+    "twitter": "Tweet under 280 chars",
+    "tiktok": "TikTok caption under 150 chars with emojis"
+  }},
+  "show_notes": "Opening paragraph.\\n\\n- Topic 1 bullet point\\n- Topic 2 bullet point\\n...\\n\\nNotable quote: \\"Funny quote from the episode\\"",
+  "chapters": [
+    {{
+      "start_timestamp": "00:00:00",
+      "title": "Intro"
+    }},
+    {{
+      "start_timestamp": "00:05:30",
+      "title": "Topic Title Here"
+    }}
+  ]
 }}
 """
 
@@ -253,6 +284,12 @@ Please respond with ONLY valid JSON in this exact format:
                     clip["start_seconds"] = self._timestamp_to_seconds(clip["start"])
                 if "end" in clip:
                     clip["end_seconds"] = self._timestamp_to_seconds(clip["end"])
+
+            for chapter in analysis.get("chapters", []):
+                if "start_timestamp" in chapter:
+                    chapter["start_seconds"] = self._timestamp_to_seconds(
+                        chapter["start_timestamp"]
+                    )
 
             return analysis
 
