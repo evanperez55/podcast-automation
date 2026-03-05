@@ -344,11 +344,19 @@ class PodcastAutomation:
                 yt_full_url = youtube_results["full_episode"]["video_url"]
             for i, clip_result in enumerate(youtube_results.get("clips", [])):
                 if clip_result.get("video_url"):
-                    clip_title = (
-                        best_clips[i].get("suggested_title", f"Clip {i + 1}")
-                        if i < len(best_clips)
-                        else f"Clip {i + 1}"
-                    )
+                    # Use title from YouTube result (already resolved via
+                    # suggested_title -> title -> generic fallback chain),
+                    # strip #Shorts suffix for Twitter display
+                    clip_title = clip_result.get("title", "").replace(" #Shorts", "")
+                    if not clip_title:
+                        clip_title = (
+                            best_clips[i].get(
+                                "suggested_title",
+                                best_clips[i].get("title", f"Clip {i + 1}"),
+                            )
+                            if i < len(best_clips)
+                            else f"Clip {i + 1}"
+                        )
                     clip_youtube_urls.append(
                         {"title": clip_title, "url": clip_result["video_url"]}
                     )

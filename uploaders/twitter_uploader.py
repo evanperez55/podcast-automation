@@ -253,13 +253,17 @@ class TwitterUploader:
         """
         if twitter_caption:
             # Use AI-generated caption, append YouTube URL if space allows
+            # Twitter wraps URLs to 23 chars via t.co, so use that for length calc
             main_tweet = twitter_caption
             if youtube_url:
-                with_url = f"{twitter_caption}\n\n{youtube_url}"
-                if len(with_url) <= 280:
-                    main_tweet = with_url
+                url_display_len = 23  # t.co wrapped length
+                caption_with_url_len = len(twitter_caption) + 2 + url_display_len
+                if caption_with_url_len <= 280:
+                    main_tweet = f"{twitter_caption}\n\n{youtube_url}"
                 else:
-                    main_tweet = twitter_caption[:280]
+                    # Trim caption to fit URL
+                    max_caption_len = 280 - 2 - url_display_len
+                    main_tweet = f"{twitter_caption[:max_caption_len]}\n\n{youtube_url}"
         else:
             # Fallback: hardcoded template
             main_tweet = (
@@ -302,14 +306,19 @@ class TwitterUploader:
         Returns:
             Dictionary with tweet info, or None if post failed
         """
-        full_caption = (
-            f"{caption}\n\n🎙️ From Episode {episode_number} of {Config.PODCAST_NAME}"
-        )
+        suffix = f"\n\n🎙️ From Episode {episode_number} of {Config.PODCAST_NAME}"
         if youtube_url:
-            full_caption += f"\n\n{youtube_url}"
+            suffix += f"\n\n{youtube_url}"
+            # Twitter wraps URLs to 23 chars via t.co
+            suffix_display_len = len(suffix) - len(youtube_url) + 23
+        else:
+            suffix_display_len = len(suffix)
+
+        max_caption_len = 280 - suffix_display_len
+        full_caption = f"{caption[:max_caption_len]}{suffix}"
 
         return self.post_tweet(
-            text=full_caption[:280],
+            text=full_caption,
             media_paths=[video_path] if video_path and not youtube_url else None,
         )
 
