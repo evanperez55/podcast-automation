@@ -13,9 +13,9 @@
 
 ### Content Voice
 
-- [ ] **VOICE-01**: All AI-generated text (titles, descriptions, social posts, blog) uses edgy comedy tone via few-shot prompts
-- [ ] **VOICE-02**: Clip detection scores moments by audio energy, laughter patterns, and conversation dynamics (not just topic changes)
-- [ ] **VOICE-03**: Generated clips include hook-style captions matching show's humor
+- [x] **VOICE-01**: All AI-generated text (titles, descriptions, social posts, blog) uses edgy comedy tone via few-shot prompts
+- [x] **VOICE-02**: Clip detection scores moments by audio energy, laughter patterns, and conversation dynamics (not just topic changes)
+- [x] **VOICE-03**: Generated clips include hook-style captions matching show's humor
 - [ ] **VOICE-04**: Chapter markers auto-generated from transcript segments and embedded in MP3 ID3 tags
 - [ ] **VOICE-05**: Chapter markers included in RSS feed for podcast apps
 
@@ -67,9 +67,9 @@
 | AUDIO-01 | Phase 2 | In Progress |
 | AUDIO-02 | Phase 2 | In Progress |
 | AUDIO-03 | Phase 2 | In Progress |
-| VOICE-01 | Phase 3 | Pending |
-| VOICE-02 | Phase 3 | Pending |
-| VOICE-03 | Phase 3 | Pending |
+| VOICE-01 | Phase 3 | Complete |
+| VOICE-02 | Phase 3 | Complete |
+| VOICE-03 | Phase 3 | Complete |
 | VOICE-04 | Phase 4 | Pending |
 | VOICE-05 | Phase 4 | Pending |
 | DIST-01 | Phase 1 | Complete |
