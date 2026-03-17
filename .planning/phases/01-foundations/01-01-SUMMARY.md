@@ -115,6 +115,17 @@ Each task was committed atomically:
 - main.py imports are clean: no function-body import statements remain
 - Ready for Phase 1 Plan 2 and Plan 3 (audio quality, credential migration)
 
+## Self-Check: PASSED
+
+- SUMMARY.md exists at `.planning/phases/01-foundations/01-01-SUMMARY.md`
+- Commit `979e479` exists (Task 1: add openai SDK and fix naming artifacts)
+- Commit `557c831` exists (Task 2: move inline re imports to main.py module top)
+- `requirements.txt` contains `openai>=1.0.0`
+- `content_editor.py` has no `_parse_claude_response` reference
+- `scheduler.py.__init__` reads `Config.SCHEDULE_*_DELAY_HOURS`
+- `main.py` has single top-level `import re`, no inline imports
+- 286 tests passing (2 pre-existing failures unrelated to this plan)
+
 ---
 *Phase: 01-foundations*
 *Completed: 2026-03-16*
