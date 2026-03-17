@@ -8,8 +8,8 @@
 ### Audio Quality
 
 - [x] **AUDIO-01**: Censored segments use smooth audio ducking (volume fade to silence) instead of beep tones
-- [ ] **AUDIO-02**: Episodes normalized to -16 LUFS using ffmpeg-normalize EBU R128 two-pass filter
-- [ ] **AUDIO-03**: Normalization metadata logged per episode (measured LUFS, gain applied, LRA)
+- [x] **AUDIO-02**: Episodes normalized to -16 LUFS using ffmpeg-normalize EBU R128 two-pass filter
+- [x] **AUDIO-03**: Normalization metadata logged per episode (measured LUFS, gain applied, LRA)
 
 ### Content Voice
 
