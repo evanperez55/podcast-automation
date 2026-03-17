@@ -534,3 +534,168 @@ class TestPromptNewTasks:
         """Test that JSON schema includes chapters field."""
         prompt = content_editor._build_analysis_prompt("transcript")
         assert '"chapters"' in prompt
+
+
+class TestVoicePrompt:
+    """Tests for show-specific voice persona embedded in the analysis prompt."""
+
+    def test_prompt_contains_system_persona_string(self, content_editor):
+        """Prompt body must signal the show persona via a voice examples block."""
+        prompt = content_editor._build_analysis_prompt("sample text")
+        # The prompt body must contain a voice examples section that references
+        # the show's irreverent comedy persona
+        persona_present = (
+            "irreverent" in prompt.lower()
+            or "comedy" in prompt.lower()
+            or "Fake Problems" in prompt
+        )
+        assert persona_present, (
+            "Prompt must contain show persona marker (irreverent/comedy/Fake Problems)"
+        )
+
+    def test_prompt_contains_voice_examples_block(self, content_editor):
+        """Prompt must contain a VOICE EXAMPLES heading (case-insensitive)."""
+        prompt = content_editor._build_analysis_prompt("sample text")
+        assert "VOICE EXAMPLES" in prompt.upper(), (
+            "Prompt must contain VOICE EXAMPLES heading"
+        )
+
+    def test_prompt_contains_bad_good_pairs(self, content_editor):
+        """Voice examples block must include BAD and GOOD labelled pairs."""
+        prompt = content_editor._build_analysis_prompt("sample text")
+        assert "BAD" in prompt, "Prompt voice examples must contain BAD label"
+        assert "GOOD" in prompt, "Prompt voice examples must contain GOOD label"
+
+    def test_prompt_hook_caption_guidance_is_show_specific(self, content_editor):
+        """hook_caption instruction must reference show-specific hook examples."""
+        prompt = content_editor._build_analysis_prompt("sample text")
+        # Must contain show-specific hook starters, not just generic examples
+        show_specific = (
+            "wait so" in prompt.lower()
+            or "??" in prompt
+            or "someone finally" in prompt.lower()
+        )
+        assert show_specific, (
+            "hook_caption guidance must include show-specific examples "
+            "('wait so', '??', 'someone finally')"
+        )
+
+    def test_prompt_contains_per_platform_tone_guidance(self, content_editor):
+        """Prompt must include separate tone/voice guidance for YouTube and Twitter."""
+        prompt = content_editor._build_analysis_prompt("sample text")
+        has_youtube_guidance = "youtube" in prompt.lower()
+        has_twitter_guidance = (
+            "twitter" in prompt.lower() or "x (twitter)" in prompt.lower()
+        )
+        assert has_youtube_guidance, (
+            "Prompt must contain YouTube-specific tone guidance"
+        )
+        assert has_twitter_guidance, (
+            "Prompt must contain Twitter-specific tone guidance"
+        )
+
+
+class TestEnergyPromptInjection:
+    """Tests for energy_candidates injection into the analysis prompt."""
+
+    def test_prompt_without_energy_candidates_has_no_energy_section(
+        self, content_editor
+    ):
+        """When energy_candidates=None, prompt must NOT contain HIGH ENERGY MOMENTS."""
+        prompt = content_editor._build_analysis_prompt(
+            "sample text", energy_candidates=None
+        )
+        assert "HIGH ENERGY MOMENTS" not in prompt
+
+    def test_prompt_with_energy_candidates_has_energy_section(self, content_editor):
+        """When energy_candidates supplied, prompt must contain HIGH ENERGY MOMENTS."""
+        candidates = [
+            {
+                "start": 10.0,
+                "end": 20.0,
+                "text": "funny bit here",
+                "audio_energy_score": 0.85,
+            }
+        ]
+        prompt = content_editor._build_analysis_prompt(
+            "sample text", energy_candidates=candidates
+        )
+        assert "HIGH ENERGY MOMENTS" in prompt
+
+    def test_energy_section_includes_score_and_text_preview(self, content_editor):
+        """Energy section must include the score value and a text snippet."""
+        candidates = [
+            {
+                "start": 10.0,
+                "end": 20.0,
+                "text": "laugh out loud moment",
+                "audio_energy_score": 0.92,
+            }
+        ]
+        prompt = content_editor._build_analysis_prompt(
+            "sample text", energy_candidates=candidates
+        )
+        assert "0.92" in prompt, "Energy section must include the score value"
+        assert "laugh out loud moment" in prompt, (
+            "Energy section must include the text snippet"
+        )
+
+
+class TestAnalyzeContentSystemMessage:
+    """Tests for system message and temperature in analyze_content API calls."""
+
+    def test_analyze_content_sends_system_message(self, content_editor):
+        """analyze_content must send a system message as the first message in the list."""
+        from unittest.mock import Mock
+
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = """{
+            "episode_title": "Test",
+            "censor_timestamps": [],
+            "best_clips": [],
+            "episode_summary": "Test summary",
+            "social_captions": {"youtube": "", "instagram": "", "twitter": ""}
+        }"""
+        content_editor.client.chat.completions.create = Mock(return_value=mock_response)
+
+        transcript_data = {"words": [], "segments": []}
+        content_editor.analyze_content(transcript_data)
+
+        call_kwargs = content_editor.client.chat.completions.create.call_args
+        messages = (
+            call_kwargs.kwargs.get("messages") or call_kwargs.args[0]
+            if call_kwargs.args
+            else None
+        )
+        if messages is None:
+            # Try positional args from kwargs
+            messages = call_kwargs.kwargs["messages"]
+        first_message = messages[0]
+        assert first_message["role"] == "system", (
+            f"First message must have role='system', got role='{first_message['role']}'"
+        )
+
+    def test_analyze_content_temperature_is_07(self, content_editor):
+        """analyze_content must call OpenAI with temperature=0.7 (not 0.3)."""
+        from unittest.mock import Mock
+
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = """{
+            "episode_title": "Test",
+            "censor_timestamps": [],
+            "best_clips": [],
+            "episode_summary": "Test summary",
+            "social_captions": {"youtube": "", "instagram": "", "twitter": ""}
+        }"""
+        content_editor.client.chat.completions.create = Mock(return_value=mock_response)
+
+        transcript_data = {"words": [], "segments": []}
+        content_editor.analyze_content(transcript_data)
+
+        call_kwargs = content_editor.client.chat.completions.create.call_args
+        temperature = call_kwargs.kwargs.get("temperature")
+        assert temperature == 0.7, (
+            f"Expected temperature=0.7, got temperature={temperature}"
+        )
