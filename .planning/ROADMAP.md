@@ -12,7 +12,7 @@ This milestone upgrades an already-functional 28-module pipeline across four dim
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundations** - Eliminate silent production bugs and dependency hygiene issues before any feature work
+- [x] **Phase 1: Foundations** - Eliminate silent production bugs and dependency hygiene issues before any feature work
 - [ ] **Phase 2: Audio Quality** - Replace beep censorship with audio ducking and normalize to broadcast LUFS standards
 - [ ] **Phase 3: Content Voice and Clips** - Make all AI-generated content sound like the show; select clips for comedy timing
 - [ ] **Phase 4: Chapter Markers** - Add navigable chapter markers to MP3 files and RSS feed
@@ -32,9 +32,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Dependency and naming hygiene (openai in requirements, rename _parse_claude_response, consolidate scheduler config reads, move inline re imports)
-- [ ] 01-02-PLAN.md — Fix scheduled upload stub (replace no-op with real uploader dispatch, add mark_failed, Discord notification on failure)
-- [ ] 01-03-PLAN.md — Google credential file migration (move files to credentials/, update path references, add tests)
+- [x] 01-01-PLAN.md — Dependency and naming hygiene (openai in requirements, rename _parse_claude_response, consolidate scheduler config reads, move inline re imports)
+- [x] 01-02-PLAN.md — Fix scheduled upload stub (replace no-op with real uploader dispatch, add mark_failed, Discord notification on failure)
+- [x] 01-03-PLAN.md — Google credential file migration (move files to credentials/, update path references, add tests)
 
 ### Phase 2: Audio Quality
 **Goal**: Episodes sound professionally mastered — censored moments are smooth volume dips and loudness meets broadcast platform standards
@@ -86,7 +86,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundations | 1/3 | In Progress|  |
+| 1. Foundations | 3/3 | Complete | 2026-03-17 |
 | 2. Audio Quality | 0/TBD | Not started | - |
 | 3. Content Voice and Clips | 0/TBD | Not started | - |
 | 4. Chapter Markers | 0/TBD | Not started | - |

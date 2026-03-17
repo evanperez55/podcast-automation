@@ -26,9 +26,9 @@
 ### Tech Debt
 
 - [ ] **DEBT-01**: main.py split into pipeline/ package with modular step classes and PipelineContext dataclass
-- [ ] **DEBT-02**: openai SDK added to requirements.txt
-- [ ] **DEBT-03**: Naming artifacts cleaned up (_parse_claude_response renamed, duplicate config reads fixed, inline re imports moved to top)
-- [ ] **DEBT-04**: Google credential files moved to credentials/ directory
+- [x] **DEBT-02**: openai SDK added to requirements.txt
+- [x] **DEBT-03**: Naming artifacts cleaned up (_parse_claude_response renamed, duplicate config reads fixed, inline re imports moved to top)
+- [x] **DEBT-04**: Google credential files moved to credentials/ directory
 - [ ] **DEBT-05**: continue_episode.py eliminated by delegating to extracted pipeline steps
 
 ## v2 Requirements
@@ -74,9 +74,9 @@
 | VOICE-05 | Phase 4 | Pending |
 | DIST-01 | Phase 1 | Complete |
 | DEBT-01 | Phase 5 | Pending |
-| DEBT-02 | Phase 1 | Pending |
-| DEBT-03 | Phase 1 | Pending |
-| DEBT-04 | Phase 1 | Pending |
+| DEBT-02 | Phase 1 | Complete |
+| DEBT-03 | Phase 1 | Complete |
+| DEBT-04 | Phase 1 | Complete |
 | DEBT-05 | Phase 5 | Pending |
 
 **Coverage:**

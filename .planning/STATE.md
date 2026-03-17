@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-foundations-02-PLAN.md
-last_updated: "2026-03-17T01:36:12.367Z"
-last_activity: 2026-03-16 — Roadmap created, all 14 v1 requirements mapped across 5 phases
+stopped_at: Completed 01-foundations-03-PLAN.md
+last_updated: "2026-03-17T01:38:52Z"
+last_activity: 2026-03-17 — Phase 1 complete: all 3 foundation plans executed
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 1
-  percent: 0
+  completed_plans: 3
+  percent: 20
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-03-16)
 
 ## Current Position
 
-Phase: 1 of 5 (Foundations)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-03-16 — Roadmap created, all 14 v1 requirements mapped across 5 phases
+Phase: 1 of 5 (Foundations) — COMPLETE
+Plan: 3 of 3 (all complete)
+Status: Phase 1 done, ready to plan Phase 2
+Last activity: 2026-03-17 — Phase 1 complete: all 3 foundation plans executed
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 20%
 
 ## Performance Metrics
 
@@ -64,6 +64,7 @@ Recent decisions affecting current work:
 - [Roadmap]: Chapter markers (Phase 4) placed after content voice so they benefit from the same AI-generated segment labels
 - [Phase 01-foundations]: Save schedule after each platform (not once at end) so partial progress survives mid-loop failure
 - [Phase 01-foundations]: mark_failed is no-op for unknown platforms — consistent with mark_uploaded, safe to call with any platform string
+- [Phase 01-03]: Anchor all credential paths to Config.BASE_DIR / "credentials" / ... instead of bare Path() to prevent cwd-relative resolution failures
 
 ### Pending Todos
 
@@ -77,6 +78,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-17T01:36:12.363Z
-Stopped at: Completed 01-foundations-02-PLAN.md
+Last session: 2026-03-17T01:38:52Z
+Stopped at: Completed 01-foundations-03-PLAN.md
 Resume file: None
