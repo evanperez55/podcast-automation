@@ -45,7 +45,12 @@ Plans:
   2. A processed episode measures between -15 and -17 LUFS on any reference loudness meter
   3. The pipeline log for each episode records the measured LUFS, gain applied, and LRA values after normalization
   4. Normalization raises a warning if ffmpeg-loudnorm falls back to AGC mode instead of true two-pass EBU R128
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — TDD scaffold: write failing tests for audio ducking (TestAudioDucking) and LUFS normalization (TestNormalizeAudio rewrite)
+- [ ] 02-02-PLAN.md — Implement audio ducking: add _apply_duck_segment(), rewrite apply_censorship() loop (AUDIO-01)
+- [ ] 02-03-PLAN.md — Implement LUFS normalization: rewrite normalize_audio() with two-pass FFmpeg loudnorm, log metadata, warn on AGC fallback (AUDIO-02, AUDIO-03)
 
 ### Phase 3: Content Voice and Clips
 **Goal**: All AI-generated text sounds like the show's edgy comedy voice and clips are selected for virality, not just topic boundaries
@@ -87,7 +92,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundations | 3/3 | Complete    | 2026-03-17 |
-| 2. Audio Quality | 0/TBD | Not started | - |
+| 2. Audio Quality | 0/3 | Not started | - |
 | 3. Content Voice and Clips | 0/TBD | Not started | - |
 | 4. Chapter Markers | 0/TBD | Not started | - |
 | 5. Architecture Refactor | 0/TBD | Not started | - |
