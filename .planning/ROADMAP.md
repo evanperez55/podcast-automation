@@ -13,7 +13,7 @@ This milestone upgrades an already-functional 28-module pipeline across four dim
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundations** - Eliminate silent production bugs and dependency hygiene issues before any feature work
-- [x] **Phase 2: Audio Quality** - Replace beep censorship with audio ducking and normalize to broadcast LUFS standards (completed 2026-03-17)
+- [x] **Phase 2: Audio Quality** - Replace beep censorship with audio ducking and normalize to broadcast LUFS standards (completed 2026-03-17)
 - [ ] **Phase 3: Content Voice and Clips** - Make all AI-generated content sound like the show; select clips for comedy timing
 - [ ] **Phase 4: Chapter Markers** - Add navigable chapter markers to MP3 files and RSS feed
 - [ ] **Phase 5: Architecture Refactor** - Split main.py God Object into testable pipeline modules
@@ -60,7 +60,12 @@ Plans:
   1. Generated titles, descriptions, social posts, and blog text use the show's edgy comedy tone — a human reader can distinguish them from generic AI output
   2. Clip selection scores moments by audio energy and laughter patterns; at least one selected clip corresponds to an obvious punchline rather than a topic transition
   3. Each generated clip includes a hook-style caption that matches the show's humor rather than a neutral transcript excerpt
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — TDD scaffold: write failing tests for voice persona (VOICE-01, VOICE-03) and audio clip scoring (VOICE-02)
+- [ ] 03-02-PLAN.md — Inject voice persona and few-shot examples into content_editor and blog_generator (VOICE-01, VOICE-03)
+- [ ] 03-03-PLAN.md — Implement AudioClipScorer with pydub RMS windowing and wire into analyze_content() (VOICE-02)
 
 ### Phase 4: Chapter Markers
 **Goal**: Listeners can navigate episodes by chapter in Apple Podcasts and compatible apps via embedded MP3 markers and RSS chapter tags
@@ -93,6 +98,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Foundations | 3/3 | Complete    | 2026-03-17 |
 | 2. Audio Quality | 3/3 | Complete    | 2026-03-17 |
-| 3. Content Voice and Clips | 0/TBD | Not started | - |
+| 3. Content Voice and Clips | 0/3 | Not started | - |
 | 4. Chapter Markers | 0/TBD | Not started | - |
 | 5. Architecture Refactor | 0/TBD | Not started | - |
