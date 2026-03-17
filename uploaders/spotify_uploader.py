@@ -117,6 +117,7 @@ class SpotifyUploader:
         duration_seconds: int,
         pub_date: Optional[datetime] = None,
         keywords: Optional[List[str]] = None,
+        chapters_url: Optional[str] = None,
     ) -> Path:
         """
         Update RSS feed with new episode.
@@ -130,6 +131,7 @@ class SpotifyUploader:
             duration_seconds: Episode duration in seconds
             pub_date: Publication date (default: now)
             keywords: List of keywords/tags
+            chapters_url: Public URL to Podcasting 2.0 chapters JSON (optional)
 
         Returns:
             Path to updated RSS feed file
@@ -163,6 +165,7 @@ class SpotifyUploader:
             "duration_seconds": duration_seconds,
             "pub_date": pub_date or datetime.now(),
             "keywords": keywords,
+            "chapters_url": chapters_url,
         }
 
         # Update feed

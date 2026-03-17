@@ -31,6 +31,7 @@ from analytics import AnalyticsCollector, TopicEngagementScorer
 from clip_previewer import ClipPreviewer
 from search_index import EpisodeSearchIndex
 from audiogram_generator import AudiogramGenerator
+from chapter_generator import ChapterGenerator
 from retry_utils import retry_with_backoff
 
 
@@ -81,6 +82,7 @@ class PodcastAutomation:
             self.clip_previewer = ClipPreviewer(auto_approve=True)
             self.search_index = None
             self.audiogram_generator = AudiogramGenerator()
+            self.chapter_generator = ChapterGenerator()
             return
 
         # Validate configuration
@@ -117,6 +119,7 @@ class PodcastAutomation:
         self.clip_previewer = ClipPreviewer(auto_approve=self.auto_approve)
         self.search_index = EpisodeSearchIndex()
         self.audiogram_generator = AudiogramGenerator()
+        self.chapter_generator = ChapterGenerator()
 
         print()
 
@@ -1182,6 +1185,7 @@ class PodcastAutomation:
         # Step 6: Convert to MP3 for uploading
         print("STEP 6: CONVERTING TO MP3")
         print("-" * 60)
+        chapters_list = analysis.get("chapters", [])
         if state and state.is_step_completed("convert_mp3"):
             outputs = state.get_step_outputs("convert_mp3")
             mp3_path = Path(outputs["mp3_path"])
@@ -1190,6 +1194,11 @@ class PodcastAutomation:
             mp3_path = self.audio_processor.convert_to_mp3(censored_audio)
             if state:
                 state.complete_step("convert_mp3", {"mp3_path": str(mp3_path)})
+
+        # Step 6.5: Embed ID3 chapter markers
+        if self.chapter_generator.enabled and chapters_list:
+            logger.info("Embedding ID3 chapter markers...")
+            self.chapter_generator.embed_id3_chapters(str(mp3_path), chapters_list)
         print()
 
         # Step 7: Upload to Dropbox
@@ -1261,10 +1270,22 @@ class PodcastAutomation:
                         transcript_data = json.load(f)
                         episode_duration = int(transcript_data.get("duration", 3600))
 
+                    # Generate chapters JSON for podcast apps
+                    chapters_json_url = None
+                    if self.chapter_generator.enabled and chapters_list:
+                        ep_output_dir = Config.OUTPUT_DIR / f"ep_{episode_number}"
+                        ep_output_dir.mkdir(parents=True, exist_ok=True)
+                        chapters_json_path = str(ep_output_dir / "chapters.json")
+                        self.chapter_generator.generate_chapters_json(
+                            chapters_list, chapters_json_path
+                        )
+                        logger.info("Chapters JSON written to %s", chapters_json_path)
+                        # chapters_json_url remains None until a public URL is available;
+                        # the file is written locally for future upload enhancement.
+
                     # Generate episode title and description
                     episode_summary = analysis.get("episode_summary", "")
                     show_notes = analysis.get("show_notes", "")
-                    chapters_list = analysis.get("chapters", [])
                     ai_title = analysis.get("episode_title", "")
                     episode_title = (
                         f"Episode #{episode_number} - {ai_title}"
@@ -1296,6 +1317,7 @@ class PodcastAutomation:
                         duration_seconds=episode_duration,
                         pub_date=datetime.now(),
                         keywords=keywords,
+                        chapters_url=chapters_json_url,
                     )
 
                     logger.info("RSS feed updated successfully!")

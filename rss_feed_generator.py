@@ -14,6 +14,7 @@ from logger import logger
 ET.register_namespace("itunes", "http://www.itunes.com/dtds/podcast-1.0.dtd")
 ET.register_namespace("content", "http://purl.org/rss/1.0/modules/content/")
 ET.register_namespace("atom", "http://www.w3.org/2005/Atom")
+ET.register_namespace("podcast", "https://podcastindex.org/namespace/1.0")
 
 
 class RSSFeedGenerator:
@@ -70,6 +71,7 @@ class RSSFeedGenerator:
                 "xmlns:itunes": "http://www.itunes.com/dtds/podcast-1.0.dtd",
                 "xmlns:content": "http://purl.org/rss/1.0/modules/content/",
                 "xmlns:atom": "http://www.w3.org/2005/Atom",
+                "xmlns:podcast": "https://podcastindex.org/namespace/1.0",
             },
         )
 
@@ -123,6 +125,7 @@ class RSSFeedGenerator:
         season_number: Optional[int] = None,
         explicit: bool = False,
         keywords: Optional[List[str]] = None,
+        chapters_url: Optional[str] = None,
     ) -> ET.Element:
         """
         Add episode to RSS feed.
@@ -192,6 +195,17 @@ class RSSFeedGenerator:
         # Keywords
         if keywords:
             ET.SubElement(item, "itunes:keywords").text = ", ".join(keywords)
+
+        # Podcasting 2.0 chapter markers
+        if chapters_url:
+            ET.SubElement(
+                item,
+                "{https://podcastindex.org/namespace/1.0}chapters",
+                {
+                    "url": chapters_url,
+                    "type": "application/json+chapters",
+                },
+            )
 
         return item
 
@@ -311,6 +325,7 @@ class RSSFeedGenerator:
                 "explicit", podcast_metadata.get("explicit", False)
             ),
             keywords=episode_data.get("keywords"),
+            chapters_url=episode_data.get("chapters_url"),
         )
 
         return rss
