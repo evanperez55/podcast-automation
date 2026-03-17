@@ -14,6 +14,7 @@ torchaudio==2.1.0  # Required by Whisper
 # Audio processing
 pydub==0.25.1
 ffmpeg-python==0.2.0
+mutagen==1.47.0
 
 # Image processing (thumbnails)
 Pillow==10.2.0
