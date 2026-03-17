@@ -64,9 +64,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUDIO-01 | Phase 2 | Pending |
-| AUDIO-02 | Phase 2 | Pending |
-| AUDIO-03 | Phase 2 | Pending |
+| AUDIO-01 | Phase 2 | In Progress |
+| AUDIO-02 | Phase 2 | In Progress |
+| AUDIO-03 | Phase 2 | In Progress |
 | VOICE-01 | Phase 3 | Pending |
 | VOICE-02 | Phase 3 | Pending |
 | VOICE-03 | Phase 3 | Pending |
