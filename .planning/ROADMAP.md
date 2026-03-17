@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundations** - Eliminate silent production bugs and dependency hygiene issues before any feature work
 - [x] **Phase 2: Audio Quality** - Replace beep censorship with audio ducking and normalize to broadcast LUFS standards (completed 2026-03-17)
-- [x] **Phase 3: Content Voice and Clips** - Make all AI-generated content sound like the show; select clips for comedy timing (completed 2026-03-17)
+- [x] **Phase 3: Content Voice and Clips** - Make all AI-generated content sound like the show; select clips for comedy timing (completed 2026-03-17)
 - [ ] **Phase 4: Chapter Markers** - Add navigable chapter markers to MP3 files and RSS feed
 - [ ] **Phase 5: Architecture Refactor** - Split main.py God Object into testable pipeline modules
 
@@ -75,7 +75,11 @@ Plans:
   1. A processed MP3 file contains ID3 chapter tags that are readable by a tool such as mutagen or mp3tag
   2. Apple Podcasts (or a compatible player) displays chapter navigation for a processed episode
   3. The RSS feed includes a <podcast:chapters> tag or equivalent chapter entries for each episode
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — TDD scaffold: failing tests for ChapterGenerator ID3 embedding and RSS podcast:chapters tag; add mutagen to requirements.txt (VOICE-04, VOICE-05)
+- [ ] 04-02-PLAN.md — Implement ChapterGenerator, update rss_feed_generator.py with podcast:chapters support, wire both into main.py pipeline (VOICE-04, VOICE-05)
 
 ### Phase 5: Architecture Refactor
 **Goal**: main.py is reduced to a thin CLI shim; pipeline orchestration lives in testable modules; continue_episode.py is eliminated
@@ -99,5 +103,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Foundations | 3/3 | Complete    | 2026-03-17 |
 | 2. Audio Quality | 3/3 | Complete    | 2026-03-17 |
 | 3. Content Voice and Clips | 2/3 | Complete    | 2026-03-17 |
-| 4. Chapter Markers | 0/TBD | Not started | - |
+| 4. Chapter Markers | 0/2 | Not started | - |
 | 5. Architecture Refactor | 0/TBD | Not started | - |
