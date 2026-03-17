@@ -1,7 +1,6 @@
 """Post scheduling module for staggered multi-platform uploads."""
 
 import json
-import os
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
@@ -14,10 +13,10 @@ class UploadScheduler:
     """Manages scheduled uploads across platforms with configurable delays."""
 
     def __init__(self):
-        self.youtube_delay = int(os.getenv("SCHEDULE_YOUTUBE_DELAY_HOURS", "0"))
-        self.twitter_delay = int(os.getenv("SCHEDULE_TWITTER_DELAY_HOURS", "0"))
-        self.instagram_delay = int(os.getenv("SCHEDULE_INSTAGRAM_DELAY_HOURS", "0"))
-        self.tiktok_delay = int(os.getenv("SCHEDULE_TIKTOK_DELAY_HOURS", "0"))
+        self.youtube_delay = Config.SCHEDULE_YOUTUBE_DELAY_HOURS
+        self.twitter_delay = Config.SCHEDULE_TWITTER_DELAY_HOURS
+        self.instagram_delay = Config.SCHEDULE_INSTAGRAM_DELAY_HOURS
+        self.tiktok_delay = Config.SCHEDULE_TIKTOK_DELAY_HOURS
 
     def is_scheduling_enabled(self) -> bool:
         """Return True if any platform has a delay configured."""
@@ -190,6 +189,24 @@ class UploadScheduler:
             schedule["platforms"][platform]["uploaded_at"] = datetime.now().isoformat()
             logger.info(f"Marked {platform} as uploaded for schedule")
 
+        return schedule
+
+    def mark_failed(self, schedule: dict, platform: str, error: str) -> dict:
+        """Mark a platform upload as failed in the schedule.
+
+        Args:
+            schedule: The schedule dict to update.
+            platform: Platform name (youtube, twitter, instagram, tiktok).
+            error: Error message describing the failure.
+
+        Returns:
+            The updated schedule dict.
+        """
+        if platform in schedule.get("platforms", {}):
+            schedule["platforms"][platform]["status"] = "failed"
+            schedule["platforms"][platform]["error"] = error
+            schedule["platforms"][platform]["failed_at"] = datetime.now().isoformat()
+            logger.error("Marked %s as failed: %s", platform, error)
         return schedule
 
     def get_youtube_publish_at(self) -> Optional[str]:

@@ -28,7 +28,10 @@ SAMPLE_ANALYSIS = {
 class TestUploadSchedulerInit:
     """Tests for UploadScheduler.__init__."""
 
-    @patch.dict("os.environ", {}, clear=True)
+    @patch.object(Config, "SCHEDULE_YOUTUBE_DELAY_HOURS", 0)
+    @patch.object(Config, "SCHEDULE_TWITTER_DELAY_HOURS", 0)
+    @patch.object(Config, "SCHEDULE_INSTAGRAM_DELAY_HOURS", 0)
+    @patch.object(Config, "SCHEDULE_TIKTOK_DELAY_HOURS", 0)
     def test_init_defaults(self):
         """All delays default to 0 when no env vars are set."""
         scheduler = UploadScheduler()
@@ -37,17 +40,12 @@ class TestUploadSchedulerInit:
         assert scheduler.instagram_delay == 0
         assert scheduler.tiktok_delay == 0
 
-    @patch.dict(
-        "os.environ",
-        {
-            "SCHEDULE_YOUTUBE_DELAY_HOURS": "2",
-            "SCHEDULE_TWITTER_DELAY_HOURS": "4",
-            "SCHEDULE_INSTAGRAM_DELAY_HOURS": "6",
-            "SCHEDULE_TIKTOK_DELAY_HOURS": "8",
-        },
-    )
+    @patch.object(Config, "SCHEDULE_YOUTUBE_DELAY_HOURS", 2)
+    @patch.object(Config, "SCHEDULE_TWITTER_DELAY_HOURS", 4)
+    @patch.object(Config, "SCHEDULE_INSTAGRAM_DELAY_HOURS", 6)
+    @patch.object(Config, "SCHEDULE_TIKTOK_DELAY_HOURS", 8)
     def test_init_with_env_vars(self):
-        """Delays are read from environment variables."""
+        """Delays are read from Config attributes."""
         scheduler = UploadScheduler()
         assert scheduler.youtube_delay == 2
         assert scheduler.twitter_delay == 4
@@ -64,7 +62,7 @@ class TestIsSchedulingEnabled:
         scheduler = UploadScheduler()
         assert scheduler.is_scheduling_enabled() is False
 
-    @patch.dict("os.environ", {"SCHEDULE_INSTAGRAM_DELAY_HOURS": "3"})
+    @patch.object(Config, "SCHEDULE_INSTAGRAM_DELAY_HOURS", 3)
     def test_scheduling_enabled(self):
         """Returns True when at least one delay is greater than 0."""
         scheduler = UploadScheduler()
@@ -81,10 +79,7 @@ class TestCreateSchedule:
         schedule = scheduler.create_schedule("ep25_folder", "ep25", SAMPLE_ANALYSIS)
         assert schedule["platforms"] == {}
 
-    @patch.dict(
-        "os.environ",
-        {"SCHEDULE_YOUTUBE_DELAY_HOURS": "2"},
-    )
+    @patch.object(Config, "SCHEDULE_YOUTUBE_DELAY_HOURS", 2)
     def test_create_schedule_youtube_only(self):
         """Only youtube appears in platforms when only its delay is set."""
         scheduler = UploadScheduler()
@@ -106,15 +101,10 @@ class TestCreateSchedule:
         assert yt["episode_title"] == "Test Episode Title"
         assert yt["social_captions"] == "YT caption"
 
-    @patch.dict(
-        "os.environ",
-        {
-            "SCHEDULE_YOUTUBE_DELAY_HOURS": "1",
-            "SCHEDULE_TWITTER_DELAY_HOURS": "2",
-            "SCHEDULE_INSTAGRAM_DELAY_HOURS": "3",
-            "SCHEDULE_TIKTOK_DELAY_HOURS": "4",
-        },
-    )
+    @patch.object(Config, "SCHEDULE_YOUTUBE_DELAY_HOURS", 1)
+    @patch.object(Config, "SCHEDULE_TWITTER_DELAY_HOURS", 2)
+    @patch.object(Config, "SCHEDULE_INSTAGRAM_DELAY_HOURS", 3)
+    @patch.object(Config, "SCHEDULE_TIKTOK_DELAY_HOURS", 4)
     def test_create_schedule_all_platforms(self):
         """All four platforms appear when all delays are > 0."""
         scheduler = UploadScheduler()
@@ -132,10 +122,7 @@ class TestCreateSchedule:
             assert entry["status"] == "pending"
             assert "publish_at" in entry
 
-    @patch.dict(
-        "os.environ",
-        {"SCHEDULE_YOUTUBE_DELAY_HOURS": "1"},
-    )
+    @patch.object(Config, "SCHEDULE_YOUTUBE_DELAY_HOURS", 1)
     def test_create_schedule_contains_metadata(self):
         """Schedule contains episode_number, episode_folder, and created_at."""
         scheduler = UploadScheduler()
@@ -150,7 +137,7 @@ class TestCreateSchedule:
 class TestSaveAndLoadSchedule:
     """Tests for UploadScheduler.save_schedule and load_schedule."""
 
-    @patch.dict("os.environ", {"SCHEDULE_YOUTUBE_DELAY_HOURS": "1"})
+    @patch.object(Config, "SCHEDULE_YOUTUBE_DELAY_HOURS", 1)
     def test_save_and_load_schedule(self, tmp_path, monkeypatch):
         """Round-trip: save then load returns identical schedule."""
         monkeypatch.setattr(Config, "OUTPUT_DIR", tmp_path)
@@ -245,7 +232,7 @@ class TestMarkUploaded:
 class TestGetYoutubePublishAt:
     """Tests for UploadScheduler.get_youtube_publish_at."""
 
-    @patch.dict("os.environ", {"SCHEDULE_YOUTUBE_DELAY_HOURS": "3"})
+    @patch.object(Config, "SCHEDULE_YOUTUBE_DELAY_HOURS", 3)
     def test_get_youtube_publish_at_enabled(self):
         """Returns an ISO datetime string when youtube delay > 0."""
         scheduler = UploadScheduler()
@@ -262,6 +249,201 @@ class TestGetYoutubePublishAt:
         scheduler = UploadScheduler()
         result = scheduler.get_youtube_publish_at()
         assert result is None
+
+
+class TestMarkFailed:
+    """Tests for UploadScheduler.mark_failed."""
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_mark_failed_sets_status(self):
+        """Status changes to 'failed' after mark_failed."""
+        scheduler = UploadScheduler()
+        schedule = {
+            "platforms": {
+                "youtube": {
+                    "status": "pending",
+                    "publish_at": datetime.now().isoformat(),
+                },
+            }
+        }
+        updated = scheduler.mark_failed(schedule, "youtube", "timeout")
+        assert updated["platforms"]["youtube"]["status"] == "failed"
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_mark_failed_stores_error(self):
+        """Error message is stored in the platform entry."""
+        scheduler = UploadScheduler()
+        schedule = {
+            "platforms": {
+                "youtube": {
+                    "status": "pending",
+                    "publish_at": datetime.now().isoformat(),
+                },
+            }
+        }
+        updated = scheduler.mark_failed(schedule, "youtube", "connection refused")
+        assert updated["platforms"]["youtube"]["error"] == "connection refused"
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_mark_failed_stores_failed_at(self):
+        """failed_at is set to an ISO datetime string."""
+        scheduler = UploadScheduler()
+        schedule = {
+            "platforms": {
+                "twitter": {
+                    "status": "pending",
+                    "publish_at": datetime.now().isoformat(),
+                },
+            }
+        }
+        updated = scheduler.mark_failed(schedule, "twitter", "rate limit")
+        assert "failed_at" in updated["platforms"]["twitter"]
+        datetime.fromisoformat(updated["platforms"]["twitter"]["failed_at"])
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_mark_failed_unknown_platform_is_noop(self):
+        """mark_failed does not raise for an unknown platform."""
+        scheduler = UploadScheduler()
+        schedule = {"platforms": {}}
+        updated = scheduler.mark_failed(schedule, "nonexistent", "error")
+        assert updated == {"platforms": {}}
+
+
+class TestRunUploadScheduled:
+    """Tests for main._run_upload_scheduled with real uploader dispatch."""
+
+    def _make_schedule(self, platform="youtube"):
+        """Return a minimal schedule dict with one pending past-due platform."""
+        return {
+            "episode_number": "ep25",
+            "episode_folder": "ep_25",
+            "created_at": datetime.now().isoformat(),
+            "platforms": {
+                platform: {
+                    "status": "pending",
+                    "publish_at": (datetime.now() - timedelta(hours=1)).isoformat(),
+                    "episode_title": "Test Title",
+                    "episode_summary": "Summary",
+                    "full_episode_video_path": "/output/ep_25/ep25.mp4",
+                    "social_captions": "Test caption",
+                }
+            },
+        }
+
+    @patch("main.DiscordNotifier")
+    @patch("main.YouTubeUploader")
+    @patch("main.UploadScheduler")
+    def test_upload_success(
+        self,
+        mock_scheduler_cls,
+        mock_yt_cls,
+        mock_notifier_cls,
+        tmp_path,
+        monkeypatch,
+    ):
+        """On success: upload method called once, mark_uploaded called, mark_failed not called."""
+        monkeypatch.setattr(Config, "OUTPUT_DIR", tmp_path)
+
+        ep_dir = tmp_path / "ep_25"
+        ep_dir.mkdir()
+        (ep_dir / "upload_schedule.json").write_text("{}", encoding="utf-8")
+
+        schedule = self._make_schedule("youtube")
+        mock_scheduler = mock_scheduler_cls.return_value
+        mock_scheduler.load_schedule.return_value = schedule
+        mock_scheduler.get_pending_uploads.return_value = [
+            {**schedule["platforms"]["youtube"], "platform": "youtube"}
+        ]
+        mock_scheduler.mark_uploaded.return_value = schedule
+        mock_scheduler.mark_failed.return_value = schedule
+
+        upload_result = {"video_id": "abc123", "url": "https://youtube.com/abc123"}
+        mock_yt_instance = mock_yt_cls.return_value
+        mock_yt_instance.upload_episode.return_value = upload_result
+
+        from main import _run_upload_scheduled
+
+        _run_upload_scheduled()
+
+        mock_yt_instance.upload_episode.assert_called_once()
+        mock_scheduler.mark_uploaded.assert_called_once()
+        mock_scheduler.mark_failed.assert_not_called()
+
+    @patch("main.DiscordNotifier")
+    @patch("main.YouTubeUploader")
+    @patch("main.UploadScheduler")
+    def test_upload_failure_after_retries(
+        self,
+        mock_scheduler_cls,
+        mock_yt_cls,
+        mock_notifier_cls,
+        tmp_path,
+        monkeypatch,
+    ):
+        """On upload failure: mark_failed called, notify_failure called, mark_uploaded NOT called."""
+        monkeypatch.setattr(Config, "OUTPUT_DIR", tmp_path)
+
+        ep_dir = tmp_path / "ep_25"
+        ep_dir.mkdir()
+        (ep_dir / "upload_schedule.json").write_text("{}", encoding="utf-8")
+
+        schedule = self._make_schedule("youtube")
+        mock_scheduler = mock_scheduler_cls.return_value
+        mock_scheduler.load_schedule.return_value = schedule
+        mock_scheduler.get_pending_uploads.return_value = [
+            {**schedule["platforms"]["youtube"], "platform": "youtube"}
+        ]
+        mock_scheduler.mark_uploaded.return_value = schedule
+        mock_scheduler.mark_failed.return_value = schedule
+
+        mock_yt_instance = mock_yt_cls.return_value
+        mock_yt_instance.upload_episode.side_effect = RuntimeError("upload failed")
+
+        mock_notifier_instance = mock_notifier_cls.return_value
+
+        from main import _run_upload_scheduled
+
+        _run_upload_scheduled()
+
+        mock_scheduler.mark_failed.assert_called_once()
+        mock_notifier_instance.notify_failure.assert_called_once()
+        mock_scheduler.mark_uploaded.assert_not_called()
+
+    @patch("main.DiscordNotifier")
+    @patch("main.YouTubeUploader")
+    @patch("main.UploadScheduler")
+    def test_no_silent_success(
+        self,
+        mock_scheduler_cls,
+        mock_yt_cls,
+        mock_notifier_cls,
+        tmp_path,
+        monkeypatch,
+    ):
+        """mark_uploaded is never called when the upload raises an exception."""
+        monkeypatch.setattr(Config, "OUTPUT_DIR", tmp_path)
+
+        ep_dir = tmp_path / "ep_25"
+        ep_dir.mkdir()
+        (ep_dir / "upload_schedule.json").write_text("{}", encoding="utf-8")
+
+        schedule = self._make_schedule("youtube")
+        mock_scheduler = mock_scheduler_cls.return_value
+        mock_scheduler.load_schedule.return_value = schedule
+        mock_scheduler.get_pending_uploads.return_value = [
+            {**schedule["platforms"]["youtube"], "platform": "youtube"}
+        ]
+        mock_scheduler.mark_uploaded.return_value = schedule
+        mock_scheduler.mark_failed.return_value = schedule
+
+        mock_yt_instance = mock_yt_cls.return_value
+        mock_yt_instance.upload_episode.side_effect = ValueError("bad data")
+
+        from main import _run_upload_scheduled
+
+        _run_upload_scheduled()
+
+        mock_scheduler.mark_uploaded.assert_not_called()
 
 
 if __name__ == "__main__":
