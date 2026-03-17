@@ -58,7 +58,7 @@ class ContentEditor:
 
             # Parse GPT-4's response
             response_text = response.choices[0].message.content
-            analysis = self._parse_claude_response(response_text)
+            analysis = self._parse_llm_response(response_text)
 
             # Ensure new fields have defaults (backward compat with older responses)
             analysis.setdefault("show_notes", "")
@@ -260,7 +260,7 @@ Please respond with ONLY valid JSON in this exact format:
 
         return prompt
 
-    def _parse_claude_response(self, response_text):
+    def _parse_llm_response(self, response_text):
         """Parse Claude's JSON response."""
         try:
             # Extract JSON from response (Claude sometimes adds explanation text)

@@ -487,7 +487,7 @@ class TestChapterParsing:
                 {"start_timestamp": "01:00:00", "title": "Topic 2"}
             ]
         }"""
-        result = content_editor._parse_claude_response(response_text)
+        result = content_editor._parse_llm_response(response_text)
 
         assert result["chapters"][0]["start_seconds"] == 0
         assert result["chapters"][1]["start_seconds"] == 330
@@ -502,7 +502,7 @@ class TestChapterParsing:
             "episode_summary": "Test",
             "social_captions": {"youtube": "", "instagram": "", "twitter": ""}
         }"""
-        result = content_editor._parse_claude_response(response_text)
+        result = content_editor._parse_llm_response(response_text)
         # chapters key may not exist, that's fine
         assert result.get("chapters", []) == []
 
