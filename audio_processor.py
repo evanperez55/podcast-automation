@@ -22,7 +22,7 @@ class AudioProcessor:
         """Initialize audio processor."""
         logger.info("Audio processor ready")
 
-        # Generate or load beep sound
+        # TODO: beep_sound kept for backward compat; no longer used by apply_censorship (Phase 2)
         self.beep_sound = self._get_beep_sound()
 
     def _get_beep_sound(self):
@@ -44,6 +44,26 @@ class AudioProcessor:
             logger.debug("Beep sound saved to: %s", beep_path)
 
             return beep
+
+    def _apply_duck_segment(
+        self, audio: AudioSegment, start_ms: int, end_ms: int
+    ) -> AudioSegment:
+        """Replace segment with smooth volume duck (radio-style dip).
+
+        Extracts the segment, reduces its volume to near-silence (-40 dB),
+        applies 50ms fade-in and fade-out at the edges, then splices it back.
+        Cap fade duration to half the segment length to handle very short segments.
+        """
+        DUCK_GAIN_DB = -40  # Near-silence — clearly intentional, not a cut
+        FADE_MS = 50  # 50ms fade-in and fade-out (shorter than 50ms padding)
+
+        segment = audio[start_ms:end_ms]
+        segment_len = end_ms - start_ms
+        actual_fade = min(FADE_MS, segment_len // 2)  # Cap for very short segments
+
+        ducked = segment.apply_gain(DUCK_GAIN_DB)
+        ducked = ducked.fade_in(actual_fade).fade_out(actual_fade)
+        return audio[:start_ms] + ducked + audio[end_ms:]
 
     def _parse_loudnorm_json(self, stderr_text):
         """Extract loudnorm measurement JSON from ffmpeg stderr output.
@@ -162,20 +182,11 @@ class AudioProcessor:
             # Make sure we don't go past the end
             end_ms = min(end_ms, len(audio))
 
-            # Get the beep segment (adjust length to match duration)
-            beep_duration_ms = int(duration * 1000)
-            if beep_duration_ms > len(self.beep_sound):
-                # Repeat beep if needed
-                beep = self.beep_sound * (beep_duration_ms // len(self.beep_sound) + 1)
-                beep = beep[:beep_duration_ms]
-            else:
-                beep = self.beep_sound[:beep_duration_ms]
-
-            # Replace the audio segment with beep
-            audio = audio[:start_ms] + beep + audio[end_ms:]
+            # Duck the censored segment (smooth volume fade — no beep)
+            audio = self._apply_duck_segment(audio, start_ms, end_ms)
 
             logger.info(
-                "[%d/%d] Censored %.2fs-%.2fs (%.2fs): %s",
+                "[%d/%d] Ducked %.2fs-%.2fs (%.2fs): %s",
                 i + 1,
                 len(sorted_timestamps),
                 start_seconds,

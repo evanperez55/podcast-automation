@@ -1,7 +1,7 @@
 """Tests for audio_processor module."""
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 from pydub import AudioSegment
 
 from audio_processor import AudioProcessor
@@ -396,19 +396,21 @@ class TestCensoringTimestampAccuracy:
     def test_censorship_handles_long_words(
         self, mock_from_file, audio_processor, tmp_path
     ):
-        """Test censorship handles long word durations (longer than beep sound)."""
-        mock_audio = Mock(spec=AudioSegment)
+        """Test censorship handles long word durations using duck (no beep repetition needed)."""
+        # MagicMock required so __getitem__, __add__ work as dunder operators
+        mock_audio = MagicMock(spec=AudioSegment)
         mock_audio.__len__ = Mock(return_value=100000)
-        mock_audio.__getitem__ = Mock(return_value=mock_audio)
+        mock_segment = MagicMock(spec=AudioSegment)
+        mock_segment.apply_gain = Mock(return_value=mock_segment)
+        mock_segment.fade_in = Mock(return_value=mock_segment)
+        mock_segment.fade_out = Mock(return_value=mock_segment)
+        mock_segment.__add__ = Mock(return_value=mock_audio)
+        mock_audio.__getitem__ = Mock(return_value=mock_segment)
         mock_audio.__add__ = Mock(return_value=mock_audio)
         mock_audio.export = Mock()
         mock_from_file.return_value = mock_audio
 
-        # Short beep sound (500ms)
         audio_processor.beep_sound = Mock(spec=AudioSegment)
-        audio_processor.beep_sound.__len__ = Mock(return_value=500)
-        audio_processor.beep_sound.__getitem__ = Mock(return_value=mock_audio)
-        audio_processor.beep_sound.__mul__ = Mock(return_value=mock_audio)
 
         audio_file = tmp_path / "test.wav"
         audio_file.write_text("fake")
@@ -423,9 +425,9 @@ class TestCensoringTimestampAccuracy:
             audio_file, censor_timestamps, output_path
         )
 
-        # Should have repeated the beep to cover 2 seconds
+        # Ducking applies gain reduction — no beep repetition needed for long words
         assert result == output_path
-        audio_processor.beep_sound.__mul__.assert_called()
+        mock_segment.apply_gain.assert_called_once()
 
 
 class TestAudioDucking:
@@ -450,7 +452,8 @@ class TestAudioDucking:
         mock_from_file.return_value = mock_audio
 
         # Assign a mock beep so we can detect if it's accessed
-        mock_beep = Mock(spec=AudioSegment)
+        # MagicMock required to track magic method calls (__getitem__, __mul__)
+        mock_beep = MagicMock(spec=AudioSegment)
         audio_processor.beep_sound = mock_beep
 
         audio_file = tmp_path / "test.wav"
@@ -471,12 +474,14 @@ class TestAudioDucking:
         self, mock_from_file, audio_processor, tmp_path
     ):
         """The ducked segment must have apply_gain called with a negative value (<= -30 dB)."""
-        mock_audio = Mock(spec=AudioSegment)
+        # MagicMock required so __getitem__, __add__ work as dunder operators
+        mock_audio = MagicMock(spec=AudioSegment)
         mock_audio.__len__ = Mock(return_value=100000)
-        mock_segment = Mock(spec=AudioSegment)
+        mock_segment = MagicMock(spec=AudioSegment)
         mock_segment.apply_gain = Mock(return_value=mock_segment)
         mock_segment.fade_in = Mock(return_value=mock_segment)
         mock_segment.fade_out = Mock(return_value=mock_segment)
+        mock_segment.__add__ = Mock(return_value=mock_audio)
         mock_audio.__getitem__ = Mock(return_value=mock_segment)
         mock_audio.__add__ = Mock(return_value=mock_audio)
         mock_audio.export = Mock()
@@ -503,12 +508,14 @@ class TestAudioDucking:
         self, mock_from_file, audio_processor, tmp_path
     ):
         """Ducked segment must have both fade_in() and fade_out() called for smooth edges."""
-        mock_audio = Mock(spec=AudioSegment)
+        # MagicMock required so __getitem__, __add__ work as dunder operators
+        mock_audio = MagicMock(spec=AudioSegment)
         mock_audio.__len__ = Mock(return_value=100000)
-        mock_segment = Mock(spec=AudioSegment)
+        mock_segment = MagicMock(spec=AudioSegment)
         mock_segment.apply_gain = Mock(return_value=mock_segment)
         mock_segment.fade_in = Mock(return_value=mock_segment)
         mock_segment.fade_out = Mock(return_value=mock_segment)
+        mock_segment.__add__ = Mock(return_value=mock_audio)
         mock_audio.__getitem__ = Mock(return_value=mock_segment)
         mock_audio.__add__ = Mock(return_value=mock_audio)
         mock_audio.export = Mock()
@@ -534,12 +541,14 @@ class TestAudioDucking:
         self, mock_from_file, audio_processor, tmp_path
     ):
         """For a 100ms segment, fade_in and fade_out must still be called (pydub handles gracefully)."""
-        mock_audio = Mock(spec=AudioSegment)
+        # MagicMock required so __getitem__, __add__ work as dunder operators
+        mock_audio = MagicMock(spec=AudioSegment)
         mock_audio.__len__ = Mock(return_value=100000)
-        mock_segment = Mock(spec=AudioSegment)
+        mock_segment = MagicMock(spec=AudioSegment)
         mock_segment.apply_gain = Mock(return_value=mock_segment)
         mock_segment.fade_in = Mock(return_value=mock_segment)
         mock_segment.fade_out = Mock(return_value=mock_segment)
+        mock_segment.__add__ = Mock(return_value=mock_audio)
         mock_audio.__getitem__ = Mock(return_value=mock_segment)
         mock_audio.__add__ = Mock(return_value=mock_audio)
         mock_audio.export = Mock()
@@ -565,13 +574,20 @@ class TestAudioDucking:
     def test_duck_preserves_audio_before_and_after(
         self, mock_from_file, audio_processor, tmp_path
     ):
-        """Final audio must be built from audio[:start_ms] + ducked + audio[end_ms:] — verify __add__ called twice."""
-        mock_audio = Mock(spec=AudioSegment)
+        """Final audio must be built from audio[:start_ms] + ducked + audio[end_ms:] — verify splice calls."""
+        # MagicMock required so __getitem__, __add__ work as dunder operators.
+        # audio[start:end] returns mock_segment (the extracted piece).
+        # The splice is: audio[:start] + ducked + audio[end:]
+        # audio[:start] returns mock_segment → mock_segment.__add__(ducked) is called (1st +)
+        # result + audio[end:] → returned object's __add__ is called (2nd +)
+        mock_audio = MagicMock(spec=AudioSegment)
         mock_audio.__len__ = Mock(return_value=100000)
-        mock_segment = Mock(spec=AudioSegment)
+        mock_segment = MagicMock(spec=AudioSegment)
         mock_segment.apply_gain = Mock(return_value=mock_segment)
         mock_segment.fade_in = Mock(return_value=mock_segment)
         mock_segment.fade_out = Mock(return_value=mock_segment)
+        # mock_segment + ducked returns mock_audio so the second + is on mock_audio
+        mock_segment.__add__ = Mock(return_value=mock_audio)
         mock_audio.__getitem__ = Mock(return_value=mock_segment)
         mock_audio.__add__ = Mock(return_value=mock_audio)
         mock_audio.export = Mock()
@@ -588,9 +604,13 @@ class TestAudioDucking:
         ]
         audio_processor.apply_censorship(audio_file, censor_timestamps, output_path)
 
-        # The splice pattern audio[:start] + ducked + audio[end:] requires two __add__ calls
-        assert mock_audio.__add__.call_count == 2, (
-            f"Expected 2 __add__ calls for before+after splice, got {mock_audio.__add__.call_count}"
+        # The splice pattern audio[:start] + ducked + audio[end:] requires exactly 2 add calls total:
+        # 1st: mock_segment.__add__(ducked), 2nd: mock_audio.__add__(audio[end:])
+        assert mock_segment.__add__.call_count == 1, (
+            f"Expected 1 __add__ call on prefix segment, got {mock_segment.__add__.call_count}"
+        )
+        assert mock_audio.__add__.call_count == 1, (
+            f"Expected 1 __add__ call on (prefix+ducked) result, got {mock_audio.__add__.call_count}"
         )
 
 
