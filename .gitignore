@@ -42,6 +42,8 @@ assets/*.wav
 *.json
 !requirements.json
 !package.json
+!.planning/**/*.json
+!.planning/*.json
 credentials/
 *.pickle
 
