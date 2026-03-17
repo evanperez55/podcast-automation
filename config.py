@@ -182,6 +182,9 @@ class Config:
     CLIP_MIN_DURATION = 15  # seconds
     CLIP_MAX_DURATION = 30  # seconds
     NUM_CLIPS = 3  # Number of clips to generate per episode
+    CLIP_AUDIO_TOP_N = int(
+        os.getenv("CLIP_AUDIO_TOP_N", "10")
+    )  # Top-N high-energy segments to pass to GPT-4o
 
     # Video Resolution Settings
     HORIZONTAL_RESOLUTION = (1280, 720)

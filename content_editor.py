@@ -2,6 +2,7 @@
 
 import openai
 import json
+from audio_clip_scorer import AudioClipScorer
 from config import Config
 from logger import logger
 
@@ -23,7 +24,7 @@ class ContentEditor:
         self.client = openai.OpenAI(api_key=Config.OPENAI_API_KEY)
         logger.info("OpenAI GPT-4 ready")
 
-    def analyze_content(self, transcript_data, topic_context=None):
+    def analyze_content(self, transcript_data, topic_context=None, audio_path=None):
         """
         Analyze transcript to find content to censor and identify best moments.
 
@@ -51,9 +52,24 @@ class ContentEditor:
         # Create a readable version with timestamps
         timestamped_text = self._format_transcript_for_analysis(words, segments)
 
+        # Score segments by audio energy if audio is available
+        energy_candidates = None
+        if audio_path:
+            scorer = AudioClipScorer()
+            scored_segments = scorer.score_segments(audio_path, segments)
+            # Sort by energy score descending, take top N
+            sorted_segs = sorted(
+                scored_segments,
+                key=lambda s: s.get("audio_energy_score", 0),
+                reverse=True,
+            )
+            energy_candidates = sorted_segs[: Config.CLIP_AUDIO_TOP_N]
+
         # Build the prompt for the LLM
         prompt = self._build_analysis_prompt(
-            timestamped_text, topic_context=topic_context
+            timestamped_text,
+            topic_context=topic_context,
+            energy_candidates=energy_candidates,
         )
 
         try:
