@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 1 context gathered
-last_updated: "2026-03-17T01:06:03.045Z"
+stopped_at: Completed 01-foundations-02-PLAN.md
+last_updated: "2026-03-17T01:36:12.367Z"
 last_activity: 2026-03-16 — Roadmap created, all 14 v1 requirements mapped across 5 phases
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 3
+  completed_plans: 1
   percent: 0
 ---
 
@@ -50,6 +50,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 01-foundations P02 | 30 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -61,6 +62,8 @@ Recent decisions affecting current work:
 - [Roadmap]: Tech debt and silent bugs fixed first (Phase 1) before audio or feature work begins
 - [Roadmap]: Architecture refactor (Phase 5) deferred until after feature phases — refactoring stable code is safer than refactoring moving targets
 - [Roadmap]: Chapter markers (Phase 4) placed after content voice so they benefit from the same AI-generated segment labels
+- [Phase 01-foundations]: Save schedule after each platform (not once at end) so partial progress survives mid-loop failure
+- [Phase 01-foundations]: mark_failed is no-op for unknown platforms — consistent with mark_uploaded, safe to call with any platform string
 
 ### Pending Todos
 
@@ -74,6 +77,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-17T01:06:03.040Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-foundations/01-CONTEXT.md
+Last session: 2026-03-17T01:36:12.363Z
+Stopped at: Completed 01-foundations-02-PLAN.md
+Resume file: None

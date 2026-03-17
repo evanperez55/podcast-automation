@@ -21,7 +21,7 @@
 
 ### Distribution
 
-- [ ] **DIST-01**: Scheduled upload execution actually uploads to platforms (fix stub)
+- [x] **DIST-01**: Scheduled upload execution actually uploads to platforms (fix stub)
 
 ### Tech Debt
 
@@ -72,7 +72,7 @@
 | VOICE-03 | Phase 3 | Pending |
 | VOICE-04 | Phase 4 | Pending |
 | VOICE-05 | Phase 4 | Pending |
-| DIST-01 | Phase 1 | Pending |
+| DIST-01 | Phase 1 | Complete |
 | DEBT-01 | Phase 5 | Pending |
 | DEBT-02 | Phase 1 | Pending |
 | DEBT-03 | Phase 1 | Pending |
