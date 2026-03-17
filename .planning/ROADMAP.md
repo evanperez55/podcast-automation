@@ -29,7 +29,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Attempting a scheduled upload raises a clear error instead of silently marking the upload complete
   3. Google credential files live in credentials/ directory and no code references the old project-root paths
   4. _parse_claude_response is renamed, duplicate config reads are eliminated, and inline re imports are moved to module top
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Dependency and naming hygiene (openai in requirements, rename _parse_claude_response, consolidate scheduler config reads, move inline re imports)
+- [ ] 01-02-PLAN.md — Fix scheduled upload stub (replace no-op with real uploader dispatch, add mark_failed, Discord notification on failure)
+- [ ] 01-03-PLAN.md — Google credential file migration (move files to credentials/, update path references, add tests)
 
 ### Phase 2: Audio Quality
 **Goal**: Episodes sound professionally mastered — censored moments are smooth volume dips and loudness meets broadcast platform standards
@@ -81,7 +86,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundations | 0/TBD | Not started | - |
+| 1. Foundations | 0/3 | Planning complete | - |
 | 2. Audio Quality | 0/TBD | Not started | - |
 | 3. Content Voice and Clips | 0/TBD | Not started | - |
 | 4. Chapter Markers | 0/TBD | Not started | - |
