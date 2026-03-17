@@ -9,6 +9,7 @@ from typing import Optional, Dict, Any
 
 from config import Config
 from logger import logger
+from content_editor import VOICE_PERSONA
 
 
 class BlogPostGenerator:
@@ -53,7 +54,10 @@ class BlogPostGenerator:
                     model="gpt-4o",
                     max_tokens=4000,
                     temperature=0.7,
-                    messages=[{"role": "user", "content": prompt}],
+                    messages=[
+                        {"role": "system", "content": VOICE_PERSONA},
+                        {"role": "user", "content": prompt},
+                    ],
                 )
                 markdown = response.choices[0].message.content
             else:
@@ -136,7 +140,20 @@ class BlogPostGenerator:
                 transcript_lines.append(text)
         full_transcript = "\n".join(transcript_lines)
 
-        prompt = f"""You are a skilled blog writer for the "Fake Problems Podcast". Your job is to transform a podcast episode transcript and analysis into an engaging, well-structured markdown blog post.
+        blog_voice_intro = """Write this blog post in the voice of the Fake Problems Podcast — irreverent, a little dark, casual, never corporate.
+
+VOICE EXAMPLES for blog writing:
+BAD: "In this episode, the hosts delve into the fascinating science behind lobster immortality."
+GOOD: "Lobsters, it turns out, don't have a biological clock. They just keep going. This is either inspiring or deeply unfair depending on how your week is going."
+
+BAD: "Join us as we explore thought-provoking topics."
+GOOD: "Two guys talked for an hour. Some of it was funny. Here's what happened."
+
+No filler phrases. No 'delve into'. No 'fascinating'. Write like you'd explain it to someone who already gets the joke.
+
+"""
+
+        prompt = f"""{blog_voice_intro}You are a skilled blog writer for the "Fake Problems Podcast". Your job is to transform a podcast episode transcript and analysis into an engaging, well-structured markdown blog post.
 
 **EPISODE INFO:**
 - Episode Number: {episode_number}
