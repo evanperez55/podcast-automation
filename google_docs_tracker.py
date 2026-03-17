@@ -1,19 +1,18 @@
 """Google Docs topic tracker for automatically marking discussed topics."""
 
 import json
-from typing import List, Dict, Tuple
+from typing import List, Dict
 from datetime import datetime
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from pathlib import Path
 from ollama_client import Ollama
 from config import Config
 
 # Google Docs API scopes
-SCOPES = ['https://www.googleapis.com/auth/documents']
+SCOPES = ["https://www.googleapis.com/auth/documents"]
 
 
 class GoogleDocsTopicTracker:
@@ -37,8 +36,8 @@ class GoogleDocsTopicTracker:
 
     def _authenticate(self):
         """Authenticate with Google Docs API."""
-        token_path = Path('google_docs_token.json')
-        creds_path = Path('google_docs_credentials.json')
+        token_path = Config.BASE_DIR / "credentials" / "google_docs_token.json"
+        creds_path = Config.BASE_DIR / "credentials" / "google_docs_credentials.json"
 
         # Load existing token if available
         if token_path.exists():
@@ -57,7 +56,7 @@ class GoogleDocsTopicTracker:
                 if not creds_path.exists():
                     raise FileNotFoundError(
                         f"Google Docs credentials file not found: {creds_path}\n"
-                        "Please download credentials from Google Cloud Console and save as google_docs_credentials.json"
+                        "Please download credentials from Google Cloud Console and save as credentials/google_docs_credentials.json"
                     )
 
                 flow = InstalledAppFlow.from_client_secrets_file(
@@ -66,11 +65,11 @@ class GoogleDocsTopicTracker:
                 self.creds = flow.run_local_server(port=0)
 
             # Save credentials for next time
-            with open(token_path, 'w') as token:
+            with open(token_path, "w") as token:
                 token.write(self.creds.to_json())
 
         # Build the service
-        self.service = build('docs', 'v1', credentials=self.creds)
+        self.service = build("docs", "v1", credentials=self.creds)
         print("[OK] Google Docs API authenticated")
 
     def get_document_content(self) -> Dict:
@@ -102,32 +101,39 @@ class GoogleDocsTopicTracker:
         topics = []
         discussed_section_start = None
 
-        content = document.get('body', {}).get('content', [])
+        content = document.get("body", {}).get("content", [])
 
         for element in content:
-            if 'paragraph' in element:
-                paragraph = element['paragraph']
-                elements = paragraph.get('elements', [])
+            if "paragraph" in element:
+                paragraph = element["paragraph"]
+                elements = paragraph.get("elements", [])
 
                 for para_element in elements:
-                    if 'textRun' in para_element:
-                        text = para_element['textRun'].get('content', '').strip()
+                    if "textRun" in para_element:
+                        text = para_element["textRun"].get("content", "").strip()
 
                         # Check if this is the "Discussed Topics" header
-                        if 'Discussed Topics' in text or 'DISCUSSED TOPICS' in text.upper():
-                            discussed_section_start = element.get('startIndex', 0)
+                        if (
+                            "Discussed Topics" in text
+                            or "DISCUSSED TOPICS" in text.upper()
+                        ):
+                            discussed_section_start = element.get("startIndex", 0)
                             break
 
                         # If we have text and we're not in discussed section yet
-                        if text and (discussed_section_start is None or
-                                   element.get('startIndex', 0) < discussed_section_start):
+                        if text and (
+                            discussed_section_start is None
+                            or element.get("startIndex", 0) < discussed_section_start
+                        ):
                             # Skip empty lines, headers, etc.
-                            if len(text) > 3 and not text.startswith('#'):
-                                topics.append({
-                                    'text': text,
-                                    'start_index': element.get('startIndex', 0),
-                                    'end_index': element.get('endIndex', 0)
-                                })
+                            if len(text) > 3 and not text.startswith("#"):
+                                topics.append(
+                                    {
+                                        "text": text,
+                                        "start_index": element.get("startIndex", 0),
+                                        "end_index": element.get("endIndex", 0),
+                                    }
+                                )
 
         return topics
 
@@ -136,7 +142,7 @@ class GoogleDocsTopicTracker:
         topics: List[Dict],
         transcript_text: str,
         episode_summary: str,
-        episode_number: int
+        episode_number: int,
     ) -> List[Dict]:
         """
         Use Claude AI to intelligently match topics with the transcript.
@@ -156,7 +162,7 @@ class GoogleDocsTopicTracker:
         print(f"[INFO] Analyzing {len(topics)} topics against transcript...")
 
         # Build topic list for Claude
-        topic_list = "\n".join([f"{i+1}. {t['text']}" for i, t in enumerate(topics)])
+        topic_list = "\n".join([f"{i + 1}. {t['text']}" for i, t in enumerate(topics)])
 
         prompt = f"""You are analyzing a podcast transcript to identify which topics from a topic list were discussed in this episode.
 
@@ -202,21 +208,19 @@ Remember: Return ONLY the JSON array, no other text."""
                 model="llama3.2",
                 max_tokens=2000,
                 temperature=0.1,
-                messages=[{
-                    "role": "user",
-                    "content": prompt
-                }]
+                messages=[{"role": "user", "content": prompt}],
             )
 
             response_text = response.content[0].text.strip()
 
             # Extract JSON from response (in case Claude adds any extra text)
-            if response_text.startswith('['):
+            if response_text.startswith("["):
                 matches = json.loads(response_text)
             else:
                 # Try to find JSON array in the response
                 import re
-                json_match = re.search(r'\[.*\]', response_text, re.DOTALL)
+
+                json_match = re.search(r"\[.*\]", response_text, re.DOTALL)
                 if json_match:
                     matches = json.loads(json_match.group(0))
                 else:
@@ -226,12 +230,12 @@ Remember: Return ONLY the JSON array, no other text."""
             # Filter for discussed topics with reasonable confidence
             discussed_topics = []
             for match in matches:
-                if match.get('discussed', False) and match.get('confidence', 0) > 0.6:
-                    topic_idx = match['topic_number'] - 1
+                if match.get("discussed", False) and match.get("confidence", 0) > 0.6:
+                    topic_idx = match["topic_number"] - 1
                     if 0 <= topic_idx < len(topics):
                         topic = topics[topic_idx].copy()
-                        topic['confidence'] = match['confidence']
-                        topic['reason'] = match.get('reason', '')
+                        topic["confidence"] = match["confidence"]
+                        topic["reason"] = match.get("reason", "")
                         discussed_topics.append(topic)
 
             print(f"[OK] Found {len(discussed_topics)} discussed topics")
@@ -242,9 +246,7 @@ Remember: Return ONLY the JSON array, no other text."""
             return []
 
     def move_topics_to_discussed_section(
-        self,
-        discussed_topics: List[Dict],
-        episode_number: int
+        self, discussed_topics: List[Dict], episode_number: int
     ) -> bool:
         """
         Move discussed topics to the "Discussed Topics" section in the Google Doc.
@@ -272,61 +274,73 @@ Remember: Return ONLY the JSON array, no other text."""
             # If no "Discussed Topics" section exists, create it
             if discussed_section_index is None:
                 # Add section at the end of document
-                doc_end_index = document.get('body', {}).get('content', [])[-1].get('endIndex', 1)
+                doc_end_index = (
+                    document.get("body", {}).get("content", [])[-1].get("endIndex", 1)
+                )
 
-                requests.append({
-                    'insertText': {
-                        'location': {'index': doc_end_index - 1},
-                        'text': '\n\n--- DISCUSSED TOPICS ---\n\n'
+                requests.append(
+                    {
+                        "insertText": {
+                            "location": {"index": doc_end_index - 1},
+                            "text": "\n\n--- DISCUSSED TOPICS ---\n\n",
+                        }
                     }
-                })
+                )
 
-                discussed_section_index = doc_end_index - 1 + len('\n\n--- DISCUSSED TOPICS ---\n\n')
+                discussed_section_index = (
+                    doc_end_index - 1 + len("\n\n--- DISCUSSED TOPICS ---\n\n")
+                )
 
             # Sort topics by their position in reverse (delete from bottom to top)
             # This prevents index shifting issues
-            sorted_topics = sorted(discussed_topics, key=lambda t: t['start_index'], reverse=True)
+            sorted_topics = sorted(
+                discussed_topics, key=lambda t: t["start_index"], reverse=True
+            )
 
             # For each discussed topic, delete from original position and add to discussed section
             date_str = datetime.now().strftime("%Y-%m-%d")
 
             for topic in sorted_topics:
-                topic_text = topic['text']
+                topic_text = topic["text"]
 
                 # Delete from original position
-                requests.append({
-                    'deleteContentRange': {
-                        'range': {
-                            'startIndex': topic['start_index'],
-                            'endIndex': topic['end_index']
+                requests.append(
+                    {
+                        "deleteContentRange": {
+                            "range": {
+                                "startIndex": topic["start_index"],
+                                "endIndex": topic["end_index"],
+                            }
                         }
                     }
-                })
+                )
 
             # Add all discussed topics to the discussed section
             # (Add them at the beginning of the discussed section)
             for topic in reversed(sorted_topics):  # Reverse to maintain order
-                topic_text = topic['text']
-                confidence = topic.get('confidence', 0)
-                reason = topic.get('reason', '')
+                topic_text = topic["text"]
+                new_topic_text = (
+                    f"• {topic_text} - Episode {episode_number} ({date_str})\n"
+                )
 
-                new_topic_text = f"• {topic_text} - Episode {episode_number} ({date_str})\n"
-
-                requests.append({
-                    'insertText': {
-                        'location': {'index': discussed_section_index},
-                        'text': new_topic_text
+                requests.append(
+                    {
+                        "insertText": {
+                            "location": {"index": discussed_section_index},
+                            "text": new_topic_text,
+                        }
                     }
-                })
+                )
 
             # Execute all requests in batch
             if requests:
                 self.service.documents().batchUpdate(
-                    documentId=self.doc_id,
-                    body={'requests': requests}
+                    documentId=self.doc_id, body={"requests": requests}
                 ).execute()
 
-                print(f"[OK] Moved {len(discussed_topics)} topics to 'Discussed Topics' section")
+                print(
+                    f"[OK] Moved {len(discussed_topics)} topics to 'Discussed Topics' section"
+                )
                 return True
 
             return True
@@ -342,28 +356,28 @@ Remember: Return ONLY the JSON array, no other text."""
         Returns:
             Start index of section, or None if not found
         """
-        content = document.get('body', {}).get('content', [])
+        content = document.get("body", {}).get("content", [])
 
         for element in content:
-            if 'paragraph' in element:
-                paragraph = element['paragraph']
-                elements = paragraph.get('elements', [])
+            if "paragraph" in element:
+                paragraph = element["paragraph"]
+                elements = paragraph.get("elements", [])
 
                 for para_element in elements:
-                    if 'textRun' in para_element:
-                        text = para_element['textRun'].get('content', '').strip()
+                    if "textRun" in para_element:
+                        text = para_element["textRun"].get("content", "").strip()
 
-                        if 'DISCUSSED TOPICS' in text.upper() or '--- DISCUSSED TOPICS ---' in text:
+                        if (
+                            "DISCUSSED TOPICS" in text.upper()
+                            or "--- DISCUSSED TOPICS ---" in text
+                        ):
                             # Return the index after this header
-                            return element.get('endIndex', 0)
+                            return element.get("endIndex", 0)
 
         return None
 
     def update_topics_for_episode(
-        self,
-        transcript_text: str,
-        episode_summary: str,
-        episode_number: int
+        self, transcript_text: str, episode_summary: str, episode_number: int
     ) -> Dict:
         """
         Main method to update Google Doc with discussed topics.
@@ -376,9 +390,9 @@ Remember: Return ONLY the JSON array, no other text."""
         Returns:
             Dictionary with update results
         """
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("UPDATING GOOGLE DOCS TOPIC TRACKER")
-        print("="*60)
+        print("=" * 60)
 
         try:
             # Fetch document
@@ -392,59 +406,49 @@ Remember: Return ONLY the JSON array, no other text."""
 
             if not topics:
                 print("[INFO] No topics found to check")
-                return {
-                    'success': True,
-                    'topics_checked': 0,
-                    'topics_moved': 0
-                }
+                return {"success": True, "topics_checked": 0, "topics_moved": 0}
 
             # Match topics with transcript using Claude
             discussed_topics = self.match_topics_with_transcript(
-                topics,
-                transcript_text,
-                episode_summary,
-                episode_number
+                topics, transcript_text, episode_summary, episode_number
             )
 
             if not discussed_topics:
                 print("[INFO] No topics matched this episode")
                 return {
-                    'success': True,
-                    'topics_checked': len(topics),
-                    'topics_moved': 0,
-                    'discussed_topics': []
+                    "success": True,
+                    "topics_checked": len(topics),
+                    "topics_moved": 0,
+                    "discussed_topics": [],
                 }
 
             # Show what will be moved
-            print(f"\n[INFO] Topics to move to 'Discussed' section:")
+            print("\n[INFO] Topics to move to 'Discussed' section:")
             for topic in discussed_topics:
-                confidence_pct = int(topic['confidence'] * 100)
+                confidence_pct = int(topic["confidence"] * 100)
                 print(f"  • {topic['text'][:60]}... ({confidence_pct}% confidence)")
                 print(f"    Reason: {topic['reason']}")
 
             # Move topics to discussed section
             success = self.move_topics_to_discussed_section(
-                discussed_topics,
-                episode_number
+                discussed_topics, episode_number
             )
 
-            print("="*60)
+            print("=" * 60)
 
             return {
-                'success': success,
-                'topics_checked': len(topics),
-                'topics_moved': len(discussed_topics),
-                'discussed_topics': [t['text'] for t in discussed_topics]
+                "success": success,
+                "topics_checked": len(topics),
+                "topics_moved": len(discussed_topics),
+                "discussed_topics": [t["text"] for t in discussed_topics],
             }
 
         except Exception as e:
             print(f"[ERROR] Topic tracker update failed: {e}")
             import traceback
+
             traceback.print_exc()
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            return {"success": False, "error": str(e)}
 
 
 def test_topic_tracker():
@@ -459,12 +463,14 @@ def test_topic_tracker():
         oozing cholesterol from his hands. It's absolutely disgusting but fascinating.
         """
 
-        test_summary = "Discussion about extreme cheese consumption and its health consequences"
+        test_summary = (
+            "Discussion about extreme cheese consumption and its health consequences"
+        )
 
         result = tracker.update_topics_for_episode(
             transcript_text=test_transcript,
             episode_summary=test_summary,
-            episode_number=999
+            episode_number=999,
         )
 
         print("\n[TEST RESULTS]")
@@ -473,8 +479,9 @@ def test_topic_tracker():
     except Exception as e:
         print(f"[ERROR] Test failed: {e}")
         import traceback
+
         traceback.print_exc()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_topic_tracker()

@@ -1,26 +1,25 @@
 """Setup script for Google Docs API authentication."""
 
 import os
-from pathlib import Path
-from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from config import Config
 
-SCOPES = ['https://www.googleapis.com/auth/documents']
+SCOPES = ["https://www.googleapis.com/auth/documents"]
 
 
 def setup_google_docs():
     """Guide user through Google Docs API setup."""
-    print("="*60)
+    print("=" * 60)
     print("GOOGLE DOCS API SETUP")
-    print("="*60)
+    print("=" * 60)
     print()
 
     # Check if credentials file exists
-    creds_path = Path('google_docs_credentials.json')
+    creds_path = Config.BASE_DIR / "credentials" / "google_docs_credentials.json"
 
     if not creds_path.exists():
-        print("[ERROR] google_docs_credentials.json not found!")
+        print("[ERROR] credentials/google_docs_credentials.json not found!")
         print()
         print("Please follow these steps:")
         print()
@@ -38,7 +37,7 @@ def setup_google_docs():
         print("   - Download the credentials JSON file")
         print()
         print("5. Save the downloaded file as:")
-        print(f"   {creds_path.absolute()}")
+        print(f"   {creds_path}")
         print()
         print("6. Run this script again")
         print()
@@ -46,10 +45,11 @@ def setup_google_docs():
 
     # Check if .env has GOOGLE_DOC_ID
     from dotenv import load_dotenv
+
     load_dotenv()
 
-    doc_id = os.getenv('GOOGLE_DOC_ID')
-    if not doc_id or doc_id == 'your_google_doc_id_here':
+    doc_id = os.getenv("GOOGLE_DOC_ID")
+    if not doc_id or doc_id == "your_google_doc_id_here":
         print("[ERROR] GOOGLE_DOC_ID not configured in .env file!")
         print()
         print("Please add your Google Doc ID to the .env file:")
@@ -73,14 +73,12 @@ def setup_google_docs():
     print()
 
     try:
-        flow = InstalledAppFlow.from_client_secrets_file(
-            str(creds_path), SCOPES
-        )
+        flow = InstalledAppFlow.from_client_secrets_file(str(creds_path), SCOPES)
         creds = flow.run_local_server(port=0)
 
         # Save credentials
-        token_path = Path('google_docs_token.json')
-        with open(token_path, 'w') as token:
+        token_path = Config.BASE_DIR / "credentials" / "google_docs_token.json"
+        with open(token_path, "w") as token:
             token.write(creds.to_json())
 
         print()
@@ -90,14 +88,14 @@ def setup_google_docs():
 
         # Test access to the document
         print("Testing access to your Google Doc...")
-        service = build('docs', 'v1', credentials=creds)
+        service = build("docs", "v1", credentials=creds)
         document = service.documents().get(documentId=doc_id).execute()
 
         print(f"[OK] Successfully connected to: {document.get('title', 'Unknown')}")
         print()
-        print("="*60)
+        print("=" * 60)
         print("SETUP COMPLETE!")
-        print("="*60)
+        print("=" * 60)
         print()
         print("Your podcast automation will now automatically:")
         print("  - Read topics from your Google Doc")
@@ -121,5 +119,5 @@ def setup_google_docs():
         return False
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     setup_google_docs()
