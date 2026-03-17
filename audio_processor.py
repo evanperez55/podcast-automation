@@ -6,6 +6,7 @@ from pathlib import Path
 from config import Config
 from logger import logger
 import os
+import subprocess  # noqa: F401  # used by normalize_audio (Phase 2 Plan 02 implementation)
 
 # Configure FFmpeg paths for pydub (Windows compatibility)
 if os.path.exists(Config.FFMPEG_PATH):
@@ -43,6 +44,13 @@ class AudioProcessor:
             logger.debug("Beep sound saved to: %s", beep_path)
 
             return beep
+
+    def _parse_loudnorm_json(self, stderr_text):
+        """Extract loudnorm measurement JSON from ffmpeg stderr output.
+
+        To be implemented in Phase 2 Plan 02.
+        """
+        raise NotImplementedError("_parse_loudnorm_json not yet implemented")
 
     def normalize_audio(self, audio_path, output_path=None):
         """

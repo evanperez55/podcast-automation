@@ -428,77 +428,388 @@ class TestCensoringTimestampAccuracy:
         audio_processor.beep_sound.__mul__.assert_called()
 
 
+class TestAudioDucking:
+    """Tests for audio ducking behavior (AUDIO-01).
+
+    These tests verify that apply_censorship uses smooth volume ducking
+    (gain reduction + fade in/out) instead of beep-tone replacement.
+    All tests are RED — implementation not yet written.
+    """
+
+    @patch("audio_processor.AudioSegment.from_file")
+    def test_duck_no_beep_sound_used(self, mock_from_file, audio_processor, tmp_path):
+        """Ducking must NOT use self.beep_sound — no __getitem__ or __mul__ on beep."""
+        mock_audio = Mock(spec=AudioSegment)
+        mock_audio.__len__ = Mock(return_value=100000)
+        mock_audio.__getitem__ = Mock(return_value=mock_audio)
+        mock_audio.__add__ = Mock(return_value=mock_audio)
+        mock_audio.apply_gain = Mock(return_value=mock_audio)
+        mock_audio.fade_in = Mock(return_value=mock_audio)
+        mock_audio.fade_out = Mock(return_value=mock_audio)
+        mock_audio.export = Mock()
+        mock_from_file.return_value = mock_audio
+
+        # Assign a mock beep so we can detect if it's accessed
+        mock_beep = Mock(spec=AudioSegment)
+        audio_processor.beep_sound = mock_beep
+
+        audio_file = tmp_path / "test.wav"
+        audio_file.write_text("fake audio")
+        output_path = tmp_path / "output.wav"
+
+        censor_timestamps = [
+            {"start_seconds": 10.0, "end_seconds": 10.5, "reason": "Test"}
+        ]
+        audio_processor.apply_censorship(audio_file, censor_timestamps, output_path)
+
+        # Ducking must not use the beep sound at all
+        mock_beep.__getitem__.assert_not_called()
+        mock_beep.__mul__.assert_not_called()
+
+    @patch("audio_processor.AudioSegment.from_file")
+    def test_duck_applies_gain_reduction(
+        self, mock_from_file, audio_processor, tmp_path
+    ):
+        """The ducked segment must have apply_gain called with a negative value (<= -30 dB)."""
+        mock_audio = Mock(spec=AudioSegment)
+        mock_audio.__len__ = Mock(return_value=100000)
+        mock_segment = Mock(spec=AudioSegment)
+        mock_segment.apply_gain = Mock(return_value=mock_segment)
+        mock_segment.fade_in = Mock(return_value=mock_segment)
+        mock_segment.fade_out = Mock(return_value=mock_segment)
+        mock_audio.__getitem__ = Mock(return_value=mock_segment)
+        mock_audio.__add__ = Mock(return_value=mock_audio)
+        mock_audio.export = Mock()
+        mock_from_file.return_value = mock_audio
+
+        audio_processor.beep_sound = Mock(spec=AudioSegment)
+
+        audio_file = tmp_path / "test.wav"
+        audio_file.write_text("fake audio")
+        output_path = tmp_path / "output.wav"
+
+        censor_timestamps = [
+            {"start_seconds": 10.0, "end_seconds": 10.5, "reason": "Test"}
+        ]
+        audio_processor.apply_censorship(audio_file, censor_timestamps, output_path)
+
+        # apply_gain must be called with a strongly negative dB value (<= -30)
+        mock_segment.apply_gain.assert_called_once()
+        gain_arg = mock_segment.apply_gain.call_args[0][0]
+        assert gain_arg <= -30, f"Expected gain <= -30 dB for ducking, got {gain_arg}"
+
+    @patch("audio_processor.AudioSegment.from_file")
+    def test_duck_applies_fade_in_and_out(
+        self, mock_from_file, audio_processor, tmp_path
+    ):
+        """Ducked segment must have both fade_in() and fade_out() called for smooth edges."""
+        mock_audio = Mock(spec=AudioSegment)
+        mock_audio.__len__ = Mock(return_value=100000)
+        mock_segment = Mock(spec=AudioSegment)
+        mock_segment.apply_gain = Mock(return_value=mock_segment)
+        mock_segment.fade_in = Mock(return_value=mock_segment)
+        mock_segment.fade_out = Mock(return_value=mock_segment)
+        mock_audio.__getitem__ = Mock(return_value=mock_segment)
+        mock_audio.__add__ = Mock(return_value=mock_audio)
+        mock_audio.export = Mock()
+        mock_from_file.return_value = mock_audio
+
+        audio_processor.beep_sound = Mock(spec=AudioSegment)
+
+        audio_file = tmp_path / "test.wav"
+        audio_file.write_text("fake audio")
+        output_path = tmp_path / "output.wav"
+
+        censor_timestamps = [
+            {"start_seconds": 10.0, "end_seconds": 10.5, "reason": "Test"}
+        ]
+        audio_processor.apply_censorship(audio_file, censor_timestamps, output_path)
+
+        # Both fade_in and fade_out must be called on the ducked segment
+        mock_segment.fade_in.assert_called_once()
+        mock_segment.fade_out.assert_called_once()
+
+    @patch("audio_processor.AudioSegment.from_file")
+    def test_duck_short_segment_no_fade_overrun(
+        self, mock_from_file, audio_processor, tmp_path
+    ):
+        """For a 100ms segment, fade_in and fade_out must still be called (pydub handles gracefully)."""
+        mock_audio = Mock(spec=AudioSegment)
+        mock_audio.__len__ = Mock(return_value=100000)
+        mock_segment = Mock(spec=AudioSegment)
+        mock_segment.apply_gain = Mock(return_value=mock_segment)
+        mock_segment.fade_in = Mock(return_value=mock_segment)
+        mock_segment.fade_out = Mock(return_value=mock_segment)
+        mock_audio.__getitem__ = Mock(return_value=mock_segment)
+        mock_audio.__add__ = Mock(return_value=mock_audio)
+        mock_audio.export = Mock()
+        mock_from_file.return_value = mock_audio
+
+        audio_processor.beep_sound = Mock(spec=AudioSegment)
+
+        audio_file = tmp_path / "test.wav"
+        audio_file.write_text("fake audio")
+        output_path = tmp_path / "output.wav"
+
+        # Very short segment: 100ms
+        censor_timestamps = [
+            {"start_seconds": 10.0, "end_seconds": 10.1, "reason": "Short word"}
+        ]
+        audio_processor.apply_censorship(audio_file, censor_timestamps, output_path)
+
+        # Fades must still be applied even for short segments
+        mock_segment.fade_in.assert_called_once()
+        mock_segment.fade_out.assert_called_once()
+
+    @patch("audio_processor.AudioSegment.from_file")
+    def test_duck_preserves_audio_before_and_after(
+        self, mock_from_file, audio_processor, tmp_path
+    ):
+        """Final audio must be built from audio[:start_ms] + ducked + audio[end_ms:] — verify __add__ called twice."""
+        mock_audio = Mock(spec=AudioSegment)
+        mock_audio.__len__ = Mock(return_value=100000)
+        mock_segment = Mock(spec=AudioSegment)
+        mock_segment.apply_gain = Mock(return_value=mock_segment)
+        mock_segment.fade_in = Mock(return_value=mock_segment)
+        mock_segment.fade_out = Mock(return_value=mock_segment)
+        mock_audio.__getitem__ = Mock(return_value=mock_segment)
+        mock_audio.__add__ = Mock(return_value=mock_audio)
+        mock_audio.export = Mock()
+        mock_from_file.return_value = mock_audio
+
+        audio_processor.beep_sound = Mock(spec=AudioSegment)
+
+        audio_file = tmp_path / "test.wav"
+        audio_file.write_text("fake audio")
+        output_path = tmp_path / "output.wav"
+
+        censor_timestamps = [
+            {"start_seconds": 10.0, "end_seconds": 10.5, "reason": "Test"}
+        ]
+        audio_processor.apply_censorship(audio_file, censor_timestamps, output_path)
+
+        # The splice pattern audio[:start] + ducked + audio[end:] requires two __add__ calls
+        assert mock_audio.__add__.call_count == 2, (
+            f"Expected 2 __add__ calls for before+after splice, got {mock_audio.__add__.call_count}"
+        )
+
+
 class TestNormalizeAudio:
-    """Tests for audio normalization."""
+    """Tests for two-pass FFmpeg LUFS normalization (AUDIO-02, AUDIO-03).
 
-    @patch("audio_processor.AudioSegment.from_file")
-    def test_normalize_applies_gain_when_needed(
-        self, mock_from_file, audio_processor, tmp_path
-    ):
-        """Test that normalize adjusts gain when audio is far from target."""
-        mock_audio = Mock(spec=AudioSegment)
-        mock_audio.dBFS = -25.0  # Below target
-        mock_normalized = Mock(spec=AudioSegment)
-        mock_audio.apply_gain = Mock(return_value=mock_normalized)
-        mock_normalized.export = Mock()
-        mock_from_file.return_value = mock_audio
+    All tests are RED — implementation rewrites normalize_audio() to use
+    subprocess FFmpeg calls instead of pydub dBFS adjustment.
+    """
+
+    # Sample JSON from FFmpeg loudnorm first-pass (measurement pass)
+    FIRST_PASS_JSON = """{
+        "input_i" : "-23.45",
+        "input_tp" : "-6.23",
+        "input_lra" : "8.10",
+        "input_thresh" : "-33.90",
+        "target_offset" : "0.39",
+        "normalization_type" : "linear",
+        "output_i" : "-16.00",
+        "output_tp" : "-1.10",
+        "output_lra" : "8.10",
+        "output_thresh" : "-26.45"
+    }"""
+
+    # Second-pass JSON from FFmpeg loudnorm output measurements
+    SECOND_PASS_JSON = """{
+        "input_i" : "-23.45",
+        "input_tp" : "-6.23",
+        "input_lra" : "8.10",
+        "input_thresh" : "-33.90",
+        "target_offset" : "0.39",
+        "normalization_type" : "linear",
+        "output_i" : "-16.00",
+        "output_tp" : "-1.10",
+        "output_lra" : "8.10",
+        "output_thresh" : "-26.45"
+    }"""
+
+    AGC_FALLBACK_JSON = """{
+        "input_i" : "-14.0",
+        "input_tp" : "-1.0",
+        "input_lra" : "5.0",
+        "input_thresh" : "-24.0",
+        "target_offset" : "0.0",
+        "normalization_type" : "dynamic",
+        "output_i" : "-16.00",
+        "output_tp" : "-1.50",
+        "output_lra" : "5.00",
+        "output_thresh" : "-24.00"
+    }"""
+
+    def test_normalize_raises_on_missing_file(self, audio_processor, tmp_path):
+        """FileNotFoundError is raised when input path does not exist (no subprocess involvement)."""
+        missing_file = tmp_path / "nonexistent.wav"
+
+        with pytest.raises(FileNotFoundError):
+            audio_processor.normalize_audio(missing_file)
+
+    @patch("audio_processor.subprocess.run")
+    def test_normalize_calls_ffmpeg_twice(self, mock_run, audio_processor, tmp_path):
+        """subprocess.run must be called exactly twice: one measurement pass, one normalize pass."""
+        mock_run.return_value = Mock(
+            returncode=0, stderr=f"FFmpeg output\n{self.FIRST_PASS_JSON}\n"
+        )
 
         audio_file = tmp_path / "test.wav"
-        audio_file.write_text("fake")
+        audio_file.write_bytes(b"fake wav content")
+        output_file = tmp_path / "normalized.wav"
 
-        result = audio_processor.normalize_audio(audio_file)
+        audio_processor.normalize_audio(audio_file, output_path=output_file)
 
-        # Should apply gain adjustment (target is LUFS_TARGET, typically -16)
-        mock_audio.apply_gain.assert_called_once()
-        gain_arg = mock_audio.apply_gain.call_args[0][0]
-        assert gain_arg == Config.LUFS_TARGET - (-25.0)
-        assert result == audio_file
+        assert mock_run.call_count == 2, (
+            f"Expected 2 subprocess.run calls, got {mock_run.call_count}"
+        )
 
-    @patch("audio_processor.AudioSegment.from_file")
-    def test_normalize_skips_when_near_target(
-        self, mock_from_file, audio_processor, tmp_path
+        # First call: measurement pass with print_format=json
+        first_call_args = mock_run.call_args_list[0][0][0]
+        first_call_str = " ".join(str(a) for a in first_call_args)
+        assert "loudnorm" in first_call_str
+        assert "I=-16" in first_call_str or "I=" in first_call_str
+        assert "print_format=json" in first_call_str
+
+        # Second call: normalization pass with linear=true and measured_I
+        second_call_args = mock_run.call_args_list[1][0][0]
+        second_call_str = " ".join(str(a) for a in second_call_args)
+        assert "linear=true" in second_call_str
+        assert "measured_I" in second_call_str
+
+    @patch.object(Config, "LUFS_TARGET", -16)
+    @patch("audio_processor.subprocess.run")
+    def test_normalize_uses_lufs_target_from_config(
+        self, mock_run, audio_processor, tmp_path
     ):
-        """Test that normalize skips when audio is already near target level."""
-        mock_audio = Mock(spec=AudioSegment)
-        mock_audio.dBFS = Config.LUFS_TARGET + 0.2  # Very close to target
-        mock_from_file.return_value = mock_audio
+        """FFmpeg loudnorm filter in first pass must use Config.LUFS_TARGET value."""
+        mock_run.return_value = Mock(
+            returncode=0, stderr=f"FFmpeg output\n{self.FIRST_PASS_JSON}\n"
+        )
 
         audio_file = tmp_path / "test.wav"
-        audio_file.write_text("fake")
+        audio_file.write_bytes(b"fake wav content")
+        output_file = tmp_path / "normalized.wav"
 
-        result = audio_processor.normalize_audio(audio_file)
+        audio_processor.normalize_audio(audio_file, output_path=output_file)
 
-        # Should NOT apply gain since difference < 0.5 dB
-        mock_audio.apply_gain.assert_not_called()
-        assert result == audio_file
+        first_call_args = mock_run.call_args_list[0][0][0]
+        first_call_str = " ".join(str(a) for a in first_call_args)
+        # LUFS target must appear in the loudnorm filter string
+        assert "I=-16" in first_call_str, (
+            f"Expected 'I=-16' (LUFS target) in first-pass command, got: {first_call_str}"
+        )
 
-    @patch("audio_processor.AudioSegment.from_file")
-    def test_normalize_outputs_to_separate_path(
-        self, mock_from_file, audio_processor, tmp_path
+    @patch("audio_processor.AudioProcessor._parse_loudnorm_json")
+    @patch("audio_processor.subprocess.run")
+    def test_normalize_warns_on_agc_fallback(
+        self, mock_run, mock_parse, audio_processor, tmp_path, caplog
     ):
-        """Test normalization writing to a different output path."""
-        mock_audio = Mock(spec=AudioSegment)
-        mock_audio.dBFS = -25.0
-        mock_normalized = Mock(spec=AudioSegment)
-        mock_audio.apply_gain = Mock(return_value=mock_normalized)
-        mock_normalized.export = Mock()
-        mock_from_file.return_value = mock_audio
+        """WARNING log is emitted (not exception) when normalization_type is 'dynamic'."""
+        import logging
+
+        mock_parse.return_value = {
+            "normalization_type": "dynamic",
+            "input_i": "-14.0",
+            "input_tp": "-1.0",
+            "input_lra": "5.0",
+            "input_thresh": "-24.0",
+            "target_offset": "0.0",
+            "output_i": "-16.0",
+            "output_lra": "5.0",
+        }
+        mock_run.return_value = Mock(returncode=0, stderr="")
 
         audio_file = tmp_path / "test.wav"
-        audio_file.write_text("fake")
+        audio_file.write_bytes(b"fake wav content")
+        output_file = tmp_path / "normalized.wav"
+
+        with caplog.at_level(logging.WARNING):
+            # Should NOT raise — warning only
+            audio_processor.normalize_audio(audio_file, output_path=output_file)
+
+        warning_messages = [
+            r.message for r in caplog.records if r.levelno == logging.WARNING
+        ]
+        assert any(
+            "dynamic" in msg.lower()
+            or "agc" in msg.lower()
+            or "fallback" in msg.lower()
+            for msg in warning_messages
+        ), f"Expected WARNING about AGC/dynamic fallback, got: {warning_messages}"
+
+    @patch("audio_processor.subprocess.run")
+    def test_normalize_logs_input_output_gain_lra(
+        self, mock_run, audio_processor, tmp_path, caplog
+    ):
+        """INFO log must contain input LUFS, output LUFS, gain applied, and LRA when normalization completes."""
+        import logging
+
+        first_stderr = f"FFmpeg measurement output\n{self.FIRST_PASS_JSON}\n"
+        second_stderr = f"FFmpeg normalize output\n{self.SECOND_PASS_JSON}\n"
+        mock_run.side_effect = [
+            Mock(returncode=0, stderr=first_stderr),
+            Mock(returncode=0, stderr=second_stderr),
+        ]
+
+        audio_file = tmp_path / "test.wav"
+        audio_file.write_bytes(b"fake wav content")
+        output_file = tmp_path / "normalized.wav"
+
+        with caplog.at_level(logging.INFO):
+            audio_processor.normalize_audio(audio_file, output_path=output_file)
+
+        info_messages = " ".join(
+            r.message for r in caplog.records if r.levelno == logging.INFO
+        )
+        # Must log the measured input LUFS value
+        assert "-23" in info_messages or "-23.45" in info_messages, (
+            f"Expected input LUFS in log, got: {info_messages}"
+        )
+        # Must log the output LUFS value
+        assert "-16" in info_messages, (
+            f"Expected output LUFS in log, got: {info_messages}"
+        )
+
+    @patch("audio_processor.subprocess.run")
+    def test_normalize_returns_output_path(self, mock_run, audio_processor, tmp_path):
+        """normalize_audio(audio_path, output_path) must return output_path."""
+        mock_run.return_value = Mock(
+            returncode=0, stderr=f"FFmpeg output\n{self.FIRST_PASS_JSON}\n"
+        )
+
+        audio_file = tmp_path / "test.wav"
+        audio_file.write_bytes(b"fake wav content")
         output_file = tmp_path / "normalized.wav"
 
         result = audio_processor.normalize_audio(audio_file, output_path=output_file)
 
         assert result == output_file
-        mock_normalized.export.assert_called_once_with(str(output_file), format="wav")
 
-    def test_normalize_raises_on_missing_file(self, audio_processor, tmp_path):
-        """Test that normalize raises FileNotFoundError for missing input."""
-        missing_file = tmp_path / "nonexistent.wav"
+    @patch("audio_processor.subprocess.run")
+    def test_normalize_passes_devnull_to_subprocess(
+        self, mock_run, audio_processor, tmp_path
+    ):
+        """subprocess.run must be called with stdin=subprocess.DEVNULL to prevent stdin hang."""
+        import subprocess
 
-        with pytest.raises(FileNotFoundError):
-            audio_processor.normalize_audio(missing_file)
+        mock_run.return_value = Mock(
+            returncode=0, stderr=f"FFmpeg output\n{self.FIRST_PASS_JSON}\n"
+        )
+
+        audio_file = tmp_path / "test.wav"
+        audio_file.write_bytes(b"fake wav content")
+        output_file = tmp_path / "normalized.wav"
+
+        audio_processor.normalize_audio(audio_file, output_path=output_file)
+
+        for call in mock_run.call_args_list:
+            kwargs = call[1]
+            assert kwargs.get("stdin") == subprocess.DEVNULL, (
+                f"Expected stdin=subprocess.DEVNULL in subprocess.run, got: {kwargs.get('stdin')}"
+            )
 
 
 class TestClipDurationValidation:
