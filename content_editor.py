@@ -5,6 +5,15 @@ import json
 from config import Config
 from logger import logger
 
+VOICE_PERSONA = (
+    "You write for the Fake Problems Podcast — an irreverent comedy show "
+    "hosted by two guys who talk about dark, weird, and absurd topics with "
+    "deadpan confidence. Your output sounds like it was written by the hosts "
+    "themselves: casual, a little dark, never corporate. No exclamation points "
+    "for hype. No 'join us as we...'. Never use filler phrases like 'delve into' "
+    "or 'unravel'. Write like you'd say it out loud to a friend who gets the joke."
+)
+
 
 class ContentEditor:
     """Use OpenAI GPT-4 to analyze transcript and identify content to censor and best clips."""
@@ -52,8 +61,11 @@ class ContentEditor:
             response = self.client.chat.completions.create(
                 model="gpt-4o",
                 max_tokens=6000,
-                temperature=0.3,
-                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                messages=[
+                    {"role": "system", "content": VOICE_PERSONA},
+                    {"role": "user", "content": prompt},
+                ],
             )
 
             # Parse GPT-4's response
@@ -113,12 +125,15 @@ class ContentEditor:
         secs = int(seconds % 60)
         return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
-    def _build_analysis_prompt(self, timestamped_text, topic_context=None):
+    def _build_analysis_prompt(
+        self, timestamped_text, topic_context=None, energy_candidates=None
+    ):
         """Build the prompt for Claude to analyze the content.
 
         Args:
             timestamped_text: Formatted transcript with timestamps
             topic_context: Optional list of scored topic dicts for clip prioritization
+            energy_candidates: Optional list of high-energy segment dicts for clip prioritization
         """
         names_list = ", ".join(Config.NAMES_TO_REMOVE)
 
@@ -136,8 +151,48 @@ class ContentEditor:
 
 """
 
+        # Build optional energy candidates section
+        energy_section = ""
+        if energy_candidates:
+            lines = []
+            for seg in energy_candidates[:10]:
+                ts = self._format_timestamp(seg.get("start", 0))
+                score = seg.get("audio_energy_score", 0)
+                text_preview = seg.get("text", "")[:80]
+                lines.append(f"  - [{ts}] energy={score:.2f}: {text_preview}")
+            energy_section = (
+                "\n**HIGH ENERGY MOMENTS (audio analysis — prioritize these for clips):**\n"
+                + "\n".join(lines)
+                + "\n"
+            )
+
+        # Voice examples block to establish show tone
+        voice_examples = """
+**VOICE EXAMPLES — match this tone in ALL output:**
+
+Episode titles:
+BAD (generic): "Exploring the Science of Lobster Immortality"
+GOOD (show voice): "Lobsters Are Basically Immortal and Honestly Good for Them"
+
+BAD: "A Deep Dive into Rube Goldberg Machines"
+GOOD: "Rube Goldberg Invented a Machine Just to Avoid Responsibility"
+
+Twitter/X captions:
+BAD: "Great episode discussing fascinating topics!"
+GOOD: "we spent 20 minutes on whether horses are lying to us and I stand by every second of it"
+
+YouTube descriptions (slightly moderated — no shock value, but still dry and authentic):
+BAD: "Join us as we explore today's fascinating topics with expert analysis."
+GOOD: "This week: lobster immortality, a machine designed for one very specific terrible purpose, and a myth that has apparently been following horses around for decades."
+
+Instagram/TikTok:
+BAD: "Listen to this week's episode for an eye-opening discussion 🎙️"
+GOOD: "turns out immortality is real, it just only applies to lobsters. link in bio 🦞"
+
+"""
+
         prompt = f"""You are analyzing a podcast transcript for the "Fake Problems Podcast" to identify content that needs censoring and find the best moments for social media clips.
-{topic_section}
+{topic_section}{voice_examples}{energy_section}
 
 **YOUR TASKS:**
 
@@ -178,11 +233,12 @@ class ContentEditor:
 4. **WRITE EPISODE SUMMARY:**
    Write a 2-3 sentence summary of the episode's main topics and themes.
 
+## SOCIAL CAPTIONS (same irreverent voice — no corporate language, no filler phrases):
 5. **CREATE SOCIAL MEDIA CAPTIONS:**
    Write engaging captions for:
-   - YouTube (description format, 2-3 paragraphs)
+   - YouTube (description format, 2-3 paragraphs — slightly moderated but still dry and authentic, algorithm-safe)
    - Instagram (short, punchy, with emojis)
-   - Twitter (concise, under 280 chars)
+   - Twitter/X (concise, under 280 chars — punchy and dry, show voice)
    - TikTok (short, punchy, under 150 chars, with emojis)
 
 6. **WRITE DETAILED SHOW NOTES:**
@@ -233,7 +289,7 @@ Please respond with ONLY valid JSON in this exact format:
       "description": "Brief description of the clip",
       "why_interesting": "Why this would work as a clip",
       "suggested_title": "Catchy title for the clip",
-      "hook_caption": "Short punchy hook for the first 2 seconds of a Reel/TikTok (e.g. 'Wait for it...' or 'This is too real')",
+      "hook_caption": "Hook for the first 2 seconds. Show-specific style: 'wait so lobsters just... don't die??', 'someone finally said it out loud', 'this is the worst idea I've ever loved'. Dry, curious, or darkly amused — never generic hype.",
       "clip_hashtags": ["relevant", "hashtags", "for", "this", "clip"]
     }}
   ],
