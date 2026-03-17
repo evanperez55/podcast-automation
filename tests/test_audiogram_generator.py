@@ -112,7 +112,8 @@ class TestBuildFfmpegCommandDimensionsVertical:
 
         fc_index = cmd.index("-filter_complex")
         filter_string = cmd[fc_index + 1]
-        assert "720x1280" in filter_string
+        # Dimensions appear in scale/pad (colon-separated) or showwaves (x-separated)
+        assert "720" in filter_string and "1280" in filter_string
 
         # Wave height should be height // 3 = 426
         wave_height = 1280 // 3

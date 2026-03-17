@@ -22,6 +22,7 @@ class AudiogramGenerator:
         self.bg_color = os.getenv("AUDIOGRAM_BG_COLOR", "0x1a1a2e")
         self.wave_color = os.getenv("AUDIOGRAM_WAVE_COLOR", "0xe94560")
         self.ffmpeg_path = Config.FFMPEG_PATH
+        self.logo_path = Config.ASSETS_DIR / "podcast_logo.png"
 
     def create_audiogram(
         self,
@@ -120,14 +121,26 @@ class AudiogramGenerator:
             List of command arguments for subprocess.run.
         """
         wave_height = height // 3
+        use_logo = self.logo_path.exists()
 
         # Build filter_complex chain
-        filters = [
-            f"color=c={self.bg_color}:s={width}x{height}:d=0[bg]",
-            f"[1:a]showwaves=s={width}x{wave_height}:mode=cline:rate=25"
-            f":colors={self.wave_color}[waves]",
-            "[bg][waves]overlay=(W-w)/2:(H-h)/2[video]",
-        ]
+        # Input 0: logo image or lavfi color source
+        # Input 1: audio file
+        if use_logo:
+            filters = [
+                f"[0:v]scale={width}:{height}:force_original_aspect_ratio=decrease,"
+                f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color={self.bg_color},"
+                f"setsar=1,fps=25[bg]",
+                f"[1:a]showwaves=s={width}x{wave_height}:mode=cline:rate=25"
+                f":colors={self.wave_color}[waves]",
+                "[bg][waves]overlay=(W-w)/2:(H-h)/2[video]",
+            ]
+        else:
+            filters = [
+                f"[1:a]showwaves=s={width}x{wave_height}:mode=cline:rate=25"
+                f":colors={self.wave_color}[waves]",
+                "[0:v][waves]overlay=(W-w)/2:(H-h)/2[video]",
+            ]
 
         if srt_path:
             # Escape backslashes and colons in the subtitle path for FFmpeg
@@ -143,13 +156,26 @@ class AudiogramGenerator:
 
         filter_complex_string = ";".join(filters)
 
+        # Build input args: logo image or lavfi color as input 0
+        if use_logo:
+            input_args = [
+                "-loop",
+                "1",
+                "-i",
+                str(self.logo_path),
+            ]
+        else:
+            input_args = [
+                "-f",
+                "lavfi",
+                "-i",
+                f"color=c={self.bg_color}:s={width}x{height}:r=25",
+            ]
+
         cmd = [
             self.ffmpeg_path,
             "-y",
-            "-f",
-            "lavfi",
-            "-i",
-            f"color=c={self.bg_color}:s={width}x{height}:r=25",
+            *input_args,
             "-i",
             str(audio_path),
             "-filter_complex",
