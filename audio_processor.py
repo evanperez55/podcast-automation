@@ -6,13 +6,30 @@ from pathlib import Path
 from config import Config
 from logger import logger
 import os
-import subprocess  # noqa: F401  # used by normalize_audio (Phase 2 Plan 02 implementation)
+import subprocess
+import json
+import re
 
 # Configure FFmpeg paths for pydub (Windows compatibility)
 if os.path.exists(Config.FFMPEG_PATH):
     AudioSegment.converter = Config.FFMPEG_PATH
     AudioSegment.ffmpeg = Config.FFMPEG_PATH
     AudioSegment.ffprobe = Config.FFPROBE_PATH
+
+
+def _parse_loudnorm_json(stderr_text: str) -> dict:
+    """Extract loudnorm measurement JSON from ffmpeg stderr output.
+
+    FFmpeg embeds the JSON block in stderr mixed with progress lines.
+    Scan the full stderr string for the first {...} block.
+    """
+    match = re.search(r"\{[^{}]+\}", stderr_text, re.DOTALL)
+    if not match:
+        raise ValueError(
+            f"Could not find loudnorm JSON in ffmpeg output. "
+            f"stderr (last 500 chars): {stderr_text[-500:]}"
+        )
+    return json.loads(match.group())
 
 
 class AudioProcessor:
@@ -65,16 +82,20 @@ class AudioProcessor:
         ducked = ducked.fade_in(actual_fade).fade_out(actual_fade)
         return audio[:start_ms] + ducked + audio[end_ms:]
 
-    def _parse_loudnorm_json(self, stderr_text):
+    def _parse_loudnorm_json(self, stderr_text: str) -> dict:
         """Extract loudnorm measurement JSON from ffmpeg stderr output.
 
-        To be implemented in Phase 2 Plan 02.
+        Delegates to the module-level _parse_loudnorm_json function.
         """
-        raise NotImplementedError("_parse_loudnorm_json not yet implemented")
+        return _parse_loudnorm_json(stderr_text)
 
     def normalize_audio(self, audio_path, output_path=None):
         """
-        Normalize audio to target LUFS level using pydub dBFS measurement.
+        Normalize audio to EBU R128 target LUFS using FFmpeg two-pass loudnorm.
+
+        Pass 1 measures the input loudness; Pass 2 applies linear normalization
+        using the measured values. Logs input LUFS, output LUFS, gain applied,
+        and LRA. Warns (does not raise) if FFmpeg falls back to AGC (dynamic) mode.
 
         Args:
             audio_path: Path to audio file
@@ -93,31 +114,92 @@ class AudioProcessor:
             output_path = Path(output_path)
 
         logger.info("Normalizing audio: %s", audio_path.name)
-        audio = AudioSegment.from_file(str(audio_path))
 
-        current_dbfs = audio.dBFS
-        target_dbfs = Config.LUFS_TARGET
-        change_in_dbfs = target_dbfs - current_dbfs
-
-        logger.debug(
-            "Current dBFS: %.1f, Target: %.1f, Adjustment: %.1f dB",
-            current_dbfs,
-            target_dbfs,
-            change_in_dbfs,
+        # --- Pass 1: measure loudness ---
+        pass1_cmd = [
+            Config.FFMPEG_PATH,
+            "-i",
+            str(audio_path),
+            "-af",
+            f"loudnorm=I={Config.LUFS_TARGET}:LRA=11:TP=-1.5:print_format=json",
+            "-f",
+            "null",
+            "-",
+        ]
+        result1 = subprocess.run(
+            pass1_cmd,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
+            text=True,
+            check=False,
         )
-
-        if abs(change_in_dbfs) > 0.5:
-            normalized = audio.apply_gain(change_in_dbfs)
-            normalized.export(
-                str(output_path), format=output_path.suffix.lstrip(".") or "wav"
+        if result1.returncode != 0:
+            raise RuntimeError(
+                f"FFmpeg loudnorm pass 1 failed (rc={result1.returncode}). "
+                f"stderr: {result1.stderr[-500:]}"
             )
-            logger.info("Audio normalized (%.1f dB adjustment)", change_in_dbfs)
-        else:
-            logger.info("Audio already near target level, skipping normalization")
-            if output_path != audio_path:
-                audio.export(
-                    str(output_path), format=output_path.suffix.lstrip(".") or "wav"
-                )
+
+        stats = self._parse_loudnorm_json(result1.stderr)
+
+        # Warn (do not raise) if FFmpeg fell back to AGC/dynamic mode
+        if stats.get("normalization_type") == "dynamic":
+            logger.warning(
+                "Normalization fell back to AGC (dynamic) mode — "
+                "linear normalization not possible with current true peak "
+                "(measured_TP=%s dBTP, target_TP=-1.5 dBTP). "
+                "Audio normalized but dynamic compression was applied.",
+                stats.get("input_tp", "unknown"),
+            )
+
+        # --- Pass 2: apply normalization ---
+        pass2_cmd = [
+            Config.FFMPEG_PATH,
+            "-i",
+            str(audio_path),
+            "-af",
+            (
+                f"loudnorm=I={Config.LUFS_TARGET}:LRA=11:TP=-1.5:linear=true:"
+                f"measured_I={stats['input_i']}:measured_LRA={stats['input_lra']}:"
+                f"measured_TP={stats['input_tp']}:measured_thresh={stats['input_thresh']}:"
+                f"offset={stats['target_offset']}"
+            ),
+            "-ar",
+            "44100",
+            "-y",
+            str(output_path),
+        ]
+        result2 = subprocess.run(
+            pass2_cmd,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
+            text=True,
+            check=False,
+        )
+        if result2.returncode != 0:
+            raise RuntimeError(
+                f"FFmpeg loudnorm pass 2 failed (rc={result2.returncode}). "
+                f"stderr: {result2.stderr[-500:]}"
+            )
+
+        # Extract pass-2 output measurements; fall back to approximations if absent
+        try:
+            stats2 = _parse_loudnorm_json(result2.stderr)
+            output_lufs = float(stats2.get("output_i", Config.LUFS_TARGET))
+            output_lra = float(stats2.get("output_lra", stats.get("input_lra", "0")))
+        except (ValueError, KeyError):
+            output_lufs = float(Config.LUFS_TARGET)
+            output_lra = float(stats.get("input_lra", "0"))
+
+        # Log normalization metrics
+        gain_db = output_lufs - float(stats["input_i"])
+        logger.info(
+            "Normalization complete — input: %.1f LUFS, output: %.1f LUFS, "
+            "gain: %.1f dB, LRA: %.1f LU",
+            float(stats["input_i"]),
+            output_lufs,
+            gain_db,
+            output_lra,
+        )
 
         return output_path
 
