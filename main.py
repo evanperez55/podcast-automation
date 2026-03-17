@@ -1,5 +1,6 @@
 """Main orchestrator for podcast automation workflow."""
 
+import re
 import sys
 import json
 from pathlib import Path
@@ -1672,16 +1673,12 @@ def _run_analytics(episode_arg):
         output_dir = Config.OUTPUT_DIR
         ep_dirs = sorted(output_dir.glob("ep_*"))
         for ep_dir in ep_dirs:
-            import re as _re
-
-            match = _re.search(r"ep_(\d+)", ep_dir.name)
+            match = re.search(r"ep_(\d+)", ep_dir.name)
             if match:
                 ep_num = int(match.group(1))
                 _collect_episode_analytics(collector, scorer, ep_num)
     else:
-        import re as _re
-
-        match = _re.search(r"(\d+)", episode_arg)
+        match = re.search(r"(\d+)", episode_arg)
         if match:
             ep_num = int(match.group(1))
             _collect_episode_analytics(collector, scorer, ep_num)
@@ -1779,8 +1776,6 @@ def main():
         elif arg.startswith("ep") or arg.startswith("episode"):
             # Process specific episode by number
             # Support formats: ep25, episode25, ep 25, episode 25
-            import re
-
             match = re.search(r"(\d+)", arg)
             if match:
                 episode_num = int(match.group(1))
