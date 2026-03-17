@@ -30,6 +30,7 @@ from analytics import AnalyticsCollector, TopicEngagementScorer
 from clip_previewer import ClipPreviewer
 from search_index import EpisodeSearchIndex
 from audiogram_generator import AudiogramGenerator
+from retry_utils import retry_with_backoff
 
 
 class PodcastAutomation:
@@ -1587,20 +1588,70 @@ def _run_upload_scheduled():
             continue
 
         logger.info("Found %d pending upload(s) for %s", len(pending), episode_folder)
+
+        dispatch = {
+            "youtube": YouTubeUploader,
+            "twitter": TwitterUploader,
+            "instagram": InstagramUploader,
+            "tiktok": TikTokUploader,
+        }
+
         for item in pending:
             platform = item["platform"]
-            logger.info("Uploading to %s...", platform)
-            # Actual upload would happen here using the platform uploaders
-            # For now, mark as uploaded with a placeholder
-            logger.info(
-                "[TODO] %s upload not yet automated in scheduled mode", platform
-            )
-            schedule = scheduler.mark_uploaded(
-                schedule, platform, {"status": "scheduled_upload_placeholder"}
-            )
+            uploader_cls = dispatch.get(platform)
+            if uploader_cls is None:
+                logger.warning("No uploader for platform '%s', skipping", platform)
+                continue
 
-        scheduler.save_schedule(episode_folder, schedule)
-        logger.info("Updated schedule for %s", episode_folder)
+            logger.info("Uploading to %s...", platform)
+
+            @retry_with_backoff(
+                max_retries=3,
+                base_delay=2.0,
+                max_delay=30.0,
+                backoff_factor=2.0,
+            )
+            def _do_upload(uploader_instance, upload_item):
+                if platform == "youtube":
+                    return uploader_instance.upload_episode(
+                        video_path=upload_item.get("full_episode_video_path", ""),
+                        title=upload_item.get("episode_title", ""),
+                        description=upload_item.get("episode_summary", ""),
+                    )
+                elif platform == "twitter":
+                    return uploader_instance.post_tweet(
+                        text=upload_item.get("social_captions", ""),
+                        media_paths=upload_item.get("video_clip_paths"),
+                    )
+                elif platform == "instagram":
+                    return uploader_instance.upload_reel(
+                        video_url=upload_item.get("video_clip_paths", [""])[0],
+                        caption=upload_item.get("social_captions", ""),
+                    )
+                elif platform == "tiktok":
+                    clip_paths = upload_item.get("video_clip_paths") or []
+                    return uploader_instance.upload_video(
+                        video_path=clip_paths[0] if clip_paths else "",
+                        title=upload_item.get("episode_title", ""),
+                        description=upload_item.get("social_captions"),
+                    )
+                return None
+
+            try:
+                uploader_instance = uploader_cls()
+                result = _do_upload(uploader_instance, item)
+                schedule = scheduler.mark_uploaded(schedule, platform, result)
+                logger.info("Successfully uploaded to %s", platform)
+            except Exception as e:
+                logger.error("Failed to upload to %s: %s", platform, e)
+                schedule = scheduler.mark_failed(schedule, platform, str(e))
+                notifier = DiscordNotifier()
+                notifier.notify_failure(
+                    episode_folder, e, step=f"scheduled_{platform}_upload"
+                )
+
+            scheduler.save_schedule(episode_folder, schedule)
+            logger.info("Updated schedule for %s after %s", episode_folder, platform)
 
     print()
     print("[DONE] Scheduled upload scan complete")
