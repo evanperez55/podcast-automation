@@ -4,14 +4,29 @@ milestone: v1.0
 milestone_name: milestone
 status: planning
 stopped_at: Completed 01-foundations-03-PLAN.md
-last_updated: "2026-03-17T01:38:52Z"
-last_activity: 2026-03-17 — Phase 1 complete: all 3 foundation plans executed
+last_updated: "2026-03-17T01:41:41.449Z"
+last_activity: "2026-03-17 — Phase 1 complete: all 3 foundation plans executed"
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 3
   completed_plans: 3
-  percent: 20
+---
+
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: planning
+stopped_at: Completed 01-foundations-03-PLAN.md
+last_updated: "2026-03-17T01:41:29.712Z"
+last_activity: "2026-03-17 — Phase 1 complete: all 3 foundation plans executed"
+progress:
+  total_phases: 5
+  completed_phases: 1
+  total_plans: 3
+  completed_plans: 3
+  percent: 100
 ---
 
 # Project State
@@ -51,6 +66,7 @@ Progress: [██░░░░░░░░] 20%
 
 *Updated after each plan completion*
 | Phase 01-foundations P02 | 30 | 2 tasks | 3 files |
+| Phase 01-foundations P01 | 15 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -65,6 +81,8 @@ Recent decisions affecting current work:
 - [Phase 01-foundations]: Save schedule after each platform (not once at end) so partial progress survives mid-loop failure
 - [Phase 01-foundations]: mark_failed is no-op for unknown platforms — consistent with mark_uploaded, safe to call with any platform string
 - [Phase 01-03]: Anchor all credential paths to Config.BASE_DIR / "credentials" / ... instead of bare Path() to prevent cwd-relative resolution failures
+- [Phase 01-foundations]: All scheduler delay config reads through Config class, not raw os.getenv — single source of truth for env vars
+- [Phase 01-foundations]: Tests for Config-backed attributes use @patch.object(Config, attr) not @patch.dict(os.environ) — avoids import-time resolution ordering issues
 
 ### Pending Todos
 
