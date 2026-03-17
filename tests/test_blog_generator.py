@@ -176,3 +176,70 @@ class TestSaveBlogPost:
         assert result_path.name == expected_name
         assert result_path.exists()
         assert result_path.read_text(encoding="utf-8") == markdown
+
+
+VOICE_TRANSCRIPT_DATA = {"segments": [], "words": []}
+
+VOICE_ANALYSIS = {
+    "episode_title": "Test Episode",
+    "episode_summary": "Test summary",
+    "best_clips": [],
+    "chapters": [],
+    "show_notes": "",
+}
+
+
+class TestBlogVoicePrompt:
+    """Tests for show-specific voice persona embedded in the blog generation prompt."""
+
+    def test_blog_prompt_contains_persona_instruction(self):
+        """Blog prompt must contain an irreverent/comedy voice instruction."""
+        gen = BlogPostGenerator()
+        prompt = gen._build_prompt(VOICE_TRANSCRIPT_DATA, VOICE_ANALYSIS, 25)
+        has_persona = (
+            "irreverent" in prompt.lower()
+            or "edgy" in prompt.lower()
+            or (
+                "hosts" in prompt.lower()
+                and ("tone" in prompt.lower() or "voice" in prompt.lower())
+            )
+        )
+        assert has_persona, (
+            "Blog prompt must signal the show's irreverent/edgy/comedy voice persona"
+        )
+
+    def test_blog_prompt_contains_voice_examples(self):
+        """Blog prompt must contain BAD/GOOD example pairs showing desired tone."""
+        gen = BlogPostGenerator()
+        prompt = gen._build_prompt(VOICE_TRANSCRIPT_DATA, VOICE_ANALYSIS, 25)
+        has_examples = ("BAD" in prompt and "GOOD" in prompt) or (
+            "don't write" in prompt.lower() and "do write" in prompt.lower()
+        )
+        assert has_examples, (
+            "Blog prompt must contain voice example pairs (BAD/GOOD or DON'T/DO format)"
+        )
+
+    def test_blog_generate_passes_system_message_to_openai(self):
+        """generate_blog_post must include a system message as first item in messages list."""
+        mock_openai = MagicMock()
+        mock_client = MagicMock()
+        mock_openai.OpenAI.return_value = mock_client
+        mock_response = MagicMock()
+        mock_response.choices[0].message.content = "# Generated Blog Post\n\nContent."
+        mock_client.chat.completions.create.return_value = mock_response
+
+        gen = BlogPostGenerator()
+        gen.use_openai = True
+
+        with patch.dict("sys.modules", {"openai": mock_openai}):
+            gen.generate_blog_post(VOICE_TRANSCRIPT_DATA, VOICE_ANALYSIS, 25)
+
+        call_kwargs = mock_client.chat.completions.create.call_args
+        messages = call_kwargs.kwargs.get("messages") or (
+            call_kwargs.args[0] if call_kwargs.args else None
+        )
+        assert messages is not None, "messages argument must be passed to create()"
+        first_message = messages[0]
+        assert first_message["role"] == "system", (
+            f"First message must have role='system', got role='{first_message['role']}'"
+        )
