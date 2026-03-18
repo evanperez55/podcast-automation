@@ -19,7 +19,7 @@
 - [x] **WEB-03**: SEO meta tags (Open Graph, Twitter Card) with episode-specific keywords
 - [x] **WEB-04**: Chapter navigation within the transcript page
 - [x] **WEB-05**: Sitemap.xml auto-generated and updated with each new episode
-- [ ] **WEB-06**: Pages deployed to GitHub Pages automatically
+- [x] **WEB-06**: Pages deployed to GitHub Pages automatically
 
 ### Content Compliance
 
@@ -68,7 +68,7 @@
 | WEB-03 | Phase 7 | Complete |
 | WEB-04 | Phase 7 | Complete |
 | WEB-05 | Phase 7 | Complete |
-| WEB-06 | Phase 7 | Pending |
+| WEB-06 | Phase 7 | Complete |
 | SAFE-01 | Phase 8 | Pending |
 | SAFE-02 | Phase 8 | Pending |
 | SAFE-03 | Phase 8 | Pending |

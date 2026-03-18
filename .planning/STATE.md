@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Discoverability & Short-Form
 status: executing
-stopped_at: Completed 07-01-PLAN.md
-last_updated: "2026-03-18T21:34:33.135Z"
-last_activity: "2026-03-18 — Plan 01 complete: SubtitleClipGenerator with pysubs2 ASS + 31 tests"
+stopped_at: Completed 07-02-PLAN.md
+last_updated: "2026-03-18T21:43:19Z"
+last_activity: "2026-03-18 — Phase 7 complete: EpisodeWebpageGenerator wired into pipeline as Step 8.6 with GitHub Pages deployment"
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
-  percent: 10
+  completed_plans: 4
+  percent: 50
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-18)
 
 **Core value:** One command produces professional-quality, platform-ready podcast content that sounds hand-edited and captures the show's edgy comedy voice — without manual intervention.
-**Current focus:** Phase 6 — Subtitle Clip Generator
+**Current focus:** Phase 8 — Content Compliance (next)
 
 ## Current Position
 
-Phase: 6 of 8 (Subtitle Clip Generator)
-Plan: 1 of 2 complete
-Status: In progress
-Last activity: 2026-03-18 — Plan 01 complete: SubtitleClipGenerator with pysubs2 ASS + 31 tests
+Phase: 7 of 8 complete (Episode Webpages)
+Plan: 2 of 2 complete
+Status: Phase 7 complete — Phase 8 next
+Last activity: 2026-03-18 — Phase 7 complete: EpisodeWebpageGenerator wired into pipeline as Step 8.6 with GitHub Pages deployment
 
-Progress: [█░░░░░░░░░] 10%
+Progress: [█████░░░░░] 50%
 
 ## Accumulated Context
 
@@ -47,12 +47,13 @@ Progress: [█░░░░░░░░░] 10%
 - [Phase 06]: Anton font committed to assets/fonts/ to prevent libass silently substituting DejaVu Sans
 - [Phase 07]: Jinja2 autoescape=True used for XSS protection — apostrophes become &#39; in HTML output
 - [Phase 07]: YAKE keyword extraction uses show_notes/episode_summary, NOT raw transcript — avoids noisy filler words
+- [07-02]: PyGithub upsert pattern: get_contents() for SHA then update_file(); on GithubException fall back to create_file()
+- [07-02]: deploy() returns None gracefully on missing GITHUB_TOKEN or GITHUB_PAGES_REPO — no exception raised
 
 ### Blockers/Concerns
 
 - [Phase 6]: Font file (Anton-Regular.ttf) must be committed to assets/fonts/ before end-to-end clip testing — libass silently substitutes DejaVu Sans otherwise
-- [Phase 7]: `GITHUB_TOKEN`, `GITHUB_PAGES_REPO`, `SITE_BASE_URL` env vars must be configured; pipeline must skip gracefully when missing
-- [Phase 7]: yake keyword extraction unvalidated on 10,000-word podcast transcripts — benchmark during Phase 7 implementation
+- [Phase 8]: Content compliance safety gate required before YouTube uploads to prevent strikes (ref: ep29 cancer misinformation strike)
 
 ## Performance Metrics
 
@@ -62,9 +63,10 @@ Progress: [█░░░░░░░░░] 10%
 | Phase 06 P02 | 5min | 1 tasks | 3 files |
 | Phase 06 P02 | 10min | 2 tasks | 3 files |
 | Phase 07 P01 | 15min | 1 tasks | 4 files |
+| 07 | 02 | 10min | 2 | 4 |
 
 ## Session Continuity
 
-Last session: 2026-03-18T21:34:33.131Z
-Stopped at: Completed 07-01-PLAN.md
-Resume: `/gsd:execute-phase 6` for Plan 02 (pipeline wiring)
+Last session: 2026-03-18T21:43:19Z
+Stopped at: Completed 07-02-PLAN.md
+Resume: `/gsd:execute-phase 8` for Phase 8 — Content Compliance (SAFE-01 to SAFE-04)

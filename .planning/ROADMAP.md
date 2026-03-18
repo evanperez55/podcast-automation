@@ -25,7 +25,7 @@ See: .planning/milestones/v1.0-ROADMAP.md for full details.
 **Milestone Goal:** Make clips go viral with burned-in subtitle vertical videos and drive organic search traffic with SEO-optimized episode webpages.
 
 - [x] **Phase 6: Subtitle Clip Generator** - Vertical 9:16 MP4 clips with word-by-word burned-in captions uploaded to Shorts/Reels/TikTok (completed 2026-03-18)
-- [ ] **Phase 7: Episode Webpages** - SEO-optimized static HTML pages with full transcripts deployed to GitHub Pages
+- [x] **Phase 7: Episode Webpages** - SEO-optimized static HTML pages with full transcripts deployed to GitHub Pages (completed 2026-03-18)
 - [ ] **Phase 8: Content Compliance** - YouTube community guidelines safety gate blocking non-compliant uploads
 
 ## Phase Details
@@ -55,7 +55,7 @@ Plans:
   3. The page HTML includes Open Graph and Twitter Card meta tags with episode-specific keywords extracted from the transcript
   4. Chapter timestamps are rendered as clickable jump links within the transcript page
   5. sitemap.xml at the GitHub Pages root is updated with the new episode URL within the same pipeline run
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 07-01-PLAN.md — Build EpisodeWebpageGenerator core module (HTML generation, JSON-LD, meta tags, keywords, chapters, sitemap)
@@ -86,5 +86,5 @@ Plans:
 | 4. Chapter Markers | v1.0 | 2/2 | Complete | 2026-03-17 |
 | 5. Architecture Refactor | v1.0 | 3/3 | Complete | 2026-03-18 |
 | 6. Subtitle Clip Generator | v1.1 | 2/2 | Complete | 2026-03-18 |
-| 7. Episode Webpages | 1/2 | In Progress|  | - |
+| 7. Episode Webpages | 2/2 | Complete   | 2026-03-18 | - |
 | 8. Content Compliance | v1.1 | 0/? | Not started | - |
