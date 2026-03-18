@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Discoverability & Short-Form
-status: completed
-stopped_at: Completed 07-02-PLAN.md
-last_updated: "2026-03-18T21:52:51.008Z"
-last_activity: "2026-03-18 — Phase 7 complete: EpisodeWebpageGenerator wired into pipeline as Step 8.6 with GitHub Pages deployment"
+status: in_progress
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-03-18T22:13:49Z"
+last_activity: "2026-03-18 — Phase 8 Plan 1 complete: ContentComplianceChecker with GPT-4o transcript analysis, 21 tests"
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
-  percent: 50
+  total_plans: 6
+  completed_plans: 5
+  percent: 62
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-18)
 
 **Core value:** One command produces professional-quality, platform-ready podcast content that sounds hand-edited and captures the show's edgy comedy voice — without manual intervention.
-**Current focus:** Phase 8 — Content Compliance (next)
+**Current focus:** Phase 8 — Content Compliance (in progress — Plan 1 of 2 complete)
 
 ## Current Position
 
-Phase: 7 of 8 complete (Episode Webpages)
-Plan: 2 of 2 complete
-Status: Phase 7 complete — Phase 8 next
-Last activity: 2026-03-18 — Phase 7 complete: EpisodeWebpageGenerator wired into pipeline as Step 8.6 with GitHub Pages deployment
+Phase: 8 of 8 in progress (Content Compliance)
+Plan: 1 of 2 complete
+Status: Phase 8 Plan 1 complete — Plan 2 (pipeline wiring + upload gate) next
+Last activity: 2026-03-18 — Phase 8 Plan 1 complete: ContentComplianceChecker with GPT-4o transcript analysis, 21 tests
 
-Progress: [█████░░░░░] 50%
+Progress: [██████░░░░] 62%
 
 ## Accumulated Context
 
@@ -49,11 +49,14 @@ Progress: [█████░░░░░] 50%
 - [Phase 07]: YAKE keyword extraction uses show_notes/episode_summary, NOT raw transcript — avoids noisy filler words
 - [07-02]: PyGithub upsert pattern: get_contents() for SHA then update_file(); on GithubException fall back to create_file()
 - [07-02]: deploy() returns None gracefully on missing GITHUB_TOKEN or GITHUB_PAGES_REPO — no exception raised
+- [08-01]: temperature=0.1 for GPT-4o compliance calls — deterministic classification, not creative generation
+- [08-01]: critical = hate_speech + dangerous_misinformation + self_harm_promotion; warning = graphic_violence + harassment + sexual_content
+- [08-01]: save_report() separates flagged (critical) from warnings in JSON for clear human review
 
 ### Blockers/Concerns
 
 - [Phase 6]: Font file (Anton-Regular.ttf) must be committed to assets/fonts/ before end-to-end clip testing — libass silently substitutes DejaVu Sans otherwise
-- [Phase 8]: Content compliance safety gate required before YouTube uploads to prevent strikes (ref: ep29 cancer misinformation strike)
+- [Phase 8]: Pipeline wiring (Step 3.6 + upload gate) still needed — that's Plan 2
 
 ## Performance Metrics
 
@@ -64,9 +67,10 @@ Progress: [█████░░░░░] 50%
 | Phase 06 P02 | 10min | 2 tasks | 3 files |
 | Phase 07 P01 | 15min | 1 tasks | 4 files |
 | 07 | 02 | 10min | 2 | 4 |
+| 08 | 01 | 5min | 1 | 2 |
 
 ## Session Continuity
 
-Last session: 2026-03-18T21:43:19Z
-Stopped at: Completed 07-02-PLAN.md
-Resume: `/gsd:execute-phase 8` for Phase 8 — Content Compliance (SAFE-01 to SAFE-04)
+Last session: 2026-03-18T22:13:49Z
+Stopped at: Completed 08-01-PLAN.md
+Resume: `/gsd:execute-phase 8` for Phase 8 Plan 2 — pipeline wiring (Step 3.6 + upload gate + --force flag)
