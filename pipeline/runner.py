@@ -33,6 +33,7 @@ from clip_previewer import ClipPreviewer
 from search_index import EpisodeSearchIndex
 from audiogram_generator import AudiogramGenerator
 from chapter_generator import ChapterGenerator
+from subtitle_clip_generator import SubtitleClipGenerator
 from retry_utils import retry_with_backoff
 
 from pipeline.context import PipelineContext
@@ -127,6 +128,7 @@ def _init_components(test_mode=False, dry_run=False, auto_approve=False, resume=
             "search_index": None,
             "audiogram_generator": AudiogramGenerator(),
             "chapter_generator": ChapterGenerator(),
+            "subtitle_clip_generator": SubtitleClipGenerator(),
         }
 
     # Validate configuration
@@ -164,6 +166,7 @@ def _init_components(test_mode=False, dry_run=False, auto_approve=False, resume=
     search_index = EpisodeSearchIndex()
     audiogram_generator = AudiogramGenerator()
     chapter_generator = ChapterGenerator()
+    subtitle_clip_generator = SubtitleClipGenerator()
 
     print()
 
@@ -183,6 +186,7 @@ def _init_components(test_mode=False, dry_run=False, auto_approve=False, resume=
         "search_index": search_index,
         "audiogram_generator": audiogram_generator,
         "chapter_generator": chapter_generator,
+        "subtitle_clip_generator": subtitle_clip_generator,
     }
 
 

@@ -110,11 +110,14 @@ def run_video(
 
     ctx.srt_paths = srt_paths
 
-    # Step 5.5: Convert clips to videos (or audiograms if enabled)
+    # Step 5.5: Convert clips to videos (subtitle clips, audiograms, or plain conversion)
+    subtitle_clip_generator = components.get("subtitle_clip_generator")
     audiogram_generator = components.get("audiogram_generator")
     video_converter = components.get("video_converter")
 
-    if audiogram_generator and audiogram_generator.enabled:
+    if subtitle_clip_generator and subtitle_clip_generator.enabled:
+        print("STEP 5.5: CREATING SUBTITLE CLIP VIDEOS")
+    elif audiogram_generator and audiogram_generator.enabled:
         print("STEP 5.5: CREATING AUDIOGRAM WAVEFORM VIDEOS")
     else:
         print("STEP 5.5: CONVERTING CLIPS TO VIDEOS")
@@ -127,6 +130,42 @@ def run_video(
         video_clip_paths = [Path(p) for p in outputs.get("video_clip_paths", [])]
         full_episode_video_path = outputs.get("full_episode_video_path")
         logger.info("[RESUME] Skipping video conversion (already completed)")
+    elif subtitle_clip_generator and subtitle_clip_generator.enabled and clip_paths:
+        logger.info("Creating word-by-word subtitle clips...")
+        srt_list = [str(s) if s else None for s in srt_paths]
+        video_clip_paths = [
+            Path(p)
+            for p in subtitle_clip_generator.create_subtitle_clips(
+                clip_paths=[str(p) for p in clip_paths],
+                srt_paths=srt_list,
+                transcript_data=transcript_data,
+                best_clips=analysis.get("best_clips", []),
+                format_type="vertical",
+            )
+        ]
+        logger.info("Created %d subtitle clips", len(video_clip_paths))
+
+        # Full episode still uses static logo (not subtitle clips)
+        if video_converter:
+            logger.info("Creating horizontal video (16:9) for YouTube full episode...")
+            full_episode_video_path = video_converter.create_episode_video(
+                audio_path=str(censored_audio),
+                output_path=str(
+                    episode_output_dir / f"{audio_file.stem}_{timestamp}_episode.mp4"
+                ),
+                format_type="horizontal",
+            )
+
+        if state:
+            state.complete_step(
+                "convert_videos",
+                {
+                    "video_clip_paths": [str(p) for p in video_clip_paths],
+                    "full_episode_video_path": str(full_episode_video_path)
+                    if full_episode_video_path
+                    else None,
+                },
+            )
     elif audiogram_generator and audiogram_generator.enabled and clip_paths:
         logger.info("Creating audiogram waveform videos for clips...")
         audiogram_srt_paths = [str(s) if s else None for s in srt_paths]
