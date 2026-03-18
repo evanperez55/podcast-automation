@@ -26,7 +26,7 @@
 - [x] **SAFE-01**: Transcript analyzed against YouTube community guidelines before upload
 - [x] **SAFE-02**: Flagged segments include timestamps, quoted text, and rule category
 - [x] **SAFE-03**: Flagged segments can be auto-muted or cut from the video before upload
-- [ ] **SAFE-04**: Upload blocked when critical violations detected (requires --force to override)
+- [x] **SAFE-04**: Upload blocked when critical violations detected (requires --force to override)
 
 ## v2 Requirements
 
@@ -72,7 +72,7 @@
 | SAFE-01 | Phase 8 | Complete |
 | SAFE-02 | Phase 8 | Complete |
 | SAFE-03 | Phase 8 | Complete |
-| SAFE-04 | Phase 8 | Pending |
+| SAFE-04 | Phase 8 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 14 total
