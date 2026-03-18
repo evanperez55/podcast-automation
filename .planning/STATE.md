@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Discoverability & Short-Form
 status: executing
-stopped_at: Completed 06-02 Task 1 — awaiting human-verify checkpoint (Task 2)
-last_updated: "2026-03-18T03:57:44.840Z"
+stopped_at: Completed 06-02-PLAN.md — Phase 6 fully complete
+last_updated: "2026-03-18T04:01:40.770Z"
 last_activity: "2026-03-18 — Plan 01 complete: SubtitleClipGenerator with pysubs2 ASS + 31 tests"
 progress:
   total_phases: 3
@@ -43,6 +43,8 @@ Progress: [█░░░░░░░░░] 10%
 - [06-01]: srt_path parameter accepted for interface compatibility but word timing sourced exclusively from transcript_data["words"]
 - [06-01]: SUBTITLE_ACCENT_COLOR defaults to 0x00e0ff (bright cyan) for high contrast on dark 0x1a1a2e background
 - [Phase 06]: Subtitle clip branch is first-priority in Step 5.5; audiogram is fallback when USE_SUBTITLE_CLIPS=false
+- [Phase 06]: Subtitle clip branch is first-priority in Step 5.5; audiogram is fallback when USE_SUBTITLE_CLIPS=false
+- [Phase 06]: Anton font committed to assets/fonts/ to prevent libass silently substituting DejaVu Sans
 
 ### Blockers/Concerns
 
@@ -56,9 +58,10 @@ Progress: [█░░░░░░░░░] 10%
 |-------|------|----------|-------|-------|
 | 06 | 01 | 4min | 1 | 3 |
 | Phase 06 P02 | 5min | 1 tasks | 3 files |
+| Phase 06 P02 | 10min | 2 tasks | 3 files |
 
 ## Session Continuity
 
-Last session: 2026-03-18T03:57:32.084Z
-Stopped at: Completed 06-02 Task 1 — awaiting human-verify checkpoint (Task 2)
+Last session: 2026-03-18T04:01:40.764Z
+Stopped at: Completed 06-02-PLAN.md — Phase 6 fully complete
 Resume: `/gsd:execute-phase 6` for Plan 02 (pipeline wiring)
