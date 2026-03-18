@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ episode_title }}</title>
+  <meta name="description" content="{{ episode_summary[:200] }}">
+  <meta name="keywords" content="{{ keywords | join(', ') }}">
+
+  {# Open Graph meta tags (WEB-03) #}
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="{{ episode_title }}">
+  <meta property="og:description" content="{{ episode_summary[:200] }}">
+  <meta property="og:url" content="{{ episode_url }}">
+  <meta property="og:site_name" content="Fake Problems Podcast">
+  {% if thumbnail_url %}
+  <meta property="og:image" content="{{ thumbnail_url }}">
+  {% endif %}
+
+  {# Twitter Card meta tags (WEB-03) #}
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ episode_title }}">
+  <meta name="twitter:description" content="{{ episode_summary[:200] }}">
+  {% if thumbnail_url %}
+  <meta name="twitter:image" content="{{ thumbnail_url }}">
+  {% endif %}
+
+  {# JSON-LD structured data (WEB-02) #}
+  <script type="application/ld+json">
+{{ jsonld | tojson(indent=2) }}
+  </script>
+
+  <style>
+    body {
+      font-family: Georgia, serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 1.5rem;
+      line-height: 1.7;
+      color: #222;
+      background: #fafafa;
+    }
+    h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+    nav.chapters {
+      background: #f0f0f0;
+      border-radius: 6px;
+      padding: 1rem 1.5rem;
+      margin: 1.5rem 0;
+    }
+    nav.chapters h2 { margin-top: 0; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    nav.chapters ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; }
+    nav.chapters li a { text-decoration: none; color: #0066cc; }
+    nav.chapters li a:hover { text-decoration: underline; }
+    div.transcript { margin-top: 2rem; }
+    div.transcript h2 { font-size: 1.2rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #ddd; padding-bottom: 0.5rem; }
+    span.segment { display: block; padding: 0.25rem 0; }
+    span.segment:target { background: #fffbcc; border-left: 3px solid #f0c040; padding-left: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>{{ episode_title }}</h1>
+  <p>{{ episode_summary }}</p>
+
+  {% if chapters %}
+  <nav class="chapters">
+    <h2>Chapters</h2>
+    <ul>
+      {% for chapter in chapters %}
+      <li>
+        <a href="#t-{{ chapter.start_seconds }}">
+          {{ chapter.start_timestamp }} — {{ chapter.title }}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </nav>
+  {% endif %}
+
+  <div class="transcript">
+    <h2>Full Transcript</h2>
+    {% for segment in segments %}
+    <span id="t-{{ segment.start_int }}" class="segment">{{ segment.text }}</span>
+    {% endfor %}
+  </div>
+</body>
+</html>

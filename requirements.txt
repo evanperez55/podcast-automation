@@ -40,6 +40,11 @@ praw==7.7.1
 tqdm==4.66.1
 pyyaml==6.0.1
 
+# Episode webpage generation (Phase 7)
+PyGithub>=2.0.0   # GitHub Pages deployment API
+yake>=0.4.8       # Keyword extraction for SEO meta tags
+Jinja2>=3.0.0     # HTML templating (may already be installed as transitive dep)
+
 # Testing
 pytest==7.4.3
 pytest-cov==4.1.0
