@@ -551,6 +551,7 @@ def dry_run(components=None):
         components = _init_components(dry_run=True)
 
     audiogram_generator = components.get("audiogram_generator")
+    subtitle_clip_generator_dr = components.get("subtitle_clip_generator")
     blog_generator = components.get("blog_generator")
     scheduler = components.get("scheduler")
     thumbnail_generator = components.get("thumbnail_generator")
@@ -701,8 +702,17 @@ def dry_run(components=None):
     print(f"[MOCK] Step 5.4: Subtitles -- would generate {num_clips} SRT file(s)")
     steps_validated += 1
 
-    audiogram_mode = audiogram_generator and audiogram_generator.enabled
-    if audiogram_mode:
+    subtitle_clip_mode = (
+        subtitle_clip_generator_dr and subtitle_clip_generator_dr.enabled
+    )
+    audiogram_mode = (
+        not subtitle_clip_mode and audiogram_generator and audiogram_generator.enabled
+    )
+    if subtitle_clip_mode:
+        print(
+            f"[MOCK] Step 5.5: Subtitle clips -- would create {num_clips} word-caption video(s)"
+        )
+    elif audiogram_mode:
         print(
             f"[MOCK] Step 5.5: Audiogram -- would create {num_clips} waveform video(s)"
         )
@@ -780,6 +790,7 @@ def dry_run(components=None):
         ("Blog generator", blog_generator),
         ("Thumbnail generator", thumbnail_generator),
         ("Audiogram generator", audiogram_generator),
+        ("Subtitle clip generator", subtitle_clip_generator_dr),
     ]:
         if mod_obj:
             print(f"[OK] {mod_name} imports correctly")
