@@ -24,7 +24,7 @@ See: .planning/milestones/v1.0-ROADMAP.md for full details.
 
 **Milestone Goal:** Make clips go viral with burned-in subtitle vertical videos and drive organic search traffic with SEO-optimized episode webpages.
 
-- [ ] **Phase 6: Subtitle Clip Generator** - Vertical 9:16 MP4 clips with word-by-word burned-in captions uploaded to Shorts/Reels/TikTok
+- [x] **Phase 6: Subtitle Clip Generator** - Vertical 9:16 MP4 clips with word-by-word burned-in captions uploaded to Shorts/Reels/TikTok (completed 2026-03-18)
 - [ ] **Phase 7: Episode Webpages** - SEO-optimized static HTML pages with full transcripts deployed to GitHub Pages
 - [ ] **Phase 8: Content Compliance** - YouTube community guidelines safety gate blocking non-compliant uploads
 
@@ -39,7 +39,7 @@ See: .planning/milestones/v1.0-ROADMAP.md for full details.
   2. The currently spoken word appears in an accent highlight color while surrounding words remain white, visually tracking speech through the clip
   3. Caption timing sourced from WhisperX word-level JSON aligns captions to within 100ms of spoken audio
   4. Clips are uploaded to YouTube Shorts, Instagram Reels queue, and TikTok automatically as part of the distribute step
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 06-01-PLAN.md — Build SubtitleClipGenerator core module (rendering engine + tests)
@@ -85,6 +85,6 @@ Plans:
 | 3. Content Voice and Clips | v1.0 | 3/3 | Complete | 2026-03-17 |
 | 4. Chapter Markers | v1.0 | 2/2 | Complete | 2026-03-17 |
 | 5. Architecture Refactor | v1.0 | 3/3 | Complete | 2026-03-18 |
-| 6. Subtitle Clip Generator | 1/2 | In Progress|  | - |
+| 6. Subtitle Clip Generator | 2/2 | Complete   | 2026-03-18 | - |
 | 7. Episode Webpages | v1.1 | 0/? | Not started | - |
 | 8. Content Compliance | v1.1 | 0/? | Not started | - |

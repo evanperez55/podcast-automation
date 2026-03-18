@@ -10,7 +10,7 @@
 - [x] **CLIP-01**: Clips rendered as vertical 9:16 video with word-by-word bold captions burned in
 - [x] **CLIP-02**: Active word highlighted with accent color as it's spoken
 - [x] **CLIP-03**: Word timing sourced from WhisperX word-level JSON (not sentence-level SRT)
-- [ ] **CLIP-04**: Subtitle clips uploaded to YouTube Shorts, Instagram Reels, and TikTok
+- [x] **CLIP-04**: Subtitle clips uploaded to YouTube Shorts, Instagram Reels, and TikTok
 
 ### Episode Webpages
 
@@ -62,7 +62,7 @@
 | CLIP-01 | Phase 6 | Complete |
 | CLIP-02 | Phase 6 | Complete |
 | CLIP-03 | Phase 6 | Complete |
-| CLIP-04 | Phase 6 | Pending |
+| CLIP-04 | Phase 6 | Complete |
 | WEB-01 | Phase 7 | Pending |
 | WEB-02 | Phase 7 | Pending |
 | WEB-03 | Phase 7 | Pending |
