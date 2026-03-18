@@ -1,8 +1,8 @@
-# Fake Problems Podcast — Pipeline Upgrade
+# Fake Problems Podcast — Automated Production Pipeline
 
 ## What This Is
 
-An automated podcast production pipeline for the "Fake Problems Podcast" — an edgy comedy show. The pipeline handles everything from raw audio to multi-platform distribution: transcription, AI content analysis, censorship, clip generation, video creation, and social media posting. This milestone is a comprehensive upgrade to make the output sound professional, the content match the show's voice, and the system cleaner and more capable.
+An automated podcast production pipeline for the "Fake Problems Podcast" — an edgy comedy show. One command takes raw audio through transcription, AI content analysis with the show's comedy voice, smooth audio ducking censorship, LUFS-normalized mastering, chapter markers, clip generation scored by audio energy, and multi-platform distribution (YouTube, Spotify, Twitter, Instagram, TikTok). Shipped v1.0 with modular pipeline architecture.
 
 ## Core Value
 
@@ -35,45 +35,53 @@ One command produces professional-quality, platform-ready podcast content that s
 - ✓ Analytics collection (YouTube + Twitter) — existing
 - ✓ Pipeline state checkpointing for resume — existing
 - ✓ --dry-run, --test, --auto-approve modes — existing
+- ✓ Smooth audio ducking censorship (volume dip instead of beep) — v1.0
+- ✓ True LUFS normalization using ffmpeg-loudnorm EBU R128 — v1.0
+- ✓ Edgy comedy voice persona in all AI-generated content — v1.0
+- ✓ AudioClipScorer for energy-based clip selection — v1.0
+- ✓ Hook-style captions matching show humor — v1.0
+- ✓ Chapter markers in MP3 ID3 tags — v1.0
+- ✓ Chapter markers in RSS feed (Podcasting 2.0) — v1.0
+- ✓ Scheduled upload execution (real uploads, not stubs) — v1.0
+- ✓ openai SDK in requirements.txt — v1.0
+- ✓ Naming cleanup (_parse_claude_response, duplicate config reads, inline re) — v1.0
+- ✓ Google credentials moved to credentials/ directory — v1.0
+- ✓ main.py refactored to 134-line CLI shim with pipeline/ package — v1.0
+- ✓ continue_episode.py eliminated (pipeline.run_distribute_only) — v1.0
 
 ### Active
 
-- [ ] Replace beep censorship with smooth audio ducking (volume dip, like radio)
-- [ ] True LUFS normalization using ffmpeg-loudnorm (not dBFS approximation)
-- [ ] Smarter clip detection — find actually funny/viral moments, not just topic changes
-- [ ] AI content generation in edgy comedy voice (titles, descriptions, social posts, blog)
-- [ ] Tech debt cleanup — break up 1700-line main.py, fix hardcoded values, resolve concerns report
-- [ ] Marketing & growth features — SEO, cross-promotion, audience analytics, discoverability
-- [ ] Expand to more platforms (Threads, Bluesky, etc.)
-- [ ] Fix scheduled upload execution (currently a stub that marks uploads done without uploading)
-- [ ] Wire Instagram upload into pipeline (currently manual-only)
-- [ ] Fix openai SDK missing from requirements.txt
-- [ ] Proper LUFS loudness normalization (ffmpeg-loudnorm filter)
-- [ ] Move Google credentials to credentials/ directory
-- [ ] Clean up naming artifacts (_parse_claude_response, duplicate config reads, inline re imports)
+- [ ] Instagram Reels auto-upload via pipeline
+- [ ] Bluesky posting via atproto SDK
+- [ ] Threads posting via Meta API
+- [ ] Filler word removal (ums/ahs) with configurable threshold
+- [ ] Episode webpage generation for SEO (needs hosting decision)
+- [ ] Keyword extraction via KeyBERT for SEO metadata
+- [ ] Burned-in subtitle Shorts/Reels for vertical video platforms
+- [ ] Public chapters.json URL (needs Dropbox upload enhancement)
 
 ### Out of Scope
 
 - Rewriting in another language — must stay Python
-- Paid API additions beyond current stack (OpenAI, Dropbox) — keep costs low
-- Live streaming features — this is a post-production pipeline
+- Paid API additions beyond current stack — keep costs low
+- Live streaming features — post-production pipeline only
 - Mobile app — CLI-driven is the workflow
 - Video editing beyond static image + audio — no multi-camera, no B-roll
+- Dynamic ad insertion — requires CDN hosting, incompatible with zero-cost constraint
+- Plugin registry / dynamic step discovery — fixed pipeline doesn't benefit
 
 ## Context
 
 - Comedy podcast with edgy/dark humor tone — AI-generated content must match this voice
 - Two hosts, weekly episodes (~70 minutes, ~700MB WAV)
-- Current pipeline works end-to-end but output feels amateur (harsh beep censorship, generic AI text)
-- main.py is 1700+ lines — the God Object problem. Orchestration, CLI, and business logic are tangled
-- The codebase concerns report (.planning/codebase/CONCERNS.md) identifies 8+ tech debt items and several known bugs
-- 279+ tests across 20 test files provide a solid safety net for refactoring
-- Pipeline must keep working during upgrade — no breaking changes to current workflow
+- v1.0 shipped: 23,810 LOC Python across 30+ modules, 333 tests, modular pipeline/ architecture
+- Pipeline architecture: main.py (134 lines, CLI shim) → pipeline/runner.py (orchestrator) → pipeline/steps/ (5 step modules)
+- 9 checkpoint keys for resume: transcribe, analyze, censor, normalize, create_clips, subtitles, convert_videos, convert_mp3, blog_post
 
 ## Constraints
 
 - **Cost**: No new paid APIs. Use existing OpenAI + Ollama + free platform APIs
-- **Compatibility**: Current `python main.py ep29 --auto-approve` workflow must never break
+- **Compatibility**: `python main.py ep29 --auto-approve` workflow must never break
 - **Stack**: Python 3.12+, FFmpeg, existing dependencies. Add new packages only when necessary
 - **Platform**: Windows 11, Git Bash, NVIDIA GPU + CUDA for Whisper
 
@@ -81,10 +89,12 @@ One command produces professional-quality, platform-ready podcast content that s
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Audio ducking over beep replacement | Smooth volume dip sounds professional, avoids jarring listener experience | — Pending |
-| Edgy comedy voice for AI content | Show's identity is dark humor — generic content undermines the brand | — Pending |
-| Tech debt first vs. features first | Clean foundation makes features easier, but ship them together | — Pending |
-| Keep costs near zero | Podcast is passion project, not revenue-generating (yet) | — Pending |
+| Audio ducking over beep replacement | Smooth volume dip sounds professional, avoids jarring listener experience | ✓ Good — -40dB fade with 50ms ramps |
+| Edgy comedy voice for AI content | Show's identity is dark humor — generic content undermines the brand | ✓ Good — VOICE_PERSONA + few-shot examples |
+| Tech debt first, then features | Clean foundation makes features easier to build | ✓ Good — Phase 1 bugs fixed before any features |
+| Architecture refactor last | Refactoring stable code is safer than refactoring moving targets | ✓ Good — all feature phases complete first |
+| Keep costs near zero | Podcast is passion project, not revenue-generating (yet) | ✓ Good — Ollama for local LLM, no new paid APIs |
+| Mechanical extraction for refactor | Faithful code movement preserves behavior, minimize risk | ✓ Good — 333 tests passing, no regressions |
 
 ---
-*Last updated: 2026-03-16 after initialization*
+*Last updated: 2026-03-18 after v1.0 milestone*
