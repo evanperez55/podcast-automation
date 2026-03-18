@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: null
-milestone_name: null
-status: between_milestones
-stopped_at: v1.0 milestone complete
+milestone: v1.1
+milestone_name: Discoverability & Short-Form
+status: defining_requirements
+stopped_at: Defining requirements for v1.1
 last_updated: "2026-03-18"
-last_activity: "2026-03-18 — v1.0 milestone shipped"
+last_activity: "2026-03-18 — Milestone v1.1 started"
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 14
-  completed_plans: 14
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -20,16 +20,19 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-18)
 
 **Core value:** One command produces professional-quality, platform-ready podcast content that sounds hand-edited and captures the show's edgy comedy voice — without manual intervention.
-**Current focus:** Planning next milestone
+**Current focus:** v1.1 — Discoverability & Short-Form
 
 ## Current Position
 
-Milestone v1.0 complete. All 5 phases shipped, 14 plans executed, 14/14 requirements satisfied.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-18 — Milestone v1.1 started
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Session Continuity
 
 Last session: 2026-03-18
-Stopped at: v1.0 milestone complete
-Resume: /gsd:new-milestone for next version
+Stopped at: Defining requirements for v1.1
+Resume: Complete requirements → roadmap → /gsd:plan-phase 6

@@ -49,16 +49,19 @@ One command produces professional-quality, platform-ready podcast content that s
 - ✓ main.py refactored to 134-line CLI shim with pipeline/ package — v1.0
 - ✓ continue_episode.py eliminated (pipeline.run_distribute_only) — v1.0
 
-### Active
+### Active (v1.1 — Discoverability & Short-Form)
 
-- [ ] Instagram Reels auto-upload via pipeline
-- [ ] Bluesky posting via atproto SDK
-- [ ] Threads posting via Meta API
-- [ ] Filler word removal (ums/ahs) with configurable threshold
-- [ ] Episode webpage generation for SEO (needs hosting decision)
-- [ ] Keyword extraction via KeyBERT for SEO metadata
-- [ ] Burned-in subtitle Shorts/Reels for vertical video platforms
-- [ ] Public chapters.json URL (needs Dropbox upload enhancement)
+- [ ] Burned-in subtitle clips (big bold word-by-word) for YouTube Shorts, Instagram Reels, TikTok
+- [ ] Episode webpages with full transcripts and SEO metadata on GitHub Pages
+- [ ] Keyword extraction for SEO metadata
+
+### Future
+
+- Instagram Reels auto-upload via pipeline
+- Bluesky posting via atproto SDK
+- Threads posting via Meta API
+- Filler word removal (ums/ahs) with configurable threshold — note: may impact comedic timing
+- Public chapters.json URL (needs Dropbox upload enhancement)
 
 ### Out of Scope
 
@@ -96,5 +99,14 @@ One command produces professional-quality, platform-ready podcast content that s
 | Keep costs near zero | Podcast is passion project, not revenue-generating (yet) | ✓ Good — Ollama for local LLM, no new paid APIs |
 | Mechanical extraction for refactor | Faithful code movement preserves behavior, minimize risk | ✓ Good — 333 tests passing, no regressions |
 
+## Current Milestone: v1.1 Discoverability & Short-Form
+
+**Goal:** Make clips go viral with burned-in subtitle vertical videos and drive organic search traffic with SEO-optimized episode webpages.
+
+**Target features:**
+- Burned-in subtitle clips (Hormozi-style word-by-word) for Shorts/Reels/TikTok
+- Static episode webpages with full transcripts on GitHub Pages
+- Keyword extraction for SEO metadata
+
 ---
-*Last updated: 2026-03-18 after v1.0 milestone*
+*Last updated: 2026-03-18 after v1.1 milestone start*
