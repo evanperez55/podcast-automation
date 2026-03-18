@@ -55,9 +55,11 @@ One command produces professional-quality, platform-ready podcast content that s
 - ✓ Auto-muting flagged segments via censor_timestamps merge — v1.1
 - ✓ Upload safety gate with --force override — v1.1
 
-### Active
+### Active (v1.2 — Engagement & Smart Scheduling)
 
-(None — ship next milestone to validate)
+- [ ] Optimal posting time analysis and automated scheduling per platform
+- [ ] Content/subject matter optimization for engagement
+- [ ] Analytics-driven clip and post strategy
 
 ### Future
 
@@ -110,9 +112,15 @@ One command produces professional-quality, platform-ready podcast content that s
 | Merge flagged segments into censor_timestamps | Reuse existing AudioProcessor duck-fade, zero new FFmpeg code | ✓ Good — elegant reuse |
 | Comedy-aware compliance prompt | Dark humor and profanity are NOT violations; only genuine hate speech and dangerous misinformation | ✓ Good — avoids over-flagging |
 
-## Current State
+## Current Milestone: v1.2 Engagement & Smart Scheduling
 
-v1.0 and v1.1 shipped. No active milestone. Run `/gsd:new-milestone` to start v1.2 or v2.0.
+**Goal:** Maximize clip and post engagement through data-driven posting schedules, content optimization, and analytics feedback loops.
+
+**Target features:**
+- Optimal posting time analysis per platform (YouTube, Twitter, Instagram, TikTok)
+- Automated smart scheduling based on audience activity patterns
+- Content/subject matter scoring for engagement prediction
+- Analytics feedback loop improving future clip selection and post timing
 
 ---
-*Last updated: 2026-03-18 after v1.1 milestone completion*
+*Last updated: 2026-03-18 after v1.2 milestone start*

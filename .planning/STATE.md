@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
-milestone: none
-milestone_name: none
-status: between_milestones
-stopped_at: v1.1 milestone completed
+milestone: v1.2
+milestone_name: Engagement & Smart Scheduling
+status: researching
+stopped_at: Starting research
 last_updated: "2026-03-18"
-last_activity: "2026-03-18 — v1.1 Discoverability & Short-Form milestone shipped"
+last_activity: "2026-03-18 — Milestone v1.2 started, launching research"
 progress:
   total_phases: 0
   completed_phases: 0
@@ -21,13 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-18)
 
 **Core value:** One command produces professional-quality, platform-ready podcast content that sounds hand-edited and captures the show's edgy comedy voice — without manual intervention.
-**Current focus:** No active milestone. Run `/gsd:new-milestone` to start next version.
+**Current focus:** v1.2 Engagement & Smart Scheduling — researching
 
 ## Current Position
 
-Milestone: v1.1 shipped
-Status: Between milestones
-Last activity: 2026-03-18 — v1.1 complete (3 phases, 6 plans, 14/14 requirements)
+Phase: Not started (researching)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-18 — Milestone v1.2 started
 
 ## Shipped Milestones
 
@@ -37,5 +38,5 @@ Last activity: 2026-03-18 — v1.1 complete (3 phases, 6 plans, 14/14 requiremen
 ## Session Continuity
 
 Last session: 2026-03-18
-Stopped at: v1.1 milestone completed
-Resume: `/gsd:new-milestone` to start next version
+Stopped at: v1.2 research phase
+Resume: Complete research → define requirements → create roadmap
