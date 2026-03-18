@@ -39,11 +39,11 @@ See: .planning/milestones/v1.0-ROADMAP.md for full details.
   2. The currently spoken word appears in an accent highlight color while surrounding words remain white, visually tracking speech through the clip
   3. Caption timing sourced from WhisperX word-level JSON aligns captions to within 100ms of spoken audio
   4. Clips are uploaded to YouTube Shorts, Instagram Reels queue, and TikTok automatically as part of the distribute step
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
+- [ ] 06-01-PLAN.md — Build SubtitleClipGenerator core module (rendering engine + tests)
+- [ ] 06-02-PLAN.md — Wire into pipeline + font asset + visual verification
 
 ### Phase 7: Episode Webpages
 **Goal**: Each published episode gets an SEO-optimized static HTML page on GitHub Pages with the full searchable transcript, structured data, and chapter navigation
@@ -85,6 +85,6 @@ Plans:
 | 3. Content Voice and Clips | v1.0 | 3/3 | Complete | 2026-03-17 |
 | 4. Chapter Markers | v1.0 | 2/2 | Complete | 2026-03-17 |
 | 5. Architecture Refactor | v1.0 | 3/3 | Complete | 2026-03-18 |
-| 6. Subtitle Clip Generator | v1.1 | 0/? | Not started | - |
+| 6. Subtitle Clip Generator | v1.1 | 0/2 | Planned | - |
 | 7. Episode Webpages | v1.1 | 0/? | Not started | - |
 | 8. Content Compliance | v1.1 | 0/? | Not started | - |
