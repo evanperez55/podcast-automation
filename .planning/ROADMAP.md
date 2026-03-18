@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Foundations** - Eliminate silent production bugs and dependency hygiene issues before any feature work
 - [x] **Phase 2: Audio Quality** - Replace beep censorship with audio ducking and normalize to broadcast LUFS standards (completed 2026-03-17)
 - [x] **Phase 3: Content Voice and Clips** - Make all AI-generated content sound like the show; select clips for comedy timing (completed 2026-03-17)
-- [x] **Phase 4: Chapter Markers** - Add navigable chapter markers to MP3 files and RSS feed (completed 2026-03-17)
+- [x] **Phase 4: Chapter Markers** - Add navigable chapter markers to MP3 files and RSS feed (completed 2026-03-17)
 - [ ] **Phase 5: Architecture Refactor** - Split main.py God Object into testable pipeline modules
 
 ## Phase Details
@@ -91,7 +91,12 @@ Plans:
   3. Running `python main.py ep29 --auto-approve` produces identical output to before the refactor (no behavior regression)
   4. continue_episode.py no longer exists; its functionality is available via pipeline.run_distribute_only() or equivalent
   5. Checkpoint key names are covered by a regression test asserting they match a known-good list
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Pipeline package skeleton, PipelineContext dataclass, and TDD test scaffolds (DEBT-01, DEBT-05)
+- [ ] 05-02-PLAN.md — Extract step implementations from main.py into pipeline/steps/ modules (DEBT-01)
+- [ ] 05-03-PLAN.md — Create runner.py orchestrator, slim main.py to CLI shim, delete continue_episode.py (DEBT-01, DEBT-05)
 
 ## Progress
 
@@ -104,4 +109,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Audio Quality | 3/3 | Complete    | 2026-03-17 |
 | 3. Content Voice and Clips | 2/3 | Complete    | 2026-03-17 |
 | 4. Chapter Markers | 2/2 | Complete    | 2026-03-17 |
-| 5. Architecture Refactor | 0/TBD | Not started | - |
+| 5. Architecture Refactor | 0/3 | Not started | - |
