@@ -347,5 +347,142 @@ class TestBuildEpisodeUrl(unittest.TestCase):
         self.assertEqual(url, "https://example.com/episodes/ep42.html")
 
 
+class TestDeploy(unittest.TestCase):
+    """WEB-06: GitHub Pages deployment via PyGithub."""
+
+    def _make_gen(
+        self,
+        token="fake-token",
+        repo="owner/pages-repo",
+        base_url="https://example.com",
+    ):
+        env = {}
+        if token is not None:
+            env["GITHUB_TOKEN"] = token
+        else:
+            env.pop("GITHUB_TOKEN", None)
+        if repo is not None:
+            env["GITHUB_PAGES_REPO"] = repo
+        else:
+            env.pop("GITHUB_PAGES_REPO", None)
+        env["SITE_BASE_URL"] = base_url
+        # Ensure None values are removed from the environment override
+        patch_env = {k: v for k, v in env.items()}
+        with patch.dict("os.environ", patch_env, clear=False):
+            gen = EpisodeWebpageGenerator()
+        # Force None for missing values (env may inherit from real environment)
+        if token is None:
+            gen.github_token = None
+        if repo is None:
+            gen.github_pages_repo = None
+        return gen
+
+    def test_skip_when_no_token(self):
+        """deploy() returns None and makes no GitHub calls when github_token is None."""
+        gen = self._make_gen(token=None)
+        with patch("episode_webpage_generator.Github") as mock_github:
+            result = gen.deploy("<html/>", episode_number=42)
+        self.assertIsNone(result)
+        mock_github.assert_not_called()
+
+    def test_skip_when_no_repo(self):
+        """deploy() returns None when github_pages_repo is None."""
+        gen = self._make_gen(repo=None)
+        with patch("episode_webpage_generator.Github") as mock_github:
+            result = gen.deploy("<html/>", episode_number=42)
+        self.assertIsNone(result)
+        mock_github.assert_not_called()
+
+    def test_skip_when_empty_token(self):
+        """deploy() returns None and makes no GitHub calls when github_token is empty string."""
+        gen = self._make_gen(token="fake-token")
+        gen.github_token = ""
+        with patch("episode_webpage_generator.Github") as mock_github:
+            result = gen.deploy("<html/>", episode_number=42)
+        self.assertIsNone(result)
+        mock_github.assert_not_called()
+
+    def test_skip_when_empty_repo(self):
+        """deploy() returns None when github_pages_repo is empty string."""
+        gen = self._make_gen(repo="owner/pages-repo")
+        gen.github_pages_repo = ""
+        with patch("episode_webpage_generator.Github") as mock_github:
+            result = gen.deploy("<html/>", episode_number=42)
+        self.assertIsNone(result)
+        mock_github.assert_not_called()
+
+    def test_upsert_calls_update_for_existing(self):
+        """_github_upsert calls update_file when file already exists (has SHA)."""
+        gen = self._make_gen()
+        mock_repo = unittest.mock.MagicMock()
+        existing_file = unittest.mock.MagicMock()
+        existing_file.sha = "abc123sha"
+        mock_repo.get_contents.return_value = existing_file
+
+        gen._github_upsert(mock_repo, "episodes/ep42.html", b"<html/>", "Update ep42")
+
+        mock_repo.update_file.assert_called_once_with(
+            "episodes/ep42.html",
+            "Update ep42",
+            b"<html/>",
+            "abc123sha",
+            branch=gen.github_pages_branch,
+        )
+        mock_repo.create_file.assert_not_called()
+
+    def test_upsert_calls_create_for_new(self):
+        """_github_upsert calls create_file when file does not exist (get_contents raises)."""
+        gen = self._make_gen()
+        mock_repo = unittest.mock.MagicMock()
+        mock_repo.get_contents.side_effect = Exception("404 Not Found")
+
+        gen._github_upsert(mock_repo, "episodes/ep42.html", b"<html/>", "Create ep42")
+
+        mock_repo.create_file.assert_called_once_with(
+            "episodes/ep42.html",
+            "Create ep42",
+            b"<html/>",
+            branch=gen.github_pages_branch,
+        )
+        mock_repo.update_file.assert_not_called()
+
+    def test_generate_and_deploy_returns_url(self):
+        """generate_and_deploy returns the episode URL from deploy()."""
+        gen = self._make_gen()
+        expected_url = "https://example.com/episodes/ep42.html"
+        with patch.object(gen, "deploy", return_value=expected_url) as mock_deploy:
+            result = gen.generate_and_deploy(
+                episode_number=42,
+                analysis=SAMPLE_ANALYSIS,
+                transcript_data=SAMPLE_TRANSCRIPT,
+            )
+        self.assertEqual(result, expected_url)
+        mock_deploy.assert_called_once()
+        # Verify HTML content (first positional arg) contains DOCTYPE
+        html_arg = mock_deploy.call_args[0][0]
+        self.assertIn("<!DOCTYPE html>", html_arg)
+
+    def test_sitemap_deployed_alongside_html(self):
+        """deploy() calls _github_upsert for both episode HTML and sitemap.xml."""
+        gen = self._make_gen()
+        mock_repo = unittest.mock.MagicMock()
+        # sitemap.xml does not exist yet → get_contents raises
+        mock_repo.get_contents.side_effect = Exception("404")
+
+        with patch("episode_webpage_generator.Github") as mock_github_cls:
+            mock_github_inst = mock_github_cls.return_value
+            mock_github_inst.get_repo.return_value = mock_repo
+
+            result = gen.deploy("<html/>", episode_number=42)
+
+        # Should have called get_contents at least twice (episode HTML + sitemap)
+        self.assertGreaterEqual(mock_repo.get_contents.call_count, 2)
+        # create_file called at least twice (episode HTML + sitemap)
+        self.assertGreaterEqual(mock_repo.create_file.call_count, 2)
+        # Returns the episode URL on success
+        self.assertIsNotNone(result)
+        self.assertIn("ep42.html", result)
+
+
 if __name__ == "__main__":
     unittest.main()

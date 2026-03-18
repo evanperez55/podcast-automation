@@ -34,6 +34,7 @@ from search_index import EpisodeSearchIndex
 from audiogram_generator import AudiogramGenerator
 from chapter_generator import ChapterGenerator
 from subtitle_clip_generator import SubtitleClipGenerator
+from episode_webpage_generator import EpisodeWebpageGenerator
 from retry_utils import retry_with_backoff
 
 from pipeline.context import PipelineContext
@@ -129,6 +130,7 @@ def _init_components(test_mode=False, dry_run=False, auto_approve=False, resume=
             "audiogram_generator": AudiogramGenerator(),
             "chapter_generator": ChapterGenerator(),
             "subtitle_clip_generator": SubtitleClipGenerator(),
+            "webpage_generator": EpisodeWebpageGenerator(),
         }
 
     # Validate configuration
@@ -167,6 +169,7 @@ def _init_components(test_mode=False, dry_run=False, auto_approve=False, resume=
     audiogram_generator = AudiogramGenerator()
     chapter_generator = ChapterGenerator()
     subtitle_clip_generator = SubtitleClipGenerator()
+    webpage_generator = EpisodeWebpageGenerator()
 
     print()
 
@@ -187,6 +190,7 @@ def _init_components(test_mode=False, dry_run=False, auto_approve=False, resume=
         "audiogram_generator": audiogram_generator,
         "chapter_generator": chapter_generator,
         "subtitle_clip_generator": subtitle_clip_generator,
+        "webpage_generator": webpage_generator,
     }
 
 
@@ -556,6 +560,7 @@ def dry_run(components=None):
     scheduler = components.get("scheduler")
     thumbnail_generator = components.get("thumbnail_generator")
     notifier = components.get("notifier")
+    webpage_generator = components.get("webpage_generator")
 
     print()
     print("=" * 60)
@@ -756,6 +761,12 @@ def dry_run(components=None):
     print(f"[MOCK] Step 8.5: Blog post -- {blog_status}")
     steps_validated += 1
 
+    webpage_status = (
+        "enabled" if webpage_generator and webpage_generator.enabled else "disabled"
+    )
+    print(f"[MOCK] Step 8.6: Episode webpage -- {webpage_status}")
+    steps_validated += 1
+
     print("[MOCK] Step 9: Search index -- would index episode for full-text search")
     steps_validated += 1
 
@@ -791,6 +802,7 @@ def dry_run(components=None):
         ("Thumbnail generator", thumbnail_generator),
         ("Audiogram generator", audiogram_generator),
         ("Subtitle clip generator", subtitle_clip_generator_dr),
+        ("Webpage generator", webpage_generator),
     ]:
         if mod_obj:
             print(f"[OK] {mod_name} imports correctly")

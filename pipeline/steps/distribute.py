@@ -569,6 +569,25 @@ def run_distribute(
         logger.info("Blog post generation disabled or not configured")
     print()
 
+    # Step 8.6: Deploy episode webpage
+    print("STEP 8.6: DEPLOYING EPISODE WEBPAGE")
+    print("-" * 60)
+    webpage_generator = components.get("webpage_generator")
+    if webpage_generator and webpage_generator.enabled:
+        try:
+            page_url = webpage_generator.generate_and_deploy(
+                episode_number=episode_number,
+                analysis=analysis,
+                transcript_data=transcript_data,
+            )
+            if page_url:
+                logger.info("Episode webpage deployed: %s", page_url)
+        except Exception as e:
+            logger.warning("Webpage deployment failed: %s", e)
+    else:
+        logger.info("Webpage deployment disabled or not configured")
+    print()
+
     # Step 9: Index episode for search
     print("STEP 9: INDEXING EPISODE FOR SEARCH")
     print("-" * 60)
@@ -623,6 +642,7 @@ def run_distribute_only(
     from blog_generator import BlogPostGenerator
     from search_index import EpisodeSearchIndex
     from chapter_generator import ChapterGenerator
+    from episode_webpage_generator import EpisodeWebpageGenerator
 
     print("=" * 60)
     print(f"CONTINUING EPISODE {episode_number} PROCESSING")
@@ -756,6 +776,12 @@ def run_distribute_only(
         logger.warning("Chapter generator not available: %s", e)
         chapter_generator = None
 
+    try:
+        webpage_generator = EpisodeWebpageGenerator()
+    except Exception as e:
+        logger.warning("Webpage generator not available: %s", e)
+        webpage_generator = None
+
     components = {
         "dropbox": dropbox,
         "uploaders": uploaders,
@@ -763,6 +789,7 @@ def run_distribute_only(
         "blog_generator": blog_generator,
         "search_index": search_index,
         "chapter_generator": chapter_generator,
+        "webpage_generator": webpage_generator,
     }
 
     run_distribute(ctx, components, state=None)
