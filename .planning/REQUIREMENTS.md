@@ -61,25 +61,25 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ANLYT-01 | TBD | Pending |
-| ANLYT-02 | TBD | Pending |
-| ANLYT-03 | TBD | Pending |
-| ANLYT-04 | TBD | Pending |
-| ENGAGE-01 | TBD | Pending |
-| ENGAGE-02 | TBD | Pending |
-| ENGAGE-03 | TBD | Pending |
-| ENGAGE-04 | TBD | Pending |
-| SCHED-01 | TBD | Pending |
-| SCHED-02 | TBD | Pending |
-| SCHED-03 | TBD | Pending |
-| CONTENT-01 | TBD | Pending |
-| CONTENT-02 | TBD | Pending |
+| ANLYT-01 | Phase 9 | Pending |
+| ANLYT-02 | Phase 9 | Pending |
+| ANLYT-03 | Phase 9 | Pending |
+| ANLYT-04 | Phase 9 | Pending |
+| CONTENT-01 | Phase 9 | Pending |
+| ENGAGE-01 | Phase 10 | Pending |
+| ENGAGE-02 | Phase 10 | Pending |
+| ENGAGE-03 | Phase 10 | Pending |
+| ENGAGE-04 | Phase 10 | Pending |
+| CONTENT-02 | Phase 10 | Pending |
+| SCHED-01 | Phase 11 | Pending |
+| SCHED-02 | Phase 11 | Pending |
+| SCHED-03 | Phase 11 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 13 total
-- Mapped to phases: 0
-- Unmapped: 13
+- Mapped to phases: 13
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-18*
-*Last updated: 2026-03-18 after initial definition*
+*Last updated: 2026-03-18 after roadmap creation*
