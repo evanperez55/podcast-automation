@@ -59,26 +59,26 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CLIP-01 | TBD | Pending |
-| CLIP-02 | TBD | Pending |
-| CLIP-03 | TBD | Pending |
-| CLIP-04 | TBD | Pending |
-| WEB-01 | TBD | Pending |
-| WEB-02 | TBD | Pending |
-| WEB-03 | TBD | Pending |
-| WEB-04 | TBD | Pending |
-| WEB-05 | TBD | Pending |
-| WEB-06 | TBD | Pending |
-| SAFE-01 | TBD | Pending |
-| SAFE-02 | TBD | Pending |
-| SAFE-03 | TBD | Pending |
-| SAFE-04 | TBD | Pending |
+| CLIP-01 | Phase 6 | Pending |
+| CLIP-02 | Phase 6 | Pending |
+| CLIP-03 | Phase 6 | Pending |
+| CLIP-04 | Phase 6 | Pending |
+| WEB-01 | Phase 7 | Pending |
+| WEB-02 | Phase 7 | Pending |
+| WEB-03 | Phase 7 | Pending |
+| WEB-04 | Phase 7 | Pending |
+| WEB-05 | Phase 7 | Pending |
+| WEB-06 | Phase 7 | Pending |
+| SAFE-01 | Phase 8 | Pending |
+| SAFE-02 | Phase 8 | Pending |
+| SAFE-03 | Phase 8 | Pending |
+| SAFE-04 | Phase 8 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 14 total
-- Mapped to phases: 0
-- Unmapped: 14
+- Mapped to phases: 14
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-18*
-*Last updated: 2026-03-18 after initial definition*
+*Last updated: 2026-03-18 after roadmap creation*
