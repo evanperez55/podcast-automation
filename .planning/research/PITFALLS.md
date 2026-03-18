@@ -1,99 +1,113 @@
 # Domain Pitfalls
 
-**Domain:** Podcast automation pipeline upgrade (audio processing, social distribution, Python refactoring)
-**Researched:** 2026-03-16
-**Project:** Fake Problems Podcast — Pipeline Upgrade
+**Domain:** Podcast automation pipeline — burned-in subtitle clips and static episode webpages
+**Researched:** 2026-03-18
+**Project:** Fake Problems Podcast — v1.1 Discoverability & Short-Form
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, data loss, or irreversible production failures.
+Mistakes that cause rewrites, broken output, or pipeline failures.
 
 ---
 
-### Pitfall 1: Whisper Timestamp Drift Causes Mis-Censored Audio
+### Pitfall 1: Windows Drive Letter Colon Breaks FFmpeg Subtitle Filter
 
-**What goes wrong:** Word-level timestamps from Whisper/WhisperX are produced by an inference-time trick, not explicit training. Timestamps can be off by hundreds of milliseconds — sometimes seconds — especially around music, jingles, cross-talk, or long pauses. When audio ducking or bleep replacement uses these timestamps to mute a region, the mute lands on the wrong syllable or the following word.
+**What goes wrong:** The FFmpeg `subtitles` and `ass` filters use `:` as an option separator inside the filter graph. Windows absolute paths (`C:\path\to\file.ass`) contain a drive letter colon that FFmpeg misparses as a filter option boundary. This produces `Invalid option "\\path\\to\\file.ass"` or silently falls back to no subtitles at all.
 
-**Why it happens:** Whisper predicts utterance-level timestamps; per-word alignment is derived by wav2vec2 forced alignment in WhisperX. The two-model pipeline adds a second failure surface: transcription errors in Whisper cause the aligner to find the "closest match," which can be phonetically similar but temporally wrong.
+**Why it happens:** FFmpeg's filter graph parser strips quoting before the subtitle filter receives the path. On Linux/macOS there are no colons in paths so this never surfaces. On Windows every absolute path hits it. The escaping rule requires `\:` for colons and `\\` for backslashes inside a filter string — producing double-escaping when called from Python `subprocess` (Python string escaping + FFmpeg filter escaping).
 
 **Consequences:**
-- Profanity passes through unmuted (compliance failure for platform distribution)
-- Adjacent clean words get muted (noticeable artifact, sounds broken)
-- Errors are inconsistent episode-to-episode, making them hard to test systematically
+- `subtitles=C:\output\ep29\clip1.ass` fails silently or crashes the FFmpeg process
+- The clip is produced without any subtitles and the error is buried in stderr
+- Different escaping rules apply depending on whether you use `subprocess.run(list_args)` vs `subprocess.run(shell=True)` — the two forms need different escaping, causing intermittent failures when the call style changes
 
 **Prevention:**
-- Add a configurable `PAD_MS` buffer (e.g., 150ms before, 75ms after) to every censorship window derived from Whisper timestamps
-- After applying ducking, verify by listening to 5-second windows around each mute point — automate this check in `--test` mode by saving these clips as QA artifacts
-- Never use single-pass Whisper timestamps for censorship; always route through WhisperX alignment first
+- Convert the subtitle file path to use forward slashes and escape the colon: `C:/output/ep29/clip1.ass` → `C\:/output/ep29/clip1.ass` inside the filter string
+- Use `subprocess.run(list_args)` (not `shell=True`) so Python does not add a second layer of shell escaping
+- Concrete pattern: `f"subtitles='{path.replace(chr(92), '/').replace(':', '\\:')}'"`
+- Write a dedicated helper `_escape_ffmpeg_filter_path(path: str) -> str` so the logic is tested in isolation
+- Add a test that calls the helper with `C:\Users\evanp\projects\output\clip.ass` and asserts the correct escaped form
 
-**Detection:** Write a post-censor validator that checks no censor window is shorter than 200ms (too short = probably missed the word) or longer than 1500ms (too wide = probably a drift error).
+**Detection:** Run a dry-run subtitle burn against a known input and check that the output video contains visible text. If FFmpeg exits 0 but the output has no subtitles, the path escaping failed silently.
 
-**Phase relevance:** Audio ducking implementation phase. Must be addressed before any ducking code ships.
+**Phase relevance:** Phase 1 (subtitle burn-in implementation). Must be resolved before any subtitle rendering ships.
 
 ---
 
-### Pitfall 2: ffmpeg-loudnorm Falls Back to Dynamic Mode Silently
+### Pitfall 2: WhisperX Word Timestamps Have Gaps and Overlaps That Break Word-by-Word Highlighting
 
-**What goes wrong:** The ffmpeg `loudnorm` filter switches from linear (constant-gain) mode to dynamic (AGC) mode automatically when the input's Loudness Range (LRA) exceeds the target LRA. This fallback happens silently — no error is raised. Dynamic mode produces "pumping" artifacts and inconsistent results across episodes that have different dynamic range characteristics.
+**What goes wrong:** WhisperX produces word-level timestamps via forced alignment (wav2vec2). The resulting data has two failure modes that break karaoke-style "one word highlighted at a time" rendering:
 
-**Why it happens:** Two-pass loudnorm requires the second pass to receive the measured stats (`measured_I`, `measured_LRA`, `measured_TP`, `measured_thresh`) from the first pass via stderr JSON parsing. If the parsed values trigger dynamic mode, there's no user-visible warning unless you explicitly check `normalization_type` in the JSON output.
+1. **Gaps:** Consecutive words have `word[n].end < word[n+1].start` — sometimes by 200-500ms. During the gap, no word is highlighted, producing a visible flash-off that looks like a glitch.
+2. **Overlaps:** `word[n].end > word[n+1].start` — the ASS file assigns conflicting highlight state to two words simultaneously, breaking the karaoke effect.
+
+Special tokens cause a third problem: numbers, contractions with apostrophes (`don't`), and punctuation-attached words (`Hello,`) cannot be aligned by the forced aligner and are returned without timestamps. These words get silently dropped from the word-level output, causing the on-screen text to skip words versus what is heard.
+
+**Why it happens:** WhisperX's wav2vec2 alignment model only has a dictionary of clean phonetic tokens. Characters outside the dictionary (digits, punctuation, apostrophes) cause alignment to fail for that word, and the model skips it. Gaps and overlaps are artifacts of the segment-to-word alignment interpolation — they are partially addressed by WhisperX PRs #816 and #999, but not fully resolved as of early 2026.
 
 **Consequences:**
-- Episode-to-episode loudness is inconsistent despite "normalization"
-- Comedy timing gets compressed by AGC (pauses and silence get boosted)
-- Spotify/Apple Podcasts apply a second normalization on top, making output unpredictable
+- Burned subtitle clips have visible flicker between words
+- Words like numbers (`2014`) or contractions disappear from the highlighted display
+- Captions no longer match audio at key moments, which looks unprofessional and undermines the "Hormozi-style" impact intended
 
 **Prevention:**
-- After the first pass, read `normalization_type` from the JSON. If it equals `"dynamic"`, log a warning and optionally abort with instructions to adjust source material or target LRA
-- Target `-16 LUFS` with `-2 dBTP` true peak limit for podcast platforms — do not use `-23` (broadcast) or `-14` (YouTube streaming); they serve different platform contexts
-- Use `ffmpeg-normalize` PyPI package (`pip install ffmpeg-normalize`) instead of raw subprocess calls — it handles two-pass correctly and exposes the normalization type
+- Post-process word timestamps before generating the ASS file:
+  - Close gaps: if `gap < 150ms`, extend `word[n].end` to `word[n+1].start`
+  - Merge overlaps: if `word[n].end > word[n+1].start`, set `word[n].end = word[n+1].start - 1ms`
+  - Distribute time to unaligned words: if a word has no timestamp, interpolate from neighboring words proportionally to character count
+- Write and test this normalization in a dedicated `normalize_word_timestamps(words: list) -> list` function with edge case coverage (all words missing timestamps, back-to-back unaligned words, last word missing end time)
+- Use existing WhisperX output from the transcription step — do not re-run alignment just for subtitles
 
-**Detection:** Parse `normalization_type` from ffmpeg stderr JSON after every normalization run. Log it. Alert if `"dynamic"`.
+**Detection:** After generating the ASS file, parse it and assert: no two `\k` (karaoke) entries overlap, no gap between consecutive entries exceeds 250ms, word count in ASS matches word count in source SRT (within 5% to account for legitimate segment splits).
 
-**Phase relevance:** LUFS normalization phase. The existing dBFS-proxy approach masks this risk; switching to true loudnorm exposes it.
+**Phase relevance:** Phase 1 (subtitle burn-in). The timestamp normalization step is a prerequisite for every other subtitle rendering concern.
 
 ---
 
-### Pitfall 3: main.py Refactor Breaks the Resume Checkpoint System
+### Pitfall 3: libass on Windows Cannot Find Fonts — Silently Falls Back to DejaVu Sans
 
-**What goes wrong:** `main.py` owns the checkpoint/resume logic that lets a failed pipeline restart mid-episode. When breaking main.py into modules, the checkpoint read/write calls get distributed across new files. If the checkpoint schema or step names change during refactoring — even by renaming a method — partially-completed episodes will not resume correctly. They'll either restart from the beginning (wasting GPU/time) or skip steps that didn't complete (producing corrupt output).
+**What goes wrong:** The FFmpeg `subtitles` filter on Windows uses libass for rendering. libass resolves fonts via fontconfig. The Windows FFmpeg build (e.g., from gyan.dev or BtbN) ships with a bundled fontconfig that points to a font cache generated at first use. If the font name specified in the ASS `[Script Info]` or `Style` section does not exist in the system font registry, libass silently substitutes DejaVu Sans — a small, thin font that is unreadable in short-form video.
 
-**Why it happens:** Checkpoint state is keyed by step names (string literals). Python refactoring tools rename methods but don't rename the string keys that reference those methods. Tests that mock the pipeline don't exercise the checkpoint paths because `main.py` has no test file.
+**Why it happens:** On Windows, libass does not scan `C:\Windows\Fonts` the same way as Linux. The fontconfig cache must be pre-built or the font must be explicitly specified via `fontsdir`. Community reports confirm that even with `fontsdir` set, libass can still prefer its system fontconfig over the provided directory depending on FFmpeg build version.
 
 **Consequences:**
-- Pipeline re-runs a 70-minute Whisper transcription that already completed
-- Pipeline skips normalization because it sees a stale "normalize: complete" flag
-- Inconsistent episode output that's hard to diagnose without reading checkpoint JSON manually
+- "Hormozi-style" big bold captions use a thin, unreadable font instead of the intended typeface
+- No error or warning is emitted — FFmpeg exits 0, the video plays, but the typography is wrong
+- Different machines produce different font output depending on what fonts happen to be installed
 
 **Prevention:**
-- Before any refactor, write a test that asserts the checkpoint key names used in `process_episode()` match a known-good list — this test will fail immediately if a refactor renames a key
-- Keep checkpoint serialization in a single dedicated module (not scattered across helpers)
-- Version the checkpoint schema: add a `schema_version` field to checkpoint JSON so mismatches are detectable at load time
+- Use `fontsdir` to point to a `assets/fonts/` directory in the project and embed the font file there
+- Confirm the substitution is not happening by checking FFmpeg stderr for the string `substituting font` — libass logs this at warning level
+- Use Impact, Arial Black, or a bundled open-license alternative (e.g., Anton from Google Fonts) as the target font — these are common on Windows and are the standard for short-form caption videos
+- If using a custom font: pass `-vf "subtitles=file.ass:fontsdir=assets/fonts"` and verify in a test that the correct font is rendered by spot-checking a frame with `ffmpeg -ss 1 -i output.mp4 -frames:v 1 test_frame.png`
 
-**Detection:** After a refactor, run `python main.py ep29 --dry-run` and inspect the checkpoint JSON to confirm all expected step keys are present with the correct names.
+**Detection:** After rendering, extract a single frame and visually confirm font weight. Add this as a `--test` mode artifact that is saved for inspection.
 
-**Phase relevance:** Tech debt / main.py refactor phase.
+**Phase relevance:** Phase 1 (subtitle burn-in). Font rendering is a visual quality gate — must be verified before the pipeline generates real episode clips.
 
 ---
 
-### Pitfall 4: Scheduled Upload Stub Marks Items Done Without Uploading
+### Pitfall 4: ASS Override Tags in Subtitle Text Are Destroyed by Naive Escaping
 
-**What goes wrong:** `_run_upload_scheduled()` already logs `[TODO] upload not yet automated` and marks uploads as `"uploaded"` with a placeholder. If any phase adds scheduling integration without also implementing the upload execution, real uploads will be permanently skipped and the schedule JSON will show them as complete. There is no retry, no error, and no visible failure.
+**What goes wrong:** ASS subtitle files use `{...}` for inline override tags (e.g., `{\c&H00FF00&}` to change word color mid-line for karaoke highlighting). If the text of a subtitle event contains `{` or `}` in the transcript (e.g., someone says "curly brace" or the transcript contains a JSON-like fragment), naive string substitution will either:
+- Corrupt the ASS override tags by over-escaping them
+- Allow transcript text curly braces to be interpreted as ASS override tags, producing invisible or garbled subtitles
 
-**Why it happens:** The stub was added to make the scheduler framework work without blocking on platform uploader wiring. The implicit contract — "we'll wire this later" — is invisible to anyone running `python main.py upload-scheduled` in production.
+A second failure mode: apostrophes in transcript text (`don't`, `I'm`) require no escaping in ASS but DO require escaping in FFmpeg `drawtext` filters. If both approaches are used (ASS file for styling + drawtext for word position), the two escaping regimes conflict.
 
-**Consequences:** Episodes are silently never uploaded to YouTube, Twitter, or TikTok in scheduled mode. The only symptom is missing content on the platforms — noticed by humans, not the system.
+**Why it happens:** ASS format has its own escaping rules that differ from both Python string escaping and FFmpeg filter escaping. Mixing approaches (partially rendering in ASS, partially via drawtext) creates a three-layer escaping problem with no clear reference implementation.
 
 **Prevention:**
-- The scheduler must be treated as blocked until real upload execution is wired in
-- Add a guard at the top of `_run_upload_scheduled()` that raises `NotImplementedError` if any upload would be marked done without actually executing — remove the guard only when real uploaders are wired
-- Do not ship any phase that adds new scheduled platforms until the stub is resolved
+- Commit to one rendering path: generate a full ASS file with embedded karaoke tags, pass it to `subtitles=` filter. Do not mix ASS and `drawtext` for the same clip.
+- When writing ASS events, sanitize transcript text: replace literal `{` with `\{` and `}` with `\}` before inserting into the ASS event line
+- Use `pysubs2` (Python library) for ASS generation — it handles encoding and escape rules correctly and is tested against real-world subtitle files
+- Never construct ASS files via raw f-string concatenation
 
-**Detection:** Add a test that calls `_run_upload_scheduled()` with a pending item and asserts the platform uploader was actually called (not just that the schedule was marked complete).
+**Detection:** Generate an ASS file from a clip that contains an apostrophe, a number, and a word in all-caps. Verify the file loads in a subtitle viewer (VLC or Aegisub) without errors before running it through FFmpeg.
 
-**Phase relevance:** Scheduler fix phase (a prerequisite for any distribution expansion).
+**Phase relevance:** Phase 1 (subtitle burn-in). This is an implementation correctness issue that affects every clip.
 
 ---
 
@@ -101,98 +115,129 @@ Mistakes that cause rewrites, data loss, or irreversible production failures.
 
 ---
 
-### Pitfall 5: Audio Ducking Attack/Release Timing Sounds Unnatural
+### Pitfall 5: drawtext Filter Graph Complexity Limit for Long Clips
 
-**What goes wrong:** When implementing volume-dip censorship, the fade-in and fade-out (attack and release) durations are critical. Too fast (< 20ms) produces a click artifact. Too slow (> 100ms) dips into surrounding words on either side of the censored word. The "right" values depend on the surrounding speech cadence and cannot be constants — a word said quickly needs shorter attack/release than one with natural pauses around it.
+**What goes wrong:** The "Hormozi style" word-by-word approach requires one `drawtext` or karaoke segment per word. A 60-second clip from a podcast running at ~150 words per minute contains ~150 active text segments. If implemented as separate chained `drawtext` nodes in a single FFmpeg filter graph (`-vf "drawtext=...,drawtext=...,drawtext=..."`), the filter graph exceeds practical complexity limits, causing:
+- Extremely slow encoding (minutes per clip instead of seconds)
+- FFmpeg crashing with `Too many filters in the graph` or `Argument list too long` errors
+- Memory exhaustion on machines with limited RAM
 
-**Why it happens:** Developers implement a single global attack/release constant and test with one example. Edge cases (rapid-fire speech, back-to-back censored words, censored word at end of sentence) are missed until someone listens to a real episode.
-
-**Consequences:** Ducked audio sounds robotic or choppy rather than the smooth "radio dip" effect that motivated the feature.
+**Why it happens:** Each `drawtext` node is a separate filter instantiation. Chaining 150 filters is a known FFmpeg anti-pattern. The alternative is ASS with karaoke `\k` tags — a single subtitle filter handles all timing internally.
 
 **Prevention:**
-- Use 30ms attack, 50ms release as starting values — these are the broadcast radio standard for ducking
-- Special-case consecutive censored words: merge their windows rather than applying separate dips
-- Build a QA mode that exports 3-second clips around every censor point so they can be listened to before final output
-- pydub's `fade()` method handles this correctly if given the right duration; do not implement raw sample-level manipulation
+- Use ASS `\k` karaoke tags (one subtitle event per line, not per word) rather than chaining drawtext nodes
+- Each ASS event covers one on-screen "card" (3-5 words), with `\k` timing within the event coloring each word in sequence
+- This reduces filter count from ~150 to ~30 per clip, well within practical limits
+- Benchmark encoding time for a 60-second clip before committing to an approach
 
-**Detection:** After implementation, listen to the QA clips for at least 3 episodes before removing manual review from the workflow.
+**Detection:** If encoding a 60-second test clip takes more than 90 seconds on this machine's GPU, the filter graph is too complex. Switch to the ASS approach.
 
-**Phase relevance:** Audio ducking implementation phase.
+**Phase relevance:** Phase 1 (subtitle burn-in). Architecture decision that affects the entire rendering approach — decide before writing the generation code.
 
 ---
 
-### Pitfall 6: Instagram Graph API Version Rot Breaks Silently
+### Pitfall 6: Existing SRT Files Use Sentence-Level Timing — Not Word-Level
 
-**What goes wrong:** `instagram_uploader.py` is hardcoded to `graph.facebook.com/v18.0`. Meta releases new Graph API versions quarterly and deprecates old ones on a ~24-month cycle. v18.0 launched September 2023, making it subject to deprecation in 2025. After deprecation, API calls return 400 errors with deprecation messages that are easy to overlook in logs if Instagram upload is already treated as "best effort."
+**What goes wrong:** The existing pipeline produces SRT files at the segment level (one timestamp per sentence or phrase, not per word). These SRT files are stored as clip artifacts. If the subtitle burn-in phase reads these existing SRT files and assumes word-level timing is present, the karaoke effect cannot be produced — only the entire sentence would highlight at once, which is not the Hormozi-style effect.
 
-**Why it happens:** The API version is a string constant in the uploader class. There's no automated check against Meta's published deprecation schedule, and Instagram upload is currently manual-only (not wired into the main pipeline), so the error wouldn't surface during normal pipeline runs.
+**Why it happens:** The transcription step stores word-level timestamps in WhisperX output, but the SRT serialization only preserves segment-level timing because standard SRT format does not support per-word timing.
 
-**Consequences:** When the pipeline is finally wired for Instagram, it will immediately fail on v18.0 calls. Debugging will look like an auth issue until someone reads the error body carefully.
+**Consequences:**
+- Phase reads existing SRT, generates a flat ASS file, burns it in — result looks like traditional subtitles, not short-form captions
+- The word-level WhisperX data is available but ignored because the developer assumed SRT had sufficient granularity
 
 **Prevention:**
-- Move the API version to `Config.INSTAGRAM_API_VERSION` with a default of `"v22.0"` (current as of March 2026)
-- Make it configurable via env var so version bumps require no code change
-- Add a startup check that logs the configured API version — makes version rot visible
+- The subtitle burn-in step must read from the raw WhisperX JSON output (which has word-level timestamps), not from the existing SRT files
+- If WhisperX JSON is not persisted (only SRT is saved), add a persistence step to save the word-level data at the transcription stage
+- Check what data the existing `subtitles` checkpoint key actually stores — it may only be an SRT path
 
-**Detection:** Any 400 response from Meta Graph API with "deprecated" in the error message.
+**Detection:** Inspect an existing clip's WhisperX output format. Confirm that word-level `start`/`end`/`word` fields are present and accessible from the pipeline's checkpoint data.
 
-**Phase relevance:** Instagram wiring phase and any social platform expansion phase.
+**Phase relevance:** Phase 1 (subtitle burn-in). Prerequisite investigation before any implementation starts.
 
 ---
 
-### Pitfall 7: Twitter URL Length Arithmetic Breaks on Edge Cases
+### Pitfall 7: Re-encoding Clips for Subtitle Burn-in Degrades Audio Quality
 
-**What goes wrong:** The existing Twitter URL length calculation in `post_clip()` is fragile — it embeds the URL in a suffix f-string before calculating display length, then subtracts and re-adds the Twitter t.co length (23 chars). This works only when `youtube_url` is a non-None string. If YouTube upload was skipped (no video ID), `youtube_url` is `None`, the f-string includes the literal string `"None"`, and the clip caption gets truncated incorrectly.
+**What goes wrong:** Burning subtitles requires re-encoding the video stream. If the clip video was encoded with AAC audio at a low bitrate (e.g., 128kbps from audiogram generation), re-encoding without `-c:a copy` will decode and re-encode the AAC audio, adding another generation of lossy compression. At 128kbps, two generations of AAC compression produce audible artifacts.
 
-**Why it happens:** The arithmetic was written for the happy path. The `None` case was handled with a conditional but the length calculation path diverges in a way that produces wrong character counts.
-
-**Consequences:** Tweet text gets truncated mid-sentence, or the tweet is rejected by the API for exceeding 280 characters.
+**Why it happens:** FFmpeg's default behavior re-encodes all streams unless `-c:a copy` is explicitly specified. Developers adding subtitle burn-in often focus on the video stream and forget to copy the audio.
 
 **Prevention:**
-- Refactor to: build the final text string first (with or without URL), then check `len(text) <= 280` before posting
-- Twitter counts any URL as exactly 23 characters regardless of actual length — calculate display length as `len(text_without_url) + 23` if a URL is present, `len(text)` if not
-- Test with `youtube_url=None`, `youtube_url=""`, and `youtube_url="https://youtu.be/abc123"`
+- Always use `-c:a copy` when burning subtitles into clips — the audio stream does not need to change
+- Verify: `ffprobe output_clip.mp4` should show the same audio codec, bitrate, and sample rate as the input
+- For the video stream, use `-crf 18 -preset slow` (H.264) to minimize re-encode quality loss while keeping file sizes acceptable for platform upload
 
-**Detection:** The existing test for `post_clip()` likely only covers the happy path. Add parameterized tests for all three URL states.
+**Detection:** Compare `ffprobe` output between input and output clips. Flag any difference in audio codec or bitrate as a pipeline error.
 
-**Phase relevance:** Any phase that touches Twitter uploader or adds new platforms with character limits.
+**Phase relevance:** Phase 1 (subtitle burn-in) and any subsequent phase that re-encodes clips.
 
 ---
 
-### Pitfall 8: LLM Voice Consistency Degrades Across Episodes Without Example Anchoring
+### Pitfall 8: GitHub Pages Build Triggered on Every Episode Causes Soft Limits
 
-**What goes wrong:** Prompting GPT-4o or Llama 3.1 to "write in an edgy comedy voice" produces different interpretations across runs. Without concrete examples of good output anchored in the prompt (few-shot examples from the actual show), the model defaults to generic "irreverent" humor that doesn't match the show's specific comedic register. This is most acute for social captions and blog intros, which are the most visible output.
+**What goes wrong:** GitHub Pages has a soft limit of 10 builds per hour and a bandwidth limit of 100 GB/month. If each episode publication triggers a Pages build (e.g., via a GitHub Actions push), and the pipeline runs multiple test episodes or regenerates all pages on data changes, the build limit is hit. Pages builds that time out (10-minute limit) or exceed quota are silently disabled — the site stops updating without a clear error.
 
-**Why it happens:** LLMs are non-deterministic, and broad style instructions ("edgy," "dark humor") are underspecified. The model's interpretation of "edgy comedy" varies with temperature, context length, and prompt order.
-
-**Consequences:** AI-generated content needs manual rewriting after every episode — defeating the automation goal.
+**Why it happens:** Automated pipelines push to the repo on each episode. GitHub Actions triggers Pages rebuild on every push to the `gh-pages` branch. If the generated HTML includes audio file embeds or the repository accumulates large transcripts, build times approach the 10-minute limit.
 
 **Prevention:**
-- Store 3-5 gold-standard examples of titles, descriptions, and captions in `config.py` or a dedicated `voice_examples.py` — include them as few-shot examples in every content generation prompt
-- Lower temperature to 0.7 for social copy (reduces variance), keep it at 1.0 for blog posts (more creative)
-- Add a `--regenerate` flag that re-runs content generation without re-running transcription/analysis — lets hosts reject and regenerate without reprocessing the whole episode
+- Never commit audio, video, or image files to the GitHub Pages repository — link to Dropbox or YouTube instead
+- Batch all episode page updates into a single commit and push, not one push per episode
+- Use `--dry-run` to generate HTML locally and only push when actually publishing
+- Keep episode HTML pages under 100KB each (transcripts are text — this should be easy if audio is external)
+- Set up a GitHub Actions workflow that only triggers Pages rebuild on pushes to `main` or `gh-pages`, not on every pipeline run
 
-**Detection:** After each episode, hosts should rate the AI content on a 1-3 scale. If average rating stays below 2 for 3 consecutive episodes, the prompts need revision.
+**Detection:** Monitor the Pages build history at `github.com/[user]/[repo]/deployments`. Alert if last successful build is more than 24 hours old when new episodes are expected.
 
-**Phase relevance:** AI voice/content generation phase.
+**Phase relevance:** Phase 2 (static episode webpages). Deployment strategy must be decided before the page-generation code is written.
 
 ---
 
-### Pitfall 9: continue_episode.py Diverges from main.py During Refactor
+### Pitfall 9: Podcast Transcript Pages Without Structured Data Get No SEO Benefit
 
-**What goes wrong:** `continue_episode.py` is a 525-line standalone script that duplicates pipeline logic from `main.py`. When `main.py` is refactored — new module structure, renamed uploaders, changed credential paths — `continue_episode.py` is not updated in parallel. It silently continues to work until a production emergency (failed upload mid-episode) forces someone to use it, at which point it calls the old interface and crashes.
+**What goes wrong:** A static HTML page containing a raw transcript will be indexed by Google, but will not receive the rich search result treatment (podcast episode cards, "listen to episode" buttons, timestamp links) without `schema.org` structured data. The page will rank as generic text content, not as a podcast episode — meaning it competes with generic content rather than appearing in podcast-specific search surfaces.
 
-**Why it happens:** The script has no tests and no callers in the test suite. It's only invoked in emergencies. Refactoring PRs don't include it because it's "not the main pipeline."
+**Why it happens:** Developers add transcripts for human readability and assume Google will infer the podcast context. Google requires explicit `PodcastEpisode` and `AudioObject` JSON-LD to surface podcast episodes in its podcast search and Google Podcasts aggregation.
 
-**Consequences:** The emergency recovery tool fails exactly when it's needed most.
+**Consequences:**
+- Pages get indexed but receive no podcast-specific treatment
+- Missing `datePublished`, `duration`, and `associatedMedia` properties mean the page does not qualify for rich results
+- Months of episodes are published before anyone checks Google Search Console and realizes the structured data is absent
 
 **Prevention:**
-- Before the main.py refactor begins, either delete `continue_episode.py` and replace it with `python main.py ep29 --resume-from=step_N`, or add integration smoke tests that call it with mocked uploaders
-- If kept, make it a thin wrapper around the same uploader classes used in `main.py` — not a reimplementation
+- Embed a `<script type="application/ld+json">` block in every episode page with:
+  - `@type: PodcastEpisode`
+  - `name`, `description`, `datePublished`, `duration` (ISO 8601, e.g., `PT1H10M`)
+  - `associatedMedia` → `AudioObject` with `contentUrl` pointing to the episode MP3
+  - `partOfSeries` → `PodcastSeries` with the show name
+- Validate with Google's Rich Results Test before publishing the first page
+- The HTML template should generate this JSON-LD from the episode's existing metadata (title, description, duration, MP3 URL from Dropbox) — no manual input required
 
-**Detection:** Add `continue_episode.py` to the pre-commit hook's lint scope so at minimum it stays syntactically valid.
+**Detection:** After publishing the first episode page, submit it to Google Search Console and run the Rich Results Test. Fix any validation errors before generating remaining episode pages.
 
-**Phase relevance:** Tech debt / main.py refactor phase.
+**Phase relevance:** Phase 2 (static episode webpages). Must be included in the initial page template, not added as a follow-up.
+
+---
+
+### Pitfall 10: Transcript HTML Injection via Unsanitized Transcript Text
+
+**What goes wrong:** Episode transcripts are generated by Whisper and may contain speaker names, timestamps, and verbatim speech including profanity, slang, URLs, and HTML-like strings (e.g., if a host reads a URL aloud that contains `<`, `>`, or `&`). If the page generator inserts transcript text via f-string interpolation into HTML without escaping, these characters produce malformed HTML or — in the worst case — inject executable script content.
+
+**Why it happens:** Static site generators that use Jinja2 handle this automatically via autoescaping, but a naive Python generator that writes HTML via f-strings or string concatenation does not.
+
+**Consequences:**
+- Malformed HTML causes browsers to misrender the page
+- If `<script>` text appears in the transcript (e.g., a host reading a code example), it executes in the user's browser
+- The RSS feed (also XML) has the same injection risk if shared generation code is reused without XML-specific escaping
+
+**Prevention:**
+- Use Jinja2 with `autoescape=True` for all HTML template rendering — this is the single safest mitigation
+- Never build episode HTML via raw f-string concatenation
+- Test the page generator with a transcript that contains `<b>test</b>`, `&amp;`, and a `<script>alert(1)</script>` string — assert these are rendered as visible text, not executed
+
+**Detection:** Generate a test page with the malicious transcript fragment above. View the page source and confirm no unescaped `<script>` tag is present.
+
+**Phase relevance:** Phase 2 (static episode webpages). Security baseline — must be addressed in initial template design.
 
 ---
 
@@ -200,43 +245,43 @@ Mistakes that cause rewrites, data loss, or irreversible production failures.
 
 ---
 
-### Pitfall 10: RSS Feed XML Injection via f-String Concatenation
+### Pitfall 11: Vertical Video Aspect Ratio Requires Specific Clip Dimensions
 
-**What goes wrong:** `spotify_uploader.py:generate_rss_item()` builds XML via f-string concatenation. Episode titles or descriptions with `&`, `<`, `>`, or `"` characters will produce malformed XML. Spotify's RSS parser will reject the feed item entirely.
+**What goes wrong:** The existing audiogram clips are generated at landscape aspect ratio (16:9 or similar). YouTube Shorts, Instagram Reels, and TikTok require 9:16 (1080x1920 for full quality, minimum 720x1280). If the subtitle burn-in phase reads the existing landscape clips and overlays subtitles without resizing, the output is the wrong aspect ratio for short-form platforms and will be pillarboxed or rejected.
 
-**Prevention:** Use `xml.etree.ElementTree` (already used in `rss_feed_generator.py`) for all RSS generation. The fix is a one-file change with clear test coverage path.
+**Prevention:**
+- Vertical clips must be generated from the episode audio with a 9:16 canvas from the start — not by cropping or rotating the existing landscape audiograms
+- Separate the clip generation step from the subtitle burn-in step: clip generation produces a raw audio+background vertical video; subtitle burn-in adds text
+- The background for vertical clips should be a solid color, gradient, or resized version of the episode thumbnail — not the existing waveform audiogram
 
-**Phase relevance:** Any phase that touches RSS or Spotify distribution.
-
----
-
-### Pitfall 11: OpenAI SDK Missing from requirements.txt Causes Silent Runtime Failure
-
-**What goes wrong:** `content_editor.py` and `blog_generator.py` import the `openai` SDK at module load time. If the SDK is not installed (fresh environment, new developer, CI), the import fails with `ModuleNotFoundError` at the start of the pipeline — before any audio is processed. The error message mentions `openai` which is confusingly similar to `openai-whisper`, which is listed in `requirements.txt`.
-
-**Prevention:** Add `openai>=1.0.0` to `requirements.txt` immediately. Long-term, consider routing all LLM calls through `ollama_client.py` to eliminate the dependency.
-
-**Phase relevance:** Should be resolved in tech debt phase before any other phase deploys.
+**Phase relevance:** Phase 1 (subtitle burn-in). Upstream dependency on a new vertical clip canvas generator.
 
 ---
 
-### Pitfall 12: TikTok Token Expiry Causes Silent Upload Skip
+### Pitfall 12: GitHub Pages Crawl Budget Wasted on Duplicate Transcript Fragments
 
-**What goes wrong:** TikTok access tokens expire (typically every 24 hours). The uploader reads the token from `Config.TIKTOK_ACCESS_TOKEN` with no expiry check. An expired token produces a 401 from TikTok's API, which is logged but not raised. The pipeline continues and marks TikTok upload as "done."
+**What goes wrong:** If each episode page includes the full transcript as plain paragraphs AND the same text is repeated in `<meta description>` and JSON-LD `description` fields, search engines see duplicate content signals within a single page. At scale (100+ episodes), the crawl budget is consumed by near-identical transcript pages, and Google may de-prioritize the site.
 
-**Prevention:** Add an explicit token expiry timestamp to the TikTok config (or fetch it programmatically from TikTok's token endpoint). Check it before attempting upload and skip with a clear `WARNING: TikTok token expired — re-auth required` message rather than a silent failure.
+**Prevention:**
+- The `<meta description>` should be the AI-generated episode summary (1-2 sentences) from the existing pipeline output — not a truncated transcript
+- The JSON-LD `description` field should match the meta description
+- The transcript itself should be wrapped in a `<section id="transcript">` with a clear heading so Google understands it is supplementary content, not the primary page purpose
+- Add a `<link rel="canonical">` pointing to the episode's own URL to prevent pagination duplicates if transcripts are ever split across pages
 
-**Phase relevance:** Any phase that makes TikTok upload production-ready.
+**Phase relevance:** Phase 2 (static episode webpages). SEO hygiene — important for long-term search performance.
 
 ---
 
-### Pitfall 13: WhisperX/PyTorch Version Lock Breaks on New Hardware
+### Pitfall 13: Pipeline Checkpoint Key Collision Between Subtitle Formats
 
-**What goes wrong:** `whisperx==3.1.6` pins `torch==2.1.0`. NVIDIA GPU drivers for Ada Lovelace (RTX 40xx) and newer architectures require PyTorch 2.2+. Running on a new GPU will produce either CUDA initialization errors or degraded performance, and the error message does not suggest the version conflict as the cause.
+**What goes wrong:** The existing pipeline has a `subtitles` checkpoint key that marks SRT file generation as complete. If the subtitle burn-in phase adds a new `subtitle_video` or `burned_subtitles` step and the developer reuses the existing `subtitles` key, the pipeline will skip SRT generation on resume (thinking it is done) and also skip subtitle burn-in (because the old `subtitles` key is already set). New episodes processed after the update will work correctly; partially-processed existing episodes will silently skip subtitle video generation.
 
-**Prevention:** Test `whisperx>=3.2.0` with the latest stable PyTorch before upgrading hardware. Pin the combination that works and document it in `requirements.txt` comments.
+**Prevention:**
+- Use a new checkpoint key: `burned_subtitle_clips` (not `subtitles`)
+- Review all existing checkpoint keys before adding new steps — the current 9 keys are documented in `PROJECT.md`
+- After shipping, validate by processing a partially-completed episode from the `subtitles` checkpoint and confirming both the SRT step and the new burn-in step execute
 
-**Phase relevance:** Infrastructure/dependency update phase.
+**Phase relevance:** Phase 1 (subtitle burn-in). Pipeline integration concern — affects resume behavior for all future episodes.
 
 ---
 
@@ -244,27 +289,35 @@ Mistakes that cause rewrites, data loss, or irreversible production failures.
 
 | Phase Topic | Likely Pitfall | Mitigation |
 |-------------|---------------|------------|
-| Audio ducking implementation | Timestamp drift causes wrong mute windows (Pitfall 1) | Add PAD_MS buffer + QA clip exports |
-| LUFS normalization | Silent dynamic mode fallback (Pitfall 2) | Parse `normalization_type` from first-pass JSON |
-| main.py refactor | Checkpoint key names break resume (Pitfall 3) | Freeze key names before refactor; add regression test |
-| Scheduler wiring | Stub marks uploads done without uploading (Pitfall 4) | Replace stub before enabling scheduled mode |
-| Instagram pipeline wiring | API version v18.0 is deprecated (Pitfall 6) | Move to v22.0 via env var before wiring |
-| Twitter/social copy generation | Voice inconsistency across episodes (Pitfall 8) | Add few-shot examples to all LLM prompts |
-| main.py refactor | continue_episode.py becomes broken recovery tool (Pitfall 9) | Deprecate or cover with smoke tests before refactor |
-| Any new platform expansion | Token expiry silently marks uploads done (Pitfall 12) | Validate tokens at pipeline start, not at upload time |
+| Subtitle burn-in — FFmpeg invocation | Windows path colon destroys filter (Pitfall 1) | `_escape_ffmpeg_filter_path()` helper, forward slashes, escaped colon |
+| Word-level timing from WhisperX | Gaps/overlaps/missing-word timestamps (Pitfall 2) | `normalize_word_timestamps()` normalization step before ASS generation |
+| Font rendering on Windows | libass silently falls back to DejaVu Sans (Pitfall 3) | Embed font in `assets/fonts/`, use `fontsdir`, check stderr for `substituting font` |
+| ASS file generation | Override tag corruption / escaping conflict (Pitfall 4) | Use `pysubs2`, never raw f-strings, commit to single rendering path |
+| Long clip encoding | drawtext filter graph complexity limit (Pitfall 5) | Use ASS `\k` karaoke tags instead of chained drawtext nodes |
+| Reading subtitle source data | Existing SRT is sentence-level, not word-level (Pitfall 6) | Read from WhisperX JSON, not SRT; confirm persistence of word-level data |
+| Re-encoding clips | Audio quality degradation from double lossy encoding (Pitfall 7) | Always `-c:a copy` when burning subtitles |
+| GitHub Pages deployment | 10 builds/hour soft limit; 100 GB/month bandwidth (Pitfall 8) | Batch pushes; never commit media files; keep HTML under 100KB |
+| Episode page SEO | Transcript without structured data gets no podcast treatment (Pitfall 9) | Embed `PodcastEpisode` JSON-LD in every page template |
+| Transcript HTML rendering | Injection via unsanitized transcript text (Pitfall 10) | Jinja2 with `autoescape=True` only |
+| Clip aspect ratio | Existing clips are landscape, shorts require 9:16 (Pitfall 11) | Generate new vertical canvas clips, not resampled landscape clips |
+| Pipeline resume | `subtitles` checkpoint key collision with new burn-in step (Pitfall 13) | New key `burned_subtitle_clips` distinct from existing `subtitles` |
 
 ---
 
 ## Sources
 
-- [ffmpeg loudnorm filter documentation](http://k.ylo.ph/2016/04/04/loudnorm.html) — MEDIUM confidence (official author's blog, not Meta/FFmpeg docs)
-- [ffmpeg-normalize PyPI package](https://pypi.org/project/ffmpeg-normalize/1.31.2/) — HIGH confidence (official PyPI)
-- [WhisperX word-level timestamp accuracy issue #1247](https://github.com/m-bain/whisperX/issues/1247) — HIGH confidence (project maintainer GitHub)
-- [Twitter API v2 Free Plan media upload rate limits](https://devcommunity.x.com/t/what-are-the-rate-limits-for-media-upload-when-used-with-twitter-api-v2-free-tier/245725) — MEDIUM confidence (official dev community, but rate limits change)
-- [Instagram Graph API changelog](https://developers.facebook.com/docs/instagram-platform/changelog/) — HIGH confidence (Meta official docs)
-- [Meta Graph API v22.0 (April 2025)](https://help.pressboardmedia.com/meta-graph-api-v22.0) — MEDIUM confidence (third-party summary of Meta release notes)
-- [CrisperWhisper: Accurate Timestamps on Verbatim Speech Transcriptions](https://arxiv.org/html/2408.16589v1) — HIGH confidence (academic paper on Whisper timestamp limitations)
-- [God Object anti-pattern in Python](https://softwarepatternslexicon.com/patterns-python/11/2/4/) — MEDIUM confidence (community resource)
-- [Data pipeline state management pitfalls](https://www.fivetran.com/blog/data-pipeline-state-management-an-underappreciated-challenge) — MEDIUM confidence (industry blog)
-- [OpenAI prompt engineering guide](https://platform.openai.com/docs/guides/prompt-engineering) — HIGH confidence (official OpenAI docs)
-- Project-specific analysis derived from `.planning/codebase/CONCERNS.md` — HIGH confidence (direct codebase audit)
+- [GitHub Pages limits (official docs)](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits) — HIGH confidence
+- [FFmpeg subtitle filter documentation](https://ffmpeg.org/ffmpeg-filters.html) — HIGH confidence
+- [Escape special characters in FFmpeg subtitle filename](https://www.devhide.com/escape-special-characters-in-ffmpeg-subtitle-filename-45916331) — MEDIUM confidence (community, verified against FFmpeg docs)
+- [FFmpeg: Can't use absolute paths in subtitles filter — MSYS2 issue #11018](https://github.com/msys2/MINGW-packages/issues/11018) — HIGH confidence (upstream bug report, MSYS2 + Windows confirmed)
+- [WhisperX word-level timestamps inaccuracy — issue #1247](https://github.com/m-bain/whisperX/issues/1247) — HIGH confidence (project maintainer GitHub)
+- [WhisperX fix subtitle overlaps PR #999](https://github.com/m-bain/whisperX/pull/999) — HIGH confidence (merged PR)
+- [WhisperX timing overlap fix PR #816](https://github.com/m-bain/whisperX/pull/816) — HIGH confidence (merged PR)
+- [libass fontsdir Windows issue — libass/libass #389](https://github.com/libass/libass/issues/389) — HIGH confidence (official libass project)
+- [FFmpeg libass subtitles filter fontsdir — Render community](https://community.render.com/t/ffmpeg-libass-subtitles-filter-not-using-fontsdir-parameter-on-render-deployment/39185) — MEDIUM confidence (community, corroborates libass issue)
+- [PodcastEpisode schema.org type](https://schema.org/PodcastEpisode) — HIGH confidence (official schema.org)
+- [PodcastSeries schema.org type](https://schema.org/PodcastSeries) — HIGH confidence (official schema.org)
+- [FFmpeg drawtext dynamic overlays — OTTVerse](https://ottverse.com/ffmpeg-drawtext-filter-dynamic-overlays-timecode-scrolling-text-credits/) — MEDIUM confidence (technical blog, verified against FFmpeg docs)
+- [pysubs2 Python library for ASS/SRT](https://pythonhosted.org/pysubs2/tutorial.html) — HIGH confidence (official library docs)
+- [Burned-in subtitles quality guide — md-subs.com](https://www.md-subs.com/blog/burned-in-subtitles-journey-to-quality) — MEDIUM confidence (subtitle professional blog)
+- [Podcast SEO structured data — dynamicschema.com](https://dynamicschema.com/podcast-schema-getting-your-show-featured-in-google-search/) — MEDIUM confidence (corroborates schema.org official types)

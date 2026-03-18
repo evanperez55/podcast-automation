@@ -1,166 +1,129 @@
 # Technology Stack
 
-**Project:** Podcast Automation Pipeline Upgrade
-**Researched:** 2026-03-16
+**Project:** Podcast Automation v1.1 — Burned-in Subtitle Clips + Episode Webpages
+**Researched:** 2026-03-18
 
 ---
 
 ## Existing Stack (Do Not Replace)
 
-The current stack is working. These are NOT candidates for replacement:
+These are validated, working dependencies. Not candidates for replacement or re-research.
 
 | Technology | Version (pinned) | Role |
 |------------|-----------------|------|
 | Python | 3.12+ | Language |
-| openai-whisper | 20231117 | Local transcription |
-| whisperx | 3.1.6 | Diarization + word alignment |
-| torch / torchaudio | 2.1.0 | ML backend |
-| pydub | 0.25.1 | Audio manipulation |
+| FFmpeg binary | C:\ffmpeg\bin\ffmpeg.exe | Media processing engine |
 | ffmpeg-python | 0.2.0 | FFmpeg bindings |
-| FFmpeg binary | system | Media processing engine |
-| Pillow | 10.2.0 | Thumbnail generation |
-| tweepy | 4.14.0 | Twitter/X posting |
-| google-api-python-client | 2.116.0 | YouTube uploads |
-| dropbox | 12.0.2 | Storage |
-| Ollama (local) | HTTP | LLM inference (Llama 3.2) |
+| WhisperX | 3.1.6 | Word-level timestamps (already produces per-word timing) |
+| pydub | 0.25.1 | Audio manipulation |
+| Pillow | 10.2.0 | Image generation |
+| Jinja2 | transitive dep | HTML templating (already available) |
+| openai | >=1.0.0 | GPT-4o for keyword/SEO generation |
 
 ---
 
 ## New Stack Additions
 
-### Audio: LUFS Normalization
+### Subtitle Generation: pysubs2
 
-**Recommended:** `ffmpeg-normalize` 1.37.3
+**Recommended:** `pysubs2==1.8.0`
 
-**Why:** The existing `audio_processor.py` already uses FFmpeg for audio processing. `ffmpeg-normalize` wraps FFmpeg's two-pass `loudnorm` filter — the EBU R128 standard used by Spotify, YouTube, and broadcast radio. Single dependency, no ML stack required, produces the exact same output as professional DAWs. Ships as a CLI tool but is fully usable as a Python library.
+**Why:** The burned-in subtitle workflow requires generating ASS (Advanced SubStation Alpha) files with per-word timing and custom styles (large bold text, color fills, drop shadows, centered positioning). `pysubs2` is the canonical Python library for this — it provides an object model for ASS styles and events, handles the format's encoding quirks, and serializes to valid ASS that FFmpeg's `ass=` filter accepts directly.
 
-**Why not `pyloudnorm`:** pyloudnorm (0.2.0, Jan 2026) measures loudness using ITU-R BS.1770 but does NOT apply normalization itself — you still need to implement gain application. It is primarily a measurement tool. For a pipeline that needs measure-then-normalize in one pass, `ffmpeg-normalize` is the right abstraction.
+The existing `audiogram_generator.py` already burns SRT subtitles via FFmpeg's `subtitles=` filter with `force_style=`. For Hormozi-style word-by-word display, SRT is insufficient — SRT has no per-word timing or style override support at the word level. ASS solves this: each word becomes a separate `Dialogue` event in the ASS file with its own start/end time, font size, color, shadow, and outline. pysubs2 makes constructing these events straightforward.
 
-**Why not raw `ffmpeg-python` with loudnorm filter:** You can call the loudnorm filter directly with the existing `ffmpeg-python` binding. This works but requires two-pass implementation from scratch. `ffmpeg-normalize` already implements this correctly and handles edge cases (clipping, true peak limiting). Use it.
+WhisperX already outputs word-level timestamps in its JSON/dict result. The generation path is: WhisperX word timestamps → Python loop building pysubs2 `SSAEvent` objects → save as `.ass` → pass to FFmpeg `ass=` filter.
 
-```bash
-pip install ffmpeg-normalize==1.37.3
-```
+**Why not raw string generation:** ASS format has encoding-sensitive headers, color format quirks (`&H00FFFFFF&` BGR hex with alpha prefix), and escape rules. Writing ASS by hand-formatting strings is fragile. pysubs2 handles all of this correctly.
 
-**Confidence:** HIGH — Official PyPI page confirmed version and release date (Feb 8, 2026).
+**Why not `drawtext` filter:** FFmpeg's `drawtext` filter can overlay text but requires one `-vf drawtext=...` expression per word with exact `enable=` time windows. For a 60-second clip with ~150 words, this produces an unwieldy 150-segment filter graph that is hard to generate, debug, and modify. ASS is the right abstraction for styled timed text.
 
----
+**Why not WhisperX's built-in `highlight_words` ASS output:** WhisperX can produce ASS with karaoke-style `\k` tags for highlight effects, but this requires re-running WhisperX at clip generation time. The pipeline already has WhisperX output cached from the transcription step. pysubs2 lets us consume the cached word timestamps and produce styled ASS without re-running transcription.
 
-### Audio: Ducking and Volume Automation
-
-**Recommended:** FFmpeg `sidechaincompress` + `amix` filters via existing `ffmpeg-python`
-
-**Why:** Audio ducking (volume dip when censoring instead of a beep) does not require a new library. FFmpeg has native sidechain compression support. The existing `ffmpeg-python==0.2.0` binding can construct these filter graphs. The `pydub` pattern of "manipulate AudioSegment objects" works fine for simpler segment-level ducking: identify the censor window from the transcript, extract the segment, apply `segment - N_db` for the dip duration with fade-in/out.
-
-**Implementation pattern:** Transcript already has millisecond-accurate word timestamps from WhisperX. The censor step knows exactly when banned words occur. Apply a programmatic volume envelope via pydub's `.fade()` and `.apply_gain()` on that window. No new library needed.
-
-**Why not `autoducking` package:** The `autoducking` project on GitHub is a single-purpose tool for music-under-voiceover scenarios (background music ducking). That is not the use case here. The use case is censorship ducking on a single audio track, which pydub handles directly.
-
-**Confidence:** HIGH — pydub volume automation is well-documented. FFmpeg sidechain compress is available in current FFmpeg builds.
-
----
-
-### Audio: Feature Analysis for Clip Detection
-
-**Recommended:** `librosa` 0.11.0
-
-**Why:** Smarter clip detection requires understanding audio energy, speech rate changes, laughter patterns, and engagement peaks — not just transcript topic shifts. `librosa` provides onset detection, RMS energy tracking, spectral analysis, and zero-crossing rate, all of which are signals for identifying high-engagement moments in a comedy podcast.
-
-**Specific signals to extract for clip scoring:**
-- Energy bursts (RMS spike) → likely reaction or punchline
-- Speech rate from WhisperX word timestamps (already available) → rapid fire = energy
-- Onset density → overlapping speech = crosstalk = engagement
-- Silence gaps → natural clip endpoints
-
-`librosa` is the dominant library for audio ML feature extraction in Python (38k+ GitHub stars, actively maintained, Python 3.8–3.13 supported as of 0.11.0).
-
-**Why not pyAudioAnalysis:** pyAudioAnalysis is older, less maintained, and adds a heavier dependency footprint. `librosa` is the current standard.
-
-**Why not a paid service (Opus Clip, Clipcast):** Out of scope — project constraint is no new paid APIs.
+**Integration point:** New `subtitle_clip_generator.py` module. Consumes `clip.words` (word-level timestamp list already present on clip objects from WhisperX). Produces a `.ass` file alongside each clip. `audiogram_generator.py` passes the `.ass` path to FFmpeg using the `ass=` filter (instead of `subtitles=` with force_style, which only applies to SRT).
 
 ```bash
-pip install librosa==0.11.0
+pip install pysubs2==1.8.0
 ```
 
-**Confidence:** HIGH — PyPI page confirmed version 0.11.0, released March 11, 2025.
+**Confidence:** HIGH — PyPI confirmed version 1.8.0, released December 24, 2024. Official docs at pysubs2.readthedocs.io. No external dependencies beyond Python stdlib.
 
 ---
 
-### Social: Bluesky
+### FFmpeg: Vertical Video Canvas
 
-**Recommended:** `atproto` 0.0.65
+**Recommended:** No new library. Use existing `ffmpeg-python==0.2.0` or `subprocess` calls to the existing FFmpeg binary.
 
-**Why:** `atproto` is the official AT Protocol Python SDK. It is auto-generated from the Bluesky lexicons, fully type-hinted, supports both sync and async clients, and handles image blob upload, rich text facets (links, mentions), and post creation. It is the only Python library with official endorsement from the Bluesky/ATProto team. The Bluesky API requires no app approval — just an app password from account settings.
+**Why:** The vertical crop and pad operation for 9:16 (1080x1920) is a standard FFmpeg filter graph: `scale=1080:-2,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black`. This is the same pattern already used in `audiogram_generator.py` for horizontal/vertical format switching. No new dependency needed — the work is in constructing the correct filter string for portrait orientation with the waveform replaced by a solid background + burned-in ASS.
 
-**Usage pattern:** Same two-step as Twitter — authenticate, send_post(). Media is uploaded as a blob first, then referenced in the post record. This mirrors the existing tweepy pattern closely.
+**Concrete filter chain for a Hormozi-style clip:**
+```
+-vf "scale=1080:-2,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,ass='/path/to/subtitles.ass'"
+```
+
+**Confidence:** HIGH — This is documented FFmpeg filter composition, validated against existing audiogram_generator.py patterns in this codebase.
+
+---
+
+### Keyword Extraction: yake
+
+**Recommended:** `yake==0.4.8`
+
+**Why:** SEO keywords for episode webpages must be extracted from podcast transcripts (~10,000 words each). The project constraint is no heavy new dependencies and no paid APIs.
+
+`yake` (Yet Another Keyword Extractor) is a statistical, unsupervised keyword extractor with no ML model dependency. It uses local text features (word frequency, co-occurrence, position) to rank keyphrases. It runs in milliseconds on a full transcript with zero additional downloads.
+
+**Why not KeyBERT:** KeyBERT requires `sentence-transformers`, which downloads a ~400MB transformer model on first use. The project already has `torch` and WhisperX occupying significant GPU memory during processing. Adding another transformer for keyword extraction creates unnecessary memory pressure and download time. KeyBERT is overkill for podcast SEO keywords where statistical extraction is accurate enough.
+
+**Why not Ollama/GPT-4o prompt:** Ollama is already used in the pipeline and is available for free. However, LLM-based keyword extraction produces inconsistent output formats requiring parsing, and adds latency. For deterministic, fast, structured keyword output, yake is more reliable.
+
+**Why not rake-nltk:** RAKE requires NLTK stopword downloads and corpus data. yake has no external corpus dependency.
+
+**Integration point:** New `keyword_extractor.py` module called from the webpage generation step. Input: full transcript text. Output: list of ranked keyphrases for `<meta name="keywords">`, Open Graph tags, and JSON-LD structured data.
 
 ```bash
-pip install atproto==0.0.65
+pip install yake==0.4.8
 ```
 
-**Confidence:** HIGH — PyPI page confirmed version 0.0.65, released December 8, 2025.
+**Confidence:** MEDIUM — PyPI shows yake 0.4.8 is the latest stable version. Last release was 2023, but the package is stable and the algorithm is deterministic. The LIAAD/yake GitHub has 1k+ stars and is actively used. No newer version found in 2024-2025 searches; the algorithm is stable, not actively developed.
 
 ---
 
-### Social: Threads
+### Static Site Generation: Jinja2 (already available)
 
-**Recommended:** `pythreads` 0.2.1 (with caveat — see below)
+**Recommended:** Use existing `Jinja2` (transitive dependency, already installed). No new package needed.
 
-**Why:** Meta has an official Threads API (part of Meta Graph API). `pythreads` wraps this official API using OAuth 2.0, handles the two-step container-create/publish flow, supports image and carousel posts, and has 93% test coverage. It is the closest Python library to an official, tested wrapper.
+**Why:** GitHub Pages accepts raw HTML pushed to a `gh-pages` branch. The episode webpage generation task is: take episode metadata + transcript → render HTML files → push to `gh-pages`. Jinja2 is already available as a transitive dependency (it ships with many packages in the stack). The blog_generator.py pattern confirms the project uses f-strings and Ollama for text generation, but Jinja2 is available for HTML templating.
 
-**Caveat:** `pythreads` is still in beta (pre-1.0, last release July 2024). The official Meta Threads API itself requires app review for some publishing permissions. Before building the Threads uploader, verify that the Fake Problems Podcast's Meta developer account has publishing permissions approved.
+**Template structure:** One `episode.html.j2` template containing the full HTML document with Open Graph meta tags, JSON-LD `PodcastEpisode` structured data, transcript with chapter navigation, and canonical URL. Jinja2 renders it per episode with episode-specific context data.
 
-**Alternative:** If `pythreads` proves insufficient, the Threads API is a straightforward REST API (POST to graph.facebook.com/v19.0/) and can be called directly via the existing `requests` library using the same pattern as the existing Instagram uploader. This is the fallback — no library required, just two HTTP calls.
+**Confidence:** HIGH — Jinja2 is a Python standard for HTML templating. The CLAUDE.md milestone context confirms it's already in deps. No new install needed.
 
-**Why not MetaThreads or threads-api (unofficial):** Both reverse-engineer Instagram's private API. They break when Meta changes internals and carry ban risk. Do not use.
+---
+
+### GitHub Pages Deployment: ghp-import
+
+**Recommended:** `ghp-import==2.1.0`
+
+**Why:** The webpage generation step must push generated HTML files to the `gh-pages` branch of the podcast repository without overwriting unrelated branches. `ghp-import` does exactly this: takes a local directory of built HTML files, creates/replaces the `gh-pages` branch, and optionally pushes to origin — all in one call. It is used by MkDocs, Sphinx, and Pelican for the same purpose.
+
+**Python API usage (no CLI required):**
+```python
+import ghp_import
+ghp_import.ghp_import("output/pages/", push=True, branch="gh-pages")
+```
+
+**Why not manual git operations:** Manually creating/switching to the `gh-pages` branch, copying files, committing, and pushing requires careful handling of detached HEAD state and branch isolation. `ghp-import` handles this correctly and atomically. The pipeline's `--dry-run` mode can be honored by passing `push=False`.
+
+**Caveat:** `ghp-import` 2.1.0 was released May 2022 and has not had a new release since. The project is considered stable/maintenance-mode. The underlying git operations it performs are simple and unlikely to break. MkDocs (widely used) still depends on it. Acceptable risk for this use case.
+
+**Why not GitHub Actions:** GitHub Actions would require a separate CI workflow file and GitHub secrets setup. The project is a local CLI pipeline (`python main.py ep29`). Deployment from local Python code is consistent with the existing pattern (all uploaders are local Python calls, not CI-triggered).
 
 ```bash
-pip install pythreads==0.2.1
+pip install ghp-import==2.1.0
 ```
 
-**Confidence:** MEDIUM — Package verified on PyPI, but beta status and Meta app review requirements add uncertainty. Official Meta Threads API documentation should be consulted before implementation.
-
----
-
-### Content Generation: Keyword Extraction for SEO
-
-**Recommended:** `keybert` 0.9.0
-
-**Why:** Blog posts and episode descriptions generated by Ollama will benefit from keyword extraction to improve search discoverability. KeyBERT uses BERT embeddings to extract keywords and keyphrases most relevant to the document — significantly better than TF-IDF or RAKE for conversational podcast transcript text. Integrates with `sentence-transformers` (already used by the ML stack via torch). Minimal overhead: one call per episode.
-
-**Why not spaCy:** spaCy is heavier and requires model downloads. For keyword extraction specifically, KeyBERT is more accurate and simpler.
-
-**Why not a custom Ollama prompt:** LLM keyword extraction is inconsistent in format and requires prompt engineering maintenance. KeyBERT is deterministic and returns ranked keyphrases directly.
-
-```bash
-pip install keybert==0.9.0
-```
-
-**Confidence:** HIGH — PyPI confirmed version 0.9.0, released February 7, 2025.
-
----
-
-### CLI Refactoring: main.py God Object
-
-**Recommended:** `click` (already available as transitive dep) or standard `argparse` with explicit subcommand modules
-
-**Why:** The 1700-line `main.py` needs decomposition. The recommended pattern for this codebase (flat module structure, no src/ directory) is to split orchestration by pipeline stage into separate orchestrator modules, with `main.py` as a thin dispatcher. This does NOT require adding a new CLI framework — the existing `argparse`-based CLI in `main.py` can be preserved and the internal logic moved to separate `pipeline_*.py` or `steps/` modules.
-
-**Why not Typer or Click migration:** Migrating the CLI interface is scope creep. The interface (`python main.py ep29 --auto-approve`) must not break. Internal decomposition is a refactor, not a CLI replacement.
-
-**No new package needed** — this is an architecture change, not a library addition.
-
-**Confidence:** HIGH — This is a code organization decision, not a library choice.
-
----
-
-## Packages to Fix (Not New — But Broken)
-
-| Problem | Current State | Fix |
-|---------|--------------|-----|
-| `openai` SDK missing from requirements.txt | `blog_generator.py` uses it, requirements.txt omits it | Add `openai>=1.0.0` (or remove usage in favor of Ollama) |
-| `torch==2.1.0` is outdated | Released 2023, PyTorch 2.6 is current | Upgrade carefully — WhisperX pins torch, check compatibility before upgrading |
-| `tweepy==4.14.0` | Released 2023, current is 4.15+ | Minor upgrade safe, check Twitter API v2 endpoint changes |
+**Confidence:** MEDIUM — Version confirmed on PyPI and libraries.io. Package is stable but unmaintained since 2022. No known breaking changes; git operations it wraps are stable. MkDocs community continues to use it successfully.
 
 ---
 
@@ -168,12 +131,13 @@ pip install keybert==0.9.0
 
 | Package | Use Case | Decision | Reason |
 |---------|----------|----------|--------|
-| `pyloudnorm` | LUFS measurement | Rejected (for normalization) | Measurement only, not normalization — use `ffmpeg-normalize` instead |
-| `autoducking` | Audio ducking | Rejected | Designed for music-under-voice, not censorship ducking. pydub + ffmpeg sufficient |
-| `pyAudioAnalysis` | Audio feature extraction | Rejected | Older, less maintained than librosa |
-| `MetaThreads` / `threads-api` (unofficial) | Threads posting | Rejected | Reverse-engineered, fragile, ban risk |
-| `spaCy` | Keyword extraction | Rejected | Too heavy for keyword-only use case; KeyBERT is more accurate with less overhead |
-| Opus Clip / Clipcast | Clip detection | Rejected (paid) | Project constraint: no new paid APIs |
+| `KeyBERT==0.9.0` | Keyword extraction | Rejected | Pulls `sentence-transformers` + ~400MB model download. yake provides sufficient quality for podcast SEO with zero ML overhead |
+| `rake-nltk` | Keyword extraction | Rejected | Requires NLTK corpus downloads; yake is simpler with equivalent output for short keyphrases |
+| FFmpeg `drawtext` filter | Word-by-word subtitle burn-in | Rejected | Requires one filter expression per word (~150 per clip); ASS format via pysubs2 is the correct abstraction for timed styled text |
+| WhisperX `highlight_words` ASS output | ASS generation | Rejected | Requires re-running transcription; pysubs2 can consume cached word timestamps |
+| Jekyll | Static episode pages | Rejected | Requires Ruby runtime. Python-based Jinja2 generation + ghp-import is consistent with the existing Python-only pipeline |
+| Hugo | Static episode pages | Rejected | Requires Go runtime. Same reasoning as Jekyll |
+| `auto-subs` (PyPI) | Subtitle generation | Rejected | Wraps Whisper for transcription — redundant. We already have WhisperX word timestamps. pysubs2 is the right tool for the ASS file layer only |
 
 ---
 
@@ -182,42 +146,41 @@ pip install keybert==0.9.0
 Libraries to add to `requirements.txt`:
 
 ```
-# Audio normalization (LUFS / EBU R128)
-ffmpeg-normalize==1.37.3
+# Word-level ASS subtitle file generation (Hormozi-style burned-in clips)
+pysubs2==1.8.0
 
-# Audio feature extraction (smarter clip detection)
-librosa==0.11.0
+# Keyword extraction for episode webpage SEO (no ML dependency)
+yake==0.4.8
 
-# Bluesky social posting
-atproto==0.0.65
-
-# Threads social posting (Meta official API wrapper)
-pythreads==0.2.1
-
-# Keyword extraction for SEO
-keybert==0.9.0
-
-# Fix: OpenAI SDK (currently used but not pinned)
-openai>=1.0.0
+# GitHub Pages deployment (push generated HTML to gh-pages branch)
+ghp-import==2.1.0
 ```
+
+**No version changes needed** to existing packages for this milestone. FFmpeg vertical video processing uses existing `ffmpeg-python==0.2.0`. HTML templating uses existing Jinja2 (already transitive dep). OpenAI GPT-4o for fallback SEO description generation uses existing `openai>=1.0.0`.
+
+---
+
+## Integration Points with Existing Pipeline
+
+| New Component | Plugs Into | Checkpoint Key |
+|--------------|-----------|----------------|
+| `subtitle_clip_generator.py` | `pipeline/steps/video.py` after existing subtitle step (5.4) | `subtitles` (existing) or new `subtitle_ass` key |
+| `subtitle_clip_generator.py` → `audiogram_generator.py` | Replace `subtitles=` SRT filter with `ass=` filter for vertical clips | In existing `create_audiogram()` |
+| `keyword_extractor.py` | `pipeline/steps/distribute.py` before webpage generation | New `keywords` checkpoint key |
+| `webpage_generator.py` | `pipeline/steps/distribute.py` after keywords, before social upload | New `webpages` checkpoint key |
+| `webpage_generator.py` → `ghp-import` | End of distribute step | Controlled by `GITHUB_PAGES_REPO` env var + `self.enabled` pattern |
 
 ---
 
 ## Sources
 
-- [ffmpeg-normalize PyPI](https://pypi.org/project/ffmpeg-normalize/) — version 1.37.3, released Feb 8, 2026
-- [ffmpeg-normalize GitHub (slhck)](https://github.com/slhck/ffmpeg-normalize) — EBU R128, two-pass loudnorm
-- [pyloudnorm PyPI](https://pypi.org/project/pyloudnorm/) — version 0.2.0, Jan 4, 2026
-- [pyloudnorm GitHub](https://github.com/csteinmetz1/pyloudnorm) — BS.1770 measurement only
-- [librosa PyPI](https://pypi.org/project/librosa/) — version 0.11.0, March 11, 2025
-- [librosa GitHub](https://github.com/librosa/librosa) — audio/music signal analysis
-- [atproto PyPI](https://pypi.org/project/atproto/) — version 0.0.65, December 8, 2025
-- [atproto GitHub (MarshalX)](https://github.com/MarshalX/atproto) — official AT Protocol Python SDK
-- [Bluesky API docs](https://docs.bsky.app/docs/get-started)
-- [pythreads PyPI](https://pypi.org/project/pythreads/) — version 0.2.1, July 15, 2024
-- [pythreads GitHub (marclove)](https://github.com/marclove/pythreads) — Meta Threads official API wrapper
-- [Threads API documentation](https://www.postman.com/meta/threads/documentation/dht3nzz/threads-api)
-- [keybert PyPI](https://pypi.org/project/keybert/) — version 0.9.0, February 7, 2025
-- [keybert GitHub (MaartenGr)](https://github.com/MaartenGr/KeyBERT)
-- [Python Audio Tools 2025 — graphlogic.ai](https://graphlogic.ai/blog/resources-tools/best-python-tools-audio-manipulation/)
-- [Building CLI Tools with Python 2025 — dasroot.net](https://dasroot.net/posts/2025/12/building-cli-tools-python-click-typer-argparse/)
+- [pysubs2 PyPI](https://pypi.org/project/pysubs2/) — version 1.8.0, released December 24, 2024
+- [pysubs2 documentation](https://pysubs2.readthedocs.io/en/latest/) — SSAEvent API, style objects
+- [yake PyPI](https://pypi.org/project/yake/) — version 0.4.8
+- [yake GitHub (LIAAD)](https://github.com/LIAAD/yake) — unsupervised keyword extraction
+- [ghp-import PyPI](https://pypi.org/project/ghp-import/) — version 2.1.0, released May 2022
+- [ghp-import GitHub (c-w)](https://github.com/c-w/ghp-import) — gh-pages branch deployment
+- [FFmpeg Filters Documentation — subtitles/ass](https://ffmpeg.org/ffmpeg-filters.html) — ass and subtitles filter syntax
+- [Schema.org PodcastEpisode](https://schema.org/PodcastEpisode) — JSON-LD structured data type for episode pages
+- [Karaoke Videos with FFmpeg and SRT Subtitles](https://www.samgalope.dev/2024/11/05/diy-karaoke-videos-with-ffmpeg-and-srt-format-sync-and-style/) — word-timing subtitle generation pattern
+- [The Power of Single-Word Subtitles (Medium)](https://medium.com/@didierlacroix/the-power-of-single-word-subtitles-662f8c3891bd) — WhisperX → ASS per-word generation pattern
