@@ -55,11 +55,11 @@ Plans:
   3. The page HTML includes Open Graph and Twitter Card meta tags with episode-specific keywords extracted from the transcript
   4. Chapter timestamps are rendered as clickable jump links within the transcript page
   5. sitemap.xml at the GitHub Pages root is updated with the new episode URL within the same pipeline run
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 07-01: TBD
-- [ ] 07-02: TBD
+- [ ] 07-01-PLAN.md — Build EpisodeWebpageGenerator core module (HTML generation, JSON-LD, meta tags, keywords, chapters, sitemap)
+- [ ] 07-02-PLAN.md — GitHub Pages deployment + pipeline wiring + visual verification
 
 ### Phase 8: Content Compliance
 **Goal**: Transcripts are analyzed against YouTube community guidelines before any upload, with flagged segments logged and critical violations blocking the upload unless overridden
@@ -85,6 +85,6 @@ Plans:
 | 3. Content Voice and Clips | v1.0 | 3/3 | Complete | 2026-03-17 |
 | 4. Chapter Markers | v1.0 | 2/2 | Complete | 2026-03-17 |
 | 5. Architecture Refactor | v1.0 | 3/3 | Complete | 2026-03-18 |
-| 6. Subtitle Clip Generator | 2/2 | Complete   | 2026-03-18 | - |
-| 7. Episode Webpages | v1.1 | 0/? | Not started | - |
+| 6. Subtitle Clip Generator | v1.1 | 2/2 | Complete | 2026-03-18 |
+| 7. Episode Webpages | v1.1 | 0/2 | Not started | - |
 | 8. Content Compliance | v1.1 | 0/? | Not started | - |
