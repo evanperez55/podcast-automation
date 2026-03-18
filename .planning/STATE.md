@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 05-architecture-refactor-02-PLAN.md
-last_updated: "2026-03-18T02:29:49.868Z"
+stopped_at: Completed 05-architecture-refactor-03-PLAN.md
+last_updated: "2026-03-18T02:45:17.810Z"
 last_activity: "2026-03-17 — Phase 1 complete: all 3 foundation plans executed"
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 14
-  completed_plans: 13
+  completed_plans: 14
 ---
 
 ---
@@ -76,6 +76,7 @@ Progress: [██░░░░░░░░] 20%
 | Phase 04-chapter-markers P02 | 7 | 2 tasks | 4 files |
 | Phase 05-architecture-refactor P01 | 3 | 2 tasks | 10 files |
 | Phase 05-architecture-refactor P02 | 525709 | 2 tasks | 5 files |
+| Phase 05-architecture-refactor P03 | 745 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -115,6 +116,8 @@ Recent decisions affecting current work:
 - [Phase 05-architecture-refactor]: KNOWN_CHECKPOINT_KEYS set in test file as regression guard against key renames during extraction
 - [Phase 05-architecture-refactor]: Mechanical extraction only — no refactoring/simplification; faithfulness over cleanliness in step modules
 - [Phase 05-architecture-refactor]: run_distribute_only builds PipelineContext from disk-glob patterns matching continue_episode.py; no main.py import required
+- [Phase 05-architecture-refactor]: Split _run_transcribe + _run_process_audio in runner.py to preserve analysis-between-audio step ordering without modifying Plan 02 audio.py
+- [Phase 05-architecture-refactor]: Updated test_scheduler.py patch targets from main.* to pipeline.runner.* — mechanical consequence of extraction
 
 ### Pending Todos
 
@@ -128,6 +131,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18T02:29:49.862Z
-Stopped at: Completed 05-architecture-refactor-02-PLAN.md
+Last session: 2026-03-18T02:45:17.805Z
+Stopped at: Completed 05-architecture-refactor-03-PLAN.md
 Resume file: None
