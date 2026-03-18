@@ -69,10 +69,11 @@ Plans:
   1. After analysis runs, a compliance report is written listing any flagged segments with their timestamps, quoted text, and violation category (e.g., "hate speech", "graphic content")
   2. Flagged segments are automatically muted or cut from the video file before the upload step executes, with no manual intervention required
   3. When critical violations are detected, the upload step is skipped and the pipeline prints a clear blocking message; running with `--force` overrides the block and proceeds to upload
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 08-01: TBD
+- [ ] 08-01-PLAN.md — Build ContentComplianceChecker module (GPT-4o violation classification + report + tests)
+- [ ] 08-02-PLAN.md — Wire into pipeline as Step 3.6 + upload block + --force flag
 
 ## Progress
 
@@ -86,5 +87,5 @@ Plans:
 | 4. Chapter Markers | v1.0 | 2/2 | Complete | 2026-03-17 |
 | 5. Architecture Refactor | v1.0 | 3/3 | Complete | 2026-03-18 |
 | 6. Subtitle Clip Generator | v1.1 | 2/2 | Complete | 2026-03-18 |
-| 7. Episode Webpages | 2/2 | Complete   | 2026-03-18 | - |
-| 8. Content Compliance | v1.1 | 0/? | Not started | - |
+| 7. Episode Webpages | v1.1 | 2/2 | Complete | 2026-03-18 |
+| 8. Content Compliance | v1.1 | 0/2 | Not started | - |
