@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An automated podcast production pipeline for the "Fake Problems Podcast" — an edgy comedy show. One command takes raw audio through transcription, AI content analysis with the show's comedy voice, smooth audio ducking censorship, LUFS-normalized mastering, chapter markers, clip generation scored by audio energy, and multi-platform distribution (YouTube, Spotify, Twitter, Instagram, TikTok). Shipped v1.0 with modular pipeline architecture.
+An automated podcast production pipeline for the "Fake Problems Podcast" — an edgy comedy show. One command takes raw audio through transcription, AI content analysis with the show's comedy voice, smooth audio ducking censorship, LUFS-normalized mastering, chapter markers, clip generation scored by audio energy, Hormozi-style subtitle clips, SEO-optimized episode webpages, content compliance checking, and multi-platform distribution (YouTube, Spotify, Twitter, Instagram, TikTok). Shipped v1.1 with discoverability and safety features.
 
 ## Core Value
 
@@ -48,12 +48,16 @@ One command produces professional-quality, platform-ready podcast content that s
 - ✓ Google credentials moved to credentials/ directory — v1.0
 - ✓ main.py refactored to 134-line CLI shim with pipeline/ package — v1.0
 - ✓ continue_episode.py eliminated (pipeline.run_distribute_only) — v1.0
+- ✓ Burned-in subtitle clips (Hormozi-style word-by-word) for YouTube Shorts — v1.1
+- ✓ Episode webpages with full transcripts, JSON-LD, SEO on GitHub Pages — v1.1
+- ✓ YAKE keyword extraction for SEO metadata — v1.1
+- ✓ Content compliance checker (GPT-4o) flagging YouTube guideline violations — v1.1
+- ✓ Auto-muting flagged segments via censor_timestamps merge — v1.1
+- ✓ Upload safety gate with --force override — v1.1
 
-### Active (v1.1 — Discoverability & Short-Form)
+### Active
 
-- [ ] Burned-in subtitle clips (big bold word-by-word) for YouTube Shorts, Instagram Reels, TikTok
-- [ ] Episode webpages with full transcripts and SEO metadata on GitHub Pages
-- [ ] Keyword extraction for SEO metadata
+(None — ship next milestone to validate)
 
 ### Future
 
@@ -77,8 +81,9 @@ One command produces professional-quality, platform-ready podcast content that s
 
 - Comedy podcast with edgy/dark humor tone — AI-generated content must match this voice
 - Two hosts, weekly episodes (~70 minutes, ~700MB WAV)
-- v1.0 shipped: 23,810 LOC Python across 30+ modules, 333 tests, modular pipeline/ architecture
+- v1.1 shipped: ~26,400 LOC Python across 33+ modules, 422 tests, modular pipeline/ architecture
 - Pipeline architecture: main.py (134 lines, CLI shim) → pipeline/runner.py (orchestrator) → pipeline/steps/ (5 step modules)
+- Pipeline step order: 1 Download → 2 Transcribe → 3 Analyze → 3.5 Topic → 3.6 Compliance → 4 Censor → 4.5 Normalize → 5 Clips → 5.1 Approval → 5.4 Subtitles → 5.5 Video → 5.6 Thumbnail → 6 MP3 → 7 Dropbox → 7.5 RSS → 8 Social → 8.5 Blog → 8.6 Webpage → 9 Search
 - 9 checkpoint keys for resume: transcribe, analyze, censor, normalize, create_clips, subtitles, convert_videos, convert_mp3, blog_post
 
 ## Constraints
@@ -98,15 +103,16 @@ One command produces professional-quality, platform-ready podcast content that s
 | Architecture refactor last | Refactoring stable code is safer than refactoring moving targets | ✓ Good — all feature phases complete first |
 | Keep costs near zero | Podcast is passion project, not revenue-generating (yet) | ✓ Good — Ollama for local LLM, no new paid APIs |
 | Mechanical extraction for refactor | Faithful code movement preserves behavior, minimize risk | ✓ Good — 333 tests passing, no regressions |
+| pysubs2 ASS for subtitle rendering | Native SSA format with per-word styling avoids frame-by-frame rendering | ✓ Good — fast, clean output, no MoviePy dependency |
+| YAKE over KeyBERT for keywords | Zero external model download, unsupervised, works on show_notes not raw transcript | ✓ Good — lightweight, adequate quality |
+| PyGithub upsert for GitHub Pages | No git binary needed, API-based deploy with SHA tracking | ✓ Good — clean upsert, graceful skip on missing token |
+| GPT-4o at temp=0.1 for compliance | Deterministic classification, not creative generation | ✓ Good — consistent flagging |
+| Merge flagged segments into censor_timestamps | Reuse existing AudioProcessor duck-fade, zero new FFmpeg code | ✓ Good — elegant reuse |
+| Comedy-aware compliance prompt | Dark humor and profanity are NOT violations; only genuine hate speech and dangerous misinformation | ✓ Good — avoids over-flagging |
 
-## Current Milestone: v1.1 Discoverability & Short-Form
+## Current State
 
-**Goal:** Make clips go viral with burned-in subtitle vertical videos and drive organic search traffic with SEO-optimized episode webpages.
-
-**Target features:**
-- Burned-in subtitle clips (Hormozi-style word-by-word) for Shorts/Reels/TikTok
-- Static episode webpages with full transcripts on GitHub Pages
-- Keyword extraction for SEO metadata
+v1.0 and v1.1 shipped. No active milestone. Run `/gsd:new-milestone` to start v1.2 or v2.0.
 
 ---
-*Last updated: 2026-03-18 after v1.1 milestone start*
+*Last updated: 2026-03-18 after v1.1 milestone completion*

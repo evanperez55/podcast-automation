@@ -43,6 +43,46 @@
 
 ---
 
+## Milestone: v1.1 — Discoverability & Short-Form
+
+**Shipped:** 2026-03-18
+**Phases:** 3 | **Plans:** 6 | **Sessions:** ~1
+
+### What Was Built
+- Hormozi-style word-by-word subtitle clips (pysubs2 ASS + FFmpeg 9:16 vertical video)
+- SEO-optimized episode webpages with PodcastEpisode JSON-LD, deployed to GitHub Pages via PyGithub
+- GPT-4o content compliance checker flagging YouTube guideline violations
+- Auto-muting of flagged segments by merging into existing censor_timestamps
+- Upload safety gate with `--force` override for critical violations
+
+### What Worked
+- Reusing existing censor_timestamps for compliance muting — zero new FFmpeg code, elegant architectural fit
+- Each phase was truly independent (no shared code between 6/7/8) so sequential execution was clean
+- Comedy-aware compliance prompt prevented over-flagging dark humor
+- TDD continued to pay off — 83 new tests caught issues immediately
+
+### What Was Inefficient
+- SUMMARY frontmatter `requirements_completed` and `one_liner` fields were inconsistently populated across agents
+- Nyquist VALIDATION.md frontmatter still not flipped post-execution (same issue as v1.0)
+- run_distribute_only compliance bypass wasn't caught until integration checker at audit — confirms v1.0 lesson about integration testing
+
+### Patterns Established
+- `self.enabled` env-var pattern works cleanly for new modules (compliance, webpage generator)
+- PyGithub upsert (get_contents for SHA, then update/create) is the GitHub Pages deploy pattern
+- Merging domain-specific flags into existing pipeline data structures (censor_timestamps) avoids new plumbing
+
+### Key Lessons
+1. Nyquist frontmatter needs automated flipping during execution — manual updates are consistently forgotten
+2. SUMMARY frontmatter extraction is unreliable for automated reporting — the tool should write these fields
+3. Integration testing at milestone boundary continues to catch real gaps (run_distribute_only bypass)
+
+### Cost Observations
+- Model mix: ~20% opus (orchestration), ~80% sonnet (research, planning, execution, verification)
+- Sessions: ~1 (entire milestone in a single conversation)
+- Notable: 3 phases in 2 days — faster than v1.0 thanks to established patterns and clean architecture
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -50,14 +90,17 @@
 | Milestone | Sessions | Phases | Key Change |
 |-----------|----------|--------|------------|
 | v1.0 | ~3 | 5 | Established TDD + mechanical extraction pattern |
+| v1.1 | ~1 | 3 | Independent phases, censor_timestamps reuse pattern |
 
 ### Cumulative Quality
 
 | Milestone | Tests | Coverage | Zero-Dep Additions |
 |-----------|-------|----------|-------------------|
 | v1.0 | 333 | — | 2 (mutagen, openai) |
+| v1.1 | 422 | — | 2 (PyGithub, yake) |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Integration testing at milestone boundary catches gaps that phase-level unit tests miss
+1. Integration testing at milestone boundary catches gaps that phase-level unit tests miss (v1.0: VOICE-02 wiring, v1.1: run_distribute_only bypass)
 2. Refactor last — stable code is safer to extract than moving targets
+3. Nyquist frontmatter updates are consistently forgotten — needs automation
