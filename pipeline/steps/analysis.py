@@ -84,7 +84,7 @@ def run_analysis(
         logger.info("[RESUME] Skipping analysis (already completed)")
     else:
         analysis = components["editor"].analyze_content(
-            transcript_data, topic_context=topic_context
+            transcript_data, topic_context=topic_context, audio_path=audio_file
         )
         with open(analysis_path, "w", encoding="utf-8") as f:
             json.dump(analysis, f, indent=2, ensure_ascii=False)
