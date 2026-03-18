@@ -1,12 +1,12 @@
-# Architecture Patterns
+# Architecture Research
 
-**Domain:** Podcast automation pipeline — v1.1 feature integration
+**Domain:** Engagement optimization and smart scheduling — v1.2 integration into existing pipeline
 **Researched:** 2026-03-18
-**Focus:** Burned-in subtitle clips and static episode webpages
+**Confidence:** HIGH — based on direct code inspection of all relevant existing modules
 
-## Current Architecture (as-built)
+---
 
-The v1.0 refactor is complete. The actual running structure:
+## Current Architecture (as-built, v1.1)
 
 ```
 main.py (134-line CLI shim)
@@ -16,510 +16,378 @@ pipeline/runner.py (orchestrator, component factory, checkpoint logic)
     +---> pipeline/context.py (PipelineContext dataclass)
     |
     +---> pipeline/steps/ingest.py     (Step 1: download)
-    +---> pipeline/steps/analysis.py   (Step 3-3.5: AI analysis)
-    +---> pipeline/steps/audio.py      (stub — Steps 4-6 still in runner.py)
+    +---> pipeline/steps/analysis.py   (Steps 3-3.5: AI analysis + topic tracker)
+    +---> pipeline/steps/audio.py      (stub — Steps 4-6 still inline in runner.py)
     +---> pipeline/steps/video.py      (Steps 5.1-5.6: clips, subs, video, thumb)
     +---> pipeline/steps/distribute.py (Steps 7-9: Dropbox, RSS, social, blog, search)
 ```
 
-`PipelineContext` fields relevant to new features:
+Key facts about existing engagement/scheduling modules:
 
-```python
-clip_paths: list          # WAV audio clips (set in video step, Step 5)
-srt_paths: list           # SRT files per clip (set in video step, Step 5.4)
-video_clip_paths: list    # MP4 videos per clip (set in video step, Step 5.5)
-transcript_data: dict     # Full Whisper transcript with word-level timestamps
-analysis: dict            # AI analysis including episode_title, chapters, keywords(TODO)
-episode_output_dir: Path  # output/ep_N/
+- `analytics.py` — `AnalyticsCollector` fetches YouTube (views/likes/comments) and Twitter (impressions/engagements) per episode. Saves to `topic_data/analytics/ep_N_analytics.json`. Run via `python main.py analytics epN`.
+- `scheduler.py` — `UploadScheduler` creates `upload_schedule.json` with platform entries at `now + SCHEDULE_X_DELAY_HOURS`. Fixed offset only — no awareness of audience activity patterns.
+- `topic_scorer.py` — `TopicScorer` via Ollama; already reads `get_engagement_bonus()` from analytics as a weak signal.
+- `audio_clip_scorer.py` — `AudioClipScorer` scores segments by RMS energy; feeds into GPT-4o clip selection in `content_editor.py`.
+- `pipeline/steps/analysis.py` — already injects `topic_context` (scored topics from `topic_data/`) into AI analysis prompt. This is the pattern for feeding external data into clip selection.
+
+---
+
+## System Overview: v1.2 Additions
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     EXISTING PIPELINE (v1.1)                         │
+│  main.py → pipeline/runner.py → pipeline/steps/                     │
+│                                                                      │
+│  Step 3: analysis.py                  Step 8: distribute.py          │
+│    reads topic_context (existing)       calls scheduler.create_      │
+│    ← [NEW] engagement_profile          schedule() (existing)         │
+│                                         ← [NEW] optimizer param      │
+├─────────────────────────────────────────────────────────────────────┤
+│                    NEW v1.2 MODULES                                  │
+│  ┌──────────────────────┐  ┌─────────────────────────────────────┐  │
+│  │  engagement_scorer.py│  │  posting_time_optimizer.py          │  │
+│  │  - get_engagement_   │  │  - suggest_time(platform) → dt|None │  │
+│  │    profile() → dict  │  │  - reads engagement_history.json    │  │
+│  │  - record_outcome()  │  │  - fallback: None if < min_episodes │  │
+│  └──────────┬───────────┘  └───────────────┬─────────────────────┘  │
+│             │                              │                         │
+│             ↓   writes                     ↓   reads                 │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │   topic_data/engagement_history.json                         │   │
+│  │   { "episodes": [ { platform: { posted_at, hour_utc,        │   │
+│  │     day_of_week, engagement_score }, ... } ] }               │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│               MODIFIED EXISTING MODULES                              │
+│  analytics.py    — add posted_at capture; record_outcome() hook     │
+│  scheduler.py    — add get_optimal_publish_at(platform, optimizer)  │
+│  pipeline/context.py — add engagement_profile: Optional[dict] field │
+│  pipeline/steps/analysis.py  — load and attach engagement_profile  │
+│  pipeline/steps/distribute.py — pass optimizer to create_schedule() │
+│  pipeline/runner.py — init new components in _init_components()     │
+│  config.py       — SMART_SCHEDULING_ENABLED, MIN_EPISODES env vars  │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Feature 1: Burned-in Subtitle Clips
-
-### What it produces
-
-Vertical (9:16) MP4 clips with large, bold, word-by-word captions burned directly
-into the video frame — the "Hormozi style" used on YouTube Shorts, Instagram Reels,
-and TikTok. These replace or supplement the current audiogram clips.
-
-### How it fits into the existing step sequence
-
-The burned-in subtitle clips slot into Step 5.5, replacing the audiogram path for
-clips destined for short-form platforms. The current Step 5.5 branch:
+## Recommended Project Structure
 
 ```
-if audiogram_generator.enabled:
-    → create_audiogram_clips() using audiogram_generator
-else:
-    → video_converter.convert_clips_to_videos()
+podcast-automation/
+├── analytics.py                       # MODIFIED: add posted_at capture
+├── scheduler.py                       # MODIFIED: add get_optimal_publish_at()
+├── posting_time_optimizer.py          # NEW: optimal posting window logic
+├── engagement_scorer.py               # NEW: clip/episode engagement prediction
+├── config.py                          # MODIFIED: two new env vars
+├── pipeline/
+│   ├── context.py                     # MODIFIED: add engagement_profile field
+│   └── steps/
+│       ├── analysis.py                # MODIFIED: inject engagement_profile
+│       └── distribute.py             # MODIFIED: pass optimizer to scheduler
+├── topic_data/
+│   ├── analytics/
+│   │   └── ep_N_analytics.json        # EXISTING: per-episode metrics files
+│   └── engagement_history.json        # NEW: cross-episode posting time outcomes
+└── tests/
+    ├── test_posting_time_optimizer.py  # NEW
+    └── test_engagement_scorer.py       # NEW
 ```
 
-The new path adds a third option controlled by an env var (`USE_SUBTITLE_CLIPS`):
+### Structure Rationale
 
-```
-if subtitle_clip_generator.enabled:   # new branch, checked first
-    → subtitle_clip_generator.create_subtitle_clips()
-elif audiogram_generator.enabled:
-    → create_audiogram_clips()
-else:
-    → video_converter.convert_clips_to_videos()
-```
-
-This means the feature is opt-in, does not break existing behavior, and respects
-the `self.enabled` pattern used by every other component.
-
-### New module: `subtitle_clip_generator.py`
-
-**Responsibility:** Take a WAV clip + SRT file, produce a 9:16 MP4 with word-by-word
-captions rendered over a dark background with the podcast logo.
-
-**Interface (matches AudiogramGenerator's interface for a clean swap):**
-
-```python
-class SubtitleClipGenerator:
-    def __init__(self):
-        self.enabled = os.getenv("USE_SUBTITLE_CLIPS", "true").lower() == "true"
-        self.ffmpeg_path = Config.FFMPEG_PATH
-        self.logo_path = Config.ASSETS_DIR / "podcast_logo.png"
-        self.font_size = int(os.getenv("SUBTITLE_FONT_SIZE", "72"))
-        self.font_color = os.getenv("SUBTITLE_FONT_COLOR", "white")
-        self.bg_color = os.getenv("SUBTITLE_BG_COLOR", "0x1a1a2e")
-
-    def create_subtitle_clips(
-        self,
-        clip_paths: list[str],
-        srt_paths: list[str | None],
-        format_type: str = "vertical",
-    ) -> list[str]:
-        """Create MP4 clips with burned-in word-by-word captions.
-
-        Returns list of output MP4 paths (parallel to clip_paths).
-        """
-
-    def create_subtitle_clip(
-        self,
-        audio_path: str,
-        srt_path: str | None,
-        output_path: str | None = None,
-        format_type: str = "vertical",
-    ) -> str | None:
-        """Create a single subtitle clip. Returns output path or None."""
-```
-
-**FFmpeg approach:** The word-by-word effect uses the ASS subtitle format (not SRT
-directly) because ASS supports `\an8` (top alignment) and per-word `{\k}` karaoke
-tags for word highlighting. The generator converts the SRT to ASS in memory before
-passing to FFmpeg's `subtitles=` filter.
-
-Alternatively, FFmpeg's `subtitles=` filter with a custom `force_style` can achieve
-the bold-large look from SRT without full ASS conversion — simpler, slightly less
-precise control. Start with the `force_style` approach; upgrade to ASS only if
-per-word highlighting is required in a later phase.
-
-**FFmpeg filter pattern (SRT with force_style):**
-
-```
-subtitles='path/to/clip.srt':force_style='FontName=Arial,FontSize=72,
-PrimaryColour=&H00FFFFFF&,Bold=1,Alignment=2,MarginV=80,BorderStyle=3,
-OutlineColour=&H00000000&,Outline=2'
-```
-
-### Integration points in `pipeline/steps/video.py`
-
-Two changes to `run_video()`:
-
-1. Import and initialize `SubtitleClipGenerator` from `components` (added by runner).
-2. In the Step 5.5 block, add the new branch before the audiogram check:
-
-```python
-subtitle_clip_generator = components.get("subtitle_clip_generator")
-
-if subtitle_clip_generator and subtitle_clip_generator.enabled and clip_paths:
-    # new path
-    srt_list = [str(s) if s else None for s in srt_paths]
-    video_clip_paths = [
-        Path(p) for p in subtitle_clip_generator.create_subtitle_clips(
-            clip_paths=[str(p) for p in clip_paths],
-            srt_paths=srt_list,
-            format_type="vertical",
-        )
-    ]
-elif audiogram_generator and audiogram_generator.enabled and clip_paths:
-    # existing audiogram path (unchanged)
-    ...
-```
-
-3. The `checkpoint key` for `convert_videos` already stores `video_clip_paths`,
-   so checkpoint/resume works unchanged — the new branch just populates the same
-   key through a different code path.
-
-### Changes to `pipeline/runner.py`
-
-Add to `_init_components()` (both the dry-run and full-init branches):
-
-```python
-from subtitle_clip_generator import SubtitleClipGenerator
-...
-"subtitle_clip_generator": SubtitleClipGenerator(),
-```
-
-Add to the `dry_run()` mock step log:
-
-```
-[MOCK] Step 5.5: Subtitle clips -- would create N word-by-word caption videos
-```
-
-### Changes to `pipeline/context.py`
-
-No changes needed. `video_clip_paths` already holds the output.
-
-### Dependency on existing `SubtitleGenerator`
-
-`subtitle_clip_generator.py` does NOT subclass or import `SubtitleGenerator`. They
-are separate concerns:
-
-- `SubtitleGenerator` — produces `.srt` files from transcript data (Step 5.4)
-- `SubtitleClipGenerator` — consumes `.srt` files, produces `.mp4` with captions burned in (Step 5.5)
-
-The SRT files produced in Step 5.4 are the input to Step 5.5. This dependency is
-already satisfied in the current pipeline: `srt_paths` on `ctx` is populated before
-Step 5.5 runs.
+- **Flat module structure** — matches existing project convention; every top-level `.py` module is a peer.
+- **`topic_data/engagement_history.json`** — co-located with existing analytics data (`topic_data/analytics/`). Consistent discovery pattern with `scored_topics_*.json` and the analytics dir.
+- **Two new modules, not one** — `posting_time_optimizer.py` owns the "when to post" problem; `engagement_scorer.py` owns the "what content scores well" prediction. Separate concerns, separately testable.
+- **No new pipeline step** — both new modules are injected into existing steps (analysis and distribute) via the established component pattern, not added as numbered pipeline steps.
 
 ---
 
-## Feature 2: Static Episode Webpages (GitHub Pages)
+## Architectural Patterns
 
-### What it produces
+### Pattern 1: Engagement History as Rolling JSON File
 
-One HTML file per episode published to a GitHub Pages site. Each page contains:
-- Episode title, number, date
-- Full transcript (formatted, searchable)
-- Episode summary and show notes
-- Chapter list with timestamps
-- SEO `<meta>` tags (description, keywords, og:title, og:description)
-- Links to YouTube, Spotify
+**What:** A single `topic_data/engagement_history.json` accumulates one entry per episode per platform. `EngagementScorer.record_outcome()` appends to it after `run_analytics()`. Both new modules read it.
 
-### How it fits into the step sequence
+**When to use:** Every time `python main.py analytics epN` runs, ~48h after a new episode goes live.
 
-Episode webpage generation belongs in `pipeline/steps/distribute.py` as a new
-Step 8.6, immediately after the blog post (Step 8.5) and before the search index
-(Step 9). The webpage depends on `analysis` (for title, summary, chapters) and
-`transcript_data` (for full transcript), both of which are available on `ctx` by
-Step 8.5.
-
-```
-Step 8.5: Blog post (existing)
-Step 8.6: Episode webpage generation (new) ← insert here
-Step 9:   Search index (existing)
-```
-
-**Why distribute.py, not video.py:** The webpage is a distribution artifact (it
-gets deployed to GitHub Pages, a public URL). It has no dependency on the video
-clips. It follows the same pattern as the blog post — AI-assisted content artifact
-that gets written to disk and then optionally published.
-
-### New module: `webpage_generator.py`
-
-**Responsibility:** Render episode data into a static HTML file and optionally
-deploy it to a GitHub Pages repository via the GitHub API or git push.
+**Trade-offs:** Zero new dependencies, trivial to inspect/debug. Scales to ~100 episodes without performance concern. Does not block if missing — both consumers return `None` gracefully.
 
 ```python
-class EpisodeWebpageGenerator:
-    def __init__(self):
-        self.enabled = os.getenv("WEBPAGE_ENABLED", "true").lower() == "true"
-        self.github_token = os.getenv("GITHUB_TOKEN")
-        self.github_repo = os.getenv("GITHUB_PAGES_REPO")  # "username/repo"
-        self.site_base_url = os.getenv("SITE_BASE_URL", "")
-
-    def generate_webpage(
-        self,
-        episode_number: int,
-        analysis: dict,
-        transcript_data: dict,
-        output_dir: Path,
-    ) -> str | None:
-        """Render HTML to output_dir/episode_N.html. Returns file path or None."""
-
-    def deploy_to_github_pages(
-        self,
-        html_path: str,
-        episode_number: int,
-    ) -> str | None:
-        """Push HTML file to GitHub Pages repo. Returns public URL or None."""
-```
-
-### GitHub Pages deployment: how it works
-
-GitHub Pages serves static files from a repository's `gh-pages` branch (or `docs/`
-folder). Two deployment approaches are viable:
-
-**Option A: GitHub API (no git required on machine)**
-The GitHub REST API `PUT /repos/{owner}/{repo}/contents/{path}` can create or update
-a file in the repo. This approach requires only `GITHUB_TOKEN` and `GITHUB_PAGES_REPO`
-env vars. No git config, no SSH keys, no local clone needed.
-
-```python
-import base64, requests
-
-def _push_via_api(self, html_content: str, filename: str) -> str | None:
-    url = f"https://api.github.com/repos/{self.github_repo}/contents/{filename}"
-    headers = {"Authorization": f"token {self.github_token}"}
-    # Check if file exists (to get sha for update)
-    existing = requests.get(url, headers=headers)
-    sha = existing.json().get("sha") if existing.status_code == 200 else None
-    payload = {
-        "message": f"Add episode webpage {filename}",
-        "content": base64.b64encode(html_content.encode()).decode(),
+# engagement_history.json schema
+{
+  "episodes": [
+    {
+      "episode_number": 29,
+      "recorded_at": "2026-03-10T14:00:00",
+      "youtube": {
+        "posted_at": "2026-03-05T10:00:00",
+        "posted_hour_utc": 10,
+        "posted_day_of_week": 2,          # 0=Mon, 6=Sun
+        "engagement_score": 6.4,
+        "views": 312,
+        "likes": 28
+      },
+      "twitter": {
+        "posted_at": "2026-03-05T11:00:00",
+        "posted_hour_utc": 11,
+        "posted_day_of_week": 2,
+        "engagement_score": 3.1,
+        "impressions": 820,
+        "engagements": 34
+      }
     }
-    if sha:
-        payload["sha"] = sha
-    r = requests.put(url, json=payload, headers=headers)
-    return f"https://{owner}.github.io/{repo_name}/{filename}" if r.ok else None
+  ]
+}
 ```
 
-This is the recommended approach. No subprocess, no git commands, works on Windows
-without SSH configuration.
+Write pattern: atomic `.tmp` then rename — matches existing `scheduler.py` approach to avoid partial-read corruption.
 
-**Option B: git push via subprocess**
-Clone or fetch the `gh-pages` branch, write the file, commit, push. More complex,
-requires git configured with credentials, more failure modes. Avoid unless Option A
-proves insufficient.
+### Pattern 2: Engagement Profile Injected into AI Clip Selection
 
-**GitHub Pages configuration required (one-time, manual):**
-1. Create a dedicated repo (e.g., `fakeproblemspodcast/episodes`) or use an existing one
-2. Enable GitHub Pages in repo Settings → Pages → Source: `gh-pages` branch
-3. Set `GITHUB_TOKEN`, `GITHUB_PAGES_REPO`, `SITE_BASE_URL` in `.env`
+**What:** `EngagementScorer.get_engagement_profile()` summarizes which topic categories and keywords historically outperform. This dict is attached to `ctx.engagement_profile` by `pipeline/steps/analysis.py` and then passed into `ContentEditor.analyze()` alongside `topic_context` — the same injection point that already exists for scored topics.
 
-The `GITHUB_TOKEN` can be a fine-grained personal access token scoped to just that
-repository with `Contents: read and write` permission. No additional GitHub App or
-OAuth flow needed.
-
-### Keyword extraction: where it lives
-
-The PROJECT.md lists "keyword extraction for SEO metadata" as a third feature in
-this milestone. Keyword extraction feeds into both the RSS feed (which already
-accepts a `keywords` list) and the episode webpage `<meta keywords>` tag.
-
-The extraction should be a method on `ContentEditor` (or a standalone function) that
-runs during Step 3 (analysis) and stores results in `ctx.analysis["keywords"]`. The
-existing `distribute.py` Step 7.5 already pulls `keywords` from `analysis` — it
-currently hardcodes `["podcast", "comedy", "fake-problems"]`. With extracted keywords,
-it would use `analysis.get("keywords", [...fallback...])`.
-
-This is a modification to `content_editor.py`'s analysis prompt (or a separate
-`_extract_keywords()` call), not a new module. Keywords are a field on the analysis
-dict, not a pipeline step of their own.
-
-### Integration points in `pipeline/steps/distribute.py`
-
-Add Step 8.6 after the blog post block:
+**When to use:** Step 3, before GPT-4o clip selection. Falls back to empty dict (no behavioral change) if `engagement_history.json` does not exist yet.
 
 ```python
-# Step 8.6: Generate episode webpage
-print("STEP 8.6: GENERATING EPISODE WEBPAGE")
-print("-" * 60)
-webpage_path = None
-webpage_generator = components.get("webpage_generator")
-if webpage_generator and webpage_generator.enabled:
-    if state and state.is_step_completed("episode_webpage"):
-        outputs = state.get_step_outputs("episode_webpage")
-        webpage_path = outputs.get("webpage_path")
-        logger.info("[RESUME] Skipping episode webpage (already completed)")
-    else:
-        try:
-            webpage_path = webpage_generator.generate_webpage(
-                episode_number=episode_number,
-                analysis=analysis,
-                transcript_data=transcript_data,
-                output_dir=episode_output_dir,
-            )
-            if webpage_path and not ctx.test_mode:
-                webpage_url = webpage_generator.deploy_to_github_pages(
-                    html_path=webpage_path,
-                    episode_number=episode_number,
-                )
-                if webpage_url:
-                    logger.info("Episode webpage published: %s", webpage_url)
-            if state and webpage_path:
-                state.complete_step("episode_webpage", {"webpage_path": str(webpage_path)})
-        except Exception as e:
-            logger.warning("Episode webpage generation failed: %s", e)
-else:
-    logger.info("Episode webpage generation disabled or not configured")
-print()
+# engagement_scorer.py — what get_engagement_profile() returns
+{
+  "high_performing_categories": ["shocking_news", "absurd_hypothetical"],
+  "high_performing_keywords": ["cheese", "airplane", "diarrhea"],
+  "avg_score_by_category": {"shocking_news": 7.2, "dating_social": 4.1},
+  "episodes_analyzed": 8,
+  "confidence": "medium"   # "low" if < 3 episodes; "none" if no data
+}
 ```
 
-### Changes to `pipeline/context.py`
+**Trade-offs:** Augments existing `audio_energy_score` + AI scoring without replacing either. No new API calls.
 
-Add optional field:
+### Pattern 3: Smart Schedule as an Optional Extension to `UploadScheduler`
+
+**What:** Add `get_optimal_publish_at(platform, optimizer)` method to `UploadScheduler`. `create_schedule()` gains an optional `optimizer=None` parameter. When optimizer is present and has enough data, it returns an optimal datetime; otherwise the existing fixed-offset logic runs unchanged.
+
+**When to use:** Called from `_upload_to_social_media()` in `distribute.py`.
+
+**Trade-offs:** Fully backward compatible — `create_schedule()` without optimizer arg behaves exactly as v1.1. `run_upload_scheduled()` and `run_distribute_only()` need no changes.
 
 ```python
-webpage_path: Optional[str] = None
+# scheduler.py addition
+def get_optimal_publish_at(self, platform: str, optimizer) -> Optional[str]:
+    """Return optimal datetime ISO string if optimizer has sufficient data."""
+    if optimizer is None:
+        return None
+    optimal_dt = optimizer.suggest_time(platform)
+    if optimal_dt:
+        return optimal_dt.isoformat()
+    # Fall back to existing fixed-delay logic
+    if platform == "youtube" and self.youtube_delay > 0:
+        return (datetime.now() + timedelta(hours=self.youtube_delay)).isoformat()
+    return None
 ```
 
-This is optional — the pipeline completes successfully whether or not the webpage
-is generated/deployed.
+### Pattern 4: Confidence-Gated Optimization
 
-### Changes to `pipeline/runner.py`
+**What:** `PostingTimeOptimizer.suggest_time(platform)` returns `None` unless at least `ENGAGEMENT_HISTORY_MIN_EPISODES` (default: 5) valid data points exist for that platform. Below the threshold, the optimizer steps aside and fixed offsets apply.
 
-Add to `_init_components()`:
+**Why:** With fewer than 5 episodes, the "best hour" computed from 2 data points is noise, not signal. Reporting false confidence leads to suboptimal schedules.
 
+**Threshold exposed in `config.py`:**
 ```python
-from webpage_generator import EpisodeWebpageGenerator
-...
-"webpage_generator": EpisodeWebpageGenerator(),
-```
-
-Add a checkpoint key `"episode_webpage"` to the existing 9-key checkpoint set.
-
----
-
-## Component Boundaries (updated for v1.1)
-
-| Component | Responsibility | New in v1.1 |
-|-----------|---------------|-------------|
-| `subtitle_clip_generator.py` | Convert WAV + SRT to MP4 with large burned-in captions (Step 5.5) | Yes |
-| `webpage_generator.py` | Render episode HTML + deploy to GitHub Pages (Step 8.6) | Yes |
-| `pipeline/steps/video.py` | Modified: add subtitle clip branch in Step 5.5 | Modified |
-| `pipeline/steps/distribute.py` | Modified: add Step 8.6 webpage generation | Modified |
-| `pipeline/runner.py` | Modified: register two new components in `_init_components()` | Modified |
-| `pipeline/context.py` | Modified: add `webpage_path` field | Modified |
-| `content_editor.py` | Modified: add keyword extraction to analysis output | Modified |
-
----
-
-## Data Flow for New Features
-
-```
-Step 5.4: SubtitleGenerator
-  reads:  ctx.transcript_data, ctx.clip_paths
-  writes: ctx.srt_paths (existing, unchanged)
-
-Step 5.5: SubtitleClipGenerator (new path)
-  reads:  ctx.clip_paths, ctx.srt_paths
-  writes: ctx.video_clip_paths (same field, new generator)
-
-Step 3:  ContentEditor (modified)
-  writes: ctx.analysis["keywords"] (new field in analysis dict)
-
-Step 8.6: EpisodeWebpageGenerator (new)
-  reads:  ctx.analysis, ctx.transcript_data, ctx.episode_number,
-          ctx.episode_output_dir
-  writes: ctx.webpage_path
-  side effect: HTTP PUT to GitHub API → public URL
+ENGAGEMENT_HISTORY_MIN_EPISODES = int(os.getenv("ENGAGEMENT_HISTORY_MIN_EPISODES", "5"))
 ```
 
 ---
 
-## Checkpoint Keys (updated)
+## Data Flow
 
-Existing 9 keys remain unchanged. One new key added:
-
-| Key | Step | New |
-|-----|------|-----|
-| `transcribe` | 2 | no |
-| `analyze` | 3 | no |
-| `censor` | 4 | no |
-| `normalize` | 4.5 | no |
-| `create_clips` | 5 | no |
-| `subtitles` | 5.4 | no |
-| `convert_videos` | 5.5 | no |
-| `convert_mp3` | 6 | no |
-| `blog_post` | 8.5 | no |
-| `episode_webpage` | 8.6 | yes |
-
-The `convert_videos` key already covers the subtitle clip output since both paths
-write to `video_clip_paths`. No separate key needed for the subtitle clip approach.
-
----
-
-## Build Order (Dependencies)
+### Engagement Feedback Loop (Cross-Episode, Asynchronous)
 
 ```
-1. subtitle_clip_generator.py  (new module, no dependencies on new code)
-   - Standalone, uses only FFmpeg and existing SRT files
-   - Can be built and tested in isolation before pipeline wiring
-
-2. Modify pipeline/steps/video.py  (add new branch in Step 5.5)
-   - Requires subtitle_clip_generator.py to be importable
-   - Requires adding component registration in runner.py
-
-3. content_editor.py keyword extraction  (modify existing module)
-   - Small prompt change + new "keywords" key in analysis dict
-   - Must be done before webpage_generator to have SEO data available
-   - Does not depend on subtitle clips
-
-4. webpage_generator.py  (new module, depends on analysis having keywords)
-   - HTML rendering has no external dependencies
-   - GitHub API deployment requires GITHUB_TOKEN env var (optional for local testing)
-
-5. Modify pipeline/steps/distribute.py  (add Step 8.6)
-   - Requires webpage_generator.py to be importable
-
-6. Modify pipeline/runner.py  (register both new components)
-   - Do last: both new modules must be importable first
-   - Single commit covers all _init_components() additions
-
-7. Modify pipeline/context.py  (add webpage_path field)
-   - Trivial, do alongside runner.py changes
+Episode N uploaded
+    |
+    | (~48h later)
+    v
+python main.py analytics epN
+    |
+    +-- AnalyticsCollector.collect_analytics(N)
+    |       reads: YouTube API, Twitter API
+    |       saves: topic_data/analytics/ep_N_analytics.json (existing)
+    |
+    +-- EngagementScorer.record_outcome(N)
+            reads: upload_schedule.json → posted_at timestamps
+            reads: ep_N_analytics.json → engagement scores
+            writes: topic_data/engagement_history.json (append)
 ```
 
-**Items 1-2 are independent of items 3-5.** Subtitle clips and webpages can be
-built and merged separately.
+### Episode Processing Data Flow (v1.2 additions in brackets)
+
+```
+run_ingest()
+    |
+_run_transcribe()
+    |
+run_analysis()
+    |-- _load_scored_topics()                       [existing]
+    |-- [EngagementScorer.get_engagement_profile()] [NEW]
+    |       reads: engagement_history.json
+    |       returns: dict or None
+    |--> ctx.engagement_profile = profile           [NEW field]
+    |--> ContentEditor.analyze(transcript, topic_context, engagement_profile)
+    |--> ctx.analysis (best_clips, topics, etc.)
+    |
+run_video()
+    |
+run_distribute()
+    |-- [PostingTimeOptimizer.suggest_time(platform)] [NEW]
+    |       reads: engagement_history.json
+    |       returns: datetime or None
+    |--> scheduler.get_optimal_publish_at(platform, optimizer)
+    |--> scheduler.create_schedule(...) with smart timestamps
+    |--> upload_schedule.json (with optimal or fallback times)
+    |--> platform uploads
+```
+
+### Key Data Flows
+
+1. **Clip selection bias:** `engagement_history.json` → `EngagementScorer.get_engagement_profile()` → `ctx.engagement_profile` → injected into `content_editor.py` GPT-4o prompt → influences `best_clips` ranking toward historically high-performing categories.
+
+2. **Smart posting time:** `engagement_history.json` → `PostingTimeOptimizer.suggest_time(platform)` → `scheduler.get_optimal_publish_at()` → replaces `now + delay_hours` in platform schedule entries → `upload_schedule.json`.
+
+3. **Analytics feedback collection:** `run_analytics()` call → `AnalyticsCollector` fetches metrics → `EngagementScorer.record_outcome()` reads `upload_schedule.json` for `posted_at` → appends to `engagement_history.json`.
 
 ---
 
-## Anti-Patterns to Avoid
+## Integration Points
 
-### Don't create a "Step 5.5b" checkpoint key for subtitle clips
+### New Modules
 
-The `convert_videos` checkpoint key covers whichever Step 5.5 code path runs. Both
-the audiogram and subtitle clip generators write to `ctx.video_clip_paths`. Using
-the same checkpoint key means resume works regardless of which mode was active.
-Adding a separate key would break resume for episodes processed before the feature
-was added.
+| Module | Integrates With | Direction |
+|--------|-----------------|-----------|
+| `posting_time_optimizer.py` | `scheduler.py` via `get_optimal_publish_at()` | optimizer → scheduler |
+| `posting_time_optimizer.py` | `topic_data/engagement_history.json` | optimizer reads file |
+| `engagement_scorer.py` | `topic_data/analytics/ep_N_analytics.json` | scorer reads files |
+| `engagement_scorer.py` | `topic_data/engagement_history.json` | scorer writes file |
+| `engagement_scorer.py` | `pipeline/steps/analysis.py` | scorer returns profile dict |
 
-### Don't generate the webpage in the video step
+### Modified Existing Modules
 
-The webpage has no video dependency. Putting it in `video.py` couples two
-unrelated concerns and makes the webpage unavailable on `run_distribute_only()`
-re-runs. It belongs in `distribute.py` for the same reason `blog_generator` lives
-there.
+| Module | Change | Risk |
+|--------|--------|------|
+| `analytics.py` | `run_analytics()` calls `EngagementScorer.record_outcome()` after collecting; no change to `AnalyticsCollector` class interface | LOW — additive only |
+| `scheduler.py` | Add `get_optimal_publish_at(platform, optimizer)` method; `create_schedule()` gains optional `optimizer=None` param | LOW — backward compatible; existing callers unaffected |
+| `pipeline/context.py` | Add `engagement_profile: Optional[dict] = None` field | MINIMAL — dataclass field with default, no callers break |
+| `pipeline/steps/analysis.py` | Initialize `EngagementScorer`, call `get_engagement_profile()`, assign to `ctx.engagement_profile`; pass to `ContentEditor.analyze()` | LOW — mirrors existing `topic_context` injection |
+| `pipeline/steps/distribute.py` | In `_upload_to_social_media()`, pass optimizer from components to `scheduler.create_schedule()` | LOW — optional param, existing behavior preserved when optimizer absent |
+| `pipeline/runner.py` | Initialize `EngagementScorer` and `PostingTimeOptimizer` in `_init_components()` (both full and dry-run branches); add to components dict | LOW — standard pattern, matches every other component |
+| `config.py` | Add `SMART_SCHEDULING_ENABLED` and `ENGAGEMENT_HISTORY_MIN_EPISODES` env vars | MINIMAL |
 
-### Don't attempt git push for GitHub Pages deployment
+### Internal Boundaries
 
-Using `subprocess.run(["git", "push", ...])` for deployment requires git credentials,
-SSH keys, or a PAT stored in `.netrc` — all fragile on Windows. The GitHub Contents
-API (`requests.put`) achieves the same result with only an HTTP call and a token.
-
-### Don't add SRT-to-ASS conversion in `subtitle_generator.py`
-
-`SubtitleGenerator` produces `.srt` files for compatibility with multiple consumers
-(the old audiogram, future editors, caption export). ASS conversion for the burned-in
-effect belongs in `SubtitleClipGenerator`, which is the only consumer that needs it.
-Keep the boundary: subtitle format production is separate from subtitle rendering.
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| `EngagementScorer` ↔ `analysis step` | `get_engagement_profile()` returns dict or None | None = no history yet; callers treat None as "no signal" |
+| `PostingTimeOptimizer` ↔ `scheduler` | `suggest_time(platform)` returns datetime or None | None = insufficient data; scheduler uses fixed offset |
+| Both new modules ↔ `engagement_history.json` | JSON file read/write; atomic `.tmp` rename on write | Matches scheduler.py's existing safe-write pattern |
+| `EngagementScorer.record_outcome()` ↔ `upload_schedule.json` | Reads episode's schedule file to extract `posted_at` timestamps | File may not exist (episode had no schedule); graceful skip |
+| New components ↔ `pipeline/runner.py` | Components dict key: `"engagement_scorer"`, `"posting_time_optimizer"` | Same pattern as all 15+ existing components |
 
 ---
 
-## Confidence Assessment
+## Build Order (Dependency-Driven)
 
-| Claim | Confidence | Basis |
-|-------|------------|-------|
-| FFmpeg `subtitles=` filter with `force_style` works for large bold captions | HIGH | Verified FFmpeg docs; current audiogram already uses this filter at smaller size |
-| GitHub Contents API supports create/update file via PUT | HIGH | Official GitHub REST API docs — no verification gap |
-| Step 5.5 branch insertion is safe (no checkpoint key change needed) | HIGH | Derived directly from existing checkpoint logic in video.py |
-| SRT → ASS conversion needed for per-word karaoke highlighting | MEDIUM | FFmpeg ASS/SRT behavior; `force_style` alone cannot do per-word timing without ASS |
-| `requests` library sufficient for GitHub API calls | HIGH | Already a transitive dependency; no new packages required |
+```
+Phase A (foundation — no dependencies on other new code):
+  1. engagement_history.json schema definition (documented, no code yet)
+  2. engagement_scorer.py
+     - get_engagement_profile() reads history, returns dict or None
+     - record_outcome() reads analytics files + schedule, appends to history
+     - Standalone, fully testable without pipeline integration
+  3. tests/test_engagement_scorer.py
+
+Phase B (optimizer — depends on history schema from Phase A):
+  4. posting_time_optimizer.py
+     - suggest_time(platform) reads history, returns datetime or None
+     - Confidence gate: returns None if < MIN_EPISODES data points
+     - Standalone, testable with mock history files
+  5. tests/test_posting_time_optimizer.py
+
+Phase C (scheduler extension — depends on optimizer from Phase B):
+  6. scheduler.py — add get_optimal_publish_at(platform, optimizer)
+     - Tested via existing test_scheduler.py + new optimizer-passing test cases
+
+Phase D (pipeline wiring — depends on Phases A, B, C):
+  7. pipeline/context.py — add engagement_profile field
+  8. pipeline/steps/analysis.py — inject engagement_profile from scorer
+  9. pipeline/steps/distribute.py — pass optimizer to scheduler
+  10. pipeline/runner.py — initialize both new components in _init_components()
+  11. config.py — add env vars
+  12. analytics.py — call record_outcome() from run_analytics()
+```
+
+Phases A and B are independent of each other's code (both depend only on the schema). They can be developed in parallel.
+
+---
+
+## Scaling Considerations
+
+| Scale | Architecture Adjustments |
+|-------|--------------------------|
+| 10-50 episodes | JSON file adequate; simple moving average for time optimization |
+| 50-200 episodes | Cap history at last 104 episodes (2 years) — trivial JSON trim in `record_outcome()` |
+| 200+ episodes | Migrate `engagement_history.json` to SQLite; `search_index.py` already uses SQLite (FTS5), same dependency |
+
+### Scaling Priorities
+
+1. **First bottleneck:** `engagement_history.json` grows unbounded. Fix: `record_outcome()` trims to last N=104 entries on every write. One-line list slice.
+2. **Second bottleneck:** YouTube Data API quota for analytics. Fix: cache raw API responses in `ep_N_analytics.json` (already done). Only re-fetch if `collected_at` is >24h old.
+
+---
+
+## Anti-Patterns
+
+### Anti-Pattern 1: Blocking the Pipeline on Analytics Availability
+
+**What people do:** Make clip selection or schedule creation raise an error if `engagement_history.json` is missing.
+**Why it's wrong:** New installs have zero history. `python main.py ep30` must work from day one.
+**Do this instead:** Every new function returns `None` or `{}` when data is absent. Callers treat `None` as "no signal, use defaults." This is already the pattern in `TopicEngagementScorer.get_engagement_bonus()` — returns `None` if no analytics file exists.
+
+### Anti-Pattern 2: Writing Engagement History During the Main Pipeline Run
+
+**What people do:** Call `EngagementScorer.record_outcome()` at the end of `run_distribute()` (Step 9).
+**Why it's wrong:** At upload time, engagement metrics do not exist — the episode was just published. The outcome (views, likes, engagement score) is only knowable 24-48h later.
+**Do this instead:** `record_outcome()` runs only from `run_analytics()`, which is a separate CLI command invoked manually after the episode has been live for a day.
+
+### Anti-Pattern 3: Replacing `scheduler.py` Rather Than Extending It
+
+**What people do:** Rewrite `create_schedule()` to require an optimizer, changing its mandatory signature.
+**Why it's wrong:** `run_upload_scheduled()` and `run_distribute_only()` call `create_schedule()` without any optimizer context. Breaking the signature breaks resume-only distribution runs.
+**Do this instead:** `create_schedule()` gains `optimizer=None` as an optional parameter. When `None`, existing behavior is byte-for-byte identical. The new `get_optimal_publish_at()` is a separate method that callers opt into.
+
+### Anti-Pattern 4: False Confidence from Small Samples
+
+**What people do:** Compute "best posting hour" from 2 episodes and report it as an actionable recommendation.
+**Why it's wrong:** With N<5, the computed optimum is indistinguishable from chance. The optimizer will confidently schedule at a suboptimal time.
+**Do this instead:** `suggest_time()` returns `None` unless `ENGAGEMENT_HISTORY_MIN_EPISODES` (default 5) valid data points exist for that platform. Log a clear message: "Insufficient history for platform X (N episodes) — using fixed offset."
+
+### Anti-Pattern 5: One Monolithic "EngagementOptimizer" Class
+
+**What people do:** Merge posting time and content prediction into one class.
+**Why it's wrong:** The two concerns have different call sites (distribute step vs analysis step), different data consumers (scheduler vs content_editor), and different test surfaces.
+**Do this instead:** Keep them as `posting_time_optimizer.py` and `engagement_scorer.py`. Both read the same `engagement_history.json` but are independently testable and replaceable.
 
 ---
 
 ## Sources
 
-- FFmpeg subtitles filter documentation: https://ffmpeg.org/ffmpeg-filters.html#subtitles — HIGH confidence
-- GitHub REST API — Create or update file contents: https://docs.github.com/en/rest/repos/contents#create-or-update-file-contents — HIGH confidence
-- Existing pipeline code (`pipeline/steps/video.py`, `pipeline/runner.py`, `pipeline/context.py`) — direct inspection
+- Direct code inspection: `analytics.py`, `scheduler.py`, `pipeline/runner.py`, `pipeline/steps/distribute.py`, `pipeline/steps/analysis.py`, `pipeline/context.py`, `audio_clip_scorer.py`, `topic_scorer.py`
+- Existing data storage patterns: `topic_data/analytics/ep_N_analytics.json`, `output/ep_N/upload_schedule.json`
+- Existing atomic write pattern: `scheduler.py:UploadScheduler.save_schedule()` (`.tmp` rename)
+- Existing component injection pattern: `pipeline/runner.py:_init_components()` returning components dict
+- Existing graceful degradation pattern: `TopicEngagementScorer.get_engagement_bonus()` returning `None` when no analytics exist
+- Existing optional-param pattern: `UploadScheduler.create_schedule()` optional `video_clip_paths`, `full_episode_video_path` params
 
 ---
 
-*Architecture research: 2026-03-18 — v1.1 feature integration*
+*Architecture research for: v1.2 Engagement & Smart Scheduling — Fake Problems Podcast Automation*
+*Researched: 2026-03-18*

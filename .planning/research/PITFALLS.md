@@ -1,323 +1,338 @@
-# Domain Pitfalls
+# Pitfalls Research
 
-**Domain:** Podcast automation pipeline — burned-in subtitle clips and static episode webpages
+**Domain:** Podcast automation pipeline — engagement optimization and smart scheduling
 **Researched:** 2026-03-18
-**Project:** Fake Problems Podcast — v1.1 Discoverability & Short-Form
+**Confidence:** MEDIUM-HIGH
+**Milestone:** v1.2 Engagement & Smart Scheduling
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, broken output, or pipeline failures.
+Mistakes that cause rewrites, gaming violations, or feedback loops that actively harm the show.
 
 ---
 
-### Pitfall 1: Windows Drive Letter Colon Breaks FFmpeg Subtitle Filter
+### Pitfall 1: Cold Start Makes Optimization Meaningless Until You Have Enough Data
 
-**What goes wrong:** The FFmpeg `subtitles` and `ass` filters use `:` as an option separator inside the filter graph. Windows absolute paths (`C:\path\to\file.ass`) contain a drive letter colon that FFmpeg misparses as a filter option boundary. This produces `Invalid option "\\path\\to\\file.ass"` or silently falls back to no subtitles at all.
+**What goes wrong:**
+Optimization algorithms trained on fewer than ~20-30 episodes of per-platform analytics data produce recommendations that reflect noise, not signal. The engagement score formula in `analytics.py` (weighted YouTube views/likes/comments + Twitter impressions/engagements) will confidently output numbers regardless of sample size. Routing posting decisions through these scores before sufficient history exists means the system is effectively randomizing with extra steps while appearing data-driven.
 
-**Why it happens:** FFmpeg's filter graph parser strips quoting before the subtitle filter receives the path. On Linux/macOS there are no colons in paths so this never surfaces. On Windows every absolute path hits it. The escaping rule requires `\:` for colons and `\\` for backslashes inside a filter string — producing double-escaping when called from Python `subprocess` (Python string escaping + FFmpeg filter escaping).
+**Why it happens:**
+Engineers wire up the feedback loop immediately because it is technically possible. The formula produces a number for every episode, so there is no failure signal — it just silently optimizes against noise. Weekly episodes with ~29 historical data points at the start of v1.2 development means the dataset is already at or near the minimum viable size, but confidence intervals are still wide for platform-specific timing decisions.
 
 **Consequences:**
-- `subtitles=C:\output\ep29\clip1.ass` fails silently or crashes the FFmpeg process
-- The clip is produced without any subtitles and the error is buried in stderr
-- Different escaping rules apply depending on whether you use `subprocess.run(list_args)` vs `subprocess.run(shell=True)` — the two forms need different escaping, causing intermittent failures when the call style changes
+- Posting time recommendations derived from 5-8 data points per platform have wide confidence intervals that make them interchangeable with any other time
+- "Shock value" and "absurdity" scoring (from `topic_scorer.py`) that gets tuned against early engagement data will overfit to whatever topics happened to land in episode 1-15, not to enduring show characteristics
+- Feedback loop amplifies whatever performed well early, narrowing topic variety over time
 
-**Prevention:**
-- Convert the subtitle file path to use forward slashes and escape the colon: `C:/output/ep29/clip1.ass` → `C\:/output/ep29/clip1.ass` inside the filter string
-- Use `subprocess.run(list_args)` (not `shell=True`) so Python does not add a second layer of shell escaping
-- Concrete pattern: `f"subtitles='{path.replace(chr(92), '/').replace(':', '\\:')}'"`
-- Write a dedicated helper `_escape_ffmpeg_filter_path(path: str) -> str` so the logic is tested in isolation
-- Add a test that calls the helper with `C:\Users\evanp\projects\output\clip.ass` and asserts the correct escaped form
+**How to avoid:**
+- Implement a minimum sample threshold (recommend: 15+ episodes with non-null analytics for a given platform) before trusting any optimization recommendation; below this threshold, fall back to static schedule defaults
+- Separate "data collection" mode (run analytics, store data, make no automated changes) from "optimization" mode (actually shift schedules based on data)
+- Display confidence intervals alongside recommendations: "Tuesday 7pm shows 12% lift over baseline — based on 8 data points (low confidence)"
+- Use a holdout: one episode per quarter posted at a random time to prevent the system from losing its reference point
 
-**Detection:** Run a dry-run subtitle burn against a known input and check that the output video contains visible text. If FFmpeg exits 0 but the output has no subtitles, the path escaping failed silently.
+**Warning signs:**
+- Optimization recommendations change drastically week to week (suggests insufficient data, not a real trend)
+- All platform recommendations converge on the same day/time window (possible artifact of correlated early data, not a genuine finding)
+- Topic recommendations start excluding entire categories that performed poorly in episodes 1-5
 
-**Phase relevance:** Phase 1 (subtitle burn-in implementation). Must be resolved before any subtitle rendering ships.
+**Phase to address:** Phase 1 (data collection infrastructure), before any scheduling automation is enabled.
 
 ---
 
-### Pitfall 2: WhisperX Word Timestamps Have Gaps and Overlaps That Break Word-by-Word Highlighting
+### Pitfall 2: Overfitting the Engagement Score to YouTube at the Expense of Comedy Voice
 
-**What goes wrong:** WhisperX produces word-level timestamps via forced alignment (wav2vec2). The resulting data has two failure modes that break karaoke-style "one word highlighted at a time" rendering:
+**What goes wrong:**
+The current engagement formula weights YouTube at 70% (7/10 points) and Twitter at 30% (3/10 points). If topic selection and clip strategy are optimized against this score, the show will gradually drift toward whatever YouTube's algorithm rewards for long-form podcast content — which for a comedy podcast is almost certainly not the edgy/dark humor content that defines the show's identity.
 
-1. **Gaps:** Consecutive words have `word[n].end < word[n+1].start` — sometimes by 200-500ms. During the gap, no word is highlighted, producing a visible flash-off that looks like a glitch.
-2. **Overlaps:** `word[n].end > word[n+1].start` — the ASS file assigns conflicting highlight state to two words simultaneously, breaking the karaoke effect.
+YouTube rewards watch time and session extension, which favors moderate, broadly accessible content with no controversial elements. The compliance checker in v1.1 already flags borderline content. An engagement-optimized feedback loop compounds this by deprioritizing the high-shock-value, dark-humor topics that generate the most shares and loyal listeners — even if those topics get slightly fewer YouTube views.
 
-Special tokens cause a third problem: numbers, contractions with apostrophes (`don't`), and punctuation-attached words (`Hello,`) cannot be aligned by the forced aligner and are returned without timestamps. These words get silently dropped from the word-level output, causing the on-screen text to skip words versus what is heard.
-
-**Why it happens:** WhisperX's wav2vec2 alignment model only has a dictionary of clean phonetic tokens. Characters outside the dictionary (digits, punctuation, apostrophes) cause alignment to fail for that word, and the model skips it. Gaps and overlaps are artifacts of the segment-to-word alignment interpolation — they are partially addressed by WhisperX PRs #816 and #999, but not fully resolved as of early 2026.
+**Why it happens:**
+View counts are easy to measure. Audience loyalty, cult following, and word-of-mouth from "I can't believe they said that" moments are not measured by any API. The optimization system will maximize what it can see, which does not include the show's actual growth driver.
 
 **Consequences:**
-- Burned subtitle clips have visible flicker between words
-- Words like numbers (`2014`) or contractions disappear from the highlighted display
-- Captions no longer match audio at key moments, which looks unprofessional and undermines the "Hormozi-style" impact intended
+- Topic scorer's `shock_value` and `absurdity` dimensions get systematically downweighted as the engagement bonus reinforces safe topics
+- Clip selection shifts toward informational moments rather than comedy peaks
+- The show sounds like a generic podcast within 6-12 months; existing audience stops recommending it to friends
+- The ep29 YouTube strike risk (cancer misinformation) creates pressure to avoid anything that could be flagged, which the engagement optimizer will internalize as a signal to avoid controversy entirely
 
-**Prevention:**
-- Post-process word timestamps before generating the ASS file:
-  - Close gaps: if `gap < 150ms`, extend `word[n].end` to `word[n+1].start`
-  - Merge overlaps: if `word[n].end > word[n+1].start`, set `word[n].end = word[n+1].start - 1ms`
-  - Distribute time to unaligned words: if a word has no timestamp, interpolate from neighboring words proportionally to character count
-- Write and test this normalization in a dedicated `normalize_word_timestamps(words: list) -> list` function with edge case coverage (all words missing timestamps, back-to-back unaligned words, last word missing end time)
-- Use existing WhisperX output from the transcription step — do not re-run alignment just for subtitles
+**How to avoid:**
+- Treat show voice as a constraint, not a variable. The engagement optimizer should only choose between options that already pass the show's comedy voice criteria — not reweight the criteria themselves
+- Add a "comedy signal" metric that captures comments/shares rather than views (comments on comedy content skew toward reactions to edgy moments, not general engagement)
+- Regularly review what the optimizer is recommending against what the hosts would actually choose — if they diverge consistently, the model is wrong
+- Never automate topic selection; use scores as a ranking hint for hosts to choose from, not as a replacement for host judgment
 
-**Detection:** After generating the ASS file, parse it and assert: no two `\k` (karaoke) entries overlap, no gap between consecutive entries exceeds 250ms, word count in ASS matches word count in source SRT (within 5% to account for legitimate segment splits).
+**Warning signs:**
+- Recommended topics become progressively less edgy over time without explicit host feedback
+- Clip selection favors factual discussion segments over joke exchanges
+- The compliance checker flags an increasing percentage of high-scoring topics (the scorer is recommending content that the safety gate rejects — a sign the two systems are not aligned)
 
-**Phase relevance:** Phase 1 (subtitle burn-in). The timestamp normalization step is a prerequisite for every other subtitle rendering concern.
+**Phase to address:** Phase 2 (engagement scoring model design). Bake comedy constraints into the scoring model before wiring the feedback loop.
 
 ---
 
-### Pitfall 3: libass on Windows Cannot Find Fonts — Silently Falls Back to DejaVu Sans
+### Pitfall 3: Scheduler Optimization Without Accounting for Platform Algorithm Decay
 
-**What goes wrong:** The FFmpeg `subtitles` filter on Windows uses libass for rendering. libass resolves fonts via fontconfig. The Windows FFmpeg build (e.g., from gyan.dev or BtbN) ships with a bundled fontconfig that points to a font cache generated at first use. If the font name specified in the ASS `[Script Info]` or `Style` section does not exist in the system font registry, libass silently substitutes DejaVu Sans — a small, thin font that is unreadable in short-form video.
+**What goes wrong:**
+Scheduling logic in `scheduler.py` currently adds static hour delays from config. Smart scheduling would shift these based on historical engagement data. However, social media algorithms front-load distribution — most of a post's total reach is delivered in the first 1-6 hours after publication. If the scheduler chooses a time when the hosting account has below-average engagement velocity (e.g., a slow Tuesday afternoon), the platform's algorithm interprets weak early signals as a quality signal and throttles reach for the remaining 48 hours.
 
-**Why it happens:** On Windows, libass does not scan `C:\Windows\Fonts` the same way as Linux. The fontconfig cache must be pre-built or the font must be explicitly specified via `fontsdir`. Community reports confirm that even with `fontsdir` set, libass can still prefer its system fontconfig over the provided directory depending on FFmpeg build version.
+**Why it happens:**
+Developers optimize for "when the audience is online" without accounting for the platform's cold-start detection window. The two are correlated but not identical: the best time to post is when enough active users will engage quickly, not just when the most users are present.
 
 **Consequences:**
-- "Hormozi-style" big bold captions use a thin, unreadable font instead of the intended typeface
-- No error or warning is emitted — FFmpeg exits 0, the video plays, but the typography is wrong
-- Different machines produce different font output depending on what fonts happen to be installed
+- Posting at the "optimal" time derived from historical data produces lower engagement than the historical baseline because the historical data reflects total reach, not early-window engagement velocity
+- YouTube Shorts and TikTok are particularly sensitive to first-hour metrics for algorithmic amplification decisions
+- Twitter/X's timeline algorithm similarly front-loads distribution; a post that doesn't hit 10+ engagements in 30 minutes gets deprioritized from non-follower feeds
 
-**Prevention:**
-- Use `fontsdir` to point to a `assets/fonts/` directory in the project and embed the font file there
-- Confirm the substitution is not happening by checking FFmpeg stderr for the string `substituting font` — libass logs this at warning level
-- Use Impact, Arial Black, or a bundled open-license alternative (e.g., Anton from Google Fonts) as the target font — these are common on Windows and are the standard for short-form caption videos
-- If using a custom font: pass `-vf "subtitles=file.ass:fontsdir=assets/fonts"` and verify in a test that the correct font is rendered by spot-checking a frame with `ffmpeg -ss 1 -i output.mp4 -frames:v 1 test_frame.png`
+**How to avoid:**
+- Distinguish between "follower online time" data (from platform analytics) and "optimal post time" (which requires knowing the platform's cold-start window length)
+- For YouTube Shorts, prefer morning posts (6-9am in target timezone) where platform activity is ramping up; avoid late night even if followers are online then (algorithm won't amplify to non-followers at low-activity hours)
+- For Twitter, the 15-minute engagement burst matters more than overall daily peak; recommend times adjacent to lunch breaks and commute windows when rapid engagement is likely
+- Build in a manual review step before changing post times automatically — this is high-leverage and hard to reverse
 
-**Detection:** After rendering, extract a single frame and visually confirm font weight. Add this as a `--test` mode artifact that is saved for inspection.
+**Warning signs:**
+- Platform analytics show normal follower reach but below-normal non-follower reach (suggests the algorithm front-loaded but didn't amplify)
+- Post-by-post engagement variance increases after enabling smart scheduling (high variance = the optimizer is not actually finding a stable optimum)
 
-**Phase relevance:** Phase 1 (subtitle burn-in). Font rendering is a visual quality gate — must be verified before the pipeline generates real episode clips.
-
----
-
-### Pitfall 4: ASS Override Tags in Subtitle Text Are Destroyed by Naive Escaping
-
-**What goes wrong:** ASS subtitle files use `{...}` for inline override tags (e.g., `{\c&H00FF00&}` to change word color mid-line for karaoke highlighting). If the text of a subtitle event contains `{` or `}` in the transcript (e.g., someone says "curly brace" or the transcript contains a JSON-like fragment), naive string substitution will either:
-- Corrupt the ASS override tags by over-escaping them
-- Allow transcript text curly braces to be interpreted as ASS override tags, producing invisible or garbled subtitles
-
-A second failure mode: apostrophes in transcript text (`don't`, `I'm`) require no escaping in ASS but DO require escaping in FFmpeg `drawtext` filters. If both approaches are used (ASS file for styling + drawtext for word position), the two escaping regimes conflict.
-
-**Why it happens:** ASS format has its own escaping rules that differ from both Python string escaping and FFmpeg filter escaping. Mixing approaches (partially rendering in ASS, partially via drawtext) creates a three-layer escaping problem with no clear reference implementation.
-
-**Prevention:**
-- Commit to one rendering path: generate a full ASS file with embedded karaoke tags, pass it to `subtitles=` filter. Do not mix ASS and `drawtext` for the same clip.
-- When writing ASS events, sanitize transcript text: replace literal `{` with `\{` and `}` with `\}` before inserting into the ASS event line
-- Use `pysubs2` (Python library) for ASS generation — it handles encoding and escape rules correctly and is tested against real-world subtitle files
-- Never construct ASS files via raw f-string concatenation
-
-**Detection:** Generate an ASS file from a clip that contains an apostrophe, a number, and a word in all-caps. Verify the file loads in a subtitle viewer (VLC or Aegisub) without errors before running it through FFmpeg.
-
-**Phase relevance:** Phase 1 (subtitle burn-in). This is an implementation correctness issue that affects every clip.
+**Phase to address:** Phase 3 (smart scheduling). Research each platform's amplification mechanics before implementing timing changes.
 
 ---
 
-## Moderate Pitfalls
+### Pitfall 4: YouTube Data API v3 Quota Exhaustion from Analytics Collection
 
----
+**What goes wrong:**
+`analytics.py` uses `search().list()` to find episode videos (100 quota units per call) then `videos().list()` to fetch stats (1 unit per call). The default YouTube Data API quota is 10,000 units per day per project. Running analytics collection for 29+ episodes costs 29 * 100 = 2,900 units for the search calls alone — in addition to whatever quota is used by the uploader during the same day. If video upload (1,600 units each), search queries, and analytics collection all run in the same project quota, a single day's pipeline run can exhaust quota before analytics finish.
 
-### Pitfall 5: drawtext Filter Graph Complexity Limit for Long Clips
-
-**What goes wrong:** The "Hormozi style" word-by-word approach requires one `drawtext` or karaoke segment per word. A 60-second clip from a podcast running at ~150 words per minute contains ~150 active text segments. If implemented as separate chained `drawtext` nodes in a single FFmpeg filter graph (`-vf "drawtext=...,drawtext=...,drawtext=..."`), the filter graph exceeds practical complexity limits, causing:
-- Extremely slow encoding (minutes per clip instead of seconds)
-- FFmpeg crashing with `Too many filters in the graph` or `Argument list too long` errors
-- Memory exhaustion on machines with limited RAM
-
-**Why it happens:** Each `drawtext` node is a separate filter instantiation. Chaining 150 filters is a known FFmpeg anti-pattern. The alternative is ASS with karaoke `\k` tags — a single subtitle filter handles all timing internally.
-
-**Prevention:**
-- Use ASS `\k` karaoke tags (one subtitle event per line, not per word) rather than chaining drawtext nodes
-- Each ASS event covers one on-screen "card" (3-5 words), with `\k` timing within the event coloring each word in sequence
-- This reduces filter count from ~150 to ~30 per clip, well within practical limits
-- Benchmark encoding time for a 60-second clip before committing to an approach
-
-**Detection:** If encoding a 60-second test clip takes more than 90 seconds on this machine's GPU, the filter graph is too complex. Switch to the ASS approach.
-
-**Phase relevance:** Phase 1 (subtitle burn-in). Architecture decision that affects the entire rendering approach — decide before writing the generation code.
-
----
-
-### Pitfall 6: Existing SRT Files Use Sentence-Level Timing — Not Word-Level
-
-**What goes wrong:** The existing pipeline produces SRT files at the segment level (one timestamp per sentence or phrase, not per word). These SRT files are stored as clip artifacts. If the subtitle burn-in phase reads these existing SRT files and assumes word-level timing is present, the karaoke effect cannot be produced — only the entire sentence would highlight at once, which is not the Hormozi-style effect.
-
-**Why it happens:** The transcription step stores word-level timestamps in WhisperX output, but the SRT serialization only preserves segment-level timing because standard SRT format does not support per-word timing.
+**Why it happens:**
+The analytics module was built before the uploader was operational. Now that uploads happen through the same project credentials, both compete for the same 10,000-unit daily quota. Backfilling analytics for all historical episodes (29+ calls) burns through quota immediately.
 
 **Consequences:**
-- Phase reads existing SRT, generates a flat ASS file, burns it in — result looks like traditional subtitles, not short-form captions
-- The word-level WhisperX data is available but ignored because the developer assumed SRT had sufficient granularity
+- Pipeline fails mid-episode with `quotaExceeded` error — this can break the upload step if it runs after analytics
+- Retry logic that does not check quota remaining will hammer the API until suspended
+- Quota suspension can lock out the channel for 24 hours, blocking episode publication
 
-**Prevention:**
-- The subtitle burn-in step must read from the raw WhisperX JSON output (which has word-level timestamps), not from the existing SRT files
-- If WhisperX JSON is not persisted (only SRT is saved), add a persistence step to save the word-level data at the transcription stage
-- Check what data the existing `subtitles` checkpoint key actually stores — it may only be an SRT path
+**How to avoid:**
+- Cache analytics results in `topic_data/analytics/ep_N_analytics.json` (already done) and never refetch if the file exists and is less than 7 days old
+- Store video IDs after upload (`analytics.py` gets `video_id` from search — this should instead be stored during upload in `schedule.json` and reused for analytics, avoiding the 100-unit search call entirely)
+- Separate the analytics collection into a distinct scheduled task (run once per week, not as part of the production pipeline)
+- Add quota-aware rate limiting: check current day's quota before running analytics; skip gracefully if under 2,000 units remaining
+- Consider using the YouTube Reporting API for batch analytics pulls (much more quota-efficient for aggregate data)
 
-**Detection:** Inspect an existing clip's WhisperX output format. Confirm that word-level `start`/`end`/`word` fields are present and accessible from the pipeline's checkpoint data.
+**Warning signs:**
+- `analytics.py` returns `None` for multiple episodes in a row (quota exhausted, not actually missing data)
+- Pipeline log shows 429 or `quotaExceeded` errors during the upload or analytics step
+- YouTube Studio shows the video uploaded successfully but analytics shows no data
 
-**Phase relevance:** Phase 1 (subtitle burn-in). Prerequisite investigation before any implementation starts.
-
----
-
-### Pitfall 7: Re-encoding Clips for Subtitle Burn-in Degrades Audio Quality
-
-**What goes wrong:** Burning subtitles requires re-encoding the video stream. If the clip video was encoded with AAC audio at a low bitrate (e.g., 128kbps from audiogram generation), re-encoding without `-c:a copy` will decode and re-encode the AAC audio, adding another generation of lossy compression. At 128kbps, two generations of AAC compression produce audible artifacts.
-
-**Why it happens:** FFmpeg's default behavior re-encodes all streams unless `-c:a copy` is explicitly specified. Developers adding subtitle burn-in often focus on the video stream and forget to copy the audio.
-
-**Prevention:**
-- Always use `-c:a copy` when burning subtitles into clips — the audio stream does not need to change
-- Verify: `ffprobe output_clip.mp4` should show the same audio codec, bitrate, and sample rate as the input
-- For the video stream, use `-crf 18 -preset slow` (H.264) to minimize re-encode quality loss while keeping file sizes acceptable for platform upload
-
-**Detection:** Compare `ffprobe` output between input and output clips. Flag any difference in audio codec or bitrate as a pipeline error.
-
-**Phase relevance:** Phase 1 (subtitle burn-in) and any subsequent phase that re-encodes clips.
+**Phase to address:** Phase 1 (analytics infrastructure hardening) before expanding analytics collection scope.
 
 ---
 
-### Pitfall 8: GitHub Pages Build Triggered on Every Episode Causes Soft Limits
+### Pitfall 5: Twitter/X API Rate Limits Make Real-Time Analytics Unreliable
 
-**What goes wrong:** GitHub Pages has a soft limit of 10 builds per hour and a bandwidth limit of 100 GB/month. If each episode publication triggers a Pages build (e.g., via a GitHub Actions push), and the pipeline runs multiple test episodes or regenerates all pages on data changes, the build limit is hit. Pages builds that time out (10-minute limit) or exceed quota are silently disabled — the site stops updating without a clear error.
+**What goes wrong:**
+`analytics.py` uses `tweepy.Client.search_recent_tweets()` to find episode mentions. The Twitter API v2 free tier limits this to 500,000 tweets per month total with rate limits of 1 search request per 15 minutes on the basic tier. The current implementation searches `f"Episode {episode_number} {Config.PODCAST_NAME}"` — a query that will return very few results for a small-audience comedy podcast, burning rate limit budget for near-zero data.
 
-**Why it happens:** Automated pipelines push to the repo on each episode. GitHub Actions triggers Pages rebuild on every push to the `gh-pages` branch. If the generated HTML includes audio file embeds or the repository accumulates large transcripts, build times approach the 10-minute limit.
+Additionally, the free tier only provides `public_metrics` on tweets from the last 7 days. Episodes older than 7 days return no data, so any historical analytics backfill returns null for Twitter data across most of the catalog.
 
-**Prevention:**
-- Never commit audio, video, or image files to the GitHub Pages repository — link to Dropbox or YouTube instead
-- Batch all episode page updates into a single commit and push, not one push per episode
-- Use `--dry-run` to generate HTML locally and only push when actually publishing
-- Keep episode HTML pages under 100KB each (transcripts are text — this should be easy if audio is external)
-- Set up a GitHub Actions workflow that only triggers Pages rebuild on pushes to `main` or `gh-pages`, not on every pipeline run
-
-**Detection:** Monitor the Pages build history at `github.com/[user]/[repo]/deployments`. Alert if last successful build is more than 24 hours old when new episodes are expected.
-
-**Phase relevance:** Phase 2 (static episode webpages). Deployment strategy must be decided before the page-generation code is written.
-
----
-
-### Pitfall 9: Podcast Transcript Pages Without Structured Data Get No SEO Benefit
-
-**What goes wrong:** A static HTML page containing a raw transcript will be indexed by Google, but will not receive the rich search result treatment (podcast episode cards, "listen to episode" buttons, timestamp links) without `schema.org` structured data. The page will rank as generic text content, not as a podcast episode — meaning it competes with generic content rather than appearing in podcast-specific search surfaces.
-
-**Why it happens:** Developers add transcripts for human readability and assume Google will infer the podcast context. Google requires explicit `PodcastEpisode` and `AudioObject` JSON-LD to surface podcast episodes in its podcast search and Google Podcasts aggregation.
+**Why it happens:**
+Twitter/X degraded its free API tier in 2023-2024. The existing `fetch_twitter_analytics()` code was written before these restrictions tightened. The `public_metrics` field (`impression_count`) requires at least Basic access ($100/month) — the free tier only provides `reply_count`, `retweet_count`, `like_count`, and `quote_count` without impression data.
 
 **Consequences:**
-- Pages get indexed but receive no podcast-specific treatment
-- Missing `datePublished`, `duration`, and `associatedMedia` properties mean the page does not qualify for rich results
-- Months of episodes are published before anyone checks Google Search Console and realizes the structured data is absent
+- `impressions` field always returns 0 on the free tier, making the Twitter score component of `calculate_engagement_score()` systematically undercount
+- Rate limit exhaustion from analytics polling blocks the pipeline's own Twitter posting step
+- Stale data (7-day window) means the Twitter engagement score reflects only the first week of each episode's life, not its total performance
 
-**Prevention:**
-- Embed a `<script type="application/ld+json">` block in every episode page with:
-  - `@type: PodcastEpisode`
-  - `name`, `description`, `datePublished`, `duration` (ISO 8601, e.g., `PT1H10M`)
-  - `associatedMedia` → `AudioObject` with `contentUrl` pointing to the episode MP3
-  - `partOfSeries` → `PodcastSeries` with the show name
-- Validate with Google's Rich Results Test before publishing the first page
-- The HTML template should generate this JSON-LD from the episode's existing metadata (title, description, duration, MP3 URL from Dropbox) — no manual input required
+**How to avoid:**
+- Decouple analytics collection from the production pipeline; run it as a separate weekly task
+- For Twitter metrics, substitute own-account metrics (use `tweepy.Client.get_users_tweets()` with the show's account ID and look up the episode tweet by URL match — this requires fewer rate limit calls and returns more reliable data for owned tweets)
+- Cap Twitter analytics collection to the most recent 3-5 episodes (the ones still within the 7-day recency window)
+- Remove `impression_count` from the engagement score or treat it as optional — it is not available on the free tier and returning 0 biases the formula
 
-**Detection:** After publishing the first episode page, submit it to Google Search Console and run the Rich Results Test. Fix any validation errors before generating remaining episode pages.
+**Warning signs:**
+- `fetch_twitter_analytics()` returns impressions: 0 consistently across all episodes
+- Pipeline logs show tweepy rate limit warnings during the distribution step
+- Twitter engagement score component is always the minimum (0.0) despite the show having active Twitter presence
 
-**Phase relevance:** Phase 2 (static episode webpages). Must be included in the initial page template, not added as a follow-up.
+**Phase to address:** Phase 1 (analytics infrastructure). Fix the impressions field assumption before building any scoring on top of it.
 
 ---
 
-### Pitfall 10: Transcript HTML Injection via Unsanitized Transcript Text
+### Pitfall 6: TikTok and Instagram Uploaders Are Stubs — Scheduling Them Will Silently No-Op
 
-**What goes wrong:** Episode transcripts are generated by Whisper and may contain speaker names, timestamps, and verbatim speech including profanity, slang, URLs, and HTML-like strings (e.g., if a host reads a URL aloud that contains `<`, `>`, or `&`). If the page generator inserts transcript text via f-string interpolation into HTML without escaping, these characters produce malformed HTML or — in the worst case — inject executable script content.
+**What goes wrong:**
+`scheduler.py` schedules TikTok and Instagram uploads based on configurable delays. The `uploaders/` directory contains stub implementations for both platforms. If smart scheduling is added without first verifying which uploaders are functional, the scheduler will queue posts for platforms that can never actually publish them — creating a false sense that distribution is happening.
 
-**Why it happens:** Static site generators that use Jinja2 handle this automatically via autoescaping, but a naive Python generator that writes HTML via f-strings or string concatenation does not.
+TikTok's Content Posting API in 2025 additionally requires app audit approval before any content can be posted publicly (unaudited apps post to private accounts only). Instagram's API for feed/Reels posting requires a Meta Business account linked to a Facebook Page and goes through a different OAuth flow than Stories.
+
+**Why it happens:**
+The scheduler was built for the eventual state where all uploaders exist. The stub pattern means the pipeline doesn't crash — it silently does nothing and marks the platform as "pending" forever.
 
 **Consequences:**
-- Malformed HTML causes browsers to misrender the page
-- If `<script>` text appears in the transcript (e.g., a host reading a code example), it executes in the user's browser
-- The RSS feed (also XML) has the same injection risk if shared generation code is reused without XML-specific escaping
+- Hours optimized for TikTok never actually post
+- The engagement feedback loop receives no data from these platforms despite the scheduler reporting "queued"
+- When the uploaders are eventually implemented, the scheduler already has stale queued entries that may execute at wrong times
 
-**Prevention:**
-- Use Jinja2 with `autoescape=True` for all HTML template rendering — this is the single safest mitigation
-- Never build episode HTML via raw f-string concatenation
-- Test the page generator with a transcript that contains `<b>test</b>`, `&amp;`, and a `<script>alert(1)</script>` string — assert these are rendered as visible text, not executed
+**How to avoid:**
+- Add a `is_functional()` method to each uploader that returns `False` for stubs; the scheduler should skip platforms where `is_functional()` is `False` and log a warning
+- Do not include TikTok or Instagram in engagement optimization until their uploaders are verified functional end-to-end
+- TikTok: factor in the API audit requirement as a prerequisite task — this can take weeks; do not build scheduling logic around an unaudited app
+- Document which platforms are functional vs. stub in `PROJECT.md` and update it as each becomes operational
 
-**Detection:** Generate a test page with the malicious transcript fragment above. View the page source and confirm no unescaped `<script>` tag is present.
+**Warning signs:**
+- `upload_schedule.json` shows `status: pending` for TikTok/Instagram entries that are weeks old
+- No engagement data exists for these platforms despite the scheduler showing them as queued
+- The pipeline marks these as "done" with 0 analytics data, silently skewing cross-platform comparisons
 
-**Phase relevance:** Phase 2 (static episode webpages). Security baseline — must be addressed in initial template design.
-
----
-
-## Minor Pitfalls
-
----
-
-### Pitfall 11: Vertical Video Aspect Ratio Requires Specific Clip Dimensions
-
-**What goes wrong:** The existing audiogram clips are generated at landscape aspect ratio (16:9 or similar). YouTube Shorts, Instagram Reels, and TikTok require 9:16 (1080x1920 for full quality, minimum 720x1280). If the subtitle burn-in phase reads the existing landscape clips and overlays subtitles without resizing, the output is the wrong aspect ratio for short-form platforms and will be pillarboxed or rejected.
-
-**Prevention:**
-- Vertical clips must be generated from the episode audio with a 9:16 canvas from the start — not by cropping or rotating the existing landscape audiograms
-- Separate the clip generation step from the subtitle burn-in step: clip generation produces a raw audio+background vertical video; subtitle burn-in adds text
-- The background for vertical clips should be a solid color, gradient, or resized version of the episode thumbnail — not the existing waveform audiogram
-
-**Phase relevance:** Phase 1 (subtitle burn-in). Upstream dependency on a new vertical clip canvas generator.
+**Phase to address:** Phase 1 (pre-optimization audit). Verify functional uploader list before any scheduling optimization targets platform-specific timing.
 
 ---
 
-### Pitfall 12: GitHub Pages Crawl Budget Wasted on Duplicate Transcript Fragments
+## Technical Debt Patterns
 
-**What goes wrong:** If each episode page includes the full transcript as plain paragraphs AND the same text is repeated in `<meta description>` and JSON-LD `description` fields, search engines see duplicate content signals within a single page. At scale (100+ episodes), the crawl budget is consumed by near-identical transcript pages, and Google may de-prioritize the site.
+Shortcuts that seem reasonable but create long-term problems.
 
-**Prevention:**
-- The `<meta description>` should be the AI-generated episode summary (1-2 sentences) from the existing pipeline output — not a truncated transcript
-- The JSON-LD `description` field should match the meta description
-- The transcript itself should be wrapped in a `<section id="transcript">` with a clear heading so Google understands it is supplementary content, not the primary page purpose
-- Add a `<link rel="canonical">` pointing to the episode's own URL to prevent pagination duplicates if transcripts are ever split across pages
-
-**Phase relevance:** Phase 2 (static episode webpages). SEO hygiene — important for long-term search performance.
-
----
-
-### Pitfall 13: Pipeline Checkpoint Key Collision Between Subtitle Formats
-
-**What goes wrong:** The existing pipeline has a `subtitles` checkpoint key that marks SRT file generation as complete. If the subtitle burn-in phase adds a new `subtitle_video` or `burned_subtitles` step and the developer reuses the existing `subtitles` key, the pipeline will skip SRT generation on resume (thinking it is done) and also skip subtitle burn-in (because the old `subtitles` key is already set). New episodes processed after the update will work correctly; partially-processed existing episodes will silently skip subtitle video generation.
-
-**Prevention:**
-- Use a new checkpoint key: `burned_subtitle_clips` (not `subtitles`)
-- Review all existing checkpoint keys before adding new steps — the current 9 keys are documented in `PROJECT.md`
-- After shipping, validate by processing a partially-completed episode from the `subtitles` checkpoint and confirming both the SRT step and the new burn-in step execute
-
-**Phase relevance:** Phase 1 (subtitle burn-in). Pipeline integration concern — affects resume behavior for all future episodes.
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Using `search().list()` to find episode video IDs | No code changes needed to analytics.py | Burns 100 quota units per episode lookup; blocks uploads if quota exhausted | Never — store video ID during upload instead |
+| Collecting analytics inside the production pipeline run | Feedback data available immediately after episode | Delays publish, risks quota exhaustion, shares rate limit budget with upload | Never — run analytics collection on a separate schedule |
+| Applying engagement scores to all historical episodes at once | Full dataset available sooner | Quota exhaustion on YouTube + Twitter rate limit on first batch run | Never — backfill incrementally (1-2 episodes per day) |
+| Using industry-generic "best time to post" defaults | Quick to implement | Ignores actual audience timezone and behavior; often wrong for edgy/niche content | Only as cold-start fallback, never as final answer |
+| Letting the engagement optimizer also adjust topic selection | Simpler architecture | Erodes comedy voice without explicit editorial override | Never — keep scoring as a hint, not an automated decision |
+| Treating impression_count as 0 on free tier without flagging | No API change needed | Systematically undervalues Twitter in composite score, biasing against Twitter-heavy episodes | Never — mark impressions as `null` (unknown), not 0 |
 
 ---
 
-## Phase-Specific Warnings
+## Integration Gotchas
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| Subtitle burn-in — FFmpeg invocation | Windows path colon destroys filter (Pitfall 1) | `_escape_ffmpeg_filter_path()` helper, forward slashes, escaped colon |
-| Word-level timing from WhisperX | Gaps/overlaps/missing-word timestamps (Pitfall 2) | `normalize_word_timestamps()` normalization step before ASS generation |
-| Font rendering on Windows | libass silently falls back to DejaVu Sans (Pitfall 3) | Embed font in `assets/fonts/`, use `fontsdir`, check stderr for `substituting font` |
-| ASS file generation | Override tag corruption / escaping conflict (Pitfall 4) | Use `pysubs2`, never raw f-strings, commit to single rendering path |
-| Long clip encoding | drawtext filter graph complexity limit (Pitfall 5) | Use ASS `\k` karaoke tags instead of chained drawtext nodes |
-| Reading subtitle source data | Existing SRT is sentence-level, not word-level (Pitfall 6) | Read from WhisperX JSON, not SRT; confirm persistence of word-level data |
-| Re-encoding clips | Audio quality degradation from double lossy encoding (Pitfall 7) | Always `-c:a copy` when burning subtitles |
-| GitHub Pages deployment | 10 builds/hour soft limit; 100 GB/month bandwidth (Pitfall 8) | Batch pushes; never commit media files; keep HTML under 100KB |
-| Episode page SEO | Transcript without structured data gets no podcast treatment (Pitfall 9) | Embed `PodcastEpisode` JSON-LD in every page template |
-| Transcript HTML rendering | Injection via unsanitized transcript text (Pitfall 10) | Jinja2 with `autoescape=True` only |
-| Clip aspect ratio | Existing clips are landscape, shorts require 9:16 (Pitfall 11) | Generate new vertical canvas clips, not resampled landscape clips |
-| Pipeline resume | `subtitles` checkpoint key collision with new burn-in step (Pitfall 13) | New key `burned_subtitle_clips` distinct from existing `subtitles` |
+Common mistakes when connecting to the existing analytics and scheduler infrastructure.
+
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| YouTube Data API analytics | Fetching analytics immediately after upload (data takes 24-48 hours to populate) | Schedule analytics collection 48+ hours after publication; check for null stats before scoring |
+| YouTube Data API quota | Running analytics + upload in the same pipeline invocation without quota tracking | Separate analytics into a distinct scheduled task; never share quota budget with upload |
+| Twitter public_metrics | Assuming `impression_count` is available on free tier | Only `reply_count`, `retweet_count`, `like_count`, `quote_count` are free; impressions require Basic ($100/month) |
+| Existing scheduler.py | Adding time-optimization logic directly to `create_schedule()` | Add a separate `optimize_schedule(base_schedule, analytics_data)` function; keep `create_schedule()` unchanged |
+| analytics.py engagement score | Applying raw score as a boost to topic_scorer without normalization | Episodes from 3+ years ago have lower raw counts due to smaller audience; normalize by episode age before comparing |
+| topic_scorer.py engagement_bonus | Current code uses `i + 1` (loop index) as episode number — this is a bug | Fix the episode number mapping before using engagement bonus in any optimization |
+
+---
+
+## Performance Traps
+
+Patterns that work at small scale but create problems as episode count grows.
+
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Scanning all analytics JSON files to compute baseline | Slow analytics report generation | Pre-aggregate baseline statistics into a `analytics_summary.json` file; update incrementally | At ~50 episodes (seconds of lag become minutes) |
+| Storing full analytics history in memory during pipeline run | Memory spikes when computing rolling averages | Load only the N most recent episodes needed for the calculation window | At ~100 episodes with large response payloads |
+| Re-running `search().list()` on every analytics refresh | Quota exhaustion from repeated lookups | Store video_id in `upload_schedule.json` at upload time; analytics reuses stored ID | At 20+ episodes per batch refresh |
+| YouTube Reporting API large report downloads | Timeouts and memory issues | Stream and parse incrementally; don't load entire report into memory | Reports over ~50MB |
+
+---
+
+## Security Mistakes
+
+Domain-specific security issues for analytics and scheduling.
+
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Storing raw platform API responses (including user data) in analytics JSON | Privacy violation if repo is public or if JSON is accidentally committed | Strip PII from API responses before saving; store only aggregated metrics |
+| Using `YOUTUBE_CHANNEL_ID` as public-facing identifier in logs | Channel ID leakage if logs are shared | Treat channel ID as a credential; redact from log output |
+| Committing analytics JSON to git | Historical engagement data is private; public repo exposes it | Add `topic_data/analytics/` to `.gitignore`; verify it is not currently tracked |
+| Scheduling posts to Instagram/TikTok before OAuth tokens are verified | Tokens expire silently; posts queue forever | Add token validity check before scheduling; alert if token expires within 7 days |
+
+---
+
+## Comedy Content Specific Risks
+
+Pitfalls unique to edgy/dark humor podcasts that don't apply to mainstream content.
+
+### The Compliance-Optimization Contradiction
+
+The v1.1 compliance checker (GPT-4o at temp=0.1) flags content that violates YouTube guidelines. The engagement optimizer rewards content that generates strong reactions. For a comedy podcast, these two systems will systematically conflict: the funniest, most shareable clips are often the ones that brush closest to compliance boundaries.
+
+**Risk:** The compliance gate + engagement optimization creates a filter that progressively narrows the show's range toward content that is "safe but dull." Over time, the hosts notice that the pipeline keeps rejecting or deprioritizing their best material and lose confidence in the automation.
+
+**Prevention:** The compliance checker should remain a binary gate (pass/fail) with clear, documented thresholds — not a continuous scoring dimension that gets factored into the engagement model. High engagement on content that passes compliance is a signal to keep making that content, not a signal to push content toward compliance limits.
+
+### Edgy Comedy Engagement Is Non-Linear
+
+Dark humor content tends to have bimodal engagement: either it lands (high shares, strong comment reactions) or it misses entirely (low engagement, comments criticizing the joke). The engagement score formula uses linear arithmetic (views * 0.001 + likes * 0.1 + comments * 0.5). Comments on a joke that didn't land still count the same as comments on one that did.
+
+**Risk:** The optimizer learns that controversy generates comments and starts optimizing for controversy rather than quality comedy. Episodes that generate angry comments and episodes that generate delighted comments receive similar composite scores.
+
+**Prevention:** If comment sentiment becomes a signal, require sentiment classification (positive vs. negative comments). Without sentiment, exclude comment count from the score for comedy content and weight shares/saves higher (these are unambiguously positive signals). Alternatively, keep comments in the score but require a minimum like-to-comment ratio to filter out "controversy engagement" from "comedy engagement."
+
+### Small Niche Audience Metrics Don't Generalize
+
+Industry benchmarks for podcast engagement (average completion rates, click-through rates, subscriber conversion rates) are derived from mainstream content. A comedy podcast with 500-5,000 listeners that achieves 40% comment-to-listener ratio is performing extraordinarily well — but raw count comparisons to larger shows will make it look like low-engagement content.
+
+**Risk:** Normalizing scores against absolute counts rather than relative audience size makes every metric look bad, leading to false conclusions that content quality is low when distribution reach is simply small.
+
+**Prevention:** Always normalize engagement metrics by subscriber/listener count (engagement rate, not raw engagement). Track growth rate alongside absolute numbers. "Views per subscriber" is more meaningful than "total views" at this stage.
+
+---
+
+## "Looks Done But Isn't" Checklist
+
+Things that appear complete but are missing critical pieces.
+
+- [ ] **Analytics collection:** Often appears to work in dry-run but silently fails in production because YouTube stats take 24-48 hours to populate — verify by waiting 48h and re-fetching
+- [ ] **Smart scheduling:** Schedule JSON is created correctly, but verify the runner actually reads and applies it at upload time (not just stores it)
+- [ ] **Engagement feedback loop:** Score is calculated and stored, but verify it is actually being read back by `topic_scorer.py`'s `engagement_bonus` logic (currently uses loop index as episode number — this is a bug)
+- [ ] **Platform-specific timing:** Optimal time recommendations work in the local timezone — verify the pipeline stores and applies times in UTC-consistent format when the deployment timezone differs from audience timezone
+- [ ] **TikTok/Instagram scheduling:** Appears queued in `upload_schedule.json` but verify these platforms have functional uploaders before treating scheduled entries as actionable
+
+---
+
+## Recovery Strategies
+
+When pitfalls occur despite prevention, how to recover.
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| YouTube API quota exhausted mid-pipeline | LOW | Wait until midnight PT for quota reset; resume pipeline with `--resume` flag; add analytics caching immediately |
+| Engagement feedback loop has overfit to early episodes | MEDIUM | Delete analytics files for episodes 1-10 (noisy early data); re-run scoring without engagement bonus; add minimum sample threshold gate |
+| Scheduler posts at wrong time due to timezone bug | LOW | Re-queue the upload manually; fix timezone handling; add UTC offset test |
+| Topic recommendations drifted away from show voice | HIGH | Disable engagement bonus in `topic_scorer.py`; revert topic scoring weights to pre-v1.2 defaults; host editorial review of last 5 scored batches |
+| TikTok app unaudited — all posts are private | MEDIUM | Submit TikTok audit request; posts can be manually set to public once audit passes; do not queue more posts until audit approved |
+| Twitter rate limit hit during distribution step | LOW | Re-run distribution step for Twitter after 15 minutes; add rate limit detection to analytics collection to prevent future conflicts |
+
+---
+
+## Pitfall-to-Phase Mapping
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| Cold start / insufficient data | Phase 1 — add minimum sample threshold before enabling optimization | Run analytics collection for 3+ weeks before enabling smart scheduling |
+| Engagement score erodes comedy voice | Phase 2 — design scoring model with comedy constraints baked in | Hosts manually review top 10 optimized recommendations vs. what they would pick |
+| Platform algorithm decay window not accounted for | Phase 3 — research platform cold-start mechanics before timing changes | Compare first-hour vs. 48-hour engagement by posting time bucket |
+| YouTube quota exhaustion | Phase 1 — cache video IDs at upload time; separate analytics schedule | Verify analytics collection does not trigger quota warnings in pipeline log |
+| Twitter free tier impressions gap | Phase 1 — remove or null-guard impressions field | Check engagement score formula returns correct value when impressions is None |
+| Stub uploaders silently no-op | Phase 1 — audit functional uploader list | Run uploader `is_functional()` check and confirm TikTok/Instagram are excluded from scheduling targets |
+| TikTok audit requirement | Phase 1 (discovery) / Phase 3 (execution) | Confirm audit status before scheduling any TikTok automation |
+| Analytics stored in tracked git files | Phase 1 — verify `.gitignore` coverage | Run `git status` after analytics collection run; confirm no JSON files are staged |
+| topic_scorer episode number bug (loop index) | Phase 2 — fix engagement_bonus mapping | Add test: verify `get_engagement_bonus(ep_number)` is called with actual episode number, not loop index |
 
 ---
 
 ## Sources
 
-- [GitHub Pages limits (official docs)](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits) — HIGH confidence
-- [FFmpeg subtitle filter documentation](https://ffmpeg.org/ffmpeg-filters.html) — HIGH confidence
-- [Escape special characters in FFmpeg subtitle filename](https://www.devhide.com/escape-special-characters-in-ffmpeg-subtitle-filename-45916331) — MEDIUM confidence (community, verified against FFmpeg docs)
-- [FFmpeg: Can't use absolute paths in subtitles filter — MSYS2 issue #11018](https://github.com/msys2/MINGW-packages/issues/11018) — HIGH confidence (upstream bug report, MSYS2 + Windows confirmed)
-- [WhisperX word-level timestamps inaccuracy — issue #1247](https://github.com/m-bain/whisperX/issues/1247) — HIGH confidence (project maintainer GitHub)
-- [WhisperX fix subtitle overlaps PR #999](https://github.com/m-bain/whisperX/pull/999) — HIGH confidence (merged PR)
-- [WhisperX timing overlap fix PR #816](https://github.com/m-bain/whisperX/pull/816) — HIGH confidence (merged PR)
-- [libass fontsdir Windows issue — libass/libass #389](https://github.com/libass/libass/issues/389) — HIGH confidence (official libass project)
-- [FFmpeg libass subtitles filter fontsdir — Render community](https://community.render.com/t/ffmpeg-libass-subtitles-filter-not-using-fontsdir-parameter-on-render-deployment/39185) — MEDIUM confidence (community, corroborates libass issue)
-- [PodcastEpisode schema.org type](https://schema.org/PodcastEpisode) — HIGH confidence (official schema.org)
-- [PodcastSeries schema.org type](https://schema.org/PodcastSeries) — HIGH confidence (official schema.org)
-- [FFmpeg drawtext dynamic overlays — OTTVerse](https://ottverse.com/ffmpeg-drawtext-filter-dynamic-overlays-timecode-scrolling-text-credits/) — MEDIUM confidence (technical blog, verified against FFmpeg docs)
-- [pysubs2 Python library for ASS/SRT](https://pythonhosted.org/pysubs2/tutorial.html) — HIGH confidence (official library docs)
-- [Burned-in subtitles quality guide — md-subs.com](https://www.md-subs.com/blog/burned-in-subtitles-journey-to-quality) — MEDIUM confidence (subtitle professional blog)
-- [Podcast SEO structured data — dynamicschema.com](https://dynamicschema.com/podcast-schema-getting-your-show-featured-in-google-search/) — MEDIUM confidence (corroborates schema.org official types)
+- [YouTube Data API v3 Quota and Compliance documentation](https://developers.google.com/youtube/v3/guides/quota_and_compliance_audits) — HIGH confidence (official Google docs)
+- [YouTube Data API quota costs](https://developers.google.com/youtube/v3/determine_quota_cost) — HIGH confidence (official Google docs)
+- [Twitter/X API rate limits](https://developer.twitter.com/en/docs/rate-limits) — HIGH confidence (official X developer docs)
+- [Twitter API free tier limitations and paid tiers](https://data365.co/guides/twitter-api-limitations-and-pricing) — MEDIUM confidence (verified against official docs)
+- [TikTok Content Posting API overview](https://developers.tiktok.com/products/content-posting-api/) — HIGH confidence (official TikTok developer docs)
+- [TikTok API audit requirement for public posting](https://developers.tiktok.com/doc/content-sharing-guidelines) — HIGH confidence (official TikTok developer docs)
+- [Podcast analytics mistakes — Cohost](https://www.cohostpodcasting.com/resources/podcast-analytics-mistakes) — MEDIUM confidence (industry practitioner source)
+- [Stop obsessing over vanity metrics — Podify](https://podify.com/stop-obsessing-over-vanity-metrics-the-podcast-data-that-actually-grows-your-show-in-2025/) — MEDIUM confidence (industry blog)
+- [Best time to release a podcast — Lower Street](https://lowerstreet.co/blog/best-day-to-publish-podcast) — MEDIUM confidence, notes that generic benchmarks don't apply to niche audiences
+- [Engagement scoring model common mistakes — Accrease](https://accrease.com/articles/building-an-engagement-scoring-model-for-analytics-data-a-step-by-step-guide/) — MEDIUM confidence (technical practitioner)
+- [Recency bias in analytics — Amplitude](https://amplitude.com/explore/experiment/recency-bias) — HIGH confidence (analytics platform vendor)
+- [YouTube Shorts shadowban and algorithm penalties — Trendly](https://trendly.so/blog/youtube-shorts-shadowban) — MEDIUM confidence (corroborated by multiple sources)
+- Direct code reading: `analytics.py`, `scheduler.py`, `topic_scorer.py` — HIGH confidence (source of truth for existing implementation details)
+
+---
+*Pitfalls research for: engagement optimization and smart scheduling — Fake Problems Podcast v1.2*
+*Researched: 2026-03-18*

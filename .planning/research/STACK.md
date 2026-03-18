@@ -1,7 +1,8 @@
 # Technology Stack
 
-**Project:** Podcast Automation v1.1 — Burned-in Subtitle Clips + Episode Webpages
+**Project:** Podcast Automation — v1.2 Engagement & Smart Scheduling
 **Researched:** 2026-03-18
+**Confidence:** HIGH (core recommendations), MEDIUM (ML prediction), LOW (Twitter time-of-day via API)
 
 ---
 
@@ -13,174 +14,220 @@ These are validated, working dependencies. Not candidates for replacement or re-
 |------------|-----------------|------|
 | Python | 3.12+ | Language |
 | FFmpeg binary | C:\ffmpeg\bin\ffmpeg.exe | Media processing engine |
-| ffmpeg-python | 0.2.0 | FFmpeg bindings |
-| WhisperX | 3.1.6 | Word-level timestamps (already produces per-word timing) |
-| pydub | 0.25.1 | Audio manipulation |
-| Pillow | 10.2.0 | Image generation |
-| Jinja2 | transitive dep | HTML templating (already available) |
-| openai | >=1.0.0 | GPT-4o for keyword/SEO generation |
+| openai | >=1.0.0 | GPT-4o for content optimization |
+| tweepy | 4.14.0 | Twitter API v2 — already fetches public_metrics |
+| google-api-python-client | 2.116.0 | YouTube Data API + YouTube Analytics API v2 |
+| praw | 7.7.1 | Reddit topic research |
+| analytics.py | — | Existing: collects YouTube views/likes/comments, Twitter impressions/engagements |
+| scheduler.py | — | Existing: stores publish_at timestamps per platform, executes uploads |
 
 ---
 
-## New Stack Additions
+## New Stack Additions (v1.2 Only)
 
-### Subtitle Generation: pysubs2
+### 1. Time-Series Statistics: pandas + numpy + scipy
 
-**Recommended:** `pysubs2==1.8.0`
+**Recommended:**
+- `pandas>=2.0.0,<3.0.0` (use 2.x for now — pandas 3.0 dropped Python 3.11 support and has breaking changes; stay on 2.x until torch compatibility is verified)
+- `numpy>=1.26.4,<2.0.0` (torch 2.1.0 in requirements.txt requires numpy < 2.0 — do not upgrade to numpy 2.x yet)
+- `scipy>=1.11.0,<2.0.0` (for `scipy.stats` — chi-square tests, t-tests for A/B significance)
 
-**Why:** The burned-in subtitle workflow requires generating ASS (Advanced SubStation Alpha) files with per-word timing and custom styles (large bold text, color fills, drop shadows, centered positioning). `pysubs2` is the canonical Python library for this — it provides an object model for ASS styles and events, handles the format's encoding quirks, and serializes to valid ASS that FFmpeg's `ass=` filter accepts directly.
+**Why:** The engagement optimization work requires:
+1. Loading all saved `topic_data/analytics/ep_*_analytics.json` files into a single DataFrame for cross-episode analysis
+2. Grouping analytics by episode metadata (topic category, day of week posted, time posted) to find patterns
+3. Running statistical significance tests when comparing two posting time slots (scipy.stats.ttest_ind or chi2_contingency)
 
-The existing `audiogram_generator.py` already burns SRT subtitles via FFmpeg's `subtitles=` filter with `force_style=`. For Hormozi-style word-by-word display, SRT is insufficient — SRT has no per-word timing or style override support at the word level. ASS solves this: each word becomes a separate `Dialogue` event in the ASS file with its own start/end time, font size, color, shadow, and outline. pysubs2 makes constructing these events straightforward.
+pandas provides the DataFrame model that makes this trivial — `df.groupby('day_of_week').agg({'views': 'mean'})` vs writing nested dicts manually. scipy.stats provides the t-test and chi-square tests needed to determine if an engagement difference is real or noise.
 
-WhisperX already outputs word-level timestamps in its JSON/dict result. The generation path is: WhisperX word timestamps → Python loop building pysubs2 `SSAEvent` objects → save as `.ass` → pass to FFmpeg `ass=` filter.
+**Why not statsmodels for full ARIMA/time-series forecasting:** The project has ~30 episodes max of historical data. ARIMA requires at minimum 50 data points for meaningful forecasting. statsmodels adds ~10MB, pulls in patsy, and provides capabilities far beyond what's needed. Simple mean/percentile analysis per day-of-week bucket is appropriate for this data volume.
 
-**Why not raw string generation:** ASS format has encoding-sensitive headers, color format quirks (`&H00FFFFFF&` BGR hex with alpha prefix), and escape rules. Writing ASS by hand-formatting strings is fragile. pysubs2 handles all of this correctly.
+**Why not scikit-learn:** sklearn's LinearRegression would fit neatly for "predict engagement from features" but the dataset is too small (30 data points) for ML predictions that aren't overfit. scipy.stats correlation coefficients (Pearson, Spearman) are statistically honest at this scale.
 
-**Why not `drawtext` filter:** FFmpeg's `drawtext` filter can overlay text but requires one `-vf drawtext=...` expression per word with exact `enable=` time windows. For a 60-second clip with ~150 words, this produces an unwieldy 150-segment filter graph that is hard to generate, debug, and modify. ASS is the right abstraction for styled timed text.
-
-**Why not WhisperX's built-in `highlight_words` ASS output:** WhisperX can produce ASS with karaoke-style `\k` tags for highlight effects, but this requires re-running WhisperX at clip generation time. The pipeline already has WhisperX output cached from the transcription step. pysubs2 lets us consume the cached word timestamps and produce styled ASS without re-running transcription.
-
-**Integration point:** New `subtitle_clip_generator.py` module. Consumes `clip.words` (word-level timestamp list already present on clip objects from WhisperX). Produces a `.ass` file alongside each clip. `audiogram_generator.py` passes the `.ass` path to FFmpeg using the `ass=` filter (instead of `subtitles=` with force_style, which only applies to SRT).
+**Version compatibility note:** `torch==2.1.0` (already pinned) requires `numpy>=1.21,<2`. pandas 2.x works with numpy 1.26.x. pandas 3.0.1 (released January 2026) requires Python 3.11+ and has breaking changes from 2.x. Stay on pandas 2.x to avoid requirements conflict risk.
 
 ```bash
-pip install pysubs2==1.8.0
+pip install "pandas>=2.0.0,<3.0.0" "numpy>=1.26.4,<2.0.0" "scipy>=1.11.0,<2.0.0"
 ```
 
-**Confidence:** HIGH — PyPI confirmed version 1.8.0, released December 24, 2024. Official docs at pysubs2.readthedocs.io. No external dependencies beyond Python stdlib.
+**Confidence:** HIGH for pandas 2.x + numpy 1.26.x compatibility with torch 2.1.0. MEDIUM for scipy version range (no known conflicts found, but not explicitly verified against all existing deps).
 
 ---
 
-### FFmpeg: Vertical Video Canvas
+### 2. YouTube Analytics API v2 (youtubeanalytics/v2)
 
-**Recommended:** No new library. Use existing `ffmpeg-python==0.2.0` or `subprocess` calls to the existing FFmpeg binary.
+**Recommended:** No new package. Use existing `google-api-python-client==2.116.0`.
 
-**Why:** The vertical crop and pad operation for 9:16 (1080x1920) is a standard FFmpeg filter graph: `scale=1080:-2,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black`. This is the same pattern already used in `audiogram_generator.py` for horizontal/vertical format switching. No new dependency needed — the work is in constructing the correct filter string for portrait orientation with the waveform replaced by a solid background + burned-in ASS.
+**Why:** The YouTube Analytics API v2 is a separate service from the YouTube Data API v3 but uses the same `googleapiclient.discovery.build()` pattern already used in `analytics.py`. The only addition is building a second service:
 
-**Concrete filter chain for a Hormozi-style clip:**
-```
--vf "scale=1080:-2,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,ass='/path/to/subtitles.ass'"
-```
-
-**Confidence:** HIGH — This is documented FFmpeg filter composition, validated against existing audiogram_generator.py patterns in this codebase.
-
----
-
-### Keyword Extraction: yake
-
-**Recommended:** `yake==0.4.8`
-
-**Why:** SEO keywords for episode webpages must be extracted from podcast transcripts (~10,000 words each). The project constraint is no heavy new dependencies and no paid APIs.
-
-`yake` (Yet Another Keyword Extractor) is a statistical, unsupervised keyword extractor with no ML model dependency. It uses local text features (word frequency, co-occurrence, position) to rank keyphrases. It runs in milliseconds on a full transcript with zero additional downloads.
-
-**Why not KeyBERT:** KeyBERT requires `sentence-transformers`, which downloads a ~400MB transformer model on first use. The project already has `torch` and WhisperX occupying significant GPU memory during processing. Adding another transformer for keyword extraction creates unnecessary memory pressure and download time. KeyBERT is overkill for podcast SEO keywords where statistical extraction is accurate enough.
-
-**Why not Ollama/GPT-4o prompt:** Ollama is already used in the pipeline and is available for free. However, LLM-based keyword extraction produces inconsistent output formats requiring parsing, and adds latency. For deterministic, fast, structured keyword output, yake is more reliable.
-
-**Why not rake-nltk:** RAKE requires NLTK stopword downloads and corpus data. yake has no external corpus dependency.
-
-**Integration point:** New `keyword_extractor.py` module called from the webpage generation step. Input: full transcript text. Output: list of ranked keyphrases for `<meta name="keywords">`, Open Graph tags, and JSON-LD structured data.
-
-```bash
-pip install yake==0.4.8
-```
-
-**Confidence:** MEDIUM — PyPI shows yake 0.4.8 is the latest stable version. Last release was 2023, but the package is stable and the algorithm is deterministic. The LIAAD/yake GitHub has 1k+ stars and is actively used. No newer version found in 2024-2025 searches; the algorithm is stable, not actively developed.
-
----
-
-### Static Site Generation: Jinja2 (already available)
-
-**Recommended:** Use existing `Jinja2` (transitive dependency, already installed). No new package needed.
-
-**Why:** GitHub Pages accepts raw HTML pushed to a `gh-pages` branch. The episode webpage generation task is: take episode metadata + transcript → render HTML files → push to `gh-pages`. Jinja2 is already available as a transitive dependency (it ships with many packages in the stack). The blog_generator.py pattern confirms the project uses f-strings and Ollama for text generation, but Jinja2 is available for HTML templating.
-
-**Template structure:** One `episode.html.j2` template containing the full HTML document with Open Graph meta tags, JSON-LD `PodcastEpisode` structured data, transcript with chapter navigation, and canonical URL. Jinja2 renders it per episode with episode-specific context data.
-
-**Confidence:** HIGH — Jinja2 is a Python standard for HTML templating. The CLAUDE.md milestone context confirms it's already in deps. No new install needed.
-
----
-
-### GitHub Pages Deployment: ghp-import
-
-**Recommended:** `ghp-import==2.1.0`
-
-**Why:** The webpage generation step must push generated HTML files to the `gh-pages` branch of the podcast repository without overwriting unrelated branches. `ghp-import` does exactly this: takes a local directory of built HTML files, creates/replaces the `gh-pages` branch, and optionally pushes to origin — all in one call. It is used by MkDocs, Sphinx, and Pelican for the same purpose.
-
-**Python API usage (no CLI required):**
 ```python
-import ghp_import
-ghp_import.ghp_import("output/pages/", push=True, branch="gh-pages")
+youtube_analytics = build("youtubeAnalytics", "v2", credentials=creds)
 ```
 
-**Why not manual git operations:** Manually creating/switching to the `gh-pages` branch, copying files, committing, and pushing requires careful handling of detached HEAD state and branch isolation. `ghp-import` handles this correctly and atomically. The pipeline's `--dry-run` mode can be honored by passing `push=False`.
+**What this unlocks:** `reports.query()` with `metrics=views,estimatedMinutesWatched,averageViewDuration` grouped by `dimensions=day`. This gives daily performance data per video — the existing `analytics.py` only fetches total-lifetime stats via the Data API, not date-segmented analytics. Date-segmented data enables: "videos posted on Tuesday get 23% more views in first 7 days than videos posted Thursday."
 
-**Caveat:** `ghp-import` 2.1.0 was released May 2022 and has not had a new release since. The project is considered stable/maintenance-mode. The underlying git operations it performs are simple and unlikely to break. MkDocs (widely used) still depends on it. Acceptable risk for this use case.
+**Critical limitation discovered:** The YouTube Analytics API does NOT have an hourly dimension or day-of-week dimension. Available time dimensions are only `day` and `month`. The "when your viewers are on YouTube" heatmap in YouTube Studio is NOT accessible via API — it is a Studio-only visualization. There is no `audienceActivity` or `viewerHour` metric available programmatically (verified against official dimensions reference at developers.google.com/youtube/analytics/dimsmets/dims).
 
-**Why not GitHub Actions:** GitHub Actions would require a separate CI workflow file and GitHub secrets setup. The project is a local CLI pipeline (`python main.py ep29`). Deployment from local Python code is consistent with the existing pattern (all uploaders are local Python calls, not CI-triggered).
+**Implication for architecture:** Optimal posting time for YouTube must be derived by:
+1. Fetching 7-day rolling view data per posted video using `dimensions=day`
+2. Calculating "first-7-day views" for each episode grouped by day_of_week_posted
+3. Using published research as a baseline (Tuesday 2-4 PM, Sunday 10 AM - 12 PM consistently cited in Buffer/Sprout Social 2025-2026 data)
+4. Blending own historical data with research defaults when sample size < 10
 
-```bash
-pip install ghp-import==2.1.0
-```
+No new package needed.
 
-**Confidence:** MEDIUM — Version confirmed on PyPI and libraries.io. Package is stable but unmaintained since 2022. No known breaking changes; git operations it wraps are stable. MkDocs community continues to use it successfully.
+**Confidence:** HIGH for API capability scope. HIGH for limitation (verified against official dimension reference). MEDIUM for the research-based time defaults (Buffer 2026 data based on millions of posts, but may not match a niche comedy podcast audience).
 
 ---
 
-## Packages Evaluated and Rejected
+### 3. Posting Time Heuristics: Built-in statistics module
+
+**Recommended:** Python stdlib `statistics` module — no new package.
+
+**Why:** For computing optimal posting windows from historical data, Python's built-in `statistics.mean()`, `statistics.median()`, and `statistics.stdev()` are sufficient alongside the pandas groupby aggregation. No new package needed.
+
+The posting time optimizer logic is:
+1. Load all episode analytics JSONs (views + date posted)
+2. Group by day_of_week: `{monday: [views_list], tuesday: [views_list], ...}`
+3. `statistics.mean()` per group → ranking
+4. Blend with research defaults (weighted average: own data gets weight proportional to sample count, research defaults fill the gaps)
+
+```python
+from statistics import mean, stdev
+```
+
+This is intentionally kept stdlib-only because at 30 episodes, pandas groupby or scipy is sufficient for the cross-platform analysis, and the time-slot recommendation itself is simple arithmetic.
+
+**Confidence:** HIGH — stdlib, no versioning concern.
+
+---
+
+### 4. Engagement Prediction: scipy.stats (already included above)
+
+**Recommended:** `scipy.stats.pearsonr`, `scipy.stats.spearmanr` — included in scipy package above.
+
+**Why this instead of scikit-learn:** Engagement prediction at this scale is "which topic categories have correlated with higher engagement historically?" The right tool is correlation analysis, not ML regression. With 30 data points, a LinearRegression model will overfit. Pearson/Spearman correlation between `topic_category_encoded` and `engagement_score` (already computed in analytics.py) reveals the direction and strength of the relationship without overfitting risk.
+
+For future milestone (when 50+ episodes exist): scikit-learn LinearRegression or GradientBoosting becomes appropriate. Flag this for v1.3.
+
+**Feature inputs available right now:**
+- `topic_category` from topic_scorer.py (`shocking_news`, `absurd_hypothetical`, etc.)
+- `engagement_score` from TopicEngagementScorer.calculate_engagement_score()
+- `day_of_week` posted (derivable from analytics JSON `collected_at`)
+- `clip_count` (episodes with more clips get more Twitter posts)
+
+**Confidence:** MEDIUM — correlations at n=30 have wide confidence intervals. The pipeline should present findings with honest caveats ("based on 30 episodes, Tuesday posts average 18% higher views — recommend more data before treating as definitive").
+
+---
+
+### 5. Content/Subject Optimization: OpenAI GPT-4o (already in stack)
+
+**Recommended:** Existing `openai>=1.0.0`. No new package.
+
+**Why:** Content optimization — rewriting titles, captions, and thumbnails to improve engagement — is a natural language task. GPT-4o already powers content_editor.py for show notes and captions. Extending it to "suggest three alternative video titles ranked by predicted click-through" requires zero new libraries: just a new prompt in `content_editor.py`.
+
+The engagement prediction output (which categories perform best) feeds back as context into the GPT-4o prompt: "Previous shocking_news episodes averaged engagement score 7.2. The current episode is shocking_news. Suggest titles that emphasize the shocking angle."
+
+**Confidence:** HIGH — already integrated, zero new dependency risk.
+
+---
+
+### 6. A/B Test Significance: scipy.stats (already included above)
+
+**Recommended:** `scipy.stats.ttest_ind` and `scipy.stats.chi2_contingency` — already in scipy package.
+
+**Why:** If the pipeline tests two different thumbnail styles or caption formats across episodes, statistical significance testing determines if the difference is real. For view counts (continuous): `ttest_ind`. For engagement rate (proportion): `chi2_contingency`. Both are in scipy.stats.
+
+**Important constraint:** True A/B testing requires randomized assignment and control of confounders — hard to achieve with weekly episodic content. The realistic implementation is "A/B" across time: old approach vs. new approach, measured across comparable episodes. scipy.stats ttest provides the p-value, but the codebase should document this limitation clearly.
+
+**Confidence:** HIGH for scipy tools. LOW for statistical validity of A/B results in this context (n is small, confounders exist).
+
+---
+
+## Packages Evaluated and Rejected (v1.2)
 
 | Package | Use Case | Decision | Reason |
 |---------|----------|----------|--------|
-| `KeyBERT==0.9.0` | Keyword extraction | Rejected | Pulls `sentence-transformers` + ~400MB model download. yake provides sufficient quality for podcast SEO with zero ML overhead |
-| `rake-nltk` | Keyword extraction | Rejected | Requires NLTK corpus downloads; yake is simpler with equivalent output for short keyphrases |
-| FFmpeg `drawtext` filter | Word-by-word subtitle burn-in | Rejected | Requires one filter expression per word (~150 per clip); ASS format via pysubs2 is the correct abstraction for timed styled text |
-| WhisperX `highlight_words` ASS output | ASS generation | Rejected | Requires re-running transcription; pysubs2 can consume cached word timestamps |
-| Jekyll | Static episode pages | Rejected | Requires Ruby runtime. Python-based Jinja2 generation + ghp-import is consistent with the existing Python-only pipeline |
-| Hugo | Static episode pages | Rejected | Requires Go runtime. Same reasoning as Jekyll |
-| `auto-subs` (PyPI) | Subtitle generation | Rejected | Wraps Whisper for transcription — redundant. We already have WhisperX word timestamps. pysubs2 is the right tool for the ASS file layer only |
+| `statsmodels>=0.14.6` | ARIMA/time-series forecasting | Rejected | Overkill for n<50 episodes. Simple mean-by-group analysis is statistically honest at this scale. Adds 10MB+ and patsy dependency |
+| `scikit-learn>=1.8.0` | ML engagement prediction | Rejected for v1.2 | n=30 is too small for ML regression without severe overfitting. scipy correlation is appropriate now. Flag for v1.3 when n>50 |
+| `prophet` (Meta) | Time-series forecasting | Rejected | Requires PyStan + heavy C++ compilation. Overkill for weekly podcast data at n<50 |
+| `APScheduler>=3.11` | Cron-based scheduling | Rejected | Scheduler.py already handles `publish_at` timestamps. APScheduler adds a daemon/background process, which conflicts with the project's CLI-run-and-exit execution model |
+| `celery` | Task queue for scheduled uploads | Rejected | Requires Redis/RabbitMQ broker. Massively overengineered for a single-user local CLI pipeline |
+| `tweepy_analytics` (third-party) | Twitter engagement timing | Rejected | Not a real package. Twitter API v2 via existing tweepy already provides `public_metrics` |
+| `buffer` / `hootsuite` API | Social media management | Rejected | Paid APIs. Project constraint: no new paid APIs |
+| `pandas>=3.0.0` | Data analysis | Rejected for now | Breaking changes from 2.x; requires Python 3.11+ minimum; compatibility with torch 2.1.0 needs verification |
+| `numpy>=2.0.0` | Numerical computing | Rejected | torch 2.1.0 requires numpy<2.0 |
 
 ---
 
-## Full Dependency Delta
+## Full Dependency Delta (v1.2 additions)
 
 Libraries to add to `requirements.txt`:
 
 ```
-# Word-level ASS subtitle file generation (Hormozi-style burned-in clips)
-pysubs2==1.8.0
-
-# Keyword extraction for episode webpage SEO (no ML dependency)
-yake==0.4.8
-
-# GitHub Pages deployment (push generated HTML to gh-pages branch)
-ghp-import==2.1.0
+# Engagement analytics — time-series stats and significance testing
+pandas>=2.0.0,<3.0.0
+numpy>=1.26.4,<2.0.0   # Constrained by torch==2.1.0 compatibility
+scipy>=1.11.0,<2.0.0
 ```
 
-**No version changes needed** to existing packages for this milestone. FFmpeg vertical video processing uses existing `ffmpeg-python==0.2.0`. HTML templating uses existing Jinja2 (already transitive dep). OpenAI GPT-4o for fallback SEO description generation uses existing `openai>=1.0.0`.
+Everything else for v1.2 uses existing packages:
+- YouTube Analytics API v2: existing `google-api-python-client==2.116.0`
+- Content optimization prompts: existing `openai>=1.0.0`
+- Posting time heuristics: Python stdlib `statistics`
+- Topic correlation: `scipy.stats` (added above)
 
 ---
 
-## Integration Points with Existing Pipeline
+## Integration Points with Existing Code
 
-| New Component | Plugs Into | Checkpoint Key |
-|--------------|-----------|----------------|
-| `subtitle_clip_generator.py` | `pipeline/steps/video.py` after existing subtitle step (5.4) | `subtitles` (existing) or new `subtitle_ass` key |
-| `subtitle_clip_generator.py` → `audiogram_generator.py` | Replace `subtitles=` SRT filter with `ass=` filter for vertical clips | In existing `create_audiogram()` |
-| `keyword_extractor.py` | `pipeline/steps/distribute.py` before webpage generation | New `keywords` checkpoint key |
-| `webpage_generator.py` | `pipeline/steps/distribute.py` after keywords, before social upload | New `webpages` checkpoint key |
-| `webpage_generator.py` → `ghp-import` | End of distribute step | Controlled by `GITHUB_PAGES_REPO` env var + `self.enabled` pattern |
+| New Component | Integrates With | What Changes |
+|--------------|----------------|--------------|
+| `engagement_optimizer.py` (new) | `analytics.py` — reads existing analytics JSONs | Adds cross-episode DataFrame analysis on top of existing per-episode collection |
+| `posting_time_advisor.py` (new) | `scheduler.py` — replaces hardcoded `SCHEDULE_*_DELAY_HOURS` config with computed optimal windows | `create_schedule()` receives `optimal_times` dict instead of fixed delays |
+| `content_optimizer.py` (new) | `content_editor.py` — adds engagement-informed title/caption rewriting | New method on existing class or standalone module with same GPT-4o client |
+| YouTube Analytics API v2 | `analytics.py` — add `fetch_youtube_video_performance()` method | Queries `youtubeanalytics/v2` for 7-day segmented view data per video |
+| `TopicEngagementScorer` | `topic_scorer.py` — already exists, already adds engagement_bonus | Extend to use correlation output from engagement_optimizer.py |
+
+---
+
+## Architecture Note: Data Flow for Optimal Posting Time
+
+The YouTube Analytics API does not expose hour-of-day viewer activity. The "When your viewers are on YouTube" heatmap in YouTube Studio has no API equivalent. The posting time recommendation must therefore be derived from:
+
+1. **Own historical data** (available): day_of_week each episode was posted + 7-day view performance from Analytics API v2
+2. **Research-based defaults** (embedded as constants): Tuesday/Wednesday 2-4 PM for YouTube; Tuesday 9 AM for Twitter/X; weekday evenings for Instagram; weekday mornings for TikTok (Buffer 2026 data, 7M+ posts analyzed)
+3. **Blending rule**: Weight own data by `min(1.0, episodes_posted_on_this_day / 5)`. Under 5 episodes posted on a given day, research defaults dominate.
+
+This approach is honest about data limitations and avoids overfitting to a small sample.
+
+---
+
+## Version Compatibility Matrix
+
+| Package | Version | Compatible With | Notes |
+|---------|---------|-----------------|-------|
+| pandas | >=2.0.0,<3.0.0 | numpy 1.26.x, Python 3.12 | pandas 3.x breaks compat with numpy 1.x |
+| numpy | >=1.26.4,<2.0.0 | torch==2.1.0 | torch 2.1 breaks with numpy>=2.0 |
+| scipy | >=1.11.0,<2.0.0 | numpy 1.26.x | scipy 1.17.1 is latest (Jan 2026); 1.11+ safe lower bound |
+| google-api-python-client | 2.116.0 | youtubeanalytics/v2 | Same client builds both youtube/v3 and youtubeAnalytics/v2 |
 
 ---
 
 ## Sources
 
-- [pysubs2 PyPI](https://pypi.org/project/pysubs2/) — version 1.8.0, released December 24, 2024
-- [pysubs2 documentation](https://pysubs2.readthedocs.io/en/latest/) — SSAEvent API, style objects
-- [yake PyPI](https://pypi.org/project/yake/) — version 0.4.8
-- [yake GitHub (LIAAD)](https://github.com/LIAAD/yake) — unsupervised keyword extraction
-- [ghp-import PyPI](https://pypi.org/project/ghp-import/) — version 2.1.0, released May 2022
-- [ghp-import GitHub (c-w)](https://github.com/c-w/ghp-import) — gh-pages branch deployment
-- [FFmpeg Filters Documentation — subtitles/ass](https://ffmpeg.org/ffmpeg-filters.html) — ass and subtitles filter syntax
-- [Schema.org PodcastEpisode](https://schema.org/PodcastEpisode) — JSON-LD structured data type for episode pages
-- [Karaoke Videos with FFmpeg and SRT Subtitles](https://www.samgalope.dev/2024/11/05/diy-karaoke-videos-with-ffmpeg-and-srt-format-sync-and-style/) — word-timing subtitle generation pattern
-- [The Power of Single-Word Subtitles (Medium)](https://medium.com/@didierlacroix/the-power-of-single-word-subtitles-662f8c3891bd) — WhisperX → ASS per-word generation pattern
+- [YouTube Analytics API Dimensions Reference](https://developers.google.com/youtube/analytics/dimsmets/dims) — confirmed no hourly or day-of-week dimension exists (only `day` and `month`)
+- [YouTube Analytics API Reports Query](https://developers.google.com/youtube/analytics/reference/reports/query) — query structure for date-segmented video stats
+- [Buffer 2026 Best Times to Post on Social Media](https://buffer.com/resources/best-time-to-post-social-media/) — research defaults for posting windows (millions of posts analyzed)
+- [Buffer Best Time to Post on Twitter/X 2026](https://buffer.com/resources/best-time-to-post-on-twitter-x/) — 1 million posts analyzed
+- [Buffer Best Time to Post on TikTok 2026](https://buffer.com/resources/best-time-to-post-on-tiktok/) — 7 million posts analyzed
+- [pandas PyPI](https://pypi.org/project/pandas/) — 3.0.1 latest (Jan 2026), 2.x LTS available
+- [numpy PyPI](https://pypi.org/project/numpy/) — 2.4.3 latest (Mar 2026), 1.26.x still maintained
+- [scipy releases](https://docs.scipy.org/doc/scipy/release.html) — 1.17.1 latest (Feb 2026)
+- [scikit-learn PyPI](https://pypi.org/project/scikit-learn/) — 1.8.0 latest; rejected for v1.2 due to sample size
+- [APScheduler PyPI](https://pypi.org/project/APScheduler/) — 3.11.2 latest; rejected (daemon model conflicts with CLI pipeline)
+- [PyTorch Python 3.12 compatibility](https://discuss.pytorch.org/t/compatibility-of-python-3-12-with-py-torch/219215) — torch 2.1 + Python 3.12 works; numpy<2.0 required
+
+---
+
+*Stack research for: Engagement optimization and smart scheduling additions to podcast-automation pipeline*
+*Researched: 2026-03-18*

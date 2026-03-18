@@ -1,190 +1,189 @@
-# Feature Landscape
+# Feature Research
 
-**Domain:** Burned-in subtitle vertical clips + SEO episode webpages for podcast automation
+**Domain:** Podcast engagement optimization and smart scheduling for a CLI-driven production pipeline
 **Researched:** 2026-03-18
-**Milestone:** v1.1 — Discoverability & Short-Form
-
-## Context: What Already Exists
-
-The following are built and NOT re-researched here. New features must integrate with them:
-
-- Whisper transcription with word-level timestamps (already in `transcription.py`)
-- SRT generation grouped into 5-word lines with 2.5s max duration (`subtitle_generator.py`)
-- Audiogram waveform videos with SRT burn-in via FFmpeg ASS (`audiogram_generator.py`)
-- Vertical 720x1280 video output (Config.VERTICAL_RESOLUTION)
-- AI-selected clips (3 per episode) with approval workflow
-- Blog post generation from transcript + analysis (Markdown, `blog_generator.py`)
-- Episode search index FTS5 (`search_index.py`)
-- YouTube Shorts + Instagram + TikTok uploaders (in `uploaders/`)
-
-**Key technical constraint:** The existing SRT burn in `audiogram_generator.py` uses
-`subtitles='path.srt':force_style='FontSize=24,PrimaryColour=&Hffffff&,Alignment=2,MarginV=40'`
-— plain white centered text. This is the baseline to replace/extend.
+**Milestone:** v1.2 — Engagement & Smart Scheduling
+**Confidence:** MEDIUM
 
 ---
 
-## Table Stakes
+## Context: What Already Exists (Do Not Re-Build)
 
-Features that are non-negotiable for clips to compete on Shorts/Reels/TikTok.
-Missing = clips look amateur and get ignored.
+These are built and fully integrated. New features must work *with* them, not replace them.
+
+| Module | What It Does | Integration Point for v1.2 |
+|--------|--------------|---------------------------|
+| `analytics.py` (`AnalyticsCollector`) | Fetches YouTube views/likes/comments and Twitter impressions/engagements/retweets/likes per episode; saves to `topic_data/analytics/ep_N_analytics.json` | Read historical data to derive posting-time patterns and topic-engagement correlation |
+| `analytics.py` (`TopicEngagementScorer`) | Computes 0–10 composite score from YouTube+Twitter data; `correlate_topics()` maps episode titles to scores | Already feeds into `topic_scorer.py` as `engagement_bonus`; extend to drive scheduling decisions |
+| `scheduler.py` (`UploadScheduler`) | Applies configurable hour-offsets per platform from `.env`; `create_schedule()` writes `upload_schedule.json` with per-platform ISO datetimes | Replace static offsets with data-derived optimal windows |
+| `topic_scorer.py` (`TopicScorer`) | LLM-scores topic ideas (shock value, relatability, absurdity, hook, visual) via Ollama/Llama; `engagement_bonus` already a stub field on every score | Backfill `engagement_bonus` with historical topic-performance data |
+| `content_editor.py` | Generates episode title, summary, show notes, chapter markers, social captions per platform via GPT-4 | Social captions go directly to uploaders; v1.2 can inject hashtag and timing signals here |
+
+---
+
+## Feature Landscape
+
+### Table Stakes (Users Expect These)
+
+Features that any engagement-aware pipeline should have. Missing them means leaving easy wins on the table.
 
 | Feature | Why Expected | Complexity | Dependency on Existing | Notes |
-|---------|--------------|------------|----------------------|-------|
-| Big bold word-by-word caption pop | Every top podcast clip channel (Huberman, Lex, Rogan clips) uses this; plain subtitles look unpolished | Medium | Uses existing word timestamps from WhisperX/Whisper; extends `subtitle_generator.py` | ASS format with per-word timing segments rather than line-level SRT |
-| All-caps text | Hormozi/podcast clip convention; easier to read on phone at small sizes | Low | Formatting only; post-process word text | Apply `.upper()` to caption text |
-| High-contrast text + outline/shadow | Dark or busy backgrounds make white text illegible; black outline is standard | Low | FFmpeg ASS `Outline` and `Shadow` style fields | 3-4px black outline on white or yellow text |
-| Bottom-third positioning (center, ~75-85% down frame) | Eye is drawn to center-bottom in vertical video; top positioning feels wrong | Low | Already uses `Alignment=2,MarginV=40` — needs margin tuning for taller fonts | Increase MarginV for 60-80px font |
-| 1-3 words per caption segment | Short segments read faster, match speaking pace, create punchy rhythm | Low | Current grouping is up to 5 words per line — reduce to 1-3 for "pop" style | New grouping mode in `subtitle_generator.py` |
-| Font size ~80-120px on 720x1280 | Readable on phone without squinting; small text gets ignored | Low | Current FontSize=24 is too small for impact style | Scale to ~100px (ASS Fontsize in points, calibrate to output px) |
-| Vertical 9:16 video output | TikTok, Reels, Shorts are all 9:16; landscape clips get letterboxed or rejected | Low | Already built: Config.VERTICAL_RESOLUTION = 720x1280 | Already handled |
-| Single background (branded color or image) | Solid color or branded image keeps focus on text/audio; busy backgrounds distract | Low | Audiogram already uses dark branded background (0x1a1a2e) | Already handled |
-| No audio issues (clean censored audio) | Clips with raw profanity or jarring beeps get flagged/removed | Low | Audio ducking censorship already in pipeline | Already handled |
+|---------|--------------|------------|------------------------|-------|
+| Platform-specific optimal posting time windows | Every scheduling tool (Buffer, Hootsuite) ships default best-time windows; hardcoded hour-offsets in scheduler.py are the baseline but not data-driven | LOW | Extends `UploadScheduler`; replaces static delays | Industry data: YouTube 5–9 AM or Tue/Wed 6–9 PM; Twitter Tue–Thu 9–11 AM, 12–2 PM; treat as starting defaults until own data accumulates |
+| Multi-episode analytics aggregation command | Creators expect `python main.py analytics all` to produce a roll-up view across episodes; the current command only handles single episodes | LOW | Extends `analytics.py`; `python main.py analytics all` stub already exists | Read all `ep_N_analytics.json` files and compute averages, trends, top performers |
+| Engagement trend reporting (episodes over time) | Without a trend view, there's no signal for what's improving; this is the most basic analytics feedback | LOW | Reads existing per-episode JSON files from `analytics.py` | Compute engagement score per episode chronologically; output table or CSV |
+| Analytics data written back to scheduling decisions | The point of analytics is to inform scheduling; a feedback loop that doesn't close on scheduling is incomplete | MEDIUM | Connects `AnalyticsCollector` output → `UploadScheduler` input | Core of the milestone; replaces `.env` hour-offset defaults with computed windows |
+| Topic-to-engagement history lookup | When scoring new topics, knowing that "gas-powered adult toys" scored 8.5 engagement historically is valuable | LOW | `TopicEngagementScorer.correlate_topics()` already exists; just need to accumulate the corpus | Write episode engagement + topic keywords to a persistent `topic_engagement_history.json` after each analytics run |
 
-## Differentiators
+### Differentiators (Competitive Advantage)
 
-Features that make clips stand out. Not universally expected, but drive virality.
+Features beyond the baseline that improve content quality and engagement prediction.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Keyword highlight color (yellow/accent for emphasis) | Captions that highlight a key word per phrase look more dynamic; Hormozi-branded yellow highlight is recognizable | Medium | Requires AI to identify "emphasis words" per segment, or heuristic (nouns, last word of phrase); ASS `{\c&H...&}` inline tags |
-| Animated text entrance (pop-in from bottom, scale) | Creates kinetic energy; static captions look flat compared to animated competitors | High | Requires frame-by-frame rendering (MoviePy/pycaps), not achievable with pure FFmpeg ASS; adds significant render time |
-| Speaker label overlay | "Joey:" prefix or name card when speaker changes; helps multi-host shows | Low-Med | Requires diarization data (already have `diarize.py`); simple text overlay |
-| Hook text overlay (first 1-2 seconds) | Static text at top "This changes everything" / "Nobody talks about this" before captions begin; used by viral channels | Low | Hard-code or AI-generate 1 hook line per clip; drawtext overlay for first 2s |
-| Comedy-aware caption timing | Hold caption longer on punchline; rush through setup; matches comedic rhythm | High | Requires clip-level comedic analysis; high risk of feeling wrong if automated |
-| Waveform visualization retained | The audiogram waveform adds visual interest absent in face-cam clips | Low | Already have this; keep it in the new subtitle clip style |
-| Multiple caption style presets (hormozi / clean / karaoke) | Different styles for different platforms/moods; Instagram skews cleaner, TikTok skews louder | Low | Parameterize ASS style; add SUBTITLE_STYLE env var |
+| Per-platform best-time analysis derived from own data | Generic industry best-time data is noise for a specific niche podcast; own historical data wins over industry averages | MEDIUM | Requires accumulating 5–10 episodes of analytics with known post times; parse `collected_at` vs engagement score and find correlation; viable after ~10 episodes | Compute per-platform engagement score vs hour-of-day from historical records; output recommended hour windows |
+| Engagement-weighted hashtag recommendations for Twitter | Tweets with 1–2 hashtags get double the engagement; the right hashtags for a dark comedy podcast differ from general podcast hashtags | LOW | Extend `content_editor.py` social caption generation; add hashtag list to config; no new API needed | Maintain a `config.py` list of known-high-performing hashtags for the show; inject top 1–2 into Twitter caption |
+| YouTube Shorts vs full-episode engagement split tracking | Tracking which clips perform best (by topic, clip position, duration) informs future `audio_clip_scorer.py` weighting | MEDIUM | Extend `analytics.py` to fetch stats for each uploaded Short's `video_id`; store alongside episode analytics | YouTube Data API v3 `videos.list` already used for full episode; same call works for Shorts |
+| Content category engagement correlation | If "shocking news" topics consistently outperform "absurd hypothetical" topics for this audience, the topic scorer should weight accordingly | MEDIUM | Cross-reference `topic_scorer.py` category field with `TopicEngagementScorer` output; needs at least 10 episodes of history | Compute average engagement score per category; write to `topic_data/category_performance.json`; load in `topic_scorer.py` |
+| Best-performing clip position report | Does clip 1 (intro of episode) always outperform clip 3? Knowing this helps `audio_clip_scorer.py` preference early high-energy moments | LOW | Analytics already stores `video_id` per episode; extend to store clip index and fetch per-clip stats | Tag each clip Short upload with its clip index (0, 1, 2); track separately in analytics |
+| Smart description/show notes optimization hints | YouTube descriptions with timestamps, keywords, and links in the first 200 chars perform better; the pipeline already generates show notes via GPT-4 | LOW | Post-process `show_notes` from `content_editor.py` before YouTube upload; ensure timestamps appear early | Add a description-formatting function that front-loads keywords and timestamps extracted from chapter data |
 
-## Anti-Features
+### Anti-Features (Commonly Requested, Often Problematic)
 
-Features to explicitly not build for this milestone.
-
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| Full animated text (scale/bounce per word) | Requires MoviePy or pycaps (alpha-stage library); adds Python dependencies and 5-10x render time per clip | Use FFmpeg ASS with per-word timing — achieves most of the visual impact at FFmpeg speed |
-| Face-cam / speaker video crop | Would require video recording infrastructure; this is an audio-only podcast | Keep branded background + waveform; the show's identity is audio-first |
-| Platform-specific cut lengths (separate 15s/30s/60s clips) | Adds clip management complexity; the AI already selects good 30-60s moments | Ensure clip scorer targets 30-60s duration; don't generate multiple lengths per clip |
-| AI-generated talking head avatars (HeyGen style) | Expensive APIs, uncanny valley risk, off-brand for edgy comedy | — |
-| Automatic B-roll / stock footage insertion | Would require stock video API (paid) and scene analysis | — |
-| Caption translation for multi-language | Out of scope for a single-language comedy show | — |
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Real-time audience activity dashboard | "Know when your audience is online" sounds useful | Requires always-on web server; this is a CLI pipeline; real-time requires WebSocket or polling infrastructure; not compatible with `python main.py ep29 --auto-approve` workflow | Compute audience activity windows in batch from historical data; write recommendations to a report file |
+| A/B testing different clip thumbnails or captions | Split testing is how SaaS tools differentiate | Requires uploading the same content twice with variants; burns YouTube upload quota; Twitter API rate limits are strict; doubles processing time; introduces state management for variant tracking | Use engagement trend analysis to observe natural variation across episodes; manually vary elements once per release and observe |
+| ML engagement prediction model (train-from-scratch) | Predicting future engagement before posting sounds appealing | Requires 50–100+ labeled episodes to train reliably; the show doesn't have that history yet; would produce low-confidence predictions at current scale; BERT models for podcast engagement prediction require 80%+ training accuracy to be useful | Use LLM-based topic scoring (already built) + historical category performance lookup; this delivers actionable signal with < 10 episodes of data |
+| Cross-platform analytics dashboard (web UI) | Unified view of all platforms in one place | Building a web UI is a separate project; requires a web framework, hosting, auth; completely out of scope for a CLI pipeline | Output a Markdown or CSV report to `output/analytics_report.md` that can be opened in any editor or spreadsheet |
+| Instagram analytics integration | Instagram in scope | Instagram API (Meta Graph API) for analytics requires a Business or Creator account; the Instagram uploader is a stub; analytics can't precede working upload | Defer until Instagram uploader is complete and account is configured; add placeholder in analytics structure |
+| TikTok analytics integration | TikTok in scope | TikTok Analytics API is gated behind TikTok for Developers approval; uploader is a stub; same problem as Instagram | Defer until TikTok uploader is complete; same defer rationale |
+| Automatic posting time switching mid-schedule | "If engagement is low, reschedule" | Modifying already-created schedules requires re-fetching upload state; the current `upload_schedule.json` model uses `status: pending/uploaded/failed`; mid-run rescheduling creates reconciliation complexity | Apply optimal windows at schedule creation time; don't attempt to adjust after the fact |
 
 ---
 
-## Episode Webpage Features
-
-### Table Stakes
-
-Features expected from any podcast episode page in 2025.
-Missing = page doesn't rank, looks unprofessional, misses distribution opportunities.
-
-| Feature | Why Expected | Complexity | Dependency on Existing | Notes |
-|---------|--------------|------------|----------------------|-------|
-| Full transcript on page | Google indexes transcripts; "This American Life" saw +4.36% traffic after publishing transcripts; Apple Podcasts links to transcripts | Low-Med | Full transcript already available from Whisper; needs HTML formatting | Format segments with timestamps as anchor links |
-| Episode title, number, publish date | Basic metadata; required for schema markup and social sharing | Low | Available from analysis/config | — |
-| Episode description / show notes | Summary that tells search engines and humans what the episode is about | Low | `episode_summary` and `show_notes` from `content_editor.py` analysis | Already generated; needs HTML rendering |
-| Open Graph + Twitter Card meta tags | Without OG tags, social shares show no preview image/title; clicks drop significantly | Low | Episode thumbnail already generated | `og:image`, `og:title`, `og:description`, `twitter:card` |
-| schema.org PodcastEpisode JSON-LD | Enables rich search results (embedded player, episode info); Google explicitly supports PodcastEpisode schema | Low | Structured data is a few JSON fields | `@type: PodcastEpisode`, `partOfSeries`, `associatedMedia`, `datePublished` |
-| Canonical URL per episode | Without canonical URL, search engines may not index the page | Low | GitHub Pages assigns URL automatically based on file path | — |
-| sitemap.xml | Search engines use sitemap to discover pages; new pages without sitemap take weeks to index | Low | Generate alongside episode pages | Static XML file listing all episode URLs |
-| Chapter timestamps with links | Jump-to-chapter links improve time-on-page and UX; Google surfaces timestamps in results for video content | Low | Chapter data already generated by `chapter_generator.py` | Format as `<a href="#t=123">` or timestamp links |
-
-### Differentiators for Episode Webpages
-
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Embedded clip videos (Shorts) on episode page | Keeps visitors on page longer; links YouTube Shorts back to source content; backlinks improve SEO | Low | YouTube embed iframes; use clip URLs from upload step |
-| Keyword-rich page slug (not just /ep25) | `/episode/why-true-crime-is-funny-ep25` ranks for show topics; generic slugs don't | Low-Med | AI-extract 3-5 keywords from episode title + summary; use as URL slug |
-| Keyword meta tags and page keywords | Drives long-tail search traffic; "podcast about [topic]" queries | Low | YAKE or simple frequency analysis on transcript; 5-10 keywords per episode |
-| Related episodes section | Reduces bounce rate; encourages binge-listening | Medium | FTS5 search index can surface related episodes by keyword overlap |
-| RSS/subscribe buttons on episode page | Converts web visitors to subscribers | Low | Static links to Spotify/Apple Podcasts RSS URL |
-
-### Anti-Features for Episode Webpages
-
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| JavaScript-heavy SPA / React page | GitHub Pages serves static HTML; JS-heavy pages have worse SEO and add build complexity | Jinja2-templated static HTML; zero JavaScript required |
-| CMS / database-backed pages | Adds hosting infrastructure; the constraint is zero-cost static hosting | Static HTML generated per episode by pipeline; committed to GitHub repo |
-| Comments / community features | Requires auth, moderation, database; completely out of scope | Link to Discord or YouTube comments |
-| Real-time audio player (custom) | Heavy JS dependency; mediocre UX vs native browser `<audio>` | Use plain HTML `<audio>` tag with episode MP3 URL; or Spotify embed |
-| Analytics dashboard on page | Use GitHub Pages + GA4 (free) for page analytics if needed | — |
-
----
-
-## Feature Dependencies (v1.1 scope only)
+## Feature Dependencies
 
 ```
-Burned-in subtitle clips (Hormozi-style)
-  └── Requires: word-level timestamps (already in transcript_data["words"])
-  └── Requires: ASS format subtitle generation (new: word_to_ass_segments())
-  └── Extends: subtitle_generator.py (new grouping mode: 1-3 words, pop style)
-  └── Extends: audiogram_generator.py (pass ASS file instead of SRT file)
-  └── Enables: all three platforms (YouTube Shorts, Reels, TikTok) already wired
+Engagement Trend Report
+    └── requires: multi-episode analytics aggregation (python main.py analytics all)
+    └── requires: historical ep_N_analytics.json files (already written by analytics.py)
 
-Keyword extraction
-  └── Requires: transcript text (already available)
-  └── Enables: episode webpage URL slug
-  └── Enables: SEO meta tags on episode page
-  └── Enables: page <title> tag keywords
+Optimal Posting Time Windows (data-derived)
+    └── requires: engagement trend data with known post timestamps
+    └── requires: at least 5-10 episodes of analytics history
+    └── enhances: UploadScheduler (replaces static hour-offsets)
 
-Episode webpage (GitHub Pages static HTML)
-  └── Requires: episode title, number, date (from analysis/config)
-  └── Requires: episode summary + show notes (from content_editor.py)
-  └── Requires: full transcript (from Whisper — already available)
-  └── Requires: chapter timestamps (from chapter_generator.py — already available)
-  └── Requires: keyword extraction (new feature, same milestone)
-  └── Requires: episode thumbnail path (already generated)
-  └── Requires: GitHub Pages repo configured (one-time setup, outside pipeline)
-  └── Produces: HTML file committed to gh-pages repo/branch
-  └── Enables: sitemap.xml update
-  └── Enables: SEO-indexed transcripts
+Topic-Engagement History Corpus
+    └── requires: TopicEngagementScorer.correlate_topics() (already exists)
+    └── requires: multi-episode analytics aggregation
+    └── enhances: topic_scorer.py engagement_bonus (already a stub field)
 
-sitemap.xml
-  └── Requires: episode webpage (must exist before sitemap entry)
-  └── Generated: alongside each episode page commit
+Category Performance Lookup
+    └── requires: topic-engagement history corpus
+    └── requires: topic_scorer.py category field per scored topic
+    └── enhances: topic scoring weights for future episodes
+
+Per-Clip Shorts Analytics
+    └── requires: clip video_id stored during YouTube upload step
+    └── requires: analytics.py YouTube fetch (already works for full episodes)
+    └── enhances: audio_clip_scorer.py (informs clip position/duration weighting)
+
+Hashtag Optimization
+    └── requires: config.py hashtag list (new config entry)
+    └── enhances: content_editor.py social caption generation (Twitter)
+    └── independent: can be added without analytics history
 ```
+
+### Dependency Notes
+
+- **Optimal posting time windows require episode history:** The pipeline processes roughly one episode per week. A meaningful data-derived best-time model needs 5–10 episodes with known post times and resulting engagement. Build the data accumulation infrastructure first (Phase 1), derive recommendations second (Phase 2).
+- **Per-clip Shorts analytics require clip video_id tracking:** The YouTube uploader must store the Shorts `video_id` per clip in the episode output (e.g., `episode_data.json`). This is a small addition to the upload step that unlocks clip-level analytics.
+- **Hashtag optimization is independent:** It requires only a config list and a text-processing step in `content_editor.py`. Ship it early — zero analytics data dependency, immediate value.
+- **Category performance conflicts with small dataset:** With fewer than 10 episodes, category averages are statistically unreliable (1–2 episodes per category). Don't gate topic scoring on this until corpus is large enough.
 
 ---
 
-## MVP Recommendation for v1.1
+## MVP Definition
 
-**Burned-in subtitle clips** — implement in two layers:
+### Launch With (v1.2 core)
 
-Layer 1 (core, must-have): Convert SRT line-grouping to word-level segments (1-3 words), generate ASS file with big font (FontSize ~100), high-contrast white text with black outline, positioned center-bottom. Feed ASS to existing audiogram FFmpeg command replacing the SRT force_style hack. This is a pure Python + FFmpeg change with no new dependencies.
+Minimum viable set that closes the analytics feedback loop without over-engineering.
 
-Layer 2 (differentiator, if time allows): Add per-word keyword highlighting — identify emphasis word in each segment (last word, or noun), override color with yellow accent `#e94560` (already the show's accent color). Still pure ASS, no MoviePy needed.
+- [ ] Multi-episode analytics aggregation (`python main.py analytics all`) — reads all saved JSON files, computes engagement trend table, outputs to stdout and `topic_data/analytics_report.md`
+- [ ] Topic-engagement history writer — after each `analytics` run, appends episode title + topics + engagement score to `topic_data/topic_engagement_history.json`
+- [ ] Platform best-time defaults in config — replace bare hour-offsets with named time windows (e.g., `SCHEDULE_YOUTUBE_WINDOW=tue-wed-18-21`) that encode day-of-week + hour range; keep backward-compatible with bare hour offsets
+- [ ] Hashtag config + injection — add `TWITTER_HASHTAGS` to config.py; inject top 1–2 tags into Twitter social caption in `content_editor.py`
+- [ ] Clip video_id tracking — store each uploaded Shorts `video_id` in episode output JSON; fetch per-clip stats in `analytics.py`
 
-**Episode webpages** — implement as static HTML generator:
+### Add After Validation (v1.2.x)
 
-1. Keyword extractor: Use YAKE (lightweight, no model download required) on transcript text. Produces 5-10 keyphrases. Feed to URL slug and meta tags.
-2. Jinja2 HTML template: Single episode page template. Fill with episode data. Write to `output/epXX/index.html`.
-3. GitHub Pages commit step: New pipeline step that pushes generated HTML to `gh-pages` branch of a separate repo (or `docs/` folder in this repo). One-time GitHub Pages setup required.
-4. sitemap.xml update: Append episode URL to sitemap on each run.
+Add once 10+ episodes of analytics history are accumulated.
 
-**Defer:**
-- Animated text entrance (MoviePy/pycaps) — too complex for v1.1, FFmpeg ASS achieves 80% of the visual effect
-- Related episodes section — FTS5 integration adds complexity; defer to v1.2
-- Embedded Shorts on episode page — defer until Shorts upload produces stable URLs in pipeline output
+- [ ] Data-derived optimal posting windows — analyze own post-time vs engagement history; output recommended windows per platform; auto-configure scheduler
+- [ ] Category performance report — compute average engagement score per topic category; surface in analytics report; feed into topic scorer
+- [ ] YouTube description optimization — format show notes to front-load timestamps and keywords in first 200 chars before upload
+
+### Future Consideration (v2+)
+
+Defer until the show has substantial audience data and these features provide clear lift.
+
+- [ ] Per-clip engagement analytics deep-dive — clip position, duration, and topic correlation with Shorts performance
+- [ ] Automated best-clip selection using historical engagement signal — replace energy-only scoring in `audio_clip_scorer.py` with hybrid energy + topic engagement model
+- [ ] Instagram and TikTok analytics integration — blocked on uploaders being complete and API access approved
+
+---
+
+## Feature Prioritization Matrix
+
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| Multi-episode analytics aggregation | HIGH | LOW | P1 |
+| Hashtag config + injection | HIGH | LOW | P1 |
+| Topic-engagement history writer | HIGH | LOW | P1 |
+| Platform best-time defaults (named windows) | MEDIUM | LOW | P1 |
+| Clip video_id tracking for Shorts | MEDIUM | LOW | P1 |
+| Data-derived posting windows (own data) | HIGH | MEDIUM | P2 |
+| Category performance report | MEDIUM | MEDIUM | P2 |
+| YouTube description formatting | MEDIUM | LOW | P2 |
+| Per-clip analytics deep-dive | LOW | MEDIUM | P3 |
+| Hybrid clip scoring (energy + engagement) | MEDIUM | HIGH | P3 |
+| Instagram/TikTok analytics | LOW | HIGH | P3 |
+
+**Priority key:**
+- P1: Must have for v1.2 launch — closes the basic feedback loop
+- P2: Should have once 10+ episodes of data exist — requires history to be useful
+- P3: Nice to have — future milestone material
+
+---
+
+## Competitor Feature Analysis
+
+This is a single-creator CLI pipeline, not a SaaS competitor. Comparison is against what tools like Buffer, Hootsuite, and Headliner offer — to identify what to replicate at zero cost vs what to skip.
+
+| Feature | Buffer / Hootsuite / Headliner | Our Approach |
+|---------|-------------------------------|--------------|
+| Best-time scheduling | ML model trained on millions of accounts; per-account audience activity graph | Industry defaults in config; own-data analysis after 10+ episodes; acceptable for indie podcast |
+| Cross-platform analytics dashboard | Web UI with charts, comparisons, exports | Markdown/CSV report to file; readable in any editor; zero infra |
+| A/B testing content variants | Upload variants, measure winner | Skip — quota and rate-limit risk; use natural variation observation instead |
+| Hashtag suggestions | Real-time trending hashtag lookup via API | Static curated list in config; podcast hashtags are stable (not trending-dependent) |
+| Clip selection AI | Automated highlight detection | Already built: `audio_clip_scorer.py` energy scoring; enhance with historical topic correlation |
+| Engagement prediction | Pre-publish score estimate | LLM topic scoring already does this; add historical category signal as modifier |
 
 ---
 
 ## Sources
 
-**Burned-in subtitle clips:**
-- [Hormozi-style captions guide — Riverside](https://riverside.com/blog/hormozi-style-videos) — MEDIUM confidence (WebSearch)
-- [Alex Hormozi Captions — SendShort](https://sendshort.ai/guides/hormozi-captions/) — MEDIUM confidence (WebSearch)
-- [3 Ways to Make Alex Hormozi Captions — Submagic](https://www.submagic.co/blog/how-to-make-alex-hormozi-captions) — MEDIUM confidence (WebSearch)
-- [Word-by-word captions with Python — AngelFolio](https://www.angel1254.com/blog/posts/word-by-word-captions) — MEDIUM confidence (WebSearch)
-- [Pycaps open-source subtitle animation — GitHub](https://github.com/francozanardi/pycaps) — HIGH confidence (official repo)
-- [Content-aware animated subtitles with Python — DEV.to](https://dev.to/francozanardi/how-to-create-content-aware-animated-subtitles-with-python-24dn) — MEDIUM confidence (WebSearch)
-- [Burn styled subtitles with FFmpeg — maxime.sh](https://maxime.sh/posts/burn-styled-subtitles-with-ffmpeg/) — MEDIUM confidence (WebSearch)
-- [FFmpeg ASS subtitle guide — Bannerbear](https://www.bannerbear.com/blog/how-to-add-subtitles-to-a-video-with-ffmpeg-5-different-styles/) — MEDIUM confidence (WebSearch)
-- [Vertical subtitle alignment stabilization — Alibaba product insights](https://www.alibaba.com/product-insights/why-do-ai-subtitle-burn-ins-shift-position-during-vertical-video-playback-and-how-to-stabilize-alignment.html) — LOW confidence (single source)
-- [Viral podcast clip guide 2025 — Fame](https://www.fame.so/post/ultimate-podcast-clip-guide) — MEDIUM confidence (WebSearch)
+- [Best time to post on YouTube — Sprout Social 2025](https://sproutsocial.com/insights/best-times-to-post-on-youtube/) — MEDIUM confidence (industry aggregate, not account-specific)
+- [Best time to post on Twitter/X — Buffer 2026, 1M posts analyzed](https://buffer.com/resources/best-time-to-post-on-twitter-x/) — MEDIUM confidence (industry aggregate)
+- [Best times to post on social media — Sprout Social 2025](https://sproutsocial.com/insights/best-times-to-post-on-social-media/) — MEDIUM confidence
+- [YouTube Analytics and Reporting APIs — Google for Developers](https://developers.google.com/youtube/analytics) — HIGH confidence (official docs)
+- [YouTube Analytics metrics reference — Google for Developers](https://developers.google.com/youtube/analytics/metrics) — HIGH confidence (official docs)
+- [Podcast engagement prediction research — ResearchGate (71–81% accuracy with BERT)](https://www.researchgate.net/publication/352397814_Modeling_Language_Usage_and_Listener_Engagement_in_Podcasts) — MEDIUM confidence (academic paper)
+- [Hashtag engagement on Twitter — 1–2 hashtags doubles engagement](https://chrismakara.com/tweet-analytics/) — LOW confidence (WebSearch only, treat as directional)
+- [Twitter A/B testing overview](https://www.twitter-follower.com/en/blog/twitter-ab-testing-campaign-optimization) — LOW confidence (WebSearch only)
+- [Podcast analytics metrics guide — Brand24 2026](https://brand24.com/blog/podcast-metrics/) — MEDIUM confidence (WebSearch)
 
-**Episode webpages / SEO:**
-- [PodcastEpisode schema.org type](https://schema.org/PodcastEpisode) — HIGH confidence (official spec)
-- [Schema markup for podcast websites — Podpage](https://support.podpage.com/en/articles/8649011-schema-markup-for-your-podcast-website) — MEDIUM confidence (WebSearch)
-- [Podcast SEO best practices 2025 — Fame](https://www.fame.so/post/podcast-seo) — MEDIUM confidence (WebSearch)
-- [Structured data for podcasts — Outcast](https://outcast.ai/blog/how-to-use-schema-markup-for-your-podcast/) — MEDIUM confidence (WebSearch)
-- [YAKE keyword extraction](http://yake.inesctec.pt/) — HIGH confidence (official project site)
-- [Staticjinja static site generator](https://github.com/staticjinja/staticjinja) — HIGH confidence (official repo)
-- [WhisperX word timestamps — openai/whisper discussion](https://github.com/openai/whisper/discussions/684) — HIGH confidence (official repo discussion)
+---
+*Feature research for: podcast engagement optimization (v1.2 milestone)*
+*Researched: 2026-03-18*
