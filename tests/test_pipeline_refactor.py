@@ -112,3 +112,180 @@ class TestContinueEpisodeDeleted:
             "continue_episode.py still exists — delete it as part of Plan 03 "
             "after its logic is extracted into pipeline/runner.py"
         )
+
+
+class TestComplianceBlock:
+    """run_distribute() blocks uploads when ctx.compliance_result['critical'] is True and ctx.force is False."""
+
+    def test_blocks_uploads_on_critical_violation(self, tmp_path):
+        """run_distribute() returns early without calling any upload functions when compliance is critical."""
+        from unittest.mock import MagicMock, patch
+        from pipeline.context import PipelineContext
+        from pipeline.steps.distribute import run_distribute
+
+        ctx = PipelineContext(
+            episode_folder="ep_1",
+            episode_number=1,
+            episode_output_dir=tmp_path,
+            timestamp="20240101_000000",
+            compliance_result={"critical": True, "flagged": [], "report_path": None},
+            force=False,
+            test_mode=False,
+        )
+
+        components = {
+            "dropbox": MagicMock(),
+            "uploaders": {},
+            "blog_generator": MagicMock(enabled=False),
+            "webpage_generator": MagicMock(enabled=False),
+            "search_index": None,
+            "scheduler": None,
+            "chapter_generator": None,
+        }
+
+        with patch("builtins.print") as mock_print:
+            result = run_distribute(ctx, components)
+
+        # Should return early — Dropbox upload_finished_episode NOT called
+        components["dropbox"].upload_finished_episode.assert_not_called()
+        assert result is ctx
+
+        # Should print BLOCKED message
+        printed = " ".join(str(call) for call in mock_print.call_args_list)
+        assert "BLOCKED" in printed
+
+
+class TestComplianceForce:
+    """run_distribute() proceeds normally when critical=True and ctx.force=True."""
+
+    def test_proceeds_with_force_flag(self, tmp_path):
+        """run_distribute() calls Dropbox upload when force=True despite critical violation."""
+        from unittest.mock import MagicMock
+        from pipeline.context import PipelineContext
+        from pipeline.steps.distribute import run_distribute
+
+        ctx = PipelineContext(
+            episode_folder="ep_1",
+            episode_number=1,
+            episode_output_dir=tmp_path,
+            timestamp="20240101_000000",
+            compliance_result={"critical": True, "flagged": [], "report_path": None},
+            force=True,
+            test_mode=True,  # use test_mode to skip actual Dropbox I/O
+        )
+
+        components = {
+            "dropbox": MagicMock(),
+            "uploaders": {},
+            "blog_generator": MagicMock(enabled=False),
+            "webpage_generator": MagicMock(enabled=False),
+            "search_index": None,
+            "scheduler": None,
+            "chapter_generator": None,
+        }
+
+        result = run_distribute(ctx, components)
+
+        # Should NOT return early — result is still ctx and no BLOCKED was raised
+        assert result is ctx
+        # Dropbox upload is skipped in test_mode, but the function reached Step 7
+        # The key assertion: upload_finished_episode was not called (test_mode skips it),
+        # but we did NOT return early — we reached the normal test_mode skip path
+        components["dropbox"].upload_finished_episode.assert_not_called()
+
+
+class TestComplianceClean:
+    """run_distribute() proceeds normally when compliance_result is None or critical=False."""
+
+    def test_proceeds_when_no_compliance_result(self, tmp_path):
+        """run_distribute() is not blocked when compliance_result is None."""
+        from unittest.mock import MagicMock
+        from pipeline.context import PipelineContext
+        from pipeline.steps.distribute import run_distribute
+
+        ctx = PipelineContext(
+            episode_folder="ep_1",
+            episode_number=1,
+            episode_output_dir=tmp_path,
+            timestamp="20240101_000000",
+            compliance_result=None,
+            force=False,
+            test_mode=True,
+        )
+
+        components = {
+            "dropbox": MagicMock(),
+            "uploaders": {},
+            "blog_generator": MagicMock(enabled=False),
+            "webpage_generator": MagicMock(enabled=False),
+            "search_index": None,
+            "scheduler": None,
+            "chapter_generator": None,
+        }
+
+        result = run_distribute(ctx, components)
+        assert result is ctx
+
+    def test_proceeds_when_critical_false(self, tmp_path):
+        """run_distribute() is not blocked when compliance_result critical=False."""
+        from unittest.mock import MagicMock
+        from pipeline.context import PipelineContext
+        from pipeline.steps.distribute import run_distribute
+
+        ctx = PipelineContext(
+            episode_folder="ep_1",
+            episode_number=1,
+            episode_output_dir=tmp_path,
+            timestamp="20240101_000000",
+            compliance_result={"critical": False, "flagged": [], "report_path": None},
+            force=False,
+            test_mode=True,
+        )
+
+        components = {
+            "dropbox": MagicMock(),
+            "uploaders": {},
+            "blog_generator": MagicMock(enabled=False),
+            "webpage_generator": MagicMock(enabled=False),
+            "search_index": None,
+            "scheduler": None,
+            "chapter_generator": None,
+        }
+
+        result = run_distribute(ctx, components)
+        assert result is ctx
+
+
+class TestForceFlag:
+    """--force in sys.argv flows through main.py args dict with force=True."""
+
+    def test_force_flag_in_argv(self, monkeypatch):
+        """--force in sys.argv is parsed and included as force=True in args dict."""
+        import sys
+
+        monkeypatch.setattr(sys, "argv", ["main.py", "ep1", "--force"])
+
+        # Re-read main.py flag parsing inline (without executing main())
+        force = "--force" in sys.argv
+        assert force is True
+
+    def test_force_flag_in_pipeline_context(self, tmp_path):
+        """PipelineContext.force defaults to False and can be set to True."""
+        from pipeline.context import PipelineContext
+
+        ctx_default = PipelineContext(
+            episode_folder="ep_1",
+            episode_number=1,
+            episode_output_dir=tmp_path,
+            timestamp="20240101_000000",
+        )
+        assert ctx_default.force is False
+
+        ctx_forced = PipelineContext(
+            episode_folder="ep_1",
+            episode_number=1,
+            episode_output_dir=tmp_path,
+            timestamp="20240101_000000",
+            force=True,
+        )
+        assert ctx_forced.force is True

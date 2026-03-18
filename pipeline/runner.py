@@ -35,6 +35,7 @@ from audiogram_generator import AudiogramGenerator
 from chapter_generator import ChapterGenerator
 from subtitle_clip_generator import SubtitleClipGenerator
 from episode_webpage_generator import EpisodeWebpageGenerator
+from content_compliance_checker import ContentComplianceChecker
 from retry_utils import retry_with_backoff
 
 from pipeline.context import PipelineContext
@@ -86,7 +87,9 @@ def _init_uploaders():
     return uploaders
 
 
-def _init_components(test_mode=False, dry_run=False, auto_approve=False, resume=False):
+def _init_components(
+    test_mode=False, dry_run=False, auto_approve=False, resume=False, force=False
+):
     """Initialize all pipeline components.
 
     Returns a components dict suitable for passing to step functions.
@@ -96,6 +99,7 @@ def _init_components(test_mode=False, dry_run=False, auto_approve=False, resume=
         dry_run: If True, skip heavy initialization (no I/O)
         auto_approve: If True, skip interactive clip approval
         resume: If True, resuming from checkpoint (informational only here)
+        force: If True, --force flag was passed (bypass compliance upload block)
     """
     print("=" * 60)
     print("FAKE PROBLEMS PODCAST AUTOMATION")
@@ -131,6 +135,7 @@ def _init_components(test_mode=False, dry_run=False, auto_approve=False, resume=
             "chapter_generator": ChapterGenerator(),
             "subtitle_clip_generator": SubtitleClipGenerator(),
             "webpage_generator": EpisodeWebpageGenerator(),
+            "compliance_checker": ContentComplianceChecker(),
         }
 
     # Validate configuration
@@ -170,6 +175,7 @@ def _init_components(test_mode=False, dry_run=False, auto_approve=False, resume=
     chapter_generator = ChapterGenerator()
     subtitle_clip_generator = SubtitleClipGenerator()
     webpage_generator = EpisodeWebpageGenerator()
+    compliance_checker = ContentComplianceChecker()
 
     print()
 
@@ -191,6 +197,7 @@ def _init_components(test_mode=False, dry_run=False, auto_approve=False, resume=
         "chapter_generator": chapter_generator,
         "subtitle_clip_generator": subtitle_clip_generator,
         "webpage_generator": webpage_generator,
+        "compliance_checker": compliance_checker,
     }
 
 
@@ -264,6 +271,7 @@ def run(args):
         dry_run = args.get("dry_run", False)
         auto_approve = args.get("auto_approve", False)
         resume = args.get("resume", False)
+        force = args.get("force", False)
     else:
         episode_number = getattr(args, "episode_number", None)
         dropbox_path = getattr(args, "dropbox_path", None)
@@ -272,9 +280,14 @@ def run(args):
         dry_run = getattr(args, "dry_run", False)
         auto_approve = getattr(args, "auto_approve", False)
         resume = getattr(args, "resume", False)
+        force = getattr(args, "force", False)
 
     components = _init_components(
-        test_mode=test_mode, dry_run=dry_run, auto_approve=auto_approve, resume=resume
+        test_mode=test_mode,
+        dry_run=dry_run,
+        auto_approve=auto_approve,
+        resume=resume,
+        force=force,
     )
 
     print("=" * 60)
@@ -324,6 +337,7 @@ def run(args):
         dry_run=dry_run,
         auto_approve=auto_approve or test_mode or dry_run,
         resume=resume,
+        force=force,
     )
 
     # Initialize pipeline state for checkpoint/resume
@@ -367,6 +381,31 @@ def run(args):
 
     # Step 3 + 3.5: Analysis
     ctx = run_analysis(ctx, components, state)
+
+    # Step 3.6: Content compliance check
+    print("STEP 3.6: CONTENT COMPLIANCE CHECK")
+    print("-" * 60)
+    compliance_checker = components.get("compliance_checker")
+    if compliance_checker and compliance_checker.enabled:
+        compliance_result = compliance_checker.check_transcript(
+            transcript_data=ctx.transcript_data,
+            episode_output_dir=ctx.episode_output_dir,
+            episode_number=ctx.episode_number,
+            timestamp=ctx.timestamp,
+        )
+        ctx.compliance_result = compliance_result
+        # Merge flagged segments into censor_timestamps for auto-muting (SAFE-03)
+        if compliance_result.get("flagged"):
+            existing = (ctx.analysis or {}).get("censor_timestamps", [])
+            new_entries = compliance_checker.get_censor_entries(compliance_result)
+            existing.extend(new_entries)
+            if ctx.analysis is None:
+                ctx.analysis = {}
+            ctx.analysis["censor_timestamps"] = existing
+            logger.info("Merged %d compliance flags into censor list", len(new_entries))
+    else:
+        logger.info("Content compliance check skipped (disabled)")
+    print()
 
     # Steps 4, 4.5, 6: Censor + normalize + MP3
     ctx = _run_process_audio(ctx, components, state)
@@ -682,6 +721,15 @@ def dry_run(components=None):
     steps_validated += 1
 
     print("[MOCK] Step 3: Content analysis -- would call LLM for content analysis")
+    steps_validated += 1
+
+    compliance_checker_dr = components.get("compliance_checker")
+    compliance_status = (
+        "enabled"
+        if compliance_checker_dr and compliance_checker_dr.enabled
+        else "disabled"
+    )
+    print(f"[MOCK] Step 3.6: Content compliance -- {compliance_status}")
     steps_validated += 1
 
     print(

@@ -367,6 +367,16 @@ def run_distribute(
     chapters_list = analysis.get("chapters", [])
     uploaders = components.get("uploaders", {})
 
+    # Compliance gate: block uploads on critical violations unless --force
+    compliance_result = ctx.compliance_result or {}
+    if compliance_result.get("critical") and not ctx.force:
+        print("[BLOCKED] Critical compliance violation detected -- uploads skipped.")
+        print("  Run with --force to override and upload anyway.")
+        report_path = compliance_result.get("report_path", "see output dir")
+        print(f"  Report: {report_path}")
+        print()
+        return ctx  # Skip all uploads
+
     # Step 7: Upload to Dropbox
     print("STEP 7: UPLOAD TO DROPBOX")
     print("-" * 60)

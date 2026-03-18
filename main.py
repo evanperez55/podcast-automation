@@ -21,9 +21,17 @@ def main():
     resume = "--resume" in sys.argv
     _dry_run = "--dry-run" in sys.argv
     auto_approve = "--auto-approve" in sys.argv
+    force = "--force" in sys.argv
 
     # Strip flags from argv before parsing positional args
-    flag_args = ["--test", "--test-mode", "--resume", "--dry-run", "--auto-approve"]
+    flag_args = [
+        "--test",
+        "--test-mode",
+        "--resume",
+        "--dry-run",
+        "--auto-approve",
+        "--force",
+    ]
     sys.argv = [arg for arg in sys.argv if arg not in flag_args]
 
     args = {
@@ -31,6 +39,7 @@ def main():
         "resume": resume,
         "dry_run": _dry_run,
         "auto_approve": auto_approve,
+        "force": force,
     }
 
     # Handle commands that don't need full component init

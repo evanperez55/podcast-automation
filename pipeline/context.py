@@ -36,6 +36,12 @@ class PipelineContext:
     finished_path: Optional[str] = None
     uploaded_clip_paths: list = field(default_factory=list)
 
+    # Compliance
+    compliance_result: Optional[dict] = (
+        None  # From ContentComplianceChecker.check_transcript()
+    )
+    force: bool = False  # --force bypasses compliance upload block
+
     # Run mode flags
     test_mode: bool = False
     dry_run: bool = False
