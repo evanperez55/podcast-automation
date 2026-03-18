@@ -310,7 +310,7 @@ class TestMarkFailed:
 
 
 class TestRunUploadScheduled:
-    """Tests for main._run_upload_scheduled with real uploader dispatch."""
+    """Tests for pipeline.runner.run_upload_scheduled with real uploader dispatch."""
 
     def _make_schedule(self, platform="youtube"):
         """Return a minimal schedule dict with one pending past-due platform."""
@@ -330,9 +330,9 @@ class TestRunUploadScheduled:
             },
         }
 
-    @patch("main.DiscordNotifier")
-    @patch("main.YouTubeUploader")
-    @patch("main.UploadScheduler")
+    @patch("pipeline.runner.DiscordNotifier")
+    @patch("pipeline.runner.YouTubeUploader")
+    @patch("pipeline.runner.UploadScheduler")
     def test_upload_success(
         self,
         mock_scheduler_cls,
@@ -361,17 +361,17 @@ class TestRunUploadScheduled:
         mock_yt_instance = mock_yt_cls.return_value
         mock_yt_instance.upload_episode.return_value = upload_result
 
-        from main import _run_upload_scheduled
+        from pipeline.runner import run_upload_scheduled
 
-        _run_upload_scheduled()
+        run_upload_scheduled()
 
         mock_yt_instance.upload_episode.assert_called_once()
         mock_scheduler.mark_uploaded.assert_called_once()
         mock_scheduler.mark_failed.assert_not_called()
 
-    @patch("main.DiscordNotifier")
-    @patch("main.YouTubeUploader")
-    @patch("main.UploadScheduler")
+    @patch("pipeline.runner.DiscordNotifier")
+    @patch("pipeline.runner.YouTubeUploader")
+    @patch("pipeline.runner.UploadScheduler")
     def test_upload_failure_after_retries(
         self,
         mock_scheduler_cls,
@@ -401,17 +401,17 @@ class TestRunUploadScheduled:
 
         mock_notifier_instance = mock_notifier_cls.return_value
 
-        from main import _run_upload_scheduled
+        from pipeline.runner import run_upload_scheduled
 
-        _run_upload_scheduled()
+        run_upload_scheduled()
 
         mock_scheduler.mark_failed.assert_called_once()
         mock_notifier_instance.notify_failure.assert_called_once()
         mock_scheduler.mark_uploaded.assert_not_called()
 
-    @patch("main.DiscordNotifier")
-    @patch("main.YouTubeUploader")
-    @patch("main.UploadScheduler")
+    @patch("pipeline.runner.DiscordNotifier")
+    @patch("pipeline.runner.YouTubeUploader")
+    @patch("pipeline.runner.UploadScheduler")
     def test_no_silent_success(
         self,
         mock_scheduler_cls,
@@ -439,9 +439,9 @@ class TestRunUploadScheduled:
         mock_yt_instance = mock_yt_cls.return_value
         mock_yt_instance.upload_episode.side_effect = ValueError("bad data")
 
-        from main import _run_upload_scheduled
+        from pipeline.runner import run_upload_scheduled
 
-        _run_upload_scheduled()
+        run_upload_scheduled()
 
         mock_scheduler.mark_uploaded.assert_not_called()
 
