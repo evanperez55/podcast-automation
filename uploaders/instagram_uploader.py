@@ -17,27 +17,18 @@ class InstagramUploader:
 
     def __init__(self):
         """Initialize Instagram uploader."""
-        self.access_token = Config.INSTAGRAM_ACCESS_TOKEN
-        self.account_id = Config.INSTAGRAM_ACCOUNT_ID
-
-        if (
-            not self.access_token
-            or self.access_token == "your_instagram_access_token_here"
-        ):
-            raise ValueError(
-                "Instagram access token not configured in .env file.\n"
-                "Please follow the setup instructions:\n"
-                "1. Create a Facebook App at https://developers.facebook.com\n"
-                "2. Add Instagram Graph API product\n"
-                "3. Get an Instagram Business Account access token\n"
-                "4. Add INSTAGRAM_ACCESS_TOKEN and INSTAGRAM_ACCOUNT_ID to .env"
-            )
-
-        if not self.account_id or self.account_id == "your_instagram_account_id_here":
-            raise ValueError(
-                "Instagram account ID not configured in .env file.\n"
-                "Add INSTAGRAM_ACCOUNT_ID to .env"
-            )
+        token = Config.INSTAGRAM_ACCESS_TOKEN
+        account_id = Config.INSTAGRAM_ACCOUNT_ID
+        self.functional = (
+            bool(token)
+            and token != "your_instagram_access_token_here"
+            and bool(account_id)
+            and account_id != "your_instagram_account_id_here"
+        )
+        if not self.functional:
+            return
+        self.access_token = token
+        self.account_id = account_id
 
     def upload_reel(
         self,
@@ -68,6 +59,8 @@ class InstagramUploader:
         Returns:
             Dictionary with Reel ID and permalink, or None if upload failed
         """
+        if not self.functional:
+            return None
         logger.info("Uploading Reel to Instagram")
         logger.info("Caption: %s...", caption[:80])
 
@@ -288,6 +281,8 @@ class InstagramUploader:
         Returns:
             Dictionary with Reel ID and permalink, or None if upload failed
         """
+        if not self.functional:
+            return None
         # Note: This requires Dropbox handler integration
         # For now, this is a placeholder that expects a direct link
         logger.info("To upload from Dropbox, you need to:")
@@ -304,6 +299,8 @@ class InstagramUploader:
         Returns:
             Dictionary with account information
         """
+        if not self.functional:
+            return None
         endpoint = f"{self.API_BASE}/{self.account_id}"
         params = {
             "fields": "id,username,name,profile_picture_url,followers_count,media_count",

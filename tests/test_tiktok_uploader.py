@@ -23,18 +23,20 @@ class TestTikTokUploader:
         assert uploader.access_token == "valid_token"
 
     @patch.object(Config, "TIKTOK_CLIENT_KEY", "your_tiktok_client_key_here")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
     def test_init_without_client_key(self):
-        """Test initialization fails without client key."""
-        with pytest.raises(ValueError, match="TikTok client key not configured"):
-            TikTokUploader()
+        """Test initialization sets .functional = False without client key."""
+        uploader = TikTokUploader()
+        assert uploader.functional is False
 
     @patch.object(Config, "TIKTOK_CLIENT_KEY", "valid_key")
     @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
     @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "your_tiktok_access_token_here")
     def test_init_without_access_token(self):
-        """Test initialization fails without access token."""
-        with pytest.raises(ValueError, match="TikTok access token not configured"):
-            TikTokUploader()
+        """Test initialization sets .functional = False without access token."""
+        uploader = TikTokUploader()
+        assert uploader.functional is False
 
     @patch.object(Config, "TIKTOK_CLIENT_KEY", "valid_key")
     @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")

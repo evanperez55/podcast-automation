@@ -236,6 +236,7 @@ class TwitterUploader:
         spotify_url: Optional[str] = None,
         clip_youtube_urls: Optional[List[Dict[str, str]]] = None,
         twitter_caption: Optional[str] = None,
+        hashtags: Optional[List[str]] = None,
     ) -> Optional[List[Dict[str, Any]]]:
         """
         Post an episode announcement as a thread.
@@ -247,6 +248,7 @@ class TwitterUploader:
             spotify_url: Optional Spotify URL
             clip_youtube_urls: Optional list of dicts with 'title' and 'url' for each clip
             twitter_caption: Optional AI-generated tweet text (used instead of template)
+            hashtags: Optional list of hashtags; top 2 are appended as '#tag1 #tag2'
 
         Returns:
             List of tweet info dictionaries, or None if failed
@@ -273,6 +275,16 @@ class TwitterUploader:
             )
             if youtube_url:
                 main_tweet += f"\n\n{youtube_url}"
+
+        # Inject hashtags as final line (top 2 only)
+        if hashtags:
+            hashtag_line = " ".join(f"#{tag}" for tag in hashtags[:2])
+            hashtag_addition = f"\n\n{hashtag_line}"
+            if len(main_tweet) + len(hashtag_addition) <= 280:
+                main_tweet = main_tweet + hashtag_addition
+            else:
+                max_len = 280 - len(hashtag_addition)
+                main_tweet = main_tweet[:max_len] + hashtag_addition
 
         # Build thread
         tweets = [main_tweet]

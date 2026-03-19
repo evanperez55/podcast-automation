@@ -16,30 +16,20 @@ class TikTokUploader:
 
     def __init__(self):
         """Initialize TikTok uploader."""
-        self.client_key = Config.TIKTOK_CLIENT_KEY
-        self.client_secret = Config.TIKTOK_CLIENT_SECRET
-        self.access_token = Config.TIKTOK_ACCESS_TOKEN
-
-        if not self.client_key or self.client_key == "your_tiktok_client_key_here":
-            raise ValueError(
-                "TikTok client key not configured in .env file.\n"
-                "Please follow the setup instructions:\n"
-                "1. Apply for TikTok Developer access at https://developers.tiktok.com\n"
-                "2. Create an app and get approved for Content Posting API\n"
-                "3. Add TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET to .env\n"
-                "4. Complete OAuth flow to get TIKTOK_ACCESS_TOKEN\n\n"
-                "Note: TikTok API access requires business verification"
-            )
-
-        if (
-            not self.access_token
-            or self.access_token == "your_tiktok_access_token_here"
-        ):
-            raise ValueError(
-                "TikTok access token not configured.\n"
-                "You need to complete the OAuth flow to get an access token.\n"
-                "See: https://developers.tiktok.com/doc/login-kit-web"
-            )
+        client_key = Config.TIKTOK_CLIENT_KEY
+        client_secret = Config.TIKTOK_CLIENT_SECRET
+        access_token = Config.TIKTOK_ACCESS_TOKEN
+        self.functional = (
+            bool(client_key)
+            and client_key != "your_tiktok_client_key_here"
+            and bool(access_token)
+            and access_token != "your_tiktok_access_token_here"
+        )
+        if not self.functional:
+            return
+        self.client_key = client_key
+        self.client_secret = client_secret
+        self.access_token = access_token
 
     def upload_video(
         self,
@@ -75,6 +65,8 @@ class TikTokUploader:
         Returns:
             Dictionary with video info, or None if upload failed
         """
+        if not self.functional:
+            return None
         video_path = Path(video_path)
         if not video_path.exists():
             print(f"[ERROR] Video file not found: {video_path}")
@@ -295,6 +287,8 @@ class TikTokUploader:
         Returns:
             Dictionary with user information
         """
+        if not self.functional:
+            return None
         endpoint = f"{self.API_BASE}/user/info/"
 
         headers = {

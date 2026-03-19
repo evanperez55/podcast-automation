@@ -24,14 +24,19 @@ class AnalyticsCollector:
         self.analytics_dir = Config.BASE_DIR / "topic_data" / "analytics"
         self.analytics_dir.mkdir(parents=True, exist_ok=True)
 
-    def fetch_youtube_analytics(self, episode_number: int) -> Optional[dict]:
+    def fetch_youtube_analytics(
+        self, episode_number: int, video_id: Optional[str] = None
+    ) -> Optional[dict]:
         """Fetch YouTube video statistics for an episode.
 
-        Searches for the episode by title pattern and retrieves view count,
-        like count, and comment count from the YouTube Data API v3.
+        When video_id is provided, skips the search API call (100 quota units)
+        and goes directly to videos().list() (1 quota unit). When video_id is
+        absent, searches by episode title to discover the video ID.
 
         Args:
             episode_number: The episode number to look up.
+            video_id: Optional known YouTube video ID. When provided, skips the
+                      search().list() call entirely.
 
         Returns:
             Dict with views, likes, comments, and video_id, or None on error.
@@ -54,27 +59,30 @@ class AnalyticsCollector:
 
             youtube = build("youtube", "v3", credentials=creds)
 
-            # Search for the episode video by title
-            search_response = (
-                youtube.search()
-                .list(
-                    q=f"Episode #{episode_number}",
-                    channelId=os.getenv("YOUTUBE_CHANNEL_ID", ""),
-                    type="video",
-                    part="id",
-                    maxResults=1,
+            if video_id is None:
+                # Search for the episode video by title (100 quota units)
+                search_response = (
+                    youtube.search()
+                    .list(
+                        q=f"Episode #{episode_number}",
+                        channelId=os.getenv("YOUTUBE_CHANNEL_ID", ""),
+                        type="video",
+                        part="id",
+                        maxResults=1,
+                    )
+                    .execute()
                 )
-                .execute()
-            )
 
-            items = search_response.get("items", [])
-            if not items:
-                logger.warning("No YouTube video found for Episode #%s", episode_number)
-                return None
+                items = search_response.get("items", [])
+                if not items:
+                    logger.warning(
+                        "No YouTube video found for Episode #%s", episode_number
+                    )
+                    return None
 
-            video_id = items[0]["id"]["videoId"]
+                video_id = items[0]["id"]["videoId"]
 
-            # Fetch video statistics
+            # Fetch video statistics (1 quota unit)
             stats_response = (
                 youtube.videos().list(part="statistics", id=video_id).execute()
             )
@@ -140,7 +148,11 @@ class AnalyticsCollector:
                 logger.warning("No tweets found for Episode #%s", episode_number)
                 return None
 
-            # Aggregate metrics across matching tweets
+            # Aggregate metrics across matching tweets.
+            # impression_count=0 on free tier is indistinguishable from "no data";
+            # use None as a sentinel so callers can distinguish "not reported" from
+            # genuinely zero impressions.
+            impression_data_available = False
             total_impressions = 0
             total_engagements = 0
             total_retweets = 0
@@ -148,7 +160,10 @@ class AnalyticsCollector:
 
             for tweet in response.data:
                 metrics = tweet.public_metrics or {}
-                total_impressions += metrics.get("impression_count", 0)
+                imp = metrics.get("impression_count")
+                if imp is not None and imp > 0:
+                    impression_data_available = True
+                    total_impressions += imp
                 total_engagements += (
                     metrics.get("reply_count", 0)
                     + metrics.get("retweet_count", 0)
@@ -159,7 +174,7 @@ class AnalyticsCollector:
                 total_likes += metrics.get("like_count", 0)
 
             return {
-                "impressions": total_impressions,
+                "impressions": total_impressions if impression_data_available else None,
                 "engagements": total_engagements,
                 "retweets": total_retweets,
                 "likes": total_likes,
@@ -228,6 +243,111 @@ class AnalyticsCollector:
         with open(analytics_path, "r", encoding="utf-8") as f:
             return json.load(f)
 
+    def _engagement_history_path(self) -> Path:
+        """Return the path to the cross-episode engagement history file."""
+        return Config.BASE_DIR / "topic_data" / "engagement_history.json"
+
+    def append_to_engagement_history(
+        self,
+        episode_number: int,
+        analytics_data: dict,
+        platform_ids: dict,
+        topics: list,
+        post_timestamp: str,
+    ) -> Path:
+        """Append or update per-episode record in engagement_history.json.
+
+        Upserts by episode_number — running analytics twice for the same episode
+        updates the existing record rather than appending a duplicate.
+
+        Args:
+            episode_number: The episode number.
+            analytics_data: Dict with 'youtube' and 'twitter' sub-dicts.
+            platform_ids: Dict with 'youtube' and/or 'twitter' IDs.
+            topics: List of topic strings (e.g. clip suggested titles).
+            post_timestamp: ISO timestamp of when the episode was published.
+
+        Returns:
+            Path to the updated engagement_history.json file.
+        """
+        history_path = self._engagement_history_path()
+
+        # Load existing history or start fresh
+        if history_path.exists():
+            with open(history_path, "r", encoding="utf-8") as f:
+                history = json.load(f)
+        else:
+            history = []
+
+        # Build the record
+        yt = analytics_data.get("youtube") or {}
+        tw = analytics_data.get("twitter") or {}
+
+        record: dict = {
+            "episode_number": episode_number,
+            "collected_at": datetime.now().isoformat(),
+            "post_timestamp": post_timestamp,
+            "topics": topics,
+            "youtube": (
+                {
+                    "video_id": platform_ids.get("youtube"),
+                    "views": yt.get("views", 0),
+                    "likes": yt.get("likes", 0),
+                    "comments": yt.get("comments", 0),
+                }
+                if yt
+                else None
+            ),
+            "twitter": (
+                {
+                    "tweet_id": platform_ids.get("twitter"),
+                    # None when free-tier API omits impression_count
+                    "impressions": tw.get("impressions"),
+                    "engagements": tw.get("engagements", 0),
+                    "retweets": tw.get("retweets", 0),
+                    "likes": tw.get("likes", 0),
+                }
+                if tw
+                else None
+            ),
+        }
+
+        # Upsert: update existing record for this episode, or append new
+        idx = next(
+            (i for i, r in enumerate(history) if r["episode_number"] == episode_number),
+            None,
+        )
+        if idx is not None:
+            history[idx] = record
+        else:
+            history.append(record)
+
+        history_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(history_path, "w", encoding="utf-8") as f:
+            json.dump(history, f, indent=2, ensure_ascii=False)
+
+        logger.info(
+            "Updated engagement history: %s (episode #%s)", history_path, episode_number
+        )
+        return history_path
+
+    def _load_platform_ids(self, episode_number: int) -> dict:
+        """Load stored platform IDs for an episode, or return empty dict.
+
+        Args:
+            episode_number: The episode number to load IDs for.
+
+        Returns:
+            Dict with 'youtube' and/or 'twitter' keys, or empty dict if not found.
+        """
+        platform_ids_path = (
+            Config.OUTPUT_DIR / f"ep_{episode_number}" / "platform_ids.json"
+        )
+        if platform_ids_path.exists():
+            with open(platform_ids_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        return {}
+
 
 class TopicEngagementScorer:
     """Score episode engagement and correlate with topics."""
@@ -268,8 +388,10 @@ class TopicEngagementScorer:
 
         tw = analytics_data.get("twitter")
         if tw:
+            # Guard against None impressions (free-tier Twitter returns null)
+            tw_impressions = tw.get("impressions") or 0
             twitter_score = (
-                tw.get("impressions", 0) * 0.0001
+                tw_impressions * 0.0001
                 + tw.get("engagements", 0) * 0.05
                 + tw.get("retweets", 0) * 0.2
                 + tw.get("likes", 0) * 0.1

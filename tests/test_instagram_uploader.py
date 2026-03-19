@@ -21,17 +21,18 @@ class TestInstagramUploader:
         assert uploader.account_id == "valid_account_id"
 
     @patch.object(Config, "INSTAGRAM_ACCESS_TOKEN", "your_instagram_access_token_here")
+    @patch.object(Config, "INSTAGRAM_ACCOUNT_ID", "valid_account_id")
     def test_init_without_access_token(self):
-        """Test initialization fails without access token."""
-        with pytest.raises(ValueError, match="Instagram access token not configured"):
-            InstagramUploader()
+        """Test initialization sets .functional = False without access token."""
+        uploader = InstagramUploader()
+        assert uploader.functional is False
 
     @patch.object(Config, "INSTAGRAM_ACCESS_TOKEN", "valid_token")
     @patch.object(Config, "INSTAGRAM_ACCOUNT_ID", "your_instagram_account_id_here")
     def test_init_without_account_id(self):
-        """Test initialization fails without account ID."""
-        with pytest.raises(ValueError, match="Instagram account ID not configured"):
-            InstagramUploader()
+        """Test initialization sets .functional = False without account ID."""
+        uploader = InstagramUploader()
+        assert uploader.functional is False
 
     @patch.object(Config, "INSTAGRAM_ACCESS_TOKEN", "valid_token")
     @patch.object(Config, "INSTAGRAM_ACCOUNT_ID", "valid_account_id")

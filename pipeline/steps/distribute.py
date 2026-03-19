@@ -179,6 +179,18 @@ def _upload_twitter(
                     {"title": clip_title, "url": clip_result["video_url"]}
                 )
 
+    # Extract top 2 unique hashtags from clip_hashtags across all clips
+    all_hashtags: list = []
+    for clip in best_clips:
+        all_hashtags.extend(clip.get("clip_hashtags", []))
+    seen: set = set()
+    unique_hashtags: list = []
+    for tag in all_hashtags:
+        if tag not in seen:
+            seen.add(tag)
+            unique_hashtags.append(tag)
+    top_hashtags = unique_hashtags[:2] if unique_hashtags else None
+
     if test_mode:
         logger.info("[TEST MODE] Skipping Twitter posts")
         logger.info("Would post: Episode %d announcement", episode_number)
@@ -186,6 +198,8 @@ def _upload_twitter(
             logger.info("Would include YouTube URL: %s", yt_full_url)
         if clip_youtube_urls:
             logger.info("Would link %d YouTube Shorts clips", len(clip_youtube_urls))
+        if top_hashtags:
+            logger.info("Would append hashtags: %s", top_hashtags)
         return {"status": "test_mode", "skipped": True}
     else:
         try:
@@ -196,6 +210,7 @@ def _upload_twitter(
                 youtube_url=yt_full_url,
                 clip_youtube_urls=clip_youtube_urls if clip_youtube_urls else None,
                 twitter_caption=twitter_caption,
+                hashtags=top_hashtags,
             )
             return twitter_result
         except Exception as e:
@@ -247,6 +262,7 @@ def _upload_to_social_media(
     components: dict,
     test_mode: bool = False,
     full_episode_video_path: str = None,
+    episode_output_dir: Path = None,
 ) -> dict:
     """Upload episode and clips to configured social media platforms."""
     results = {}
@@ -299,6 +315,22 @@ def _upload_to_social_media(
     )
     if twitter_results:
         results["twitter"] = twitter_results
+
+    # Persist platform IDs for analytics lookups (ANLYT-01)
+    if episode_output_dir is not None:
+        platform_ids: dict = {}
+        if youtube_results:
+            full_ep = youtube_results.get("full_episode") or {}
+            if full_ep.get("video_id"):
+                platform_ids["youtube"] = full_ep["video_id"]
+        if twitter_results and isinstance(twitter_results, list) and twitter_results:
+            if twitter_results[0].get("tweet_id"):
+                platform_ids["twitter"] = twitter_results[0]["tweet_id"]
+        if platform_ids:
+            platform_ids_path = episode_output_dir / "platform_ids.json"
+            with open(platform_ids_path, "w", encoding="utf-8") as f:
+                json.dump(platform_ids, f, indent=2)
+            logger.info("Saved platform IDs: %s", platform_ids_path)
 
     # Instagram Reels
     instagram_results = _upload_instagram(
@@ -541,6 +573,7 @@ def run_distribute(
             components=components,
             test_mode=ctx.test_mode,
             full_episode_video_path=full_episode_video_path,
+            episode_output_dir=episode_output_dir,
         )
 
     print()

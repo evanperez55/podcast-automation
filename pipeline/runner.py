@@ -64,18 +64,20 @@ def _init_uploaders():
         logger.info("Twitter uploader not available: %s", str(e).split("\n")[0])
 
     # Instagram
-    try:
-        uploaders["instagram"] = InstagramUploader()
+    uploaders["instagram"] = InstagramUploader()
+    if uploaders["instagram"].functional:
         logger.info("Instagram uploader initialized")
-    except ValueError as e:
-        logger.info("Instagram uploader not available: %s", str(e).split("\n")[0])
+    else:
+        logger.warning(
+            "[SKIP] Instagram: uploader not functional (credentials missing)"
+        )
 
     # TikTok
-    try:
-        uploaders["tiktok"] = TikTokUploader()
+    uploaders["tiktok"] = TikTokUploader()
+    if uploaders["tiktok"].functional:
         logger.info("TikTok uploader initialized")
-    except ValueError as e:
-        logger.info("TikTok uploader not available: %s", str(e).split("\n")[0])
+    else:
+        logger.warning("[SKIP] TikTok: uploader not functional (credentials missing)")
 
     # Spotify
     try:
@@ -795,8 +797,13 @@ def dry_run(components=None):
 
     # Step 8: check which uploader classes are importable
     platform_status = []
+    _dry_uploaders = components.get("uploaders", {})
     for name in ["youtube", "twitter", "instagram", "tiktok", "spotify"]:
-        platform_status.append(f"{name.capitalize()}: ready")
+        uploader = _dry_uploaders.get(name)
+        if uploader is not None and not getattr(uploader, "functional", True):
+            platform_status.append(f"{name.capitalize()}: STUB (not functional)")
+        else:
+            platform_status.append(f"{name.capitalize()}: ready")
     scheduling_note = ""
     if scheduler and scheduler.is_scheduling_enabled():
         scheduling_note = " (scheduling enabled)"
