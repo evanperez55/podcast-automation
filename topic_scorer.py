@@ -177,14 +177,15 @@ Return ONLY the JSON array."""
                     try:
                         from analytics import TopicEngagementScorer
 
-                        eng_scorer = TopicEngagementScorer()
-                        # Try to find analytics for related episodes
-                        bonus = eng_scorer.get_engagement_bonus(i + 1)
-                        if bonus is not None:
-                            topic["score"]["engagement_bonus"] = bonus
-                            topic["score"]["total"] = min(
-                                10, topic["score"]["total"] + bonus * 0.1
-                            )
+                        actual_ep = topic.get("episode_number")
+                        if actual_ep is not None:
+                            eng_scorer = TopicEngagementScorer()
+                            bonus = eng_scorer.get_engagement_bonus(actual_ep)
+                            if bonus is not None:
+                                topic["score"]["engagement_bonus"] = bonus
+                                topic["score"]["total"] = min(
+                                    10, topic["score"]["total"] + bonus * 0.1
+                                )
                     except Exception:
                         pass  # Analytics integration is optional
                 scored_topics.append(topic)
