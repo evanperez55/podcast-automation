@@ -30,7 +30,7 @@ Plan: 2 of 3 in current phase
 Status: In Progress
 Last activity: 2026-03-19 — 09-02 complete: stub uploader detection (.functional flag) + Twitter hashtag injection
 
-Progress: [██░░░░░░░░] 22% (v1.2 milestone)
+Progress: [███████░░░] 67% (v1.2 milestone)
 
 ## Shipped Milestones
 
@@ -48,6 +48,9 @@ Progress: [██░░░░░░░░] 22% (v1.2 milestone)
 - CONTENT-01 (hashtag injection) placed in Phase 9 — zero data dependency, immediate value
 - Instagram/TikTok uploaders now use .functional flag instead of ValueError raises — always instantiate, check flag before use
 - Hashtag injection limited to top 2 unique clip_hashtags per tweet, preserving 280-char budget
+- impression_count=0 on Twitter free tier returns None sentinel (not 0) — distinguishes free-tier limitation from actual zero impressions
+- platform_ids.json written as separate file in episode_output_dir (not merged into existing results JSON) — avoids risk of corrupting earlier pipeline output
+- engagement_history upsert keyed on episode_number to prevent duplicate records on re-runs of analytics command
 
 ### Blockers/Concerns
 
