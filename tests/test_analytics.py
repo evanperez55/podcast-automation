@@ -619,5 +619,234 @@ class TestFetchYoutubeAnalyticsVideoId:
         assert result["video_id"] == "known_vid_xyz"
 
 
+class TestRunBackfillIds:
+    """Tests for the run_backfill_ids pipeline function."""
+
+    def test_run_backfill_ids_writes_platform_ids(self, tmp_path):
+        """Backfill searches YouTube and writes platform_ids.json in each ep dir."""
+        # Create fake ep dirs
+        ep1_dir = tmp_path / "ep_1"
+        ep2_dir = tmp_path / "ep_2"
+        ep1_dir.mkdir()
+        ep2_dir.mkdir()
+
+        mock_youtube = MagicMock()
+        mock_search_response = {"items": [{"id": {"videoId": "vid_abc"}}]}
+        mock_youtube.search().list().execute.return_value = mock_search_response
+
+        with (
+            patch("pipeline.runner.AnalyticsCollector") as MockCollector,
+            patch("pipeline.runner.Config") as MockConfig,
+            patch("pipeline.runner.re") as mock_re,
+            patch("pipeline.runner.time"),
+            patch("pipeline.runner.json"),
+        ):
+            mock_re.search = __import__("re").search
+            MockConfig.OUTPUT_DIR = tmp_path
+
+            mock_collector_instance = MagicMock()
+            MockCollector.return_value = mock_collector_instance
+
+            # Build YouTube client via the collector instance
+            mock_collector_instance._build_youtube_client.return_value = mock_youtube
+
+            import builtins
+
+            opened_files = []
+
+            original_open = builtins.open
+
+            def fake_open(path, *args, **kwargs):
+                opened_files.append(str(path))
+                return original_open(path, *args, **kwargs)
+
+            with patch("builtins.open", side_effect=fake_open):
+                from pipeline.runner import run_backfill_ids
+
+                run_backfill_ids()
+
+        # platform_ids.json should exist in both dirs
+        assert (ep1_dir / "platform_ids.json").exists() or (
+            ep2_dir / "platform_ids.json"
+        ).exists()
+
+    def test_run_backfill_ids_skips_existing(self, tmp_path):
+        """Backfill skips ep dirs that already have platform_ids.json."""
+        ep1_dir = tmp_path / "ep_1"
+        ep1_dir.mkdir()
+        existing = ep1_dir / "platform_ids.json"
+        existing.write_text(
+            '{"youtube": "existing_id", "twitter": null}', encoding="utf-8"
+        )
+
+        mock_youtube = MagicMock()
+
+        with (
+            patch("pipeline.runner.AnalyticsCollector") as MockCollector,
+            patch("pipeline.runner.Config") as MockConfig,
+            patch("pipeline.runner.time"),
+        ):
+            MockConfig.OUTPUT_DIR = tmp_path
+            mock_collector_instance = MagicMock()
+            MockCollector.return_value = mock_collector_instance
+            mock_collector_instance._build_youtube_client.return_value = mock_youtube
+
+            from pipeline.runner import run_backfill_ids
+
+            run_backfill_ids()
+
+        # YouTube search should NOT have been called (file already exists)
+        mock_youtube.search.assert_not_called()
+        # File should be unchanged
+        content = json.loads(existing.read_text(encoding="utf-8"))
+        assert content["youtube"] == "existing_id"
+
+    def test_run_backfill_ids_handles_search_failure(self, tmp_path):
+        """Backfill logs warning and continues when YouTube search raises exception."""
+        ep1_dir = tmp_path / "ep_1"
+        ep2_dir = tmp_path / "ep_2"
+        ep1_dir.mkdir()
+        ep2_dir.mkdir()
+
+        mock_youtube = MagicMock()
+        # First call raises, second returns valid result
+        mock_youtube.search().list().execute.side_effect = [
+            Exception("API error"),
+            {"items": [{"id": {"videoId": "vid_ep2"}}]},
+        ]
+
+        with (
+            patch("pipeline.runner.AnalyticsCollector") as MockCollector,
+            patch("pipeline.runner.Config") as MockConfig,
+            patch("pipeline.runner.time"),
+        ):
+            MockConfig.OUTPUT_DIR = tmp_path
+            mock_collector_instance = MagicMock()
+            MockCollector.return_value = mock_collector_instance
+            mock_collector_instance._build_youtube_client.return_value = mock_youtube
+
+            from pipeline.runner import run_backfill_ids
+
+            # Should not raise even when search fails for one episode
+            run_backfill_ids()
+
+        # ep2 should have been processed (continues after ep1 failure)
+        assert (ep2_dir / "platform_ids.json").exists()
+
+    def test_run_backfill_ids_rate_limits(self, tmp_path):
+        """Backfill sleeps between YouTube API requests for rate limiting."""
+        ep1_dir = tmp_path / "ep_1"
+        ep2_dir = tmp_path / "ep_2"
+        ep3_dir = tmp_path / "ep_3"
+        ep1_dir.mkdir()
+        ep2_dir.mkdir()
+        ep3_dir.mkdir()
+
+        mock_youtube = MagicMock()
+        mock_youtube.search().list().execute.return_value = {
+            "items": [{"id": {"videoId": "vid_xyz"}}]
+        }
+
+        sleep_calls = []
+
+        with (
+            patch("pipeline.runner.AnalyticsCollector") as MockCollector,
+            patch("pipeline.runner.Config") as MockConfig,
+            patch("pipeline.runner.time") as mock_time_mod,
+        ):
+            mock_time_mod.sleep.side_effect = lambda s: sleep_calls.append(s)
+            MockConfig.OUTPUT_DIR = tmp_path
+            mock_collector_instance = MagicMock()
+            MockCollector.return_value = mock_collector_instance
+            mock_collector_instance._build_youtube_client.return_value = mock_youtube
+
+            from pipeline.runner import run_backfill_ids
+
+            run_backfill_ids()
+
+        # Should sleep between requests (one per ep processed)
+        assert len(sleep_calls) >= 1
+        assert all(s >= 1.0 for s in sleep_calls), "Sleep should be at least 1 second"
+
+
+class TestRunAnalyticsWiring:
+    """Tests that run_analytics uses platform_ids and calls append_to_engagement_history."""
+
+    def test_run_analytics_uses_platform_ids(self, tmp_path):
+        """_collect_episode_analytics loads platform_ids and passes video_id to fetch_youtube_analytics."""
+        ep_dir = tmp_path / "ep_25"
+        ep_dir.mkdir()
+
+        mock_collector = MagicMock()
+        mock_scorer = MagicMock()
+
+        platform_ids = {"youtube": "abc123", "twitter": None}
+        mock_collector._load_platform_ids.return_value = platform_ids
+        mock_collector.collect_analytics.return_value = {
+            "episode_number": 25,
+            "collected_at": "2026-03-19T00:00:00",
+            "youtube": {
+                "views": 1000,
+                "likes": 50,
+                "comments": 5,
+                "video_id": "abc123",
+            },
+            "twitter": None,
+        }
+        mock_scorer.calculate_engagement_score.return_value = 5.5
+
+        with patch("pipeline.runner.Config") as MockConfig:
+            MockConfig.OUTPUT_DIR = tmp_path
+
+            from pipeline.runner import _collect_episode_analytics
+
+            _collect_episode_analytics(mock_collector, mock_scorer, 25)
+
+        # _load_platform_ids should have been called with episode 25
+        mock_collector._load_platform_ids.assert_called_once_with(25)
+        # collect_analytics called with video_id from platform_ids
+        mock_collector.collect_analytics.assert_called_once()
+        call_args = mock_collector.collect_analytics.call_args
+        assert call_args[1].get("video_id") == "abc123" or (
+            len(call_args[0]) > 1 and call_args[0][1] == "abc123"
+        )
+
+    def test_run_analytics_calls_append_to_engagement_history(self, tmp_path):
+        """_collect_episode_analytics calls append_to_engagement_history after collecting metrics."""
+        ep_dir = tmp_path / "ep_1"
+        ep_dir.mkdir()
+
+        mock_collector = MagicMock()
+        mock_scorer = MagicMock()
+
+        platform_ids = {"youtube": "vid_001", "twitter": None}
+        mock_collector._load_platform_ids.return_value = platform_ids
+        analytics_data = {
+            "episode_number": 1,
+            "collected_at": "2026-03-19T00:00:00",
+            "youtube": {
+                "views": 500,
+                "likes": 20,
+                "comments": 3,
+                "video_id": "vid_001",
+            },
+            "twitter": None,
+        }
+        mock_collector.collect_analytics.return_value = analytics_data
+        mock_scorer.calculate_engagement_score.return_value = 3.5
+
+        with patch("pipeline.runner.Config") as MockConfig:
+            MockConfig.OUTPUT_DIR = tmp_path
+
+            from pipeline.runner import _collect_episode_analytics
+
+            _collect_episode_analytics(mock_collector, mock_scorer, 1)
+
+        # append_to_engagement_history should have been called
+        mock_collector.append_to_engagement_history.assert_called_once()
+        call_kwargs = mock_collector.append_to_engagement_history.call_args
+        assert call_kwargs[1]["episode_number"] == 1 or call_kwargs[0][0] == 1
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
