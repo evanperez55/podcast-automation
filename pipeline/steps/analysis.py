@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 
 from config import Config
+from engagement_scorer import EngagementScorer
 from pipeline.context import PipelineContext
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,19 @@ def run_analysis(
     topic_context = _load_scored_topics()
 
     analysis_path = episode_output_dir / f"{audio_file.stem}_{timestamp}_analysis.json"
+    # Load engagement context for prompt enrichment (optional — never blocks pipeline)
+    engagement_context = None
+    try:
+        scorer = EngagementScorer()
+        engagement_context = scorer.get_category_rankings()
+        logger.info(
+            "Engagement context: %s (%d episodes)",
+            engagement_context.get("status"),
+            engagement_context.get("episodes_analyzed", 0),
+        )
+    except Exception:
+        pass  # Engagement scoring is optional — never blocks analysis
+
     if state and state.is_step_completed("analyze"):
         outputs = state.get_step_outputs("analyze")
         analysis_path = Path(outputs["analysis_path"])
@@ -84,7 +98,10 @@ def run_analysis(
         logger.info("[RESUME] Skipping analysis (already completed)")
     else:
         analysis = components["editor"].analyze_content(
-            transcript_data, topic_context=topic_context, audio_path=audio_file
+            transcript_data,
+            topic_context=topic_context,
+            audio_path=audio_file,
+            engagement_context=engagement_context,
         )
         with open(analysis_path, "w", encoding="utf-8") as f:
             json.dump(analysis, f, indent=2, ensure_ascii=False)
