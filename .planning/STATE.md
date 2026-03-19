@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: Engagement & Smart Scheduling
 status: completed
 stopped_at: Completed 11-02-PLAN.md (PostingTimeOptimizer wired into scheduler and distribute.py)
-last_updated: "2026-03-19T02:25:43.536Z"
-last_activity: "2026-03-19 — 11-01 complete: PostingTimeOptimizer computes optimal publish datetimes per platform"
+last_updated: "2026-03-19T02:32:06.661Z"
+last_activity: "2026-03-19 — 11-02 complete: UploadScheduler.get_optimal_publish_at wired to PostingTimeOptimizer; distribute.py updated"
 progress:
   total_phases: 3
   completed_phases: 3
