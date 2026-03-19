@@ -21,8 +21,8 @@
 
 ### Smart Scheduling
 
-- [ ] **SCHED-01**: Optimal posting time computed from own historical data + research defaults
-- [ ] **SCHED-02**: Platform-specific scheduling windows (YouTube, Twitter differ)
+- [x] **SCHED-01**: Optimal posting time computed from own historical data + research defaults
+- [x] **SCHED-02**: Platform-specific scheduling windows (YouTube, Twitter differ)
 - [ ] **SCHED-03**: scheduler.py accepts computed optimal times instead of fixed delay config
 
 ### Content Optimization
@@ -71,8 +71,8 @@
 | ENGAGE-03 | Phase 10 | Complete |
 | ENGAGE-04 | Phase 10 | Complete |
 | CONTENT-02 | Phase 10 | Complete |
-| SCHED-01 | Phase 11 | Pending |
-| SCHED-02 | Phase 11 | Pending |
+| SCHED-01 | Phase 11 | Complete |
+| SCHED-02 | Phase 11 | Complete |
 | SCHED-03 | Phase 11 | Pending |
 
 **Coverage:**

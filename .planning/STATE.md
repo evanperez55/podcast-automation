@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Engagement & Smart Scheduling
-status: completed
-stopped_at: Completed 10-02-PLAN.md (engagement context injection into GPT-4o prompt)
-last_updated: "2026-03-19T01:51:54.397Z"
-last_activity: "2026-03-19 — 10-02 complete: engagement context wired into content_editor + pipeline"
+status: in_progress
+stopped_at: Completed 11-01-PLAN.md (PostingTimeOptimizer with per-platform posting hours)
+last_updated: "2026-03-19T02:13:00Z"
+last_activity: "2026-03-19 — 11-01 complete: PostingTimeOptimizer computes optimal publish datetimes per platform"
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 6
+  completed_plans: 6
   percent: 100
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-18)
 
 **Core value:** One command produces professional-quality, platform-ready podcast content that sounds hand-edited and captures the show's edgy comedy voice — without manual intervention.
-**Current focus:** Phase 10 — Engagement Scoring
+**Current focus:** Phase 11 — Smart Scheduling
 
 ## Current Position
 
-Phase: 10 of 11 (Engagement Scoring)
-Plan: 2 of 2 in current phase — PHASE COMPLETE
-Status: Plan 10-02 Complete
-Last activity: 2026-03-19 — 10-02 complete: engagement context wired into content_editor + pipeline
+Phase: 11 of 11 (Smart Scheduling)
+Plan: 1 of 2 in current phase — PLAN COMPLETE
+Status: Plan 11-01 Complete
+Last activity: 2026-03-19 — 11-01 complete: PostingTimeOptimizer computes optimal publish datetimes per platform
 
-Progress: [██████████] 100% (5/5 plans complete in v1.2)
+Progress: [██████████] 100% (6/6 plans complete in v1.2)
 
 ## Shipped Milestones
 
@@ -66,6 +66,12 @@ Progress: [██████████] 100% (5/5 plans complete in v1.2)
 - Engagement section uses top-3 category rankings to keep GPT-4o prompt concise while closing the analytics feedback loop
 - Pipeline wraps EngagementScorer in try/except — engagement enrichment is advisory, never a gate for podcast production
 
+### Decisions (Phase 11)
+
+- PostingTimeOptimizer returns None naturally on insufficient data — no exceptions, no enabled gate
+- Module-level helpers (_best_weekday, _next_occurrence, _posting_hour_for) are public for direct unit testing
+- history_path constructor arg forwarded to EngagementScorer — enables clean testing without mocking Config
+
 ### Blockers/Concerns
 
 - [Phase 9]: YouTube Analytics API v2 OAuth scope (`yt-analytics.readonly`) may not be in existing credentials — verify before testing analytics end-to-end
@@ -80,6 +86,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T01:45:00Z
-Stopped at: Completed 10-02-PLAN.md (engagement context injection into GPT-4o prompt)
+Last session: 2026-03-19T02:13:00Z
+Stopped at: Completed 11-01-PLAN.md (PostingTimeOptimizer with per-platform posting hours)
 Resume file: None
