@@ -23,7 +23,7 @@
 
 - [x] **SCHED-01**: Optimal posting time computed from own historical data + research defaults
 - [x] **SCHED-02**: Platform-specific scheduling windows (YouTube, Twitter differ)
-- [ ] **SCHED-03**: scheduler.py accepts computed optimal times instead of fixed delay config
+- [x] **SCHED-03**: scheduler.py accepts computed optimal times instead of fixed delay config
 
 ### Content Optimization
 
@@ -73,7 +73,7 @@
 | CONTENT-02 | Phase 10 | Complete |
 | SCHED-01 | Phase 11 | Complete |
 | SCHED-02 | Phase 11 | Complete |
-| SCHED-03 | Phase 11 | Pending |
+| SCHED-03 | Phase 11 | Complete |
 
 **Coverage:**
 - v1.2 requirements: 13 total

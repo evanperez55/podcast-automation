@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Engagement & Smart Scheduling
-status: in_progress
-stopped_at: Completed 11-01-PLAN.md (PostingTimeOptimizer with per-platform posting hours)
-last_updated: "2026-03-19T02:13:00Z"
+status: completed
+stopped_at: Completed 11-02-PLAN.md (PostingTimeOptimizer wired into scheduler and distribute.py)
+last_updated: "2026-03-19T02:25:43.536Z"
 last_activity: "2026-03-19 — 11-01 complete: PostingTimeOptimizer computes optimal publish datetimes per platform"
 progress:
   total_phases: 3
-  completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  completed_phases: 3
+  total_plans: 7
+  completed_plans: 7
   percent: 100
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-18)
 ## Current Position
 
 Phase: 11 of 11 (Smart Scheduling)
-Plan: 1 of 2 in current phase — PLAN COMPLETE
-Status: Plan 11-01 Complete
-Last activity: 2026-03-19 — 11-01 complete: PostingTimeOptimizer computes optimal publish datetimes per platform
+Plan: 2 of 2 in current phase — PHASE COMPLETE
+Status: Plan 11-02 Complete — v1.2 milestone SHIPPED
+Last activity: 2026-03-19 — 11-02 complete: UploadScheduler.get_optimal_publish_at wired to PostingTimeOptimizer; distribute.py updated
 
-Progress: [██████████] 100% (6/6 plans complete in v1.2)
+Progress: [██████████] 100% (7/7 plans complete in v1.2)
 
 ## Shipped Milestones
 
@@ -71,6 +71,8 @@ Progress: [██████████] 100% (6/6 plans complete in v1.2)
 - PostingTimeOptimizer returns None naturally on insufficient data — no exceptions, no enabled gate
 - Module-level helpers (_best_weekday, _next_occurrence, _posting_hour_for) are public for direct unit testing
 - history_path constructor arg forwarded to EngagementScorer — enables clean testing without mocking Config
+- Module-level import for PostingTimeOptimizer in scheduler.py — enables @patch testability; no circular import exists
+- PostingTimeOptimizer wrapped in try/except in get_optimal_publish_at — matches engagement enrichment pattern, smart scheduling never blocks pipeline
 
 ### Blockers/Concerns
 
@@ -86,6 +88,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T02:13:00Z
-Stopped at: Completed 11-01-PLAN.md (PostingTimeOptimizer with per-platform posting hours)
+Last session: 2026-03-19T02:25:43.524Z
+Stopped at: Completed 11-02-PLAN.md (PostingTimeOptimizer wired into scheduler and distribute.py)
 Resume file: None
