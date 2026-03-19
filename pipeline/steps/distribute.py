@@ -292,7 +292,7 @@ def _upload_to_social_media(
         }
 
     # YouTube uploads (may use publishAt if scheduled)
-    publish_at = scheduler.get_youtube_publish_at() if scheduler else None
+    publish_at = scheduler.get_optimal_publish_at("youtube") if scheduler else None
     youtube_results = _upload_youtube(
         episode_number,
         video_clip_paths,
