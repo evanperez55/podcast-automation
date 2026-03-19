@@ -83,6 +83,48 @@
 
 ---
 
+## Milestone: v1.2 — Engagement & Smart Scheduling
+
+**Shipped:** 2026-03-19
+**Phases:** 3 | **Plans:** 7 | **Sessions:** ~1
+
+### What Was Built
+- Platform ID capture at upload + backfill-ids CLI for existing episodes
+- Engagement history accumulator with episode-level upsert
+- Spearman category ranking with comedy voice constraint and confidence gating
+- GPT-4o content generation informed by top-3 historically high-performing categories
+- Smart scheduling with per-platform optimal posting windows and three-tier cascade fallback
+- Stub uploader detection + Twitter hashtag auto-injection
+
+### What Worked
+- Sequential phase dependencies (9→10→11) were well-scoped — each phase delivered exactly what the next consumed
+- Comedy voice as hard constraint was the right architectural choice — prevents metric-chasing from eroding the show's identity
+- Three-tier cascade in scheduler (optimizer → fixed delay → None) means the pipeline never blocks, even with zero history
+- Parallel execution in Wave 1 of Phase 9 (plans 01+02 touch different files) saved time
+
+### What Was Inefficient
+- SUMMARY frontmatter `requirements_completed` still inconsistently populated (same issue as v1.0 and v1.1)
+- Nyquist VALIDATION.md frontmatter STILL not flipped post-execution (3rd milestone in a row)
+- Some agents shared commits (09-01 and 09-02 had overlapping staging) — parallel execution needs better file isolation
+
+### Patterns Established
+- `.functional` flag pattern for stub uploaders — always instantiate, check flag before use
+- Confidence gating: return `None` below threshold, let callers fall through to defaults
+- Advisory enrichment pattern: try/except wrap around optional scoring, never gate pipeline
+- Platform-specific config via `SCHEDULE_*_POSTING_HOUR` env vars with research-based defaults
+
+### Key Lessons
+1. Confidence gating is essential for data-driven features at low episode counts — prevents noisy early recommendations
+2. Advisory (not gating) pattern works perfectly for optional enrichment like engagement scoring and smart scheduling
+3. SUMMARY/VALIDATION frontmatter automation is overdue — 3 milestones of the same manual-update debt
+
+### Cost Observations
+- Model mix: ~15% opus (orchestration), ~85% sonnet (research, planning, execution, verification)
+- Sessions: ~1 (entire milestone in a single conversation)
+- Notable: 3 phases in 1 day — fastest milestone yet. Research phase was the longest step (~30 min for 4 parallel researchers)
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -91,6 +133,7 @@
 |-----------|----------|--------|------------|
 | v1.0 | ~3 | 5 | Established TDD + mechanical extraction pattern |
 | v1.1 | ~1 | 3 | Independent phases, censor_timestamps reuse pattern |
+| v1.2 | ~1 | 3 | Sequential deps, confidence gating, advisory enrichment |
 
 ### Cumulative Quality
 
@@ -98,9 +141,11 @@
 |-----------|-------|----------|-------------------|
 | v1.0 | 333 | — | 2 (mutagen, openai) |
 | v1.1 | 422 | — | 2 (PyGithub, yake) |
+| v1.2 | 487 | — | 0 (scipy/pandas already installed) |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Integration testing at milestone boundary catches gaps that phase-level unit tests miss (v1.0: VOICE-02 wiring, v1.1: run_distribute_only bypass)
+1. Integration testing at milestone boundary catches gaps that phase-level unit tests miss (v1.0: VOICE-02, v1.1: run_distribute_only, v1.2: Instagram/TikTok day-of-week)
 2. Refactor last — stable code is safer to extract than moving targets
-3. Nyquist frontmatter updates are consistently forgotten — needs automation
+3. Nyquist/SUMMARY frontmatter automation is overdue — same manual debt across all 3 milestones
+4. Advisory (not gating) pattern is the right default for optional enrichment features

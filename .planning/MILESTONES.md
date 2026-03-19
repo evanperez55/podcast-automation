@@ -1,5 +1,29 @@
 # Milestones
 
+## v1.2 Engagement & Smart Scheduling (Shipped: 2026-03-19)
+
+**Phases:** 3 | **Plans:** 7 | **Files changed:** 46 (+5721/-167)
+**New code:** 1,278 LOC Python (2 new modules + 4 new test files + extensions)
+**Requirements:** 13/13 satisfied (ANLYT-01–04, ENGAGE-01–04, SCHED-01–03, CONTENT-01–02)
+**Timeline:** 2026-03-18 → 2026-03-19 (1 day)
+**Git range:** test(09-01) → feat(11-02)
+
+**Key accomplishments:**
+1. Platform IDs captured at upload — analytics saves 100 quota units/episode by skipping YouTube search API
+2. Engagement history accumulator builds cross-episode corpus automatically with upsert logic
+3. Spearman category ranking with comedy voice as hard constraint — edgy content never scored down
+4. GPT-4o content generation receives top-3 historically high-performing categories as prompt context
+5. Smart scheduling computes optimal posting windows per platform, research-based fallback when sparse
+6. Stub uploader detection (.functional flags) + hashtag auto-injection into Twitter posts
+7. topic_scorer episode number bug fixed (loop index → actual episode number)
+
+**Tech debt accepted:**
+- VALIDATION.md nyquist_compliant not flipped post-execution (all 3 phases)
+- SUMMARY frontmatter missing some requirements_completed entries
+- Instagram/TikTok day-of-week data not in EngagementScorer (uploaders are stubs — by design)
+
+---
+
 ## v1.1 Discoverability & Short-Form (Shipped: 2026-03-18)
 
 **Phases:** 3 | **Plans:** 6 | **Files changed:** 35 (+5931/-68)

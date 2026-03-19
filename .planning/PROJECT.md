@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An automated podcast production pipeline for the "Fake Problems Podcast" — an edgy comedy show. One command takes raw audio through transcription, AI content analysis with the show's comedy voice, smooth audio ducking censorship, LUFS-normalized mastering, chapter markers, clip generation scored by audio energy, Hormozi-style subtitle clips, SEO-optimized episode webpages, content compliance checking, and multi-platform distribution (YouTube, Spotify, Twitter, Instagram, TikTok). Shipped v1.1 with discoverability and safety features.
+An automated podcast production pipeline for the "Fake Problems Podcast" — an edgy comedy show. One command takes raw audio through transcription, AI content analysis with the show's comedy voice, smooth audio ducking censorship, LUFS-normalized mastering, chapter markers, clip generation scored by audio energy, Hormozi-style subtitle clips, SEO-optimized episode webpages, content compliance checking, engagement-optimized scheduling, and multi-platform distribution (YouTube, Spotify, Twitter, Instagram, TikTok). Shipped v1.2 with data-driven engagement optimization.
 
 ## Core Value
 
@@ -54,12 +54,20 @@ One command produces professional-quality, platform-ready podcast content that s
 - ✓ Content compliance checker (GPT-4o) flagging YouTube guideline violations — v1.1
 - ✓ Auto-muting flagged segments via censor_timestamps merge — v1.1
 - ✓ Upload safety gate with --force override — v1.1
+- ✓ Platform ID capture at upload time (quota-safe analytics) — v1.2
+- ✓ Engagement history accumulation with upsert logic — v1.2
+- ✓ Twitter impression null guard for free tier — v1.2
+- ✓ Stub uploader detection (.functional flags) — v1.2
+- ✓ Hashtag auto-injection into Twitter posts — v1.2
+- ✓ Spearman category ranking with comedy voice constraint — v1.2
+- ✓ GPT-4o content generation with engagement history context — v1.2
+- ✓ Smart scheduling with per-platform optimal posting windows — v1.2
+- ✓ Backfill-ids CLI command for existing episodes — v1.2
+- ✓ topic_scorer episode number bug fix — v1.2
 
-### Active (v1.2 — Engagement & Smart Scheduling)
+### Active
 
-- [ ] Optimal posting time analysis and automated scheduling per platform
-- [ ] Content/subject matter optimization for engagement
-- [ ] Analytics-driven clip and post strategy
+(None — ship next milestone to validate)
 
 ### Future
 
@@ -83,7 +91,7 @@ One command produces professional-quality, platform-ready podcast content that s
 
 - Comedy podcast with edgy/dark humor tone — AI-generated content must match this voice
 - Two hosts, weekly episodes (~70 minutes, ~700MB WAV)
-- v1.1 shipped: ~26,400 LOC Python across 33+ modules, 422 tests, modular pipeline/ architecture
+- v1.2 shipped: ~28,000 LOC Python across 35+ modules, 487 tests, modular pipeline/ architecture
 - Pipeline architecture: main.py (134 lines, CLI shim) → pipeline/runner.py (orchestrator) → pipeline/steps/ (5 step modules)
 - Pipeline step order: 1 Download → 2 Transcribe → 3 Analyze → 3.5 Topic → 3.6 Compliance → 4 Censor → 4.5 Normalize → 5 Clips → 5.1 Approval → 5.4 Subtitles → 5.5 Video → 5.6 Thumbnail → 6 MP3 → 7 Dropbox → 7.5 RSS → 8 Social → 8.5 Blog → 8.6 Webpage → 9 Search
 - 9 checkpoint keys for resume: transcribe, analyze, censor, normalize, create_clips, subtitles, convert_videos, convert_mp3, blog_post
@@ -111,16 +119,14 @@ One command produces professional-quality, platform-ready podcast content that s
 | GPT-4o at temp=0.1 for compliance | Deterministic classification, not creative generation | ✓ Good — consistent flagging |
 | Merge flagged segments into censor_timestamps | Reuse existing AudioProcessor duck-fade, zero new FFmpeg code | ✓ Good — elegant reuse |
 | Comedy-aware compliance prompt | Dark humor and profanity are NOT violations; only genuine hate speech and dangerous misinformation | ✓ Good — avoids over-flagging |
+| scipy Spearman over ML/scikit-learn | Dataset too small (~30 episodes) for ML; correlations are statistically appropriate | ✓ Good — simple, interpretable, no overfitting |
+| Comedy voice as binary constraint | Edgy content categories (shocking_news, absurd_hypothetical) can never receive negative scores | ✓ Good — optimizer cannot erode the show's identity |
+| 15-episode confidence gate | Below threshold, optimizer returns nothing — pipeline uses fixed delays | ✓ Good — prevents noisy early recommendations |
+| Store video_id at upload time | Avoids 100-unit YouTube search API call per episode during analytics | ✓ Good — quota-safe from day one |
 
-## Current Milestone: v1.2 Engagement & Smart Scheduling
+## Current State
 
-**Goal:** Maximize clip and post engagement through data-driven posting schedules, content optimization, and analytics feedback loops.
-
-**Target features:**
-- Optimal posting time analysis per platform (YouTube, Twitter, Instagram, TikTok)
-- Automated smart scheduling based on audience activity patterns
-- Content/subject matter scoring for engagement prediction
-- Analytics feedback loop improving future clip selection and post timing
+v1.0, v1.1, and v1.2 shipped. No active milestone. Run `/gsd:new-milestone` to start v1.3 or v2.0.
 
 ---
-*Last updated: 2026-03-18 after v1.2 milestone start*
+*Last updated: 2026-03-19 after v1.2 milestone completion*
