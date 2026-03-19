@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Engagement & Smart Scheduling
 status: completed
-stopped_at: Completed 09-03-PLAN.md (backfill-ids command + analytics wiring)
-last_updated: "2026-03-19T01:05:34.208Z"
+stopped_at: Completed 10-01-PLAN.md (EngagementScorer + topic_scorer bug fix)
+last_updated: "2026-03-19T01:36:10.780Z"
 last_activity: "2026-03-19 — 09-03 complete: backfill-ids command + analytics-to-engagement-history wiring"
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 5
+  completed_plans: 4
   percent: 100
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-18)
 
 **Core value:** One command produces professional-quality, platform-ready podcast content that sounds hand-edited and captures the show's edgy comedy voice — without manual intervention.
-**Current focus:** Phase 9 — Analytics Infrastructure
+**Current focus:** Phase 10 — Engagement Scoring
 
 ## Current Position
 
-Phase: 9 of 11 (Analytics Infrastructure)
-Plan: 3 of 3 in current phase (phase complete)
-Status: Phase 9 Complete
-Last activity: 2026-03-19 — 09-03 complete: backfill-ids command + analytics-to-engagement-history wiring
+Phase: 10 of 11 (Engagement Scoring)
+Plan: 1 of 2 in current phase
+Status: Plan 10-01 Complete
+Last activity: 2026-03-19 — 10-01 complete: EngagementScorer + topic_scorer bug fix
 
-Progress: [██████████] 100% Phase 9 complete (v1.2 milestone)
+Progress: [████████░░] 80% (4/5 plans complete in v1.2)
 
 ## Shipped Milestones
 
@@ -57,13 +57,20 @@ Progress: [██████████] 100% Phase 9 complete (v1.2 milestone
 - post_timestamp for engagement_history derived from platform_ids.json file mtime (accurate proxy for upload time)
 - _load_episode_topics() uses *_analysis.json glob (not hardcoded filename) — compatible with pre-refactor ep1-28 output dirs
 
+### Decisions (Phase 10)
+
+- EngagementScorer accepts optional history_path constructor arg — enables clean unit testing without mocking Config
+- Constant category presence returns skipped=no_variance entry (not silently dropped) so callers distinguish no-data from no-signal
+- topic_scorer engagement bonus skipped entirely when episode_number absent — scraped future topics cannot inherit index-based bonuses
+- Comedy constraint applied post-correlation, pre-sort — preserves natural ordering while enforcing editorial floor
+
 ### Blockers/Concerns
 
 - [Phase 9]: YouTube Analytics API v2 OAuth scope (`yt-analytics.readonly`) may not be in existing credentials — verify before testing analytics end-to-end
 - [Phase 9]: Twitter free-tier `impression_count` returns 0 — must null-guard before building any scoring formula on top of it
 - [Phase 9]: TikTok Content Posting API requires app audit approval — confirm status; exclude TikTok from scheduling if unaudited
 - [Phase 9]: pandas may already be a transitive dependency — check version before adding to requirements.txt
-- [Phase 10]: topic_scorer episode number bug — `get_engagement_bonus()` uses loop index instead of actual episode number; must fix before Phase 10 wires feedback loop
+- ~~[Phase 10]: topic_scorer episode number bug — FIXED in 10-01~~
 
 ### Pending Todos
 
@@ -71,6 +78,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19
-Stopped at: Completed 09-03-PLAN.md (backfill-ids command + analytics wiring)
+Last session: 2026-03-19T01:36:10.777Z
+Stopped at: Completed 10-01-PLAN.md (EngagementScorer + topic_scorer bug fix)
 Resume file: None

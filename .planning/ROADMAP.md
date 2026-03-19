@@ -70,7 +70,7 @@ Plans:
   3. The topic_scorer episode number bug is fixed — `get_engagement_bonus()` uses actual episode number, not loop index, verified by a regression test
   4. Comedy voice is a binary constraint in the model — edgy/dark content cannot be scored down by the optimizer; engagement scores are hints for hosts, not autonomous decisions
   5. GPT-4o title and caption generation receives engagement history as context and produces titles/captions optimized for the show's historical performance patterns
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 10-01-PLAN.md — EngagementScorer module (category ranking, day-of-week, comedy constraint, confidence gate) + topic_scorer bug fix
@@ -99,5 +99,5 @@ Plans:
 | 7. Episode Webpages | v1.1 | 2/2 | Complete | 2026-03-18 |
 | 8. Content Compliance | v1.1 | 2/2 | Complete | 2026-03-18 |
 | 9. Analytics Infrastructure | v1.2 | 3/3 | Complete | 2026-03-19 |
-| 10. Engagement Scoring | v1.2 | 0/2 | Not started | - |
+| 10. Engagement Scoring | 1/2 | In Progress|  | - |
 | 11. Smart Scheduling | v1.2 | 0/? | Not started | - |

@@ -14,10 +14,10 @@
 
 ### Engagement Scoring
 
-- [ ] **ENGAGE-01**: Topic categories ranked by historical engagement correlation
-- [ ] **ENGAGE-02**: Day-of-week performance analysis per platform
-- [ ] **ENGAGE-03**: Comedy voice preserved as constraint — optimizer cannot de-score edgy content
-- [ ] **ENGAGE-04**: Confidence gating — no recommendations until minimum data threshold met (15+ episodes)
+- [x] **ENGAGE-01**: Topic categories ranked by historical engagement correlation
+- [x] **ENGAGE-02**: Day-of-week performance analysis per platform
+- [x] **ENGAGE-03**: Comedy voice preserved as constraint — optimizer cannot de-score edgy content
+- [x] **ENGAGE-04**: Confidence gating — no recommendations until minimum data threshold met (15+ episodes)
 
 ### Smart Scheduling
 
@@ -66,10 +66,10 @@
 | ANLYT-03 | Phase 9 | Complete |
 | ANLYT-04 | Phase 9 | Complete |
 | CONTENT-01 | Phase 9 | Complete |
-| ENGAGE-01 | Phase 10 | Pending |
-| ENGAGE-02 | Phase 10 | Pending |
-| ENGAGE-03 | Phase 10 | Pending |
-| ENGAGE-04 | Phase 10 | Pending |
+| ENGAGE-01 | Phase 10 | Complete |
+| ENGAGE-02 | Phase 10 | Complete |
+| ENGAGE-03 | Phase 10 | Complete |
+| ENGAGE-04 | Phase 10 | Complete |
 | CONTENT-02 | Phase 10 | Pending |
 | SCHED-01 | Phase 11 | Pending |
 | SCHED-02 | Phase 11 | Pending |
