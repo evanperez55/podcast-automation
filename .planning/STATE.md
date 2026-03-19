@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Content Calendar & CI/CD
-status: ready_to_plan
-stopped_at: Phase 12 ready to plan
+status: in_progress
+stopped_at: "Completed 12-01-PLAN.md"
 last_updated: "2026-03-19"
-last_activity: "2026-03-19 — Roadmap created for v1.3 (phases 12-14)"
+last_activity: "2026-03-19 — Completed 12-01 ContentCalendar Foundation"
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 6
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 17
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 12 of 14 (ContentCalendar Foundation)
-Plan: 0 of 2 in current phase
-Status: Ready to plan
-Last activity: 2026-03-19 — v1.3 roadmap created (phases 12-14)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-03-19 — Completed 12-01 ContentCalendar Foundation module
 
-Progress: [░░░░░░░░░░] 0% (v1.3 milestone)
+Progress: [█░░░░░░░░░] 17% (v1.3 milestone)
 
 ## Shipped Milestones
 
@@ -45,6 +45,9 @@ Progress: [░░░░░░░░░░] 0% (v1.3 milestone)
 - [v1.3 research]: Self-hosted runner on GPU machine — only zero-cost path with GPU + local Dropbox access; cloud GPU runners cost ~$5/episode
 - [v1.3 research]: Polling over webhooks for Dropbox — webhooks require public HTTPS endpoint; polling every 4-6h via cron is correct for home machine behind NAT
 - [v1.3 research]: Human review gate mandatory before distribution — ep29 YouTube strike makes auto-posting edgy content unacceptable risk
+- [12-01]: Clip slots cap at 3 (D+2, D+4, D+6); plan_episode uses video_clip_paths count to decide how many clip slots to generate
+- [12-01]: Teaser slot requires best_clips[0].hook_caption to be non-empty; empty list or missing key skips teaser entirely
+- [12-01]: PostingTimeOptimizer instantiated once in __init__; falls back to Config.SCHEDULE_*_POSTING_HOUR when optimizer returns None
 
 ### Blockers/Concerns
 
@@ -55,5 +58,5 @@ Progress: [░░░░░░░░░░] 0% (v1.3 milestone)
 ## Session Continuity
 
 Last session: 2026-03-19
-Stopped at: Roadmap created for v1.3, Phase 12 ready to plan
+Stopped at: Completed 12-01-PLAN.md
 Resume file: None

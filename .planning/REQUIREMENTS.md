@@ -7,8 +7,8 @@
 
 ### Content Calendar
 
-- [ ] **CAL-01**: Content calendar generates a 5-slot distribution plan per episode (D-1 teaser, D0 episode + clip 1, D+2 clip 2, D+4 clip 3)
-- [ ] **CAL-02**: Calendar tracks per-slot, per-platform upload status in `topic_data/content_calendar.json`
+- [x] **CAL-01**: Content calendar generates a 5-slot distribution plan per episode (D-1 teaser, D0 episode + clip 1, D+2 clip 2, D+4 clip 3)
+- [x] **CAL-02**: Calendar tracks per-slot, per-platform upload status in `topic_data/content_calendar.json`
 - [ ] **CAL-03**: `python main.py upload-scheduled` fires due slots from the calendar (extends existing scheduled upload)
 - [ ] **CAL-04**: Dry run displays the full calendar plan with slot dates and platform assignments
 
@@ -58,8 +58,8 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CAL-01 | Phase 12 | Pending |
-| CAL-02 | Phase 12 | Pending |
+| CAL-01 | Phase 12 | Complete |
+| CAL-02 | Phase 12 | Complete |
 | CAL-03 | Phase 12 | Pending |
 | CAL-04 | Phase 12 | Pending |
 | CI-01 | Phase 13 | Pending |

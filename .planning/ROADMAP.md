@@ -115,6 +115,6 @@ Plans:
 | 9. Analytics Infrastructure | v1.2 | 3/3 | Complete | 2026-03-19 |
 | 10. Engagement Scoring | v1.2 | 2/2 | Complete | 2026-03-19 |
 | 11. Smart Scheduling | v1.2 | 2/2 | Complete | 2026-03-19 |
-| 12. ContentCalendar Foundation | v1.3 | 0/2 | Not started | - |
+| 12. ContentCalendar Foundation | 1/2 | In Progress|  | - |
 | 13. CI/CD Automation | v1.3 | 0/2 | Not started | - |
 | 14. Security & Reliability Hardening | v1.3 | 0/2 | Not started | - |
