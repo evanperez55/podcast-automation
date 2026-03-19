@@ -1,13 +1,13 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.3
-milestone_name: Content Calendar & CI/CD
-status: completed
-stopped_at: Completed 12-02-PLAN.md
-last_updated: "2026-03-19T04:05:23.540Z"
-last_activity: 2026-03-19 — Completed 12-02 ContentCalendar pipeline wiring
+milestone_name: Content Calendar
+status: shipped
+stopped_at: v1.3 shipped — CI/CD phases dropped (requires local GPU + Ollama)
+last_updated: "2026-03-19"
+last_activity: 2026-03-19 — v1.3 shipped with Phase 12 only; Phases 13-14 removed
 progress:
-  total_phases: 3
+  total_phases: 1
   completed_phases: 1
   total_plans: 2
   completed_plans: 2
@@ -21,16 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** One command produces professional-quality, platform-ready podcast content that sounds hand-edited and captures the show's edgy comedy voice — without manual intervention.
-**Current focus:** Phase 12 — ContentCalendar Foundation
+**Current focus:** v1.3 shipped — no active milestone
 
 ## Current Position
 
-Phase: 12 of 14 (ContentCalendar Foundation)
-Plan: 2 of 2 in current phase
-Status: Phase 12 complete
-Last activity: 2026-03-19 — Completed 12-02 ContentCalendar pipeline wiring
+Milestone: v1.3 Content Calendar — SHIPPED
+Status: All milestones through v1.3 complete
+Last activity: 2026-03-19 — v1.3 shipped; CI/CD phases dropped
 
-Progress: [██████████] 100% (v1.3 phase 12)
+Progress: [██████████] 100%
 
 ## Shipped Milestones
 
@@ -42,18 +41,15 @@ Progress: [██████████] 100% (v1.3 phase 12)
 
 ### Decisions
 
-- [v1.3 research]: Self-hosted runner on GPU machine — only zero-cost path with GPU + local Dropbox access; cloud GPU runners cost ~$5/episode
-- [v1.3 research]: Polling over webhooks for Dropbox — webhooks require public HTTPS endpoint; polling every 4-6h via cron is correct for home machine behind NAT
-- [v1.3 research]: Human review gate mandatory before distribution — ep29 YouTube strike makes auto-posting edgy content unacceptable risk
 - [12-01]: Clip slots cap at 3 (D+2, D+4, D+6); plan_episode uses video_clip_paths count to decide how many clip slots to generate
 - [12-01]: Teaser slot requires best_clips[0].hook_caption to be non-empty; empty list or missing key skips teaser entirely
 - [12-01]: PostingTimeOptimizer instantiated once in __init__; falls back to Config.SCHEDULE_*_POSTING_HOUR when optimizer returns None
 - [Phase 12-02]: Late import (try/except) for ContentCalendar in distribute.py and runner.py keeps calendar optional — failures don't break pipeline
 - [Phase 12-02]: get_calendar_display() fixed to return dt as datetime object (was ISO string) for dry-run formatting
+- [v1.3]: CI/CD automation dropped — pipeline requires local GPU + Ollama; GitHub-hosted runners can't support this
 
 ### Blockers/Concerns
 
-- [Phase 13 flag]: GitHub Actions `environment: production` required-reviewers may not be available on Free plan for personal private repos — verify before designing approval UX; fallback is Discord-triggered workflow_dispatch
 - [Active]: `assets/podcast_logo.png` untracked (8.6MB) — needs Git LFS or compression
 - [Active]: 2 pre-existing test failures (analytics + audiogram enabled defaults)
 
