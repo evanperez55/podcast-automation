@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Any
 
 from config import Config
 from logger import logger
+from posting_time_optimizer import PostingTimeOptimizer
 
 
 class UploadScheduler:
@@ -208,6 +209,54 @@ class UploadScheduler:
             schedule["platforms"][platform]["failed_at"] = datetime.now().isoformat()
             logger.error("Marked %s as failed: %s", platform, error)
         return schedule
+
+    def get_optimal_publish_at(self, platform: str) -> Optional[str]:
+        """Get the optimal ISO datetime string for the given platform.
+
+        Tries PostingTimeOptimizer first.  Falls back to the fixed-delay
+        config when the optimizer returns None or raises an exception.
+
+        Args:
+            platform: Platform name ("youtube", "twitter", "instagram", "tiktok").
+
+        Returns:
+            ISO datetime string, or None when both optimizer and fixed delay
+            yield no result.
+        """
+        delay_map = {
+            "youtube": self.youtube_delay,
+            "twitter": self.twitter_delay,
+            "instagram": self.instagram_delay,
+            "tiktok": self.tiktok_delay,
+        }
+        delay = delay_map.get(platform, 0)
+
+        try:
+            optimizer = PostingTimeOptimizer()
+            optimal_dt = optimizer.get_optimal_publish_at(platform)
+            if optimal_dt is not None:
+                logger.info(
+                    "Smart scheduling for %s: optimal publish at %s",
+                    platform,
+                    optimal_dt.isoformat(),
+                )
+                return optimal_dt.isoformat()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "PostingTimeOptimizer failed for %s (%s); falling back to fixed delay",
+                platform,
+                exc,
+            )
+
+        # Fall back to fixed-delay config
+        if delay > 0:
+            publish_at = (datetime.now() + timedelta(hours=delay)).isoformat()
+            logger.debug(
+                "Fixed-delay scheduling for %s: publish at %s", platform, publish_at
+            )
+            return publish_at
+
+        return None
 
     def get_youtube_publish_at(self) -> Optional[str]:
         """Get the ISO datetime string for YouTube's publishAt scheduling parameter.

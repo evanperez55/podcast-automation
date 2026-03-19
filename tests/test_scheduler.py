@@ -446,5 +446,83 @@ class TestRunUploadScheduled:
         mock_scheduler.mark_uploaded.assert_not_called()
 
 
+class TestGetOptimalPublishAt:
+    """Tests for UploadScheduler.get_optimal_publish_at."""
+
+    @patch.object(Config, "SCHEDULE_YOUTUBE_DELAY_HOURS", 2)
+    @patch("scheduler.PostingTimeOptimizer")
+    def test_returns_optimizer_datetime_when_available(self, mock_optimizer_cls):
+        """Returns ISO datetime from optimizer when optimizer returns a datetime."""
+        optimal_dt = datetime(2026, 4, 1, 10, 0, 0)
+        mock_optimizer_cls.return_value.get_optimal_publish_at.return_value = optimal_dt
+
+        scheduler = UploadScheduler()
+        result = scheduler.get_optimal_publish_at("youtube")
+
+        assert result == optimal_dt.isoformat()
+        mock_optimizer_cls.return_value.get_optimal_publish_at.assert_called_once_with(
+            "youtube"
+        )
+
+    @patch.object(Config, "SCHEDULE_YOUTUBE_DELAY_HOURS", 3)
+    @patch("scheduler.PostingTimeOptimizer")
+    def test_falls_back_to_delay_when_optimizer_returns_none(self, mock_optimizer_cls):
+        """Falls back to fixed-delay ISO datetime when optimizer returns None and delay > 0."""
+        mock_optimizer_cls.return_value.get_optimal_publish_at.return_value = None
+
+        scheduler = UploadScheduler()
+        result = scheduler.get_optimal_publish_at("youtube")
+
+        assert result is not None
+        publish_at = datetime.fromisoformat(result)
+        expected = datetime.now() + timedelta(hours=3)
+        assert abs((publish_at - expected).total_seconds()) < 10
+
+    @patch.object(Config, "SCHEDULE_YOUTUBE_DELAY_HOURS", 0)
+    @patch("scheduler.PostingTimeOptimizer")
+    def test_returns_none_when_both_optimizer_and_delay_are_none(
+        self, mock_optimizer_cls
+    ):
+        """Returns None when optimizer returns None and delay == 0."""
+        mock_optimizer_cls.return_value.get_optimal_publish_at.return_value = None
+
+        scheduler = UploadScheduler()
+        result = scheduler.get_optimal_publish_at("youtube")
+
+        assert result is None
+
+    @patch.object(Config, "SCHEDULE_YOUTUBE_DELAY_HOURS", 2)
+    @patch.object(Config, "SCHEDULE_TWITTER_DELAY_HOURS", 5)
+    @patch("scheduler.PostingTimeOptimizer")
+    def test_twitter_uses_twitter_delay_as_fallback(self, mock_optimizer_cls):
+        """Platform-specific delay is used for fallback (twitter uses twitter_delay)."""
+        mock_optimizer_cls.return_value.get_optimal_publish_at.return_value = None
+
+        scheduler = UploadScheduler()
+        result = scheduler.get_optimal_publish_at("twitter")
+
+        assert result is not None
+        publish_at = datetime.fromisoformat(result)
+        # Should be ~5 hours (twitter_delay), not 2 hours (youtube_delay)
+        expected = datetime.now() + timedelta(hours=5)
+        assert abs((publish_at - expected).total_seconds()) < 10
+
+    @patch.object(Config, "SCHEDULE_YOUTUBE_DELAY_HOURS", 2)
+    @patch("scheduler.PostingTimeOptimizer")
+    def test_optimizer_exception_falls_back_gracefully(self, mock_optimizer_cls):
+        """When optimizer raises an exception, falls back to fixed delay without crashing."""
+        mock_optimizer_cls.return_value.get_optimal_publish_at.side_effect = (
+            RuntimeError("optimizer exploded")
+        )
+
+        scheduler = UploadScheduler()
+        result = scheduler.get_optimal_publish_at("youtube")
+
+        assert result is not None
+        publish_at = datetime.fromisoformat(result)
+        expected = datetime.now() + timedelta(hours=2)
+        assert abs((publish_at - expected).total_seconds()) < 10
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
