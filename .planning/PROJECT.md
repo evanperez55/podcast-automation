@@ -65,9 +65,11 @@ One command produces professional-quality, platform-ready podcast content that s
 - ✓ Backfill-ids CLI command for existing episodes — v1.2
 - ✓ topic_scorer episode number bug fix — v1.2
 
-### Active
+### Active (v1.3 — Content Calendar & CI/CD)
 
-(None — ship next milestone to validate)
+- [ ] Content calendar planner for bi-weekly episode + clip distribution strategy
+- [ ] GitHub Actions automation (scheduled + manual trigger, Dropbox polling)
+- [ ] Clip distribution timing optimization (spread vs. same-day — research needed)
 
 ### Future
 
@@ -124,9 +126,15 @@ One command produces professional-quality, platform-ready podcast content that s
 | 15-episode confidence gate | Below threshold, optimizer returns nothing — pipeline uses fixed delays | ✓ Good — prevents noisy early recommendations |
 | Store video_id at upload time | Avoids 100-unit YouTube search API call per episode during analytics | ✓ Good — quota-safe from day one |
 
-## Current State
+## Current Milestone: v1.3 Content Calendar & CI/CD
 
-v1.0, v1.1, and v1.2 shipped. No active milestone. Run `/gsd:new-milestone` to start v1.3 or v2.0.
+**Goal:** Automate the entire bi-weekly release cycle — a content calendar plans when to drop the episode and spread clips across the week, and GitHub Actions runs the pipeline without manual intervention.
+
+**Target features:**
+- Content calendar: bi-weekly episode schedule with clip distribution strategy
+- GitHub Actions workflow (scheduled Dropbox polling + manual dispatch)
+- Self-hosted runner or cloud runner (research needed for GPU/Whisper tradeoffs)
+- Clip timing optimization based on engagement research
 
 ---
-*Last updated: 2026-03-19 after v1.2 milestone completion*
+*Last updated: 2026-03-19 after v1.3 milestone start*
