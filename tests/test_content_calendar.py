@@ -528,3 +528,304 @@ class TestSlotDatetime:
                 result = cal._slot_datetime(RELEASE_DATE, -1, "twitter")
 
         assert result.hour == 10
+
+
+# ---------------------------------------------------------------------------
+# class TestDryRunDisplay
+# ---------------------------------------------------------------------------
+
+
+class TestDryRunDisplay:
+    """Tests for ContentCalendar.get_calendar_display() used in dry_run."""
+
+    def _make_calendar(self, tmp_path):
+        with patch("content_calendar.Config") as mock_cfg:
+            mock_cfg.CONTENT_CALENDAR_ENABLED = True
+            mock_cfg.TOPIC_DATA_DIR = tmp_path
+            mock_cfg.SCHEDULE_YOUTUBE_POSTING_HOUR = 14
+            mock_cfg.SCHEDULE_TWITTER_POSTING_HOUR = 10
+            mock_cfg.SCHEDULE_INSTAGRAM_POSTING_HOUR = 12
+            mock_cfg.SCHEDULE_TIKTOK_POSTING_HOUR = 12
+
+            with patch("content_calendar.PostingTimeOptimizer") as mock_pto_cls:
+                mock_pto = MagicMock()
+                mock_pto.get_optimal_publish_at.return_value = None
+                mock_pto_cls.return_value = mock_pto
+
+                cal = ContentCalendar()
+                return cal, mock_cfg
+
+    def test_get_calendar_display_returns_slots_with_labels(self, tmp_path):
+        """get_calendar_display returns list of dicts with label, dt, type, platforms."""
+        with patch("content_calendar.Config") as mock_cfg:
+            mock_cfg.CONTENT_CALENDAR_ENABLED = True
+            mock_cfg.TOPIC_DATA_DIR = tmp_path
+            mock_cfg.SCHEDULE_YOUTUBE_POSTING_HOUR = 14
+            mock_cfg.SCHEDULE_TWITTER_POSTING_HOUR = 10
+            mock_cfg.SCHEDULE_INSTAGRAM_POSTING_HOUR = 12
+            mock_cfg.SCHEDULE_TIKTOK_POSTING_HOUR = 12
+
+            with patch("content_calendar.PostingTimeOptimizer") as mock_pto_cls:
+                mock_pto = MagicMock()
+                mock_pto.get_optimal_publish_at.return_value = None
+                mock_pto_cls.return_value = mock_pto
+
+                cal = ContentCalendar()
+                slots = cal.get_calendar_display(
+                    episode_number="XX",
+                    release_date=RELEASE_DATE,
+                )
+
+        assert len(slots) >= 2  # at minimum teaser + episode
+        for slot in slots:
+            assert "label" in slot, "slot must have 'label'"
+            assert "dt" in slot, "slot must have 'dt'"
+            assert "type" in slot, "slot must have 'type'"
+            assert "platforms" in slot, "slot must have 'platforms'"
+            assert isinstance(slot["dt"], datetime)
+            assert isinstance(slot["platforms"], list)
+
+    def test_display_no_duplicate_days(self, tmp_path):
+        """No two slots in get_calendar_display share the same calendar date."""
+        with patch("content_calendar.Config") as mock_cfg:
+            mock_cfg.CONTENT_CALENDAR_ENABLED = True
+            mock_cfg.TOPIC_DATA_DIR = tmp_path
+            mock_cfg.SCHEDULE_YOUTUBE_POSTING_HOUR = 14
+            mock_cfg.SCHEDULE_TWITTER_POSTING_HOUR = 10
+            mock_cfg.SCHEDULE_INSTAGRAM_POSTING_HOUR = 12
+            mock_cfg.SCHEDULE_TIKTOK_POSTING_HOUR = 12
+
+            with patch("content_calendar.PostingTimeOptimizer") as mock_pto_cls:
+                mock_pto = MagicMock()
+                mock_pto.get_optimal_publish_at.return_value = None
+                mock_pto_cls.return_value = mock_pto
+
+                cal = ContentCalendar()
+                slots = cal.get_calendar_display(
+                    episode_number="XX",
+                    release_date=RELEASE_DATE,
+                )
+
+        dates = [s["dt"].date() for s in slots]
+        assert len(dates) == len(set(dates)), (
+            "Duplicate dates found in calendar display"
+        )
+
+
+# ---------------------------------------------------------------------------
+# class TestDistributeIntegration
+# ---------------------------------------------------------------------------
+
+
+class TestDistributeIntegration:
+    """Tests for ContentCalendar.plan_episode() wiring in distribute step."""
+
+    def test_distribute_calls_plan_episode(self, tmp_path):
+        """run_distribute calls ContentCalendar.plan_episode() with correct args."""
+        from pipeline.context import PipelineContext
+        from pipeline.steps.distribute import run_distribute
+
+        episode_output_dir = tmp_path / "ep_29"
+        episode_output_dir.mkdir()
+
+        ctx = PipelineContext(
+            episode_folder="ep_29",
+            episode_number=29,
+            episode_output_dir=episode_output_dir,
+            timestamp="20260319_120000",
+            audio_file=tmp_path / "ep29.wav",
+            analysis={
+                "episode_title": "Test Episode",
+                "best_clips": [{"hook_caption": "test", "score": 0.9}],
+                "social_captions": {},
+                "chapters": [],
+            },
+            mp3_path=tmp_path / "ep29.mp3",
+            video_clip_paths=["clip1.mp4"],
+            full_episode_video_path=str(tmp_path / "ep29_full.mp4"),
+            test_mode=True,
+            transcript_path=None,
+            transcript_data={"segments": [], "duration": 3600},
+        )
+
+        mock_calendar = MagicMock()
+        mock_calendar.enabled = True
+        mock_calendar.plan_episode.return_value = {"slots": {}}
+
+        mock_calendar_cls = MagicMock(return_value=mock_calendar)
+
+        components = {"uploaders": {}}
+
+        # ContentCalendar is imported inside distribute's try block, so patch at source
+        with patch("content_calendar.ContentCalendar", mock_calendar_cls):
+            run_distribute(ctx, components)
+
+        # plan_episode should have been called
+        mock_calendar.plan_episode.assert_called_once()
+        call_kwargs = mock_calendar.plan_episode.call_args
+        assert call_kwargs.kwargs.get("episode_number") == 29 or (
+            len(call_kwargs.args) > 0 and call_kwargs.args[0] == 29
+        )
+
+    def test_distribute_skips_calendar_when_disabled(self, tmp_path):
+        """run_distribute skips calendar when ContentCalendar.enabled is False."""
+        from pipeline.context import PipelineContext
+        from pipeline.steps.distribute import run_distribute
+
+        episode_output_dir = tmp_path / "ep_29"
+        episode_output_dir.mkdir()
+
+        ctx = PipelineContext(
+            episode_folder="ep_29",
+            episode_number=29,
+            episode_output_dir=episode_output_dir,
+            timestamp="20260319_120000",
+            audio_file=tmp_path / "ep29.wav",
+            analysis={
+                "episode_title": "Test Episode",
+                "best_clips": [],
+                "social_captions": {},
+                "chapters": [],
+            },
+            mp3_path=tmp_path / "ep29.mp3",
+            video_clip_paths=[],
+            full_episode_video_path=None,
+            test_mode=True,
+            transcript_path=None,
+            transcript_data={"segments": [], "duration": 3600},
+        )
+
+        mock_calendar = MagicMock()
+        mock_calendar.enabled = False
+
+        mock_calendar_cls = MagicMock(return_value=mock_calendar)
+
+        components = {"uploaders": {}}
+
+        # ContentCalendar is imported inside distribute's try block, so patch at source
+        with patch("content_calendar.ContentCalendar", mock_calendar_cls):
+            run_distribute(ctx, components)
+
+        mock_calendar.plan_episode.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# class TestUploadScheduledIntegration
+# ---------------------------------------------------------------------------
+
+
+class TestUploadScheduledIntegration:
+    """Tests for ContentCalendar slot dispatch in run_upload_scheduled()."""
+
+    def test_fires_past_due_calendar_slots(self, tmp_path, monkeypatch):
+        """run_upload_scheduled dispatches past-due pending calendar slots."""
+        from pipeline import runner
+
+        past = datetime.now() - timedelta(hours=1)
+        mock_slot = {
+            "slot_name": "episode",
+            "slot_type": "episode",
+            "platforms": ["youtube"],
+            "content": {
+                "title": "Test Ep",
+                "video_path": "ep29.mp4",
+                "description": "desc",
+            },
+        }
+
+        mock_calendar = MagicMock()
+        mock_calendar.enabled = True
+        mock_calendar.load_all.return_value = {
+            "ep_29": {
+                "slots": {
+                    "episode": {
+                        "slot_type": "episode",
+                        "scheduled_at": past.isoformat(),
+                        "platforms": ["youtube"],
+                        "status": "pending",
+                    }
+                }
+            }
+        }
+        mock_calendar.get_pending_slots.return_value = [mock_slot]
+
+        mock_yt_uploader = MagicMock()
+        mock_yt_uploader.upload_episode.return_value = {"video_id": "abc"}
+
+        # Patch output dir to tmp_path (no schedule files)
+        monkeypatch.setattr(runner.Config, "OUTPUT_DIR", tmp_path)
+
+        # ContentCalendar is imported locally inside run_upload_scheduled, patch at source
+        with patch(
+            "content_calendar.ContentCalendar", MagicMock(return_value=mock_calendar)
+        ):
+            with patch(
+                "pipeline.runner.YouTubeUploader",
+                MagicMock(return_value=mock_yt_uploader),
+            ):
+                runner.run_upload_scheduled()
+
+        mock_calendar.get_pending_slots.assert_called_once()
+        mock_yt_uploader.upload_episode.assert_called_once()
+        mock_calendar.mark_slot_uploaded.assert_called_once()
+
+    def test_skips_future_calendar_slots(self, tmp_path, monkeypatch):
+        """run_upload_scheduled does not dispatch future pending calendar slots."""
+        from pipeline import runner
+
+        mock_calendar = MagicMock()
+        mock_calendar.enabled = True
+        mock_calendar.load_all.return_value = {"ep_29": {"slots": {}}}
+        mock_calendar.get_pending_slots.return_value = []  # nothing due
+
+        monkeypatch.setattr(runner.Config, "OUTPUT_DIR", tmp_path)
+
+        # ContentCalendar is imported locally inside run_upload_scheduled, patch at source
+        with patch(
+            "content_calendar.ContentCalendar", MagicMock(return_value=mock_calendar)
+        ):
+            runner.run_upload_scheduled()
+
+        mock_calendar.mark_slot_uploaded.assert_not_called()
+        mock_calendar.mark_slot_failed.assert_not_called()
+
+    def test_dispatch_calendar_slot_maps_episode_to_upload_episode(self):
+        """_dispatch_calendar_slot routes episode slots to upload_episode on YouTube."""
+        from pipeline.runner import _dispatch_calendar_slot
+
+        mock_uploader = MagicMock()
+        slot = {
+            "slot_type": "episode",
+            "content": {
+                "title": "My Episode",
+                "video_path": "ep29.mp4",
+                "description": "Great ep",
+            },
+        }
+        _dispatch_calendar_slot(mock_uploader, "youtube", slot)
+
+        mock_uploader.upload_episode.assert_called_once_with(
+            video_path="ep29.mp4",
+            title="My Episode",
+            description="Great ep",
+        )
+
+    def test_dispatch_calendar_slot_maps_clip_to_upload_short(self):
+        """_dispatch_calendar_slot routes clip slots to upload_short on YouTube."""
+        from pipeline.runner import _dispatch_calendar_slot
+
+        mock_uploader = MagicMock()
+        slot = {
+            "slot_type": "clip_1",
+            "content": {
+                "clip_path": "clip1.mp4",
+                "caption": "Funny moment",
+            },
+        }
+        _dispatch_calendar_slot(mock_uploader, "youtube", slot)
+
+        mock_uploader.upload_short.assert_called_once_with(
+            video_path="clip1.mp4",
+            title="Funny moment",
+            description="",
+        )

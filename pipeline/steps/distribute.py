@@ -631,6 +631,37 @@ def run_distribute(
         logger.info("Webpage deployment disabled or not configured")
     print()
 
+    # Step 8.7: Generate content calendar
+    print("STEP 8.7: CONTENT CALENDAR")
+    print("-" * 60)
+    try:
+        from content_calendar import ContentCalendar
+
+        calendar = ContentCalendar()
+        if calendar.enabled:
+            entry = calendar.plan_episode(
+                episode_number=episode_number,
+                release_date=datetime.now(),
+                analysis=analysis,
+                video_clip_paths=[str(p) for p in video_clip_paths]
+                if video_clip_paths
+                else None,
+                full_episode_video_path=str(full_episode_video_path)
+                if full_episode_video_path
+                else None,
+            )
+            slot_count = len(entry.get("slots", {}))
+            logger.info(
+                "Content calendar generated: %d slots for ep %s",
+                slot_count,
+                episode_number,
+            )
+        else:
+            logger.info("Content calendar disabled")
+    except Exception as e:
+        logger.warning("Content calendar generation failed: %s", e)
+    print()
+
     # Step 9: Index episode for search
     print("STEP 9: INDEXING EPISODE FOR SEARCH")
     print("-" * 60)

@@ -823,6 +823,31 @@ def dry_run(components=None):
     print(f"[MOCK] Step 8.6: Episode webpage -- {webpage_status}")
     steps_validated += 1
 
+    # Content calendar preview (Step 8.7)
+    try:
+        from content_calendar import ContentCalendar
+
+        calendar = ContentCalendar()
+        if calendar.enabled:
+            display_slots = calendar.get_calendar_display(
+                episode_number="XX",
+                release_date=datetime.now(),
+            )
+            if display_slots:
+                print("[MOCK] Step 8.7: Content Calendar (5-day spread):")
+                for slot in display_slots:
+                    print(
+                        f"  {slot['label']:30s}  "
+                        f"{slot['dt'].strftime('%Y-%m-%d %H:%M')}  "
+                        f"{slot['type']:8s} -> {', '.join(slot['platforms'])}"
+                    )
+        else:
+            print("[MOCK] Step 8.7: Content Calendar -- disabled")
+        steps_validated += 1
+    except Exception as e:
+        print(f"[WARN] Content calendar: {e}")
+        warnings.append(f"Content calendar: {e}")
+
     print("[MOCK] Step 9: Search index -- would index episode for full-text search")
     steps_validated += 1
 
@@ -937,6 +962,63 @@ def run_with_notification(
         raise
 
 
+def _dispatch_calendar_slot(uploader_instance, platform, slot):
+    """Map calendar slot content to uploader method calls.
+
+    Slot content varies by slot_type:
+      teaser:  {caption}                        -> twitter post_tweet(text=caption)
+      episode: {title, video_path, description} -> youtube upload_episode / twitter post_tweet
+      clip_N:  {clip_path, caption}             -> youtube upload_short / twitter post_tweet with media
+
+    Args:
+        uploader_instance: Uploader object for the platform.
+        platform: Platform string ('youtube', 'twitter', 'instagram', 'tiktok').
+        slot: Slot dict with 'slot_type' and 'content' keys.
+
+    Returns:
+        Upload result dict or None.
+    """
+    content = slot.get("content", {})
+    slot_type = slot.get("slot_type", "")
+
+    if platform == "youtube":
+        if slot_type == "episode":
+            return uploader_instance.upload_episode(
+                video_path=content.get("video_path", ""),
+                title=content.get("title", ""),
+                description=content.get("description", ""),
+            )
+        else:
+            # clip / teaser slots -> upload as Short
+            return uploader_instance.upload_short(
+                video_path=content.get("clip_path", ""),
+                title=content.get("caption", ""),
+                description="",
+            )
+    elif platform == "twitter":
+        media = []
+        if content.get("clip_path"):
+            media = [content["clip_path"]]
+        elif content.get("video_path"):
+            media = [content["video_path"]]
+        return uploader_instance.post_tweet(
+            text=content.get("caption", content.get("title", "")),
+            media_paths=media or None,
+        )
+    elif platform == "instagram":
+        return uploader_instance.upload_reel(
+            video_url=content.get("clip_path", content.get("video_path", "")),
+            caption=content.get("caption", ""),
+        )
+    elif platform == "tiktok":
+        return uploader_instance.upload_video(
+            video_path=content.get("clip_path", content.get("video_path", "")),
+            title=content.get("caption", content.get("title", "")),
+            description=content.get("caption", ""),
+        )
+    return None
+
+
 def run_upload_scheduled():
     """Scan output folders for pending scheduled uploads and execute them."""
     print("=" * 60)
@@ -952,9 +1034,13 @@ def run_upload_scheduled():
         return
 
     schedule_files = list(output_dir.glob("*/upload_schedule.json"))
-    if not schedule_files:
-        print("No scheduled uploads found")
-        return
+
+    dispatch = {
+        "youtube": YouTubeUploader,
+        "twitter": TwitterUploader,
+        "instagram": InstagramUploader,
+        "tiktok": TikTokUploader,
+    }
 
     for schedule_file in schedule_files:
         episode_folder = schedule_file.parent.name
@@ -968,13 +1054,6 @@ def run_upload_scheduled():
             continue
 
         logger.info("Found %d pending upload(s) for %s", len(pending), episode_folder)
-
-        dispatch = {
-            "youtube": YouTubeUploader,
-            "twitter": TwitterUploader,
-            "instagram": InstagramUploader,
-            "tiktok": TikTokUploader,
-        }
 
         for item in pending:
             platform = item["platform"]
@@ -1032,6 +1111,57 @@ def run_upload_scheduled():
 
             scheduler.save_schedule(episode_folder, schedule)
             logger.info("Updated schedule for %s after %s", episode_folder, platform)
+
+    # Content calendar slots
+    try:
+        from content_calendar import ContentCalendar
+
+        calendar = ContentCalendar()
+        if calendar.enabled:
+            all_episodes = calendar.load_all()
+            for ep_key, ep_data in all_episodes.items():
+                pending_slots = calendar.get_pending_slots(ep_data)
+                if not pending_slots:
+                    continue
+                logger.info(
+                    "Found %d pending calendar slot(s) for %s",
+                    len(pending_slots),
+                    ep_key,
+                )
+                for slot in pending_slots:
+                    slot_name = slot["slot_name"]
+                    platforms = slot.get("platforms", [])
+                    for platform in platforms:
+                        uploader_cls = dispatch.get(platform)
+                        if uploader_cls is None:
+                            continue
+                        try:
+                            uploader_instance = uploader_cls()
+                            result = _dispatch_calendar_slot(
+                                uploader_instance, platform, slot
+                            )
+                            calendar.mark_slot_uploaded(
+                                ep_key, slot_name, {platform: result}
+                            )
+                            logger.info(
+                                "Calendar slot %s/%s uploaded to %s",
+                                ep_key,
+                                slot_name,
+                                platform,
+                            )
+                        except Exception as e:
+                            logger.error(
+                                "Calendar slot %s/%s failed on %s: %s",
+                                ep_key,
+                                slot_name,
+                                platform,
+                                e,
+                            )
+                            calendar.mark_slot_failed(ep_key, slot_name, str(e))
+    except ImportError:
+        pass  # content_calendar module not available
+    except Exception as e:
+        logger.warning("Calendar slot dispatch failed: %s", e)
 
     print()
     print("[DONE] Scheduled upload scan complete")

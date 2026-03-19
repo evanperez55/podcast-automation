@@ -280,7 +280,7 @@ class ContentCalendar:
             release_date: The canonical release date (D0).
 
         Returns:
-            List of dicts with keys: label, dt (ISO string), type, platforms.
+            List of dicts with keys: label, dt (datetime), type, platforms.
         """
         display = []
         slots_info = [
@@ -295,7 +295,7 @@ class ContentCalendar:
             display.append(
                 {
                     "label": f"ep_{episode_number} / {slot_type}",
-                    "dt": dt.isoformat(),
+                    "dt": dt,
                     "type": slot_type,
                     "platforms": [primary_platform],
                 }
