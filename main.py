@@ -7,6 +7,7 @@ from pipeline import (
     run_with_notification,
     run_upload_scheduled,
     run_analytics,
+    run_backfill_ids,
     run_search,
     dry_run,
     list_episodes_by_number,
@@ -48,6 +49,10 @@ def main():
 
         if cmd == "upload-scheduled":
             run_upload_scheduled()
+            return
+
+        if cmd == "backfill-ids":
+            run_backfill_ids()
             return
 
         if cmd == "analytics":

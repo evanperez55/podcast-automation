@@ -24,6 +24,37 @@ class AnalyticsCollector:
         self.analytics_dir = Config.BASE_DIR / "topic_data" / "analytics"
         self.analytics_dir.mkdir(parents=True, exist_ok=True)
 
+    def _build_youtube_client(self):
+        """Build and return an authenticated YouTube Data API v3 client.
+
+        Uses the pickle-based OAuth token from credentials/youtube_token.pickle.
+        Refreshes expired credentials automatically.
+
+        Returns:
+            Authenticated YouTube API resource, or None if credentials unavailable.
+        """
+        try:
+            import pickle
+            from google.auth.transport.requests import Request
+            from googleapiclient.discovery import build
+
+            token_path = Config.BASE_DIR / "credentials" / "youtube_token.pickle"
+            if not token_path.exists():
+                logger.warning("YouTube token not found: %s", token_path)
+                return None
+
+            with open(token_path, "rb") as f:
+                creds = pickle.load(f)
+
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+
+            return build("youtube", "v3", credentials=creds)
+
+        except Exception as e:
+            logger.warning("Failed to build YouTube client: %s", e)
+            return None
+
     def fetch_youtube_analytics(
         self, episode_number: int, video_id: Optional[str] = None
     ) -> Optional[dict]:
@@ -42,22 +73,9 @@ class AnalyticsCollector:
             Dict with views, likes, comments, and video_id, or None on error.
         """
         try:
-            import pickle
-            from google.auth.transport.requests import Request
-            from googleapiclient.discovery import build
-
-            token_path = Config.BASE_DIR / "credentials" / "youtube_token.pickle"
-            if not token_path.exists():
-                logger.warning("YouTube token not found: %s", token_path)
+            youtube = self._build_youtube_client()
+            if youtube is None:
                 return None
-
-            with open(token_path, "rb") as f:
-                creds = pickle.load(f)
-
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-
-            youtube = build("youtube", "v3", credentials=creds)
 
             if video_id is None:
                 # Search for the episode video by title (100 quota units)
@@ -184,11 +202,16 @@ class AnalyticsCollector:
             logger.warning("Failed to fetch Twitter analytics: %s", e)
             return None
 
-    def collect_analytics(self, episode_number: int) -> dict:
+    def collect_analytics(
+        self, episode_number: int, video_id: Optional[str] = None
+    ) -> dict:
         """Collect analytics from all platforms for an episode.
 
         Args:
             episode_number: The episode number to collect analytics for.
+            video_id: Optional known YouTube video ID. When provided, skips the
+                      YouTube search API call (100 quota units) and goes directly
+                      to videos().list() (1 quota unit).
 
         Returns:
             Dict with episode_number, collected_at timestamp, and
@@ -197,7 +220,7 @@ class AnalyticsCollector:
         """
         logger.info("Collecting analytics for Episode #%s", episode_number)
 
-        youtube_data = self.fetch_youtube_analytics(episode_number)
+        youtube_data = self.fetch_youtube_analytics(episode_number, video_id=video_id)
         twitter_data = self.fetch_twitter_analytics(episode_number)
 
         return {
