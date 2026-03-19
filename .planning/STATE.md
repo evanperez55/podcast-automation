@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Engagement & Smart Scheduling
 status: completed
-stopped_at: Completed 10-01-PLAN.md (EngagementScorer + topic_scorer bug fix)
-last_updated: "2026-03-19T01:36:10.780Z"
-last_activity: "2026-03-19 — 09-03 complete: backfill-ids command + analytics-to-engagement-history wiring"
+stopped_at: Completed 10-02-PLAN.md (engagement context injection into GPT-4o prompt)
+last_updated: "2026-03-19T01:45:00Z"
+last_activity: "2026-03-19 — 10-02 complete: engagement context wired into content_editor + pipeline"
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 100
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-18)
 ## Current Position
 
 Phase: 10 of 11 (Engagement Scoring)
-Plan: 1 of 2 in current phase
-Status: Plan 10-01 Complete
-Last activity: 2026-03-19 — 10-01 complete: EngagementScorer + topic_scorer bug fix
+Plan: 2 of 2 in current phase — PHASE COMPLETE
+Status: Plan 10-02 Complete
+Last activity: 2026-03-19 — 10-02 complete: engagement context wired into content_editor + pipeline
 
-Progress: [████████░░] 80% (4/5 plans complete in v1.2)
+Progress: [██████████] 100% (5/5 plans complete in v1.2)
 
 ## Shipped Milestones
 
@@ -63,6 +63,8 @@ Progress: [████████░░] 80% (4/5 plans complete in v1.2)
 - Constant category presence returns skipped=no_variance entry (not silently dropped) so callers distinguish no-data from no-signal
 - topic_scorer engagement bonus skipped entirely when episode_number absent — scraped future topics cannot inherit index-based bonuses
 - Comedy constraint applied post-correlation, pre-sort — preserves natural ordering while enforcing editorial floor
+- Engagement section uses top-3 category rankings to keep GPT-4o prompt concise while closing the analytics feedback loop
+- Pipeline wraps EngagementScorer in try/except — engagement enrichment is advisory, never a gate for podcast production
 
 ### Blockers/Concerns
 
@@ -78,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T01:36:10.777Z
-Stopped at: Completed 10-01-PLAN.md (EngagementScorer + topic_scorer bug fix)
+Last session: 2026-03-19T01:45:00Z
+Stopped at: Completed 10-02-PLAN.md (engagement context injection into GPT-4o prompt)
 Resume file: None

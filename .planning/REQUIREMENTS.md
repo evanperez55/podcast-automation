@@ -28,7 +28,7 @@
 ### Content Optimization
 
 - [x] **CONTENT-01**: Relevant hashtags auto-injected into Twitter posts (1-2 tags from curated list)
-- [ ] **CONTENT-02**: GPT-4o title/caption optimization using engagement history as context
+- [x] **CONTENT-02**: GPT-4o title/caption optimization using engagement history as context
 
 ## v2 Requirements
 
@@ -70,7 +70,7 @@
 | ENGAGE-02 | Phase 10 | Complete |
 | ENGAGE-03 | Phase 10 | Complete |
 | ENGAGE-04 | Phase 10 | Complete |
-| CONTENT-02 | Phase 10 | Pending |
+| CONTENT-02 | Phase 10 | Complete |
 | SCHED-01 | Phase 11 | Pending |
 | SCHED-02 | Phase 11 | Pending |
 | SCHED-03 | Phase 11 | Pending |
