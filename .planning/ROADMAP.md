@@ -48,7 +48,7 @@ See: .planning/milestones/v1.2-ROADMAP.md for full details.
 
 **Milestone Goal:** Automate the entire bi-weekly release cycle — a content calendar spreads clip distribution across the week, and GitHub Actions runs the pipeline without manual intervention (with a human review gate before any social uploads).
 
-- [ ] **Phase 12: ContentCalendar Foundation** - Content calendar module with spread scheduling, JSON state, and dry-run display
+- [x] **Phase 12: ContentCalendar Foundation** - Content calendar module with spread scheduling, JSON state, and dry-run display (completed 2026-03-19)
 - [ ] **Phase 13: CI/CD Automation** - GitHub Actions workflows with self-hosted runner, Dropbox polling, and human review gate
 - [ ] **Phase 14: Security & Reliability Hardening** - Secrets management, concurrency control, SHA pinning, and pre-flight validation
 
@@ -115,6 +115,6 @@ Plans:
 | 9. Analytics Infrastructure | v1.2 | 3/3 | Complete | 2026-03-19 |
 | 10. Engagement Scoring | v1.2 | 2/2 | Complete | 2026-03-19 |
 | 11. Smart Scheduling | v1.2 | 2/2 | Complete | 2026-03-19 |
-| 12. ContentCalendar Foundation | 1/2 | In Progress|  | - |
+| 12. ContentCalendar Foundation | 2/2 | Complete   | 2026-03-19 | - |
 | 13. CI/CD Automation | v1.3 | 0/2 | Not started | - |
 | 14. Security & Reliability Hardening | v1.3 | 0/2 | Not started | - |
