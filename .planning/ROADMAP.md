@@ -63,11 +63,11 @@ See: .planning/milestones/v1.2-ROADMAP.md for full details.
   2. After a real episode run, `topic_data/content_calendar.json` contains a record for that episode with D0/D+2/D+4 slot entries and per-slot upload status
   3. Running `python main.py upload-scheduled` fires only the clip slots whose scheduled datetime has passed, leaving future slots untouched
   4. The calendar correctly spreads clips: episode on D0, clip 1 on D+2, clip 2 on D+4 — no two clips land on the same day
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 12-01: ContentCalendar module (content_calendar.py, CalendarEntry/ClipSlot dataclasses, plan_episode/plan_clips/get_pending_slots/mark_slot_uploaded, atomic write, tests)
-- [ ] 12-02: Pipeline integration and CLI (distribute.py calls plan_episode/plan_clips, runner.py upload-scheduled checks calendar slots, dry-run display, config platform hour defaults)
+- [ ] 12-01-PLAN.md — ContentCalendar module with slot generation, atomic JSON persistence, and unit tests
+- [ ] 12-02-PLAN.md — Pipeline integration: distribute calls plan_episode, upload-scheduled dispatches calendar slots, dry-run display
 
 ### Phase 13: CI/CD Automation
 **Goal**: The pipeline runs automatically when a new episode appears in Dropbox, stops for human approval before any social uploads, and can also be triggered manually
