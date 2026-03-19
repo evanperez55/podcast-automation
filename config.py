@@ -103,6 +103,10 @@ class Config:
     )
     SCHEDULE_TIKTOK_POSTING_HOUR = int(os.getenv("SCHEDULE_TIKTOK_POSTING_HOUR", "12"))
 
+    # Content Calendar
+    CONTENT_CALENDAR_ENABLED = os.getenv("CONTENT_CALENDAR_ENABLED", "true") == "true"
+    TOPIC_DATA_DIR = Path("topic_data")
+
     # Blog Post Generator
     BLOG_ENABLED = os.getenv("BLOG_ENABLED", "true").lower() == "true"
     BLOG_USE_OPENAI = os.getenv("BLOG_USE_OPENAI", "true").lower() == "true"
