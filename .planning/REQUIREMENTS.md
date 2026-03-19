@@ -10,7 +10,7 @@
 - [ ] **ANLYT-01**: Video IDs stored at upload time for each platform (no search API calls needed for analytics)
 - [ ] **ANLYT-02**: Twitter analytics handles missing impressions gracefully on free tier
 - [ ] **ANLYT-03**: Engagement history accumulated in rolling JSON per episode (post time, platform, engagement metrics)
-- [ ] **ANLYT-04**: Stub uploaders detected and flagged so scheduling/analytics skip non-functional platforms
+- [x] **ANLYT-04**: Stub uploaders detected and flagged so scheduling/analytics skip non-functional platforms
 
 ### Engagement Scoring
 
@@ -27,7 +27,7 @@
 
 ### Content Optimization
 
-- [ ] **CONTENT-01**: Relevant hashtags auto-injected into Twitter posts (1-2 tags from curated list)
+- [x] **CONTENT-01**: Relevant hashtags auto-injected into Twitter posts (1-2 tags from curated list)
 - [ ] **CONTENT-02**: GPT-4o title/caption optimization using engagement history as context
 
 ## v2 Requirements
@@ -64,8 +64,8 @@
 | ANLYT-01 | Phase 9 | Pending |
 | ANLYT-02 | Phase 9 | Pending |
 | ANLYT-03 | Phase 9 | Pending |
-| ANLYT-04 | Phase 9 | Pending |
-| CONTENT-01 | Phase 9 | Pending |
+| ANLYT-04 | Phase 9 | Complete |
+| CONTENT-01 | Phase 9 | Complete |
 | ENGAGE-01 | Phase 10 | Pending |
 | ENGAGE-02 | Phase 10 | Pending |
 | ENGAGE-03 | Phase 10 | Pending |

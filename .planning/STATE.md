@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Engagement & Smart Scheduling
-status: roadmapping_complete
-stopped_at: Phase 9 ready to plan
-last_updated: "2026-03-18"
-last_activity: "2026-03-18 — v1.2 roadmap created (phases 9-11), 13/13 requirements mapped"
+status: executing
+stopped_at: Completed 09-02-PLAN.md (stub detection + hashtag injection)
+last_updated: "2026-03-19T00:36:38.793Z"
+last_activity: "2026-03-19 — 09-02 complete: stub uploader detection (.functional flag) + Twitter hashtag injection"
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 3
+  completed_plans: 2
+  percent: 22
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-18)
 ## Current Position
 
 Phase: 9 of 11 (Analytics Infrastructure)
-Plan: 0 of ? in current phase
-Status: Ready to plan
-Last activity: 2026-03-18 — v1.2 roadmap created (phases 9-11), 13/13 requirements mapped
+Plan: 2 of 3 in current phase
+Status: In Progress
+Last activity: 2026-03-19 — 09-02 complete: stub uploader detection (.functional flag) + Twitter hashtag injection
 
-Progress: [░░░░░░░░░░] 0% (v1.2 milestone)
+Progress: [██░░░░░░░░] 22% (v1.2 milestone)
 
 ## Shipped Milestones
 
@@ -46,6 +46,8 @@ Progress: [░░░░░░░░░░] 0% (v1.2 milestone)
 - Comedy voice is a binary editorial constraint, not a scoring variable — optimizer cannot de-score edgy content
 - Confidence gate set at 15 episodes minimum before optimizer returns recommendations
 - CONTENT-01 (hashtag injection) placed in Phase 9 — zero data dependency, immediate value
+- Instagram/TikTok uploaders now use .functional flag instead of ValueError raises — always instantiate, check flag before use
+- Hashtag injection limited to top 2 unique clip_hashtags per tweet, preserving 280-char budget
 
 ### Blockers/Concerns
 
@@ -61,6 +63,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18
-Stopped at: Roadmap created for v1.2 (phases 9-11), STATE.md initialized
+Last session: 2026-03-19
+Stopped at: Completed 09-02-PLAN.md (stub detection + hashtag injection)
 Resume file: None
