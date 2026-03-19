@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Engagement & Smart Scheduling
 status: executing
-stopped_at: Completed 09-02-PLAN.md (stub detection + hashtag injection)
-last_updated: "2026-03-19T00:36:38.793Z"
-last_activity: "2026-03-19 — 09-02 complete: stub uploader detection (.functional flag) + Twitter hashtag injection"
+stopped_at: Completed 09-03-PLAN.md (backfill-ids command + analytics wiring)
+last_updated: "2026-03-19T00:52:00.000Z"
+last_activity: "2026-03-19 — 09-03 complete: backfill-ids command + analytics-to-engagement-history wiring"
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 3
-  completed_plans: 2
-  percent: 22
+  completed_plans: 3
+  percent: 33
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-18)
 ## Current Position
 
 Phase: 9 of 11 (Analytics Infrastructure)
-Plan: 2 of 3 in current phase
-Status: In Progress
-Last activity: 2026-03-19 — 09-02 complete: stub uploader detection (.functional flag) + Twitter hashtag injection
+Plan: 3 of 3 in current phase (phase complete)
+Status: Phase 9 Complete
+Last activity: 2026-03-19 — 09-03 complete: backfill-ids command + analytics-to-engagement-history wiring
 
-Progress: [███████░░░] 67% (v1.2 milestone)
+Progress: [██████████] 100% Phase 9 complete (v1.2 milestone)
 
 ## Shipped Milestones
 
@@ -52,6 +52,11 @@ Progress: [███████░░░] 67% (v1.2 milestone)
 - platform_ids.json written as separate file in episode_output_dir (not merged into existing results JSON) — avoids risk of corrupting earlier pipeline output
 - engagement_history upsert keyed on episode_number to prevent duplicate records on re-runs of analytics command
 
+- _build_youtube_client() extracted from fetch_youtube_analytics() to enable auth reuse by backfill command without duplication
+- collect_analytics() given optional video_id param to propagate stored ID through to fetch_youtube_analytics (skips 100-quota search)
+- post_timestamp for engagement_history derived from platform_ids.json file mtime (accurate proxy for upload time)
+- _load_episode_topics() uses *_analysis.json glob (not hardcoded filename) — compatible with pre-refactor ep1-28 output dirs
+
 ### Blockers/Concerns
 
 - [Phase 9]: YouTube Analytics API v2 OAuth scope (`yt-analytics.readonly`) may not be in existing credentials — verify before testing analytics end-to-end
@@ -67,5 +72,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-19
-Stopped at: Completed 09-02-PLAN.md (stub detection + hashtag injection)
+Stopped at: Completed 09-03-PLAN.md (backfill-ids command + analytics wiring)
 Resume file: None
