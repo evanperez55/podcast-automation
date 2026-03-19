@@ -1,179 +1,165 @@
 # Project Research Summary
 
-**Project:** Podcast Automation — v1.2 Engagement & Smart Scheduling
-**Domain:** Analytics feedback loop and data-driven scheduling for CLI-driven podcast production pipeline
-**Researched:** 2026-03-18
-**Confidence:** HIGH (architecture and stack), MEDIUM (features and pitfalls)
+**Project:** Podcast Automation — v1.3 Content Calendar & CI/CD
+**Domain:** Bi-weekly comedy podcast pipeline automation (content scheduling + CI/CD)
+**Researched:** 2026-03-19
+**Confidence:** HIGH
 
 ## Executive Summary
 
-v1.2 adds an engagement feedback loop and smart scheduling layer on top of a mature, fully-functional production pipeline. The core challenge is not building new infrastructure — it is closing the loop between what gets posted and what actually performs, then feeding that signal back into clip selection, topic scoring, and upload timing. Research confirms this is achievable with minimal new dependencies (pandas 2.x, numpy 1.26.x, scipy) and two new standalone modules wired into existing pipeline integration points. The architecture is well-understood from direct code inspection and the approach is clear: build incrementally, gate on data availability, and never block the pipeline on missing history.
+v1.3 adds two capabilities to an already-working pipeline: a content calendar that spreads clip distribution across a week instead of dumping everything on release day, and GitHub Actions CI/CD that triggers automatically when a new episode appears in Dropbox. The research is unusually clean because the existing codebase (scheduler.py, posting_time_optimizer.py, pipeline/runner.py) already provides the scaffolding — v1.3 extends it, not replaces it. The recommended approach is additive: one new module (content_calendar.py), one new CI script (ci/poll.py), two workflow YAML files, and targeted modifications to distribute.py and runner.py. No new Python packages are needed.
 
-The single most important finding is a data cold-start constraint: the show has ~29 historical episodes, which is at the low edge of meaningful optimization. The correct sequence is (1) harden analytics collection infrastructure, (2) build the cross-episode history file and engagement scoring model, and (3) only then wire the optimizer into scheduling and clip selection. Any reversal of this order wastes implementation effort because the optimizer will have no data to act on. Industry-standard posting-time defaults (Tuesday/Wednesday for YouTube, Tuesday morning for Twitter) should function as fallbacks until the show's own data crosses the 5-episode-per-platform threshold.
+The key architectural decision is self-hosted GitHub Actions runner on the existing Windows 11 GPU machine. Cloud runners cannot run Whisper (no GPU on free tier; paid GPU runners cost ~$5/episode), and they cannot access local Dropbox sync folders or credential files without significant additional infrastructure. The self-hosted runner solves all three problems at zero cost. Dropbox monitoring uses polling (every 4-6 hours via GitHub Actions cron) rather than webhooks, which require a public HTTPS endpoint — polling is the correct pattern for a home machine behind NAT.
 
-The primary risks are not technical. The engagement score formula weights YouTube at 70%, which can erode the show's dark-comedy voice over time if optimization pressure is allowed to narrow topic variety. A second risk is the YouTube Data API v3 quota: running analytics alongside uploads in a shared project can exhaust the 10,000 daily units. Both risks have clear mitigations documented in the pitfalls research, and both must be addressed in Phase 1 before any feedback loop is activated.
+The dominant risk is the comedy content dimension: automated posting without human review creates real exposure, as demonstrated by ep29's YouTube cancer misinformation strike. Research is emphatic that CI must stop before distribution steps and require explicit human approval. Concurrency control (preventing duplicate pipeline runs on the same episode) and credential security (secrets split into individual scalar values, not JSON blobs) are the two technical pitfalls that, if missed, cause the most costly recovery scenarios.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The v1.2 stack additions are deliberately minimal. Three packages are added: `pandas>=2.0.0,<3.0.0` for cross-episode DataFrame analysis, `numpy>=1.26.4,<2.0.0` (constrained by torch 2.1.0 compatibility), and `scipy>=1.11.0,<2.0.0` for statistical significance testing. Everything else — YouTube Analytics API v2, posting time heuristics, content optimization, A/B significance testing — uses existing packages already in requirements.txt. scikit-learn and statsmodels were evaluated and rejected: the dataset (n≈30 episodes) is too small for ML regression without severe overfitting, and simple correlation analysis via scipy.stats is statistically honest at this scale. Flag scikit-learn for v1.3 when episode count exceeds 50.
+The v1.3 stack adds no new Python packages. GitHub Actions with a self-hosted runner on the existing Windows 11 NVIDIA machine handles CI/CD. Dropbox polling uses the existing dropbox SDK (v12.0.2) already in requirements.txt with cursor-based change detection. The content calendar is pure stdlib (datetime, json). GitHub repository secrets handle credentials for any future cloud runner path.
 
 **Core technologies:**
-- `pandas>=2.0.0,<3.0.0`: Cross-episode DataFrame analysis — only statistically honest tool for groupby aggregation at this scale without over-engineering
-- `numpy>=1.26.4,<2.0.0`: Constrained by torch 2.1.0 — do not upgrade to 2.x until torch compatibility is verified
-- `scipy>=1.11.0,<2.0.0`: Pearson/Spearman correlation for topic-engagement relationships; t-test/chi-square for A/B significance
-- `google-api-python-client==2.116.0` (existing): Builds `youtubeAnalytics/v2` service alongside existing `youtube/v3` — no new package needed
-- `openai>=1.0.0` (existing): GPT-4o content optimization already integrated; extend with engagement-informed prompts
-- Python stdlib `statistics`: Posting-time recommendation arithmetic — no new package
+- GitHub Actions self-hosted runner: CI/CD — only option with GPU access at zero cost; installs as a Windows service for reboot resilience
+- dropbox SDK 12.0.2 (existing): Dropbox polling — cursor-based `files_list_folder_continue` detects new episodes without webhooks
+- Python stdlib datetime/json: Content calendar — no new packages; date arithmetic is sufficient for bi-weekly spread scheduling
+- GitHub Actions secrets: Credential management — maps to existing `os.environ.get()` calls in config.py without code changes
 
 ### Expected Features
 
-The feature set divides cleanly on data availability: P1 features deliver value with zero episodes of history; P2 features require 10+ episodes of accumulated analytics; P3 features are v2+ material.
+**Must have (table stakes — v1.3 launch):**
+- Content calendar JSON per episode with spread schedule (D0 episode, D+1 clip 0, D+3 clip 1, D+5 clip 2) — pipeline's current same-day dump is treated as spam by algorithms
+- Platform hour defaults in config.py (YouTube 14:00, Twitter 10:00, TikTok 19:00) — calendar cannot produce meaningful ISO datetimes without hours
+- Dry-run calendar display before any upload commits — operators must see the full week plan first
+- GitHub Actions poll workflow (cron every 4-6 hours) to detect new Dropbox episodes — eliminates manual trigger requirement
+- GitHub Actions manual dispatch workflow — escape hatch for immediate episode processing
+- Self-hosted runner on GPU machine — prerequisite for all CI workflows to function
 
-**Must have (table stakes — P1, v1.2 launch):**
-- Multi-episode analytics aggregation (`python main.py analytics all`) — baseline feedback mechanism; reads all existing ep_N_analytics.json files
-- Topic-engagement history writer — persists episode+topic+score to `topic_data/topic_engagement_history.json` after each analytics run; foundation for all optimization
-- Platform best-time defaults in config — replace bare `SCHEDULE_X_DELAY_HOURS` with named windows (`tue-wed-18-21`); backward-compatible with existing offset values
-- Hashtag config + injection — `TWITTER_HASHTAGS` in config.py; inject top 1-2 tags in Twitter captions from `content_editor.py`; zero data dependency, immediate value
-- Clip video_id tracking — store Shorts `video_id` in episode output JSON during YouTube upload; enables per-clip analytics retrieval
+**Should have (add after 2-cycle validation):**
+- Teaser clip at D-1 before episode drop — pre-episode teasers drive higher launch-day engagement velocity; requires D0 gate logic to be proven reliable first
+- Calendar diff/conflict warning on re-run — warns when timestamps changed significantly; add once JSON format is stable
+- Mid-cycle throwback clip at D+7 — sustains presence in 14-day gap; blocked on Instagram/TikTok uploaders becoming functional
 
-**Should have (data-derived — P2, after 10+ episode history):**
-- Data-derived optimal posting windows — own-data analysis per platform; auto-configure scheduler once 10+ episodes exist
-- Category performance report — average engagement per topic category; feeds into topic scorer
-- YouTube description formatting — front-load timestamps and keywords in first 200 chars before upload
-
-**Defer (v2+):**
-- Per-clip engagement analytics deep-dive — clip position, duration, topic correlation with Shorts performance
-- Automated best-clip selection using historical engagement signal — replace energy-only scoring with hybrid model
-- Instagram and TikTok analytics integration — blocked on uploaders being functional and API access approved
+**Defer to v2+:**
+- Comedy clip role classifier (teaser hook vs. punchline vs. controversy bait) — requires 10+ episodes of calendar data
+- Dynamic teaser window adjustment based on engagement velocity — incompatible with batch pipeline model
 
 ### Architecture Approach
 
-Two new standalone modules (`engagement_scorer.py`, `posting_time_optimizer.py`) are injected into existing pipeline steps at the same integration points already used for `topic_context` and `UploadScheduler`. Both modules read from a new shared file `topic_data/engagement_history.json` (one entry per episode per platform, accumulated via `run_analytics()`). The optimizer injects into `distribute.py` via an optional parameter on `UploadScheduler.create_schedule()`; the scorer injects into `analysis.py` alongside the existing topic_context mechanism. No new pipeline steps are numbered. No existing module signatures break — all new parameters are `Optional` with `None` defaults that preserve current behavior exactly.
+The architecture adds a Trigger Layer (GitHub Actions workflows + ci/poll.py) and a Calendar Layer (content_calendar.py) on top of the unchanged existing pipeline. The calendar is a generated, mutable JSON state file at topic_data/content_calendar.json — not hand-edited config. Clip upload slots are consumed by extending the existing run_upload_scheduled() in pipeline/runner.py to also check ContentCalendar.get_pending_slots(now), reusing all existing platform uploader code. The pipeline splits cleanly: main run (episode + step 1-6 production) and daily upload-scheduled run (fires due clip slots from the calendar).
 
 **Major components:**
-1. `engagement_scorer.py` — reads `ep_N_analytics.json` files and `engagement_history.json`; produces `engagement_profile` dict (high-performing categories, keywords, confidence level) for AI clip selection; appends new outcomes to history via `record_outcome()`
-2. `posting_time_optimizer.py` — reads `engagement_history.json`; returns optimal posting datetime or `None` if below minimum episode threshold; consumed by `UploadScheduler.get_optimal_publish_at()`
-3. `topic_data/engagement_history.json` — shared rolling JSON file (capped at 104 entries); atomic `.tmp`-rename write to match existing scheduler.py safe-write pattern; zero-dependency on all callers when absent
+1. content_calendar.py — ContentCalendar class with plan_episode(), plan_clips(), get_pending_slots(), mark_slot_uploaded(); atomic writes via .tmp rename matching scheduler.py pattern
+2. ci/poll.py — lightweight Dropbox polling script (~30 lines); compares Dropbox listing to calendar's processed episodes; exits 0 (new episode found) or 1 (nothing new) for workflow conditional
+3. .github/workflows/poll.yml + manual.yml — cron trigger (every 4-6h) for polling; workflow_dispatch for manual episode processing; both target `runs-on: [self-hosted, windows, gpu]`
+4. Modified pipeline/steps/distribute.py — calls ContentCalendar.plan_episode() + plan_clips() after episode upload completes
+5. Modified pipeline/runner.py:run_upload_scheduled() — adds ContentCalendar.get_pending_slots() check alongside existing upload_schedule.json loop
 
 ### Critical Pitfalls
 
-1. **Cold start produces noise recommendations** — Enforce `ENGAGEMENT_HISTORY_MIN_EPISODES=5` threshold before `suggest_time()` returns anything other than `None`. Below threshold, log "Insufficient history for platform X — using fixed offset" and fall through to static delays. Phase 1 must build data collection before Phase 3 enables optimization.
+1. **Auto-posting edgy comedy content without human review** — CI must stop after step 6 (MP3 production) and fire a Discord notification with a GitHub Actions `environment: production` gate requiring named reviewer approval before any distribution step runs. Never use `--auto-approve` or `--force` for steps 7.5+. The ep29 YouTube strike is not hypothetical.
 
-2. **Engagement score erodes comedy voice** — YouTube's 70% weight in the composite score will systematically favor broadly accessible content over dark comedy. Treat comedy voice as a constraint (binary editorial override), not a variable. Never automate topic selection; engagement scores are ranking hints for hosts, not decisions. Phase 2 must bake this constraint into the scoring model design.
+2. **Concurrent pipeline runs corrupting episode state** — Add `concurrency: group: podcast-pipeline-${{ inputs.episode_number || 'scheduled' }}` with `cancel-in-progress: false` to every workflow. Two simultaneous dispatches for the same episode create duplicate uploads and corrupted checkpoint files.
 
-3. **YouTube API quota exhaustion** — `search().list()` costs 100 quota units per episode lookup. Fix during Phase 1: store `video_id` at upload time in `upload_schedule.json` (avoids the search call entirely). Run analytics collection as a separate scheduled task, never inside the production pipeline run.
+3. **Secrets exposure via CI logs or JSON credential blobs** — Split all OAuth credentials into individual scalar secrets (not single JSON blobs); GitHub's log redaction does not reliably mask structured data. Pin all `uses:` to full commit SHA (not @v4 tags) to guard against supply chain compromise (tj-actions March 2025 incident affected 23,000+ repositories).
 
-4. **Twitter free-tier impressions gap** — `impression_count` is not available on the free tier; it returns 0. This biases the composite engagement score. Fix: treat impressions as `null` (unknown) not `0`; null-guard the formula before building any scoring on top of it.
+4. **OAuth token expiry silently failing uploads** — Add a pre-flight credential check step at job start that calls a low-cost read endpoint for each platform. YouTube OAuth apps in "Testing" status issue tokens that expire every 7 days. Exit non-zero on 401 before any upload step runs.
 
-5. **topic_scorer episode number bug** — `get_engagement_bonus()` uses loop index (`i + 1`) instead of actual episode number, silently mapping bonuses to wrong episodes. Fix in Phase 2 before the engagement feedback loop is wired; add a regression test.
+5. **Dropbox polling triggering on partial uploads or non-episode files** — Filter by explicit filename pattern (ep[0-9]+\.wav), file size sanity check (>100MB), and file-age check (server_modified > 5 minutes ago). Deduplication via content_calendar.json's processed episode set prevents re-processing.
 
 ## Implications for Roadmap
 
-Based on combined research, the dependency graph drives a clear three-phase structure. Phase 1 must precede Phases 2 and 3 because all optimization work depends on clean analytics data. Phase 2 precedes Phase 3 because the engagement profile feeds into the scheduler's content signal.
+Based on combined research, the build order is driven by one dependency chain: ContentCalendar must exist before the CI workflows can use it to deduplicate episodes, and the self-hosted runner must be registered before any workflow can run. Within that, ContentCalendar is standalone and fully testable in isolation before any pipeline changes are required.
 
-### Phase 1: Analytics Infrastructure Hardening
+### Phase A: ContentCalendar Foundation
 
-**Rationale:** All optimization work depends on clean, reliable, quota-safe analytics data. Four distinct infrastructure problems must be fixed before any feedback loop is activated: quota exhaustion, Twitter impressions gap, stub uploader detection, and gitignore coverage of analytics files. Building the cross-episode history accumulator also belongs here — it has zero dependencies and starts collecting data that Phase 2 consumes.
+**Rationale:** No dependencies on existing pipeline code; fully testable in isolation with mock data. Everything else depends on this module existing.
+**Delivers:** content_calendar.py with CalendarEntry + ClipSlot dataclasses, plan_episode(), plan_clips(), get_pending_slots(), mark_slot_uploaded(), atomic write pattern; tests/test_content_calendar.py; config.py additions (CALENDAR_CLIP_SPREAD_DAYS, platform hour defaults).
+**Addresses:** Content calendar JSON per episode (P1), spread schedule (D0, D+1, D+3, D+5), platform hour defaults, dry-run display.
+**Avoids:** Anti-pattern of storing calendar state in hand-edited config; mutable state must live in the JSON file, not config constants.
 
-**Delivers:** Reliable per-episode analytics; `engagement_history.json` accumulator; `python main.py analytics all` aggregation report; video_id stored at upload time; Twitter impressions null-guarded; TikTok/Instagram excluded from scheduling targets; `topic_data/analytics/` in .gitignore.
+### Phase B: CI Trigger Layer
 
-**Addresses:** Multi-episode analytics aggregation (P1), topic-engagement history writer (P1), clip video_id tracking (P1), platform best-time defaults in config (P1), hashtag injection (P1 — zero data dependency, implement here for immediate value)
+**Rationale:** Depends on ContentCalendar for episode deduplication (is_processed check). Can be built in parallel with Phase C once Phase A is complete. Self-hosted runner setup is an ops step that unblocks all workflow testing.
+**Delivers:** ci/poll.py with filename/size/age/dedup guards; .github/workflows/poll.yml (cron every 4-6h); .github/workflows/manual.yml (workflow_dispatch); self-hosted runner installed as Windows service with labels [self-hosted, windows, gpu].
+**Addresses:** Dropbox polling cron (P1), manual dispatch (P1), self-hosted runner (P1).
+**Avoids:** Dropbox false-positive triggers (filename pattern + size + age guards); webhook complexity (polling is the correct approach); WAV file artifact passing between jobs (single-job architecture).
 
-**Avoids:** YouTube quota exhaustion (Pitfall 4), Twitter free-tier impressions gap (Pitfall 5), stub uploaders silently no-op (Pitfall 6), analytics data committed to git (security)
+### Phase C: Pipeline Integration
 
-**Research flag:** Standard patterns — direct code inspection complete; well-understood extension of existing analytics.py; no additional research needed.
+**Rationale:** Depends on Phase A (ContentCalendar class). Modifies existing production code, so must come after the standalone module is tested. Changes are additive with no existing call site modifications.
+**Delivers:** Modified distribute.py calling plan_episode() + plan_clips() after upload; modified runner.py:run_upload_scheduled() checking get_pending_slots(); daily upload-scheduled cron workflow or cron step in poll.yml.
+**Addresses:** Clip spread schedule execution; daily upload-scheduled cron integration.
+**Avoids:** Firing all clip uploads in the main pipeline run (destroys spread strategy; introduces rate-limit risk during a 60-90 min job).
 
-### Phase 2: Engagement Scoring Model
+### Phase D: Human Review Gate & Security Hardening
 
-**Rationale:** With history accumulation in place from Phase 1, the scoring model can be built and tested with real data. The episode number bug in topic_scorer must be fixed here before the feedback loop is wired. The comedy voice constraint must be baked into the model design — not added as a post-hoc patch.
-
-**Delivers:** `engagement_scorer.py` with `get_engagement_profile()` and `record_outcome()`; `pipeline/context.py` engagement_profile field; analysis step injection; category performance report; topic_scorer episode number bug fixed; `test_engagement_scorer.py`.
-
-**Uses:** pandas 2.x, scipy.stats Pearson/Spearman correlation
-
-**Implements:** Pattern 2 (Engagement Profile Injected into AI Clip Selection from ARCHITECTURE.md)
-
-**Avoids:** Comedy voice erosion (Pitfall 2), false confidence from small samples (Pitfall 1), topic_scorer episode number bug
-
-**Research flag:** Needs research-phase attention — comedy engagement scoring is domain-specific; confidence interval documentation for n=30; how to prevent engagement bias from narrowing topic variety without explicit editorial structure.
-
-### Phase 3: Smart Scheduling
-
-**Rationale:** The optimizer can only produce meaningful recommendations after Phase 1 has been accumulating data for multiple weeks. Phase 3 wires the optimizer into the scheduler with the confidence gate established in architecture research. Platform algorithm cold-start mechanics must be understood before timing changes go live.
-
-**Delivers:** `posting_time_optimizer.py`; `scheduler.py` `get_optimal_publish_at()` method; distribute step integration; `runner.py` component initialization; `SMART_SCHEDULING_ENABLED` and `ENGAGEMENT_HISTORY_MIN_EPISODES` config env vars; `test_posting_time_optimizer.py`.
-
-**Uses:** Python stdlib statistics, engagement_history.json from Phase 1
-
-**Implements:** Pattern 3 (Smart Schedule as Optional Extension) and Pattern 4 (Confidence-Gated Optimization from ARCHITECTURE.md)
-
-**Avoids:** Scheduler optimization without accounting for platform algorithm decay (Pitfall 3), scheduler signature breakage (Anti-Pattern 3), false confidence from small samples (Pitfall 1)
-
-**Research flag:** Needs research-phase attention for platform cold-start window mechanics — YouTube Shorts and Twitter first-hour amplification behavior should be documented per-platform before timing changes are deployed. Twitter 15-minute engagement burst threshold and YouTube Shorts first-hour algorithm behavior are not confirmed in current research.
+**Rationale:** Must be in place before any end-to-end CI run that includes distribution steps. Can be designed concurrently with A/B/C but must be verified before first production run.
+**Delivers:** GitHub Actions `environment: production` with required reviewers (configured in GitHub UI, not just YAML); Discord notification with approve/cancel link and clip preview; "pause all scheduled posts" kill switch (repository variable); pre-flight credential check step; concurrency group in all workflows; third-party action SHA pinning; disk cleanup step.
+**Addresses:** Human review requirement for comedy content (critical), concurrent run corruption prevention, OAuth token expiry detection, secrets security, runner disk exhaustion.
+**Avoids:** Auto-posting content during breaking news events; duplicate YouTube uploads; silent 401 failures; secrets in workflow logs; tj-actions-style supply chain compromise.
 
 ### Phase Ordering Rationale
 
-- Phase 1 is a prerequisite for both Phases 2 and 3: quota-safe analytics and the engagement_history.json schema must exist before any scoring or optimization logic is built.
-- Phase 2 before Phase 3: `engagement_scorer.py` produces the `engagement_profile` that eventually informs the optimizer's content signal; fixing the episode number bug before Phase 3 prevents corrupt data in the feedback loop.
-- P1 features with zero data dependency (hashtag injection, best-time config defaults) belong in Phase 1 for early wins — they do not need to wait for analytics history.
-- P2 features (data-derived posting windows, category performance) require Phase 1 to have run for 2-4 weeks before they deliver meaningful signal.
+- Phase A first because ContentCalendar is a standalone, testable unit with no pipeline dependencies — fastest to validate and lowest risk.
+- Phase B in parallel with Phase C once Phase A completes. ci/poll.py needs ContentCalendar only for the read-only is_processed() check; the pipeline integration (Phase C) is a more invasive production code change.
+- Phase D can be developed concurrently with B and C but must be verified before any distribution workflow is merged. The GitHub `environment: production` gate must be configured in the GitHub UI — YAML alone does nothing.
+- Self-hosted runner setup (Phase B ops step) is a prerequisite for testing any workflow YAML — do it early in Phase B even though it requires no code.
 
 ### Research Flags
 
 Phases needing deeper research during planning:
-- **Phase 2:** Comedy-specific engagement scoring — how to prevent feedback loop from narrowing topic variety; confidence interval documentation for n=30; comedy engagement non-linearity (bimodal distribution of "lands vs misses")
-- **Phase 3:** Per-platform cold-start mechanics — YouTube Shorts first-hour amplification threshold; Twitter 15-minute engagement burst mechanics; whether "when audience is online" differs materially from "optimal algorithm amplification window"
+- **Phase D (Human Review Gate):** The GitHub Actions `environment: production` required-reviewers feature availability on the Free plan (vs. Team plan) needs verification for personal-account private repositories. Fallback is a manual Discord approve link triggering a separate `workflow_dispatch`. Confirm before designing the approval UX.
 
 Phases with standard patterns (skip research-phase):
-- **Phase 1:** Direct code inspection complete; quota limits documented in official Google/Twitter developer docs; extension patterns are well-established in existing codebase
+- **Phase A (ContentCalendar):** Pure Python stdlib, well-understood JSON state pattern, mirrors existing scheduler.py atomic write pattern already in the codebase.
+- **Phase B (CI Trigger Layer):** GitHub Actions cron + workflow_dispatch are official, heavily documented patterns. Dropbox cursor-based polling is documented in official Dropbox SDK guides.
+- **Phase C (Pipeline Integration):** Extends existing run_upload_scheduled() and distribute.py with additive, low-risk changes. No new external dependencies.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Version constraints verified against pinned deps (torch 2.1.0 forces numpy<2.0); YouTube Analytics API v2 confirmed against official dimension reference; scikit-learn rejection is well-reasoned |
-| Features | MEDIUM | Industry best-time defaults from Buffer/Sprout Social (millions of posts) but niche comedy podcast may diverge; hashtag engagement data is directional only (LOW confidence source) |
-| Architecture | HIGH | Derived from direct code inspection of all integration modules; patterns mirror existing codebase conventions; concrete interface signatures provided |
-| Pitfalls | MEDIUM-HIGH | YouTube/Twitter quota limits from official docs (HIGH); comedy voice erosion and cold-start thresholds from practitioner sources (MEDIUM); platform algorithm cold-start mechanics unconfirmed |
+| Stack | HIGH | No new packages; all technology choices backed by official docs or existing codebase. Self-hosted runner is the only viable GPU path — no ambiguity. |
+| Features | MEDIUM | Comedy-specific posting time windows (YouTube 1-4PM, Twitter 9AM-12PM, TikTok 7-9PM) are from MEDIUM-confidence sources (Sprout Social, ClipGOAT). Platform algorithms shift; these are research-validated defaults, not guarantees. PostingTimeOptimizer will eventually override them with show-specific data. |
+| Architecture | HIGH | Based on direct code inspection of all relevant existing modules. ContentCalendar JSON state pattern mirrors scheduler.py (already proven). Integration points are additive with low modification risk. |
+| Pitfalls | HIGH | Most pitfalls verified against official GitHub docs. tj-actions supply chain incident is documented public record. ep29 YouTube strike is confirmed project history. OAuth testing-status 7-day expiry is confirmed Google behavior. |
 
-**Overall confidence:** MEDIUM-HIGH
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Twitter impressions availability:** Free tier does not provide `impression_count`. Before Phase 1 is complete, verify what the show's current Twitter API tier actually returns and whether upgrading to Basic ($100/month) is justified. The engagement score formula is biased if impressions silently returns 0.
-
-- **YouTube Analytics API v2 OAuth scope:** The existing YouTube OAuth credentials may not include `https://www.googleapis.com/auth/yt-analytics.readonly`. Building the `youtubeAnalytics/v2` service may require a credentials update and re-authorization before Phase 1 analytics work can be tested end-to-end.
-
-- **pandas already in requirements.txt:** Check whether pandas is already present as a transitive dependency before adding it. If present at a conflicting version, the version constraint update may require a full `pip install -r requirements.txt` rebuild.
-
-- **TikTok audit status:** TikTok Content Posting API requires app audit approval before posts are public. Phase 1 should document the current audit status; if unaudited, exclude TikTok from all scheduling work and do not queue posts until audit is complete.
-
-- **Engagement history bootstrap:** ~29 historical episodes already exist. Backfilling `engagement_history.json` would accelerate the optimizer's learning. However, backfilling YouTube analytics via search costs 100 quota units per episode. The video_id storage fix (Phase 1) must be in place before any backfill is attempted to avoid quota exhaustion.
+- **GitHub Actions `environment:` feature on Free plan:** Required-reviewers on environments may require GitHub Team for organization repos. Verify for a personal-account private repo before committing to this design; fallback is a Discord-triggered `workflow_dispatch` approval flow.
+- **Comedy-specific posting hour defaults:** Platform timing research is MEDIUM confidence and based on general audiences, not niche comedy. The PostingTimeOptimizer (already in codebase from v1.2) will override these with show-specific data once the 15-episode confidence gate is met. Accept this uncertainty and let engagement data correct it over 2-3 cycles.
+- **Instagram/TikTok uploader status:** Mid-cycle throwback slot (D+7) is explicitly blocked on these uploaders becoming functional. Research does not resolve when this will happen — flag for v1.3.x planning.
+- **WhisperX model cache behavior after Windows Update / CUDA driver change:** Pitfalls research recommends a weekly smoke-test workflow. Confirm the Whisper model cache path and version before first production run to prevent cache miss on first episode.
+- **YouTube Data API quota during daily upload-scheduled runs:** If upload-scheduled fires clip uploads daily, verify those API calls do not compete with the main episode upload for the 10,000 daily quota. Analytics collection (run-analytics.yml) should run on a separate schedule to avoid quota conflicts.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- YouTube Analytics API Dimensions Reference (developers.google.com/youtube/analytics/dimsmets/dims) — confirmed no hourly/day-of-week dimension; only `day` and `month` available
-- YouTube Analytics API Reports Query (developers.google.com/youtube/analytics/reference/reports/query) — query structure for date-segmented video stats
-- YouTube Data API v3 Quota documentation (developers.google.com/youtube/v3/determine_quota_cost) — quota unit costs per operation
-- Twitter/X API rate limits (developer.twitter.com/en/docs/rate-limits) — free tier restrictions
-- TikTok Content Posting API documentation (developers.tiktok.com/products/content-posting-api/) — audit requirement for public posts
-- Direct code inspection: analytics.py, scheduler.py, pipeline/runner.py, pipeline/steps/, topic_scorer.py, audio_clip_scorer.py, pipeline/context.py
+- GitHub Docs: Adding self-hosted runners — Windows service install, GPU access, private repo security guidance
+- GitHub Docs: Events that trigger workflows — cron schedule, workflow_dispatch inputs
+- GitHub Docs: Using secrets in GitHub Actions — repository vs. environment secrets
+- GitHub Actions Concurrency Docs — concurrency group patterns and cancel-in-progress behavior
+- Dropbox Detecting Changes Guide — server-side cursor polling; webhook requires public endpoint (confirmed)
+- Direct code inspection: scheduler.py, posting_time_optimizer.py, pipeline/runner.py, pipeline/steps/distribute.py, main.py, config.py, dropbox_handler.py
+- tj-actions supply chain compromise (March 2025) — documented incident with public disclosure; 23,000+ repositories affected
+- GitHub Actions self-hosted runner minimum version enforcement (v2.329.0, February 2026) — official changelog
+- GitHub Actions GPU Runners GA — requires paid GitHub Team/Enterprise plan; confirmed for free tier unavailability
+- Windows Server 2025 runner disk space — official runner-images issue tracker
 
 ### Secondary (MEDIUM confidence)
-- Buffer 2026 Best Times to Post on Social Media (7M+ posts analyzed) — posting time defaults
-- Buffer 2026 Best Time to Post on Twitter/X (1M posts analyzed) — Twitter timing defaults
-- Sprout Social 2025 Best Times to Post on YouTube — YouTube timing defaults
-- Engagement scoring model common mistakes — Accrease practitioner guide
-- Best time to release a podcast — Lower Street (notes generic benchmarks don't apply to niche audiences)
-- Recency bias in analytics — Amplitude (analytics platform vendor)
+- Sprout Social: Best times to post on social media 2025 — platform hour defaults (general audience, not comedy-specific)
+- ClipGOAT: Best times to post TikTok, YouTube Shorts, Instagram Reels 2025 — comedy timing windows
+- Simplecast: Leveraging Podcast Clips for Cross-Promotion — drip > dump engagement evidence
+- Galati Media: Podcast Content Calendar Guide — bi-weekly gap content patterns
+- GitHub Community: Bi-weekly cron workaround — no native bi-weekly cron confirmed; modulo approach documented
+- Sysdig: Self-hosted runner security risks — private repo + sole owner mitigates risk
 
 ### Tertiary (LOW confidence)
-- Hashtag engagement data (1-2 hashtags doubles engagement) — directional signal only; single source; treat as hypothesis to test with own data
-- YouTube Shorts shadowban and algorithm penalties — corroborated by multiple sources but no official confirmation of specific threshold mechanics
+- YouTube Bulk Upload Detection Risk 2025 (social media post) — directional signal only; add inter-upload delays as a precaution but do not treat as confirmed platform behavior
 
 ---
-*Research completed: 2026-03-18*
+*Research completed: 2026-03-19*
 *Ready for roadmap: yes*

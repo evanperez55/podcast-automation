@@ -1,12 +1,12 @@
 # Architecture Research
 
-**Domain:** Engagement optimization and smart scheduling — v1.2 integration into existing pipeline
-**Researched:** 2026-03-18
-**Confidence:** HIGH — based on direct code inspection of all relevant existing modules
+**Domain:** Content calendar and GitHub Actions CI/CD — v1.3 integration into existing pipeline
+**Researched:** 2026-03-19
+**Confidence:** HIGH — based on direct code inspection of all relevant existing modules + official GitHub Actions docs
 
 ---
 
-## Current Architecture (as-built, v1.1)
+## Current Architecture (as-built, v1.2)
 
 ```
 main.py (134-line CLI shim)
@@ -17,57 +17,80 @@ pipeline/runner.py (orchestrator, component factory, checkpoint logic)
     |
     +---> pipeline/steps/ingest.py     (Step 1: download)
     +---> pipeline/steps/analysis.py   (Steps 3-3.5: AI analysis + topic tracker)
-    +---> pipeline/steps/audio.py      (stub — Steps 4-6 still inline in runner.py)
     +---> pipeline/steps/video.py      (Steps 5.1-5.6: clips, subs, video, thumb)
     +---> pipeline/steps/distribute.py (Steps 7-9: Dropbox, RSS, social, blog, search)
+
+State files (per-episode):
+    output/ep_N/upload_schedule.json    — platform upload schedule + status
+    output/.pipeline_state/ep_N.json    — step checkpoint state
+
+Cross-episode data:
+    topic_data/engagement_history.json  — posting time outcomes (v1.2)
+    topic_data/analytics/               — per-episode platform metrics
 ```
 
-Key facts about existing engagement/scheduling modules:
+Key facts about scheduling in the existing system:
 
-- `analytics.py` — `AnalyticsCollector` fetches YouTube (views/likes/comments) and Twitter (impressions/engagements) per episode. Saves to `topic_data/analytics/ep_N_analytics.json`. Run via `python main.py analytics epN`.
-- `scheduler.py` — `UploadScheduler` creates `upload_schedule.json` with platform entries at `now + SCHEDULE_X_DELAY_HOURS`. Fixed offset only — no awareness of audience activity patterns.
-- `topic_scorer.py` — `TopicScorer` via Ollama; already reads `get_engagement_bonus()` from analytics as a weak signal.
-- `audio_clip_scorer.py` — `AudioClipScorer` scores segments by RMS energy; feeds into GPT-4o clip selection in `content_editor.py`.
-- `pipeline/steps/analysis.py` — already injects `topic_context` (scored topics from `topic_data/`) into AI analysis prompt. This is the pattern for feeding external data into clip selection.
+- `scheduler.py` — `UploadScheduler.create_schedule()` writes `upload_schedule.json` per episode at pipeline creation time. `run_upload_scheduled()` in `pipeline/runner.py` polls existing schedule files and fires any pending platform uploads whose `publish_at` has passed.
+- `posting_time_optimizer.py` — `PostingTimeOptimizer` computes the next optimal weekday+hour for a platform. Returns `None` if fewer than 15 episodes of history exist.
+- No content calendar exists yet. Clip distribution timing is the same as episode publishing — all clips and episode are produced together, published with fixed platform delays.
+- No CI/CD exists. All runs are manual via `python main.py latest` or `python main.py epN` on the local Windows machine.
 
 ---
 
-## System Overview: v1.2 Additions
+## System Overview: v1.3 Additions
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                     EXISTING PIPELINE (v1.1)                         │
-│  main.py → pipeline/runner.py → pipeline/steps/                     │
-│                                                                      │
-│  Step 3: analysis.py                  Step 8: distribute.py          │
-│    reads topic_context (existing)       calls scheduler.create_      │
-│    ← [NEW] engagement_profile          schedule() (existing)         │
-│                                         ← [NEW] optimizer param      │
-├─────────────────────────────────────────────────────────────────────┤
-│                    NEW v1.2 MODULES                                  │
-│  ┌──────────────────────┐  ┌─────────────────────────────────────┐  │
-│  │  engagement_scorer.py│  │  posting_time_optimizer.py          │  │
-│  │  - get_engagement_   │  │  - suggest_time(platform) → dt|None │  │
-│  │    profile() → dict  │  │  - reads engagement_history.json    │  │
-│  │  - record_outcome()  │  │  - fallback: None if < min_episodes │  │
-│  └──────────┬───────────┘  └───────────────┬─────────────────────┘  │
-│             │                              │                         │
-│             ↓   writes                     ↓   reads                 │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │   topic_data/engagement_history.json                         │   │
-│  │   { "episodes": [ { platform: { posted_at, hour_utc,        │   │
-│  │     day_of_week, engagement_score }, ... } ] }               │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-├─────────────────────────────────────────────────────────────────────┤
-│               MODIFIED EXISTING MODULES                              │
-│  analytics.py    — add posted_at capture; record_outcome() hook     │
-│  scheduler.py    — add get_optimal_publish_at(platform, optimizer)  │
-│  pipeline/context.py — add engagement_profile: Optional[dict] field │
-│  pipeline/steps/analysis.py  — load and attach engagement_profile  │
-│  pipeline/steps/distribute.py — pass optimizer to create_schedule() │
-│  pipeline/runner.py — init new components in _init_components()     │
-│  config.py       — SMART_SCHEDULING_ENABLED, MIN_EPISODES env vars  │
-└─────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                  TRIGGER LAYER (NEW)                                  │
+│                                                                       │
+│  GitHub Actions (.github/workflows/)                                  │
+│  ┌──────────────────────┐  ┌───────────────────────────────────────┐ │
+│  │  poll.yml            │  │  manual.yml                           │ │
+│  │  schedule: cron      │  │  on: workflow_dispatch                │ │
+│  │  → python ci/poll.py │  │  inputs: episode_number, flags        │ │
+│  │  if new file found:  │  │  → python main.py epN --auto-approve  │ │
+│  │    dispatch process  │  └───────────────────────────────────────┘ │
+│  └──────────────────────┘                                             │
+│                                                                       │
+│  runs-on: self-hosted (Windows 11, NVIDIA GPU, CUDA)                  │
+├──────────────────────────────────────────────────────────────────────┤
+│                  CALENDAR LAYER (NEW)                                 │
+│                                                                       │
+│  content_calendar.py                                                  │
+│  ┌─────────────────────────────────────────────────────────────────┐ │
+│  │  ContentCalendar                                                  │ │
+│  │  - plan_episode(episode_number, release_date) → CalendarEntry    │ │
+│  │  - plan_clips(episode_number, clips) → List[ClipSlot]            │ │
+│  │  - get_pending_slots(now) → List[ClipSlot]                       │ │
+│  │  reads/writes: topic_data/content_calendar.json                  │ │
+│  └────────────────────────────┬────────────────────────────────────┘ │
+│                               │                                       │
+│  ci/poll.py                   │                                       │
+│  ┌────────────────────────────▼────────────────────────────────────┐ │
+│  │  - list Dropbox new_raw_files                                     │ │
+│  │  - compare against content_calendar.json processed episodes      │ │
+│  │  - if unprocessed WAV found → write ci/pending_episode.txt       │ │
+│  │  - exit 0 (new file) or exit 1 (nothing new)                     │ │
+│  └─────────────────────────────────────────────────────────────────┘ │
+├──────────────────────────────────────────────────────────────────────┤
+│                  EXISTING PIPELINE (v1.2, unchanged)                  │
+│                                                                       │
+│  main.py → pipeline/runner.py → pipeline/steps/                      │
+│  upload_schedule.json + .pipeline_state/ep_N.json                    │
+│                                                                       │
+│  MODIFIED: pipeline/steps/distribute.py                              │
+│  - After clips produced: ContentCalendar.plan_clips()                │
+│  - Assigns clip publish slots spread across the week                 │
+│  - Clip uploads read slot datetimes from content_calendar.json       │
+├──────────────────────────────────────────────────────────────────────┤
+│                  STATE & SECRETS                                      │
+│                                                                       │
+│  topic_data/content_calendar.json  — calendar entries (local file)   │
+│  .env (local, never committed)     — all API keys                    │
+│  GitHub Actions Secrets            — mirrors of .env vars            │
+│  (runner reads .env from disk; Actions secrets used in cloud fallback)│
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -76,185 +99,230 @@ Key facts about existing engagement/scheduling modules:
 
 ```
 podcast-automation/
-├── analytics.py                       # MODIFIED: add posted_at capture
-├── scheduler.py                       # MODIFIED: add get_optimal_publish_at()
-├── posting_time_optimizer.py          # NEW: optimal posting window logic
-├── engagement_scorer.py               # NEW: clip/episode engagement prediction
-├── config.py                          # MODIFIED: two new env vars
+├── main.py                              # UNCHANGED
+├── config.py                           # MODIFIED: CALENDAR_CLIP_SPREAD_DAYS, DROPBOX_POLL_INTERVAL
+├── content_calendar.py                 # NEW: ContentCalendar class
 ├── pipeline/
-│   ├── context.py                     # MODIFIED: add engagement_profile field
 │   └── steps/
-│       ├── analysis.py                # MODIFIED: inject engagement_profile
-│       └── distribute.py             # MODIFIED: pass optimizer to scheduler
+│       └── distribute.py              # MODIFIED: call calendar.plan_clips() after clip creation
+├── ci/
+│   ├── poll.py                        # NEW: Dropbox polling script for GitHub Actions
+│   └── trigger_episode.py             # NEW: invoke pipeline for discovered episode
+├── .github/
+│   └── workflows/
+│       ├── poll.yml                   # NEW: scheduled cron, calls ci/poll.py
+│       └── manual.yml                 # NEW: workflow_dispatch for manual episode trigger
 ├── topic_data/
-│   ├── analytics/
-│   │   └── ep_N_analytics.json        # EXISTING: per-episode metrics files
-│   └── engagement_history.json        # NEW: cross-episode posting time outcomes
+│   ├── content_calendar.json          # NEW: persistent calendar state
+│   ├── engagement_history.json        # EXISTING (v1.2)
+│   └── analytics/                     # EXISTING
 └── tests/
-    ├── test_posting_time_optimizer.py  # NEW
-    └── test_engagement_scorer.py       # NEW
+    └── test_content_calendar.py       # NEW
 ```
 
 ### Structure Rationale
 
-- **Flat module structure** — matches existing project convention; every top-level `.py` module is a peer.
-- **`topic_data/engagement_history.json`** — co-located with existing analytics data (`topic_data/analytics/`). Consistent discovery pattern with `scored_topics_*.json` and the analytics dir.
-- **Two new modules, not one** — `posting_time_optimizer.py` owns the "when to post" problem; `engagement_scorer.py` owns the "what content scores well" prediction. Separate concerns, separately testable.
-- **No new pipeline step** — both new modules are injected into existing steps (analysis and distribute) via the established component pattern, not added as numbered pipeline steps.
+- **`ci/` directory** — separates CI-specific scripts (poll, trigger) from the main pipeline. These scripts are thin: they read Dropbox state and invoke `main.py`. No business logic here.
+- **`content_calendar.py` at root** — follows project convention of flat module structure. Peer to `scheduler.py` and `posting_time_optimizer.py`.
+- **`topic_data/content_calendar.json`** — co-located with existing cross-episode data files (`engagement_history.json`, `scored_topics_*.json`). Consistent discovery pattern.
+- **`.github/workflows/`** — standard location; two workflows (poll + manual) to keep concerns separate.
 
 ---
 
 ## Architectural Patterns
 
-### Pattern 1: Engagement History as Rolling JSON File
+### Pattern 1: Content Calendar as a JSON State File (Not Config)
 
-**What:** A single `topic_data/engagement_history.json` accumulates one entry per episode per platform. `EngagementScorer.record_outcome()` appends to it after `run_analytics()`. Both new modules read it.
+**What:** `content_calendar.json` is a generated, mutable state file — not a hand-edited config. `ContentCalendar` generates it when `plan_episode()` or `plan_clips()` is called, and updates it as slots are consumed.
 
-**When to use:** Every time `python main.py analytics epN` runs, ~48h after a new episode goes live.
+**When to use:** After the distribute step creates clips; before `run_upload_scheduled()` fires.
 
-**Trade-offs:** Zero new dependencies, trivial to inspect/debug. Scales to ~100 episodes without performance concern. Does not block if missing — both consumers return `None` gracefully.
+**Trade-offs:** Zero new database dependency. Trivially inspectable (`cat topic_data/content_calendar.json`). Atomic write pattern (`.tmp` rename) prevents corrupt state on crash. Scales adequately to a bi-weekly show (~50 entries/year). No web UI or external calendar service needed.
 
-```python
-# engagement_history.json schema
+**Schema:**
+```json
 {
-  "episodes": [
-    {
-      "episode_number": 29,
-      "recorded_at": "2026-03-10T14:00:00",
-      "youtube": {
-        "posted_at": "2026-03-05T10:00:00",
-        "posted_hour_utc": 10,
-        "posted_day_of_week": 2,          # 0=Mon, 6=Sun
-        "engagement_score": 6.4,
-        "views": 312,
-        "likes": 28
-      },
-      "twitter": {
-        "posted_at": "2026-03-05T11:00:00",
-        "posted_hour_utc": 11,
-        "posted_day_of_week": 2,
-        "engagement_score": 3.1,
-        "impressions": 820,
-        "engagements": 34
-      }
+  "episodes": {
+    "ep_30": {
+      "episode_number": 30,
+      "release_date": "2026-03-25T14:00:00",
+      "status": "scheduled",
+      "dropbox_path": "/Fake Problems Podcast/new_raw_files/ep30.wav",
+      "clips": [
+        {
+          "clip_index": 0,
+          "clip_path": "output/ep_30/clip_0_subtitled.mp4",
+          "platforms": {
+            "twitter":  { "publish_at": "2026-03-26T10:00:00", "status": "pending" },
+            "tiktok":   { "publish_at": "2026-03-27T12:00:00", "status": "pending" },
+            "youtube":  { "publish_at": "2026-03-25T14:00:00", "status": "uploaded", "video_id": "abc123" }
+          }
+        },
+        {
+          "clip_index": 1,
+          "clip_path": "output/ep_30/clip_1_subtitled.mp4",
+          "platforms": {
+            "twitter":  { "publish_at": "2026-03-28T10:00:00", "status": "pending" },
+            "tiktok":   { "publish_at": "2026-03-29T12:00:00", "status": "pending" }
+          }
+        }
+      ]
     }
-  ]
+  },
+  "last_updated": "2026-03-19T12:00:00"
 }
 ```
 
-Write pattern: atomic `.tmp` then rename — matches existing `scheduler.py` approach to avoid partial-read corruption.
+Clip spread strategy: episode day = Clip 0 (YouTube Short); day+1 = Clip 0 Twitter/TikTok; day+3 = Clip 1 Twitter/TikTok; day+5 = Clip 2 if exists. This gives 5 social touchpoints across the week from a single episode.
 
-### Pattern 2: Engagement Profile Injected into AI Clip Selection
+### Pattern 2: GitHub Actions Self-Hosted Runner on the Existing Windows Machine
 
-**What:** `EngagementScorer.get_engagement_profile()` summarizes which topic categories and keywords historically outperform. This dict is attached to `ctx.engagement_profile` by `pipeline/steps/analysis.py` and then passed into `ContentEditor.analyze()` alongside `topic_context` — the same injection point that already exists for scored topics.
+**What:** Install the GitHub Actions runner as a Windows service on the existing local machine. The runner listens for job triggers from GitHub. Workflows run `python main.py` exactly as the host already does — same GPU, same FFmpeg, same `.env` file.
 
-**When to use:** Step 3, before GPT-4o clip selection. Falls back to empty dict (no behavioral change) if `engagement_history.json` does not exist yet.
+**When to use:** This is the only option that keeps GPU access (Whisper requires CUDA), avoids uploading 700MB WAV files to cloud runners, and costs nothing extra.
 
-```python
-# engagement_scorer.py — what get_engagement_profile() returns
-{
-  "high_performing_categories": ["shocking_news", "absurd_hypothetical"],
-  "high_performing_keywords": ["cheese", "airplane", "diarrhea"],
-  "avg_score_by_category": {"shocking_news": 7.2, "dating_social": 4.1},
-  "episodes_analyzed": 8,
-  "confidence": "medium"   # "low" if < 3 episodes; "none" if no data
-}
+**Setup:**
+```
+# Install runner as Windows service (run once, as Administrator)
+# Download from: github.com/{repo}/settings/actions/runners/new
+# Config registers the runner with labels: self-hosted, windows, gpu
+
+# Workflow targets it:
+runs-on: [self-hosted, windows, gpu]
 ```
 
-**Trade-offs:** Augments existing `audio_energy_score` + AI scoring without replacing either. No new API calls.
+**Trade-offs:** Runner requires the host machine to be on and the service running. Acceptable for a bi-weekly show — no SLA requirement. If the machine is off when the cron fires, GitHub Actions re-runs the scheduled workflow at the next opportunity (within ~1h window). Alternative (cloud GPU runner at $0.07/min) costs ~$5/episode for Whisper — not worth it at current scale.
 
-### Pattern 3: Smart Schedule as an Optional Extension to `UploadScheduler`
+**Secrets vs .env:** The self-hosted runner executes on the machine that already has `.env`. The workflow can simply invoke `python main.py` — `load_dotenv()` in `config.py` reads `.env` at runtime. No GitHub Secrets needed for the self-hosted path. GitHub Secrets are the fallback if a cloud runner is ever used.
 
-**What:** Add `get_optimal_publish_at(platform, optimizer)` method to `UploadScheduler`. `create_schedule()` gains an optional `optimizer=None` parameter. When optimizer is present and has enough data, it returns an optimal datetime; otherwise the existing fixed-offset logic runs unchanged.
+### Pattern 3: Dropbox Polling via Lightweight CI Script
 
-**When to use:** Called from `_upload_to_social_media()` in `distribute.py`.
+**What:** `ci/poll.py` is a small script (not part of the main pipeline) that:
+1. Connects to Dropbox (reads credentials from `.env`)
+2. Lists files in `DROPBOX_FOLDER_PATH`
+3. Compares against episodes already in `content_calendar.json`
+4. If an unprocessed WAV is found, writes its filename to `ci/pending_episode.txt` and exits 0
+5. If nothing new, exits 1 (which allows the GitHub Actions workflow to skip the expensive pipeline run)
 
-**Trade-offs:** Fully backward compatible — `create_schedule()` without optimizer arg behaves exactly as v1.1. `run_upload_scheduled()` and `run_distribute_only()` need no changes.
+**When to use:** Called from `poll.yml` on a cron schedule (e.g., every 6 hours). The workflow checks the exit code and only runs the episode pipeline step if exit 0.
 
-```python
-# scheduler.py addition
-def get_optimal_publish_at(self, platform: str, optimizer) -> Optional[str]:
-    """Return optimal datetime ISO string if optimizer has sufficient data."""
-    if optimizer is None:
-        return None
-    optimal_dt = optimizer.suggest_time(platform)
-    if optimal_dt:
-        return optimal_dt.isoformat()
-    # Fall back to existing fixed-delay logic
-    if platform == "youtube" and self.youtube_delay > 0:
-        return (datetime.now() + timedelta(hours=self.youtube_delay)).isoformat()
-    return None
+```yaml
+# .github/workflows/poll.yml
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # every 6 hours
+  workflow_dispatch:          # always include for manual testing
+
+jobs:
+  poll:
+    runs-on: [self-hosted, windows, gpu]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Poll Dropbox for new episodes
+        id: poll
+        run: python ci/poll.py
+        continue-on-error: true
+      - name: Process new episode
+        if: steps.poll.outcome == 'success'
+        run: python main.py latest --auto-approve
 ```
 
-### Pattern 4: Confidence-Gated Optimization
+**Trade-offs:** Simple and transparent. The poll script is ~30 lines, fully unit-testable with mock Dropbox. No webhooks or event subscriptions needed. Polling interval of 6h is fine for a bi-weekly show.
 
-**What:** `PostingTimeOptimizer.suggest_time(platform)` returns `None` unless at least `ENGAGEMENT_HISTORY_MIN_EPISODES` (default: 5) valid data points exist for that platform. Below the threshold, the optimizer steps aside and fixed offsets apply.
+### Pattern 4: Clip Distribution Spread vs. Same-Day
 
-**Why:** With fewer than 5 episodes, the "best hour" computed from 2 data points is noise, not signal. Reporting false confidence leads to suboptimal schedules.
+**What:** Rather than uploading all clips on episode release day, spread short-form clips across the week. The `ContentCalendar.plan_clips()` method assigns each clip to a specific platform+day slot.
 
-**Threshold exposed in `config.py`:**
-```python
-ENGAGEMENT_HISTORY_MIN_EPISODES = int(os.getenv("ENGAGEMENT_HISTORY_MIN_EPISODES", "5"))
+**Recommended spread for 3 clips, bi-weekly schedule:**
 ```
+Day 0 (release): Episode full video → YouTube
+Day 1:           Clip 0 → YouTube Short, Twitter, TikTok
+Day 3:           Clip 1 → Twitter, TikTok
+Day 5:           Clip 2 → Twitter, TikTok
+```
+
+**Rationale:** Social algorithms reward consistent posting (not spikes). Spreading clips extends the promotion window from 1 day to 5 days. Each clip post can reference the full episode, driving late listeners to the back catalog. Evidence from content calendar research: weekly drip sustains engagement for longer than same-day dump.
+
+**Trade-offs:** Clip uploads can no longer happen in a single `run_upload_scheduled()` call. The `upload-scheduled` command must be run periodically (daily via cron) to fire due slots. `main.py upload-scheduled` already exists and iterates pending schedules — it just needs to also read `content_calendar.json` clip slots.
+
+### Pattern 5: Clip Upload via Existing `run_upload_scheduled()` Path
+
+**What:** The clip calendar slots are consumed by extending `run_upload_scheduled()` to also check `content_calendar.json` for due clip slots. No new CLI command needed.
+
+**When to use:** Daily cron in `poll.yml` (or a separate `upload.yml` that runs `python main.py upload-scheduled` daily at 9am).
+
+**Integration point:**
+```
+pipeline/runner.py:run_upload_scheduled()
+    EXISTING: reads output/ep_N/upload_schedule.json for episode-level platform uploads
+    NEW: also calls ContentCalendar.get_pending_slots(now)
+         for each due clip slot: calls clip-appropriate uploader
+         marks slot as uploaded in content_calendar.json
+```
+
+This reuses all existing platform uploader code. The calendar is a scheduling layer on top of the existing upload machinery.
 
 ---
 
 ## Data Flow
 
-### Engagement Feedback Loop (Cross-Episode, Asynchronous)
+### Full Episode Processing + Calendar Planning
 
 ```
-Episode N uploaded
+GitHub Actions poll.yml cron trigger
     |
-    | (~48h later)
-    v
-python main.py analytics epN
+ci/poll.py
+    +-- DropboxHandler.list_episodes()
+    +-- ContentCalendar.is_processed(filename)
+    |   if processed: exit 1 (no-op)
     |
-    +-- AnalyticsCollector.collect_analytics(N)
-    |       reads: YouTube API, Twitter API
-    |       saves: topic_data/analytics/ep_N_analytics.json (existing)
+    v (new episode found)
+python main.py latest --auto-approve
     |
-    +-- EngagementScorer.record_outcome(N)
-            reads: upload_schedule.json → posted_at timestamps
-            reads: ep_N_analytics.json → engagement scores
-            writes: topic_data/engagement_history.json (append)
+pipeline/steps/ingest.py      → download WAV
+pipeline/steps/analysis.py    → transcribe, analyze, select clips
+pipeline/steps/video.py       → render clip videos (subtitled)
+pipeline/steps/distribute.py  → upload episode (YouTube, Spotify, RSS)
+                               → ContentCalendar.plan_episode(episode_num, release_dt)
+                               → ContentCalendar.plan_clips(episode_num, clip_paths)
+                               → saves topic_data/content_calendar.json
 ```
 
-### Episode Processing Data Flow (v1.2 additions in brackets)
+### Daily Clip Distribution
 
 ```
-run_ingest()
+GitHub Actions upload.yml daily cron (or same poll.yml with upload step)
     |
-_run_transcribe()
+python main.py upload-scheduled
     |
-run_analysis()
-    |-- _load_scored_topics()                       [existing]
-    |-- [EngagementScorer.get_engagement_profile()] [NEW]
-    |       reads: engagement_history.json
-    |       returns: dict or None
-    |--> ctx.engagement_profile = profile           [NEW field]
-    |--> ContentEditor.analyze(transcript, topic_context, engagement_profile)
-    |--> ctx.analysis (best_clips, topics, etc.)
+pipeline/runner.py:run_upload_scheduled()
     |
-run_video()
+    +-- [EXISTING] iterate output/ep_N/upload_schedule.json files
+    |                check publish_at <= now, fire pending platform uploads
     |
-run_distribute()
-    |-- [PostingTimeOptimizer.suggest_time(platform)] [NEW]
-    |       reads: engagement_history.json
-    |       returns: datetime or None
-    |--> scheduler.get_optimal_publish_at(platform, optimizer)
-    |--> scheduler.create_schedule(...) with smart timestamps
-    |--> upload_schedule.json (with optimal or fallback times)
-    |--> platform uploads
+    +-- [NEW] ContentCalendar.get_pending_slots(now)
+              for each due ClipSlot:
+                  call platform uploader (twitter, tiktok, youtube)
+                  ContentCalendar.mark_slot_uploaded(episode, clip_index, platform, result)
+                  saves content_calendar.json (atomic write)
 ```
 
-### Key Data Flows
+### CI/CD Secrets Flow
 
-1. **Clip selection bias:** `engagement_history.json` → `EngagementScorer.get_engagement_profile()` → `ctx.engagement_profile` → injected into `content_editor.py` GPT-4o prompt → influences `best_clips` ranking toward historically high-performing categories.
+```
+.env (local file, never committed)
+    |
+    +-- config.py:load_dotenv()    (production: local Windows machine)
+    |
+    +-- GitHub Actions Secrets     (future: if cloud runner needed)
+           OPENAI_API_KEY
+           DROPBOX_APP_KEY / DROPBOX_APP_SECRET / DROPBOX_REFRESH_TOKEN
+           YOUTUBE_CLIENT_ID / YOUTUBE_CLIENT_SECRET
+           TWITTER_* / INSTAGRAM_* / TIKTOK_*
+           DISCORD_WEBHOOK_URL
+```
 
-2. **Smart posting time:** `engagement_history.json` → `PostingTimeOptimizer.suggest_time(platform)` → `scheduler.get_optimal_publish_at()` → replaces `now + delay_hours` in platform schedule entries → `upload_schedule.json`.
-
-3. **Analytics feedback collection:** `run_analytics()` call → `AnalyticsCollector` fetches metrics → `EngagementScorer.record_outcome()` reads `upload_schedule.json` for `posted_at` → appends to `engagement_history.json`.
+For self-hosted runner: `.env` is present on disk, `load_dotenv()` works as-is. No GitHub Secrets configuration required for initial setup. Add secrets only if/when switching to cloud runner.
 
 ---
 
@@ -264,68 +332,106 @@ run_distribute()
 
 | Module | Integrates With | Direction |
 |--------|-----------------|-----------|
-| `posting_time_optimizer.py` | `scheduler.py` via `get_optimal_publish_at()` | optimizer → scheduler |
-| `posting_time_optimizer.py` | `topic_data/engagement_history.json` | optimizer reads file |
-| `engagement_scorer.py` | `topic_data/analytics/ep_N_analytics.json` | scorer reads files |
-| `engagement_scorer.py` | `topic_data/engagement_history.json` | scorer writes file |
-| `engagement_scorer.py` | `pipeline/steps/analysis.py` | scorer returns profile dict |
+| `content_calendar.py` | `pipeline/steps/distribute.py` | distribute calls `plan_episode()`, `plan_clips()` after uploads |
+| `content_calendar.py` | `pipeline/runner.py:run_upload_scheduled()` | scheduler reads `get_pending_slots()` to fire clip uploads |
+| `content_calendar.py` | `topic_data/content_calendar.json` | reads/writes file (atomic) |
+| `ci/poll.py` | `dropbox_handler.py` (indirectly, via Dropbox SDK) | poll reads Dropbox listing |
+| `ci/poll.py` | `content_calendar.py` | poll reads processed episode set |
+| `.github/workflows/poll.yml` | `ci/poll.py`, `main.py` | workflow invokes scripts |
 
 ### Modified Existing Modules
 
 | Module | Change | Risk |
 |--------|--------|------|
-| `analytics.py` | `run_analytics()` calls `EngagementScorer.record_outcome()` after collecting; no change to `AnalyticsCollector` class interface | LOW — additive only |
-| `scheduler.py` | Add `get_optimal_publish_at(platform, optimizer)` method; `create_schedule()` gains optional `optimizer=None` param | LOW — backward compatible; existing callers unaffected |
-| `pipeline/context.py` | Add `engagement_profile: Optional[dict] = None` field | MINIMAL — dataclass field with default, no callers break |
-| `pipeline/steps/analysis.py` | Initialize `EngagementScorer`, call `get_engagement_profile()`, assign to `ctx.engagement_profile`; pass to `ContentEditor.analyze()` | LOW — mirrors existing `topic_context` injection |
-| `pipeline/steps/distribute.py` | In `_upload_to_social_media()`, pass optimizer from components to `scheduler.create_schedule()` | LOW — optional param, existing behavior preserved when optimizer absent |
-| `pipeline/runner.py` | Initialize `EngagementScorer` and `PostingTimeOptimizer` in `_init_components()` (both full and dry-run branches); add to components dict | LOW — standard pattern, matches every other component |
-| `config.py` | Add `SMART_SCHEDULING_ENABLED` and `ENGAGEMENT_HISTORY_MIN_EPISODES` env vars | MINIMAL |
+| `pipeline/steps/distribute.py` | Call `ContentCalendar.plan_clips()` after clips are uploaded. Pass `release_date` from analysis to `plan_episode()`. | LOW — additive; no existing call sites change |
+| `pipeline/runner.py:run_upload_scheduled()` | Add ContentCalendar `get_pending_slots()` check alongside existing `upload_schedule.json` loop. | LOW — additive block; existing episode schedule loop untouched |
+| `config.py` | Add `CALENDAR_CLIP_SPREAD_DAYS` (default: 5), `DROPBOX_POLL_INTERVAL_HOURS` (default: 6). | MINIMAL |
+| `main.py` | No change required — `upload-scheduled` already routes to `run_upload_scheduled()`. | NONE |
 
 ### Internal Boundaries
 
 | Boundary | Communication | Notes |
 |----------|---------------|-------|
-| `EngagementScorer` ↔ `analysis step` | `get_engagement_profile()` returns dict or None | None = no history yet; callers treat None as "no signal" |
-| `PostingTimeOptimizer` ↔ `scheduler` | `suggest_time(platform)` returns datetime or None | None = insufficient data; scheduler uses fixed offset |
-| Both new modules ↔ `engagement_history.json` | JSON file read/write; atomic `.tmp` rename on write | Matches scheduler.py's existing safe-write pattern |
-| `EngagementScorer.record_outcome()` ↔ `upload_schedule.json` | Reads episode's schedule file to extract `posted_at` timestamps | File may not exist (episode had no schedule); graceful skip |
-| New components ↔ `pipeline/runner.py` | Components dict key: `"engagement_scorer"`, `"posting_time_optimizer"` | Same pattern as all 15+ existing components |
+| `ContentCalendar` ↔ `distribute.py` | `plan_episode()` + `plan_clips()` return void, write file | Called after real uploads complete; safe to skip on dry-run |
+| `ContentCalendar` ↔ `run_upload_scheduled()` | `get_pending_slots(now)` returns list of due ClipSlot objects | Returns empty list if calendar missing — no-op behavior |
+| `ci/poll.py` ↔ `content_calendar.json` | Read-only: checks processed episode set | Graceful: if calendar missing, assume no episodes processed |
+| `ContentCalendar` write path | Atomic `.tmp` rename (matches `scheduler.py` pattern) | Prevents corrupt state if process killed mid-write |
+| GitHub Actions ↔ self-hosted runner | HTTPS long-poll from runner to GitHub API | Runner initiates connection; no inbound firewall rule needed |
+
+---
+
+## Anti-Patterns
+
+### Anti-Pattern 1: Storing Calendar in a Hand-Edited Config File
+
+**What people do:** Define the release schedule as static config (e.g., `RELEASE_DAYS = ["Tuesday", "Thursday"]` in config.py).
+**Why it's wrong:** The calendar needs per-episode state (was ep30 processed? which clips have been uploaded?). A config value can't track mutable state. Stateless config + mutable state = no safe way to avoid double-uploads.
+**Do this instead:** `content_calendar.json` is generated state, not config. Release cadence preferences (spread days, posting hours) live in config.py as constants; the episode-specific schedule lives in the JSON file.
+
+### Anti-Pattern 2: Using GitHub-Hosted Cloud Runners for Whisper
+
+**What people do:** Run the full pipeline on GitHub-hosted runners (ubuntu-latest or windows-latest).
+**Why it's wrong:** (a) No GPU — Whisper CPU mode is 3x slower, ~35 minutes for a 70-minute episode. (b) No CUDA — WhisperX/pyannote diarization won't run. (c) 700MB WAV uploads needed. (d) Cost: $0.007/min for Windows hosted runner = ~$25/episode at full duration.
+**Do this instead:** Self-hosted runner on the existing Windows machine. GPU is present, CUDA is configured, WAV files don't move. Cost: $0.
+
+### Anti-Pattern 3: Committing `.env` or Credentials to the Repo
+
+**What people do:** Add API keys to `.github/workflows/*.yml` as inline values, or commit a `.env.ci` file for convenience.
+**Why it's wrong:** Leaks credentials. GitHub Actions workflow files are public in public repos. Even in private repos, this is a security risk if the repo is ever made public or shared.
+**Do this instead:** Self-hosted runner reads `.env` from disk via `load_dotenv()` — nothing in the workflow files. If cloud runners are used in future, secrets go in GitHub Actions Secrets (`${{ secrets.OPENAI_API_KEY }}`), injected as environment variables in the workflow step.
+
+### Anti-Pattern 4: Firing All Clip Uploads in the Main Pipeline Run
+
+**What people do:** Upload all clips to all platforms in the same `run_distribute()` call that uploads the full episode.
+**Why it's wrong:** (a) Destroys the spread strategy — all clips land on day 0. (b) Makes the pipeline run ~30-60 minutes longer if Twitter/TikTok rate-limit. (c) If one clip upload fails, it can't be retried without re-running the whole pipeline.
+**Do this instead:** Main pipeline uploads only the full episode (YouTube, Spotify, RSS). Clips are planned into `content_calendar.json` with future dates. Daily `upload-scheduled` fires due clip slots. This mirrors the existing `upload_schedule.json` pattern already in use for delayed episode uploads.
+
+### Anti-Pattern 5: Separate CLI Command for Calendar Management
+
+**What people do:** Add `python main.py calendar show`, `python main.py calendar plan ep30`, etc.
+**Why it's wrong:** Adds surface area that must be maintained, tested, and documented. The calendar should be invisible plumbing — it updates automatically during the pipeline run.
+**Do this instead:** Calendar operations are internal to `content_calendar.py` and triggered by existing pipeline hooks. The only user-visible interaction is: things get uploaded at the right times without manual intervention. If inspection is needed, `cat topic_data/content_calendar.json` is sufficient.
 
 ---
 
 ## Build Order (Dependency-Driven)
 
 ```
-Phase A (foundation — no dependencies on other new code):
-  1. engagement_history.json schema definition (documented, no code yet)
-  2. engagement_scorer.py
-     - get_engagement_profile() reads history, returns dict or None
-     - record_outcome() reads analytics files + schedule, appends to history
-     - Standalone, fully testable without pipeline integration
-  3. tests/test_engagement_scorer.py
+Phase A — ContentCalendar foundation (no pipeline dependencies):
+  1. content_calendar.py
+     - CalendarEntry and ClipSlot dataclasses
+     - plan_episode(), plan_clips() — compute spread schedule
+     - get_pending_slots(now) — returns due slots
+     - mark_slot_uploaded() — updates status + atomic write
+     - Standalone, testable with mock data
+  2. tests/test_content_calendar.py
 
-Phase B (optimizer — depends on history schema from Phase A):
-  4. posting_time_optimizer.py
-     - suggest_time(platform) reads history, returns datetime or None
-     - Confidence gate: returns None if < MIN_EPISODES data points
-     - Standalone, testable with mock history files
-  5. tests/test_posting_time_optimizer.py
+Phase B — CI/polling scripts (depends on ContentCalendar for episode check):
+  3. ci/poll.py
+     - Dropbox list → compare against content_calendar.json
+     - exit 0/1 for workflow conditional
+  4. .github/workflows/poll.yml
+     - cron trigger + workflow_dispatch
+     - calls poll.py then main.py if new episode
+  5. .github/workflows/manual.yml (or add episode input to poll.yml)
+     - workflow_dispatch with episode_number input
 
-Phase C (scheduler extension — depends on optimizer from Phase B):
-  6. scheduler.py — add get_optimal_publish_at(platform, optimizer)
-     - Tested via existing test_scheduler.py + new optimizer-passing test cases
+Phase C — Pipeline integration (depends on ContentCalendar):
+  6. pipeline/steps/distribute.py
+     - call plan_episode() + plan_clips() after upload
+  7. pipeline/runner.py:run_upload_scheduled()
+     - add ContentCalendar.get_pending_slots() check
+  8. config.py
+     - CALENDAR_CLIP_SPREAD_DAYS, DROPBOX_POLL_INTERVAL_HOURS
 
-Phase D (pipeline wiring — depends on Phases A, B, C):
-  7. pipeline/context.py — add engagement_profile field
-  8. pipeline/steps/analysis.py — inject engagement_profile from scorer
-  9. pipeline/steps/distribute.py — pass optimizer to scheduler
-  10. pipeline/runner.py — initialize both new components in _init_components()
-  11. config.py — add env vars
-  12. analytics.py — call record_outcome() from run_analytics()
+Phase D — Self-hosted runner setup (ops, not code):
+  9. Install GitHub Actions runner as Windows service on local machine
+     - Register at github.com/{repo}/settings/actions/runners
+     - Labels: [self-hosted, windows, gpu]
+     - Install as service so it survives reboots
 ```
 
-Phases A and B are independent of each other's code (both depend only on the schema). They can be developed in parallel.
+Phases A and B are independent. Phase C requires Phase A. Phase D is ops-only (no code changes).
 
 ---
 
@@ -333,61 +439,24 @@ Phases A and B are independent of each other's code (both depend only on the sch
 
 | Scale | Architecture Adjustments |
 |-------|--------------------------|
-| 10-50 episodes | JSON file adequate; simple moving average for time optimization |
-| 50-200 episodes | Cap history at last 104 episodes (2 years) — trivial JSON trim in `record_outcome()` |
-| 200+ episodes | Migrate `engagement_history.json` to SQLite; `search_index.py` already uses SQLite (FTS5), same dependency |
-
-### Scaling Priorities
-
-1. **First bottleneck:** `engagement_history.json` grows unbounded. Fix: `record_outcome()` trims to last N=104 entries on every write. One-line list slice.
-2. **Second bottleneck:** YouTube Data API quota for analytics. Fix: cache raw API responses in `ep_N_analytics.json` (already done). Only re-fetch if `collected_at` is >24h old.
-
----
-
-## Anti-Patterns
-
-### Anti-Pattern 1: Blocking the Pipeline on Analytics Availability
-
-**What people do:** Make clip selection or schedule creation raise an error if `engagement_history.json` is missing.
-**Why it's wrong:** New installs have zero history. `python main.py ep30` must work from day one.
-**Do this instead:** Every new function returns `None` or `{}` when data is absent. Callers treat `None` as "no signal, use defaults." This is already the pattern in `TopicEngagementScorer.get_engagement_bonus()` — returns `None` if no analytics file exists.
-
-### Anti-Pattern 2: Writing Engagement History During the Main Pipeline Run
-
-**What people do:** Call `EngagementScorer.record_outcome()` at the end of `run_distribute()` (Step 9).
-**Why it's wrong:** At upload time, engagement metrics do not exist — the episode was just published. The outcome (views, likes, engagement score) is only knowable 24-48h later.
-**Do this instead:** `record_outcome()` runs only from `run_analytics()`, which is a separate CLI command invoked manually after the episode has been live for a day.
-
-### Anti-Pattern 3: Replacing `scheduler.py` Rather Than Extending It
-
-**What people do:** Rewrite `create_schedule()` to require an optimizer, changing its mandatory signature.
-**Why it's wrong:** `run_upload_scheduled()` and `run_distribute_only()` call `create_schedule()` without any optimizer context. Breaking the signature breaks resume-only distribution runs.
-**Do this instead:** `create_schedule()` gains `optimizer=None` as an optional parameter. When `None`, existing behavior is byte-for-byte identical. The new `get_optimal_publish_at()` is a separate method that callers opt into.
-
-### Anti-Pattern 4: False Confidence from Small Samples
-
-**What people do:** Compute "best posting hour" from 2 episodes and report it as an actionable recommendation.
-**Why it's wrong:** With N<5, the computed optimum is indistinguishable from chance. The optimizer will confidently schedule at a suboptimal time.
-**Do this instead:** `suggest_time()` returns `None` unless `ENGAGEMENT_HISTORY_MIN_EPISODES` (default 5) valid data points exist for that platform. Log a clear message: "Insufficient history for platform X (N episodes) — using fixed offset."
-
-### Anti-Pattern 5: One Monolithic "EngagementOptimizer" Class
-
-**What people do:** Merge posting time and content prediction into one class.
-**Why it's wrong:** The two concerns have different call sites (distribute step vs analysis step), different data consumers (scheduler vs content_editor), and different test surfaces.
-**Do this instead:** Keep them as `posting_time_optimizer.py` and `engagement_scorer.py`. Both read the same `engagement_history.json` but are independently testable and replaceable.
+| Current (bi-weekly, ~50 eps/year) | JSON calendar file, local runner, adequate |
+| Daily show (~365 eps/year) | Calendar JSON grows to ~5MB — add rolling trim (keep last 60 episodes) |
+| Multiple shows | Parameterize calendar with show_id; separate `content_calendar_{show}.json` files |
+| Cloud runner needed | Add GitHub Secrets for all API keys; `config.py` already reads from env vars, zero code change |
 
 ---
 
 ## Sources
 
-- Direct code inspection: `analytics.py`, `scheduler.py`, `pipeline/runner.py`, `pipeline/steps/distribute.py`, `pipeline/steps/analysis.py`, `pipeline/context.py`, `audio_clip_scorer.py`, `topic_scorer.py`
-- Existing data storage patterns: `topic_data/analytics/ep_N_analytics.json`, `output/ep_N/upload_schedule.json`
-- Existing atomic write pattern: `scheduler.py:UploadScheduler.save_schedule()` (`.tmp` rename)
-- Existing component injection pattern: `pipeline/runner.py:_init_components()` returning components dict
-- Existing graceful degradation pattern: `TopicEngagementScorer.get_engagement_bonus()` returning `None` when no analytics exist
-- Existing optional-param pattern: `UploadScheduler.create_schedule()` optional `video_clip_paths`, `full_episode_video_path` params
+- Direct code inspection: `scheduler.py`, `posting_time_optimizer.py`, `pipeline/runner.py`, `pipeline/steps/distribute.py`, `main.py`, `config.py`, `pipeline_state.py`, `dropbox_handler.py`
+- [GitHub Actions: Configuring self-hosted runner as a service (Windows)](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/configuring-the-self-hosted-runner-application-as-a-service) — MEDIUM confidence (Windows-specific permission docs sparse)
+- [GitHub Actions: Events that trigger workflows](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows) — HIGH confidence (official docs)
+- [GitHub Actions: Using secrets](https://docs.github.com/actions/security-guides/using-secrets-in-github-actions) — HIGH confidence (official docs)
+- [GitHub Actions: Self-hosted runners reference](https://docs.github.com/en/actions/reference/runners/self-hosted-runners) — HIGH confidence (official docs)
+- Existing patterns in codebase: `scheduler.py:save_schedule()` atomic write, `pipeline/runner.py:run_upload_scheduled()` polling pattern, `PipelineState` checkpoint JSON
+- Podcast clip distribution research: WebSearch (MEDIUM confidence) — drip > dump for sustained week-long engagement; evidence from [Simplecast: Leveraging Podcast Clips for Cross-Promotion](https://blog.simplecast.com/how-to-leverage-podcast-clips-for-cross-promotion)
 
 ---
 
-*Architecture research for: v1.2 Engagement & Smart Scheduling — Fake Problems Podcast Automation*
-*Researched: 2026-03-18*
+*Architecture research for: v1.3 Content Calendar & CI/CD — Fake Problems Podcast Automation*
+*Researched: 2026-03-19*
