@@ -32,7 +32,7 @@ See: .planning/milestones/v1.1-ROADMAP.md for full details.
 
 </details>
 
-### 🚧 v1.2 Engagement & Smart Scheduling (In Progress)
+### v1.2 Engagement & Smart Scheduling (In Progress)
 
 **Milestone Goal:** Maximize clip and post engagement through reliable analytics collection, data-driven engagement scoring, and automated smart scheduling — without ever blocking the pipeline when history is sparse.
 
@@ -53,7 +53,12 @@ See: .planning/milestones/v1.1-ROADMAP.md for full details.
   4. TikTok and Instagram platforms are detected as stubs and skipped in scheduling and analytics — no silent no-ops
   5. Twitter analytics handles missing impression_count (free tier returns 0) by treating it as null — engagement score formula is not biased by zero impressions
   6. Twitter posts include 1-2 relevant hashtags auto-injected from a curated config list — no data history required
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 09-01-PLAN.md — Core analytics hardening: platform ID capture, engagement history, impression null guard
+- [ ] 09-02-PLAN.md — Stub uploader detection (.functional flags) and Twitter hashtag injection
+- [ ] 09-03-PLAN.md — Backfill-ids CLI command and analytics-to-history wiring
 
 ### Phase 10: Engagement Scoring
 **Goal**: A scoring model ranks topic categories and informs GPT-4o content generation using accumulated engagement history, with the comedy voice treated as a hard constraint the optimizer cannot override
@@ -89,6 +94,6 @@ See: .planning/milestones/v1.1-ROADMAP.md for full details.
 | 6. Subtitle Clip Generator | v1.1 | 2/2 | Complete | 2026-03-18 |
 | 7. Episode Webpages | v1.1 | 2/2 | Complete | 2026-03-18 |
 | 8. Content Compliance | v1.1 | 2/2 | Complete | 2026-03-18 |
-| 9. Analytics Infrastructure | v1.2 | 0/? | Not started | - |
+| 9. Analytics Infrastructure | v1.2 | 0/3 | Not started | - |
 | 10. Engagement Scoring | v1.2 | 0/? | Not started | - |
 | 11. Smart Scheduling | v1.2 | 0/? | Not started | - |
