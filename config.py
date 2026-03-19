@@ -91,6 +91,18 @@ class Config:
     )
     SCHEDULE_TIKTOK_DELAY_HOURS = int(os.getenv("SCHEDULE_TIKTOK_DELAY_HOURS", "0"))
 
+    # Smart scheduling — research-based posting hour defaults (24h, local time)
+    SCHEDULE_YOUTUBE_POSTING_HOUR = int(
+        os.getenv("SCHEDULE_YOUTUBE_POSTING_HOUR", "14")
+    )
+    SCHEDULE_TWITTER_POSTING_HOUR = int(
+        os.getenv("SCHEDULE_TWITTER_POSTING_HOUR", "10")
+    )
+    SCHEDULE_INSTAGRAM_POSTING_HOUR = int(
+        os.getenv("SCHEDULE_INSTAGRAM_POSTING_HOUR", "12")
+    )
+    SCHEDULE_TIKTOK_POSTING_HOUR = int(os.getenv("SCHEDULE_TIKTOK_POSTING_HOUR", "12"))
+
     # Blog Post Generator
     BLOG_ENABLED = os.getenv("BLOG_ENABLED", "true").lower() == "true"
     BLOG_USE_OPENAI = os.getenv("BLOG_USE_OPENAI", "true").lower() == "true"
