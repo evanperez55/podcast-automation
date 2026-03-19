@@ -641,6 +641,71 @@ class TestEnergyPromptInjection:
         )
 
 
+class TestEngagementContextInjection:
+    """Tests for engagement_context injection into _build_analysis_prompt."""
+
+    def test_engagement_context_injected(self, content_editor):
+        """When engagement_context has status=ok and rankings, prompt includes engagement section."""
+        engagement_context = {
+            "status": "ok",
+            "episodes_analyzed": 20,
+            "episodes_needed": None,
+            "rankings": [
+                {
+                    "category": "pop_science",
+                    "correlation": 0.72,
+                    "method": "spearman",
+                    "p_value": 0.003,
+                    "episode_count": 18,
+                    "comedy_protected": False,
+                },
+                {
+                    "category": "true_crime",
+                    "correlation": 0.65,
+                    "method": "spearman",
+                    "p_value": 0.009,
+                    "episode_count": 15,
+                    "comedy_protected": False,
+                },
+                {
+                    "category": "dating_social",
+                    "correlation": 0.51,
+                    "method": "spearman",
+                    "p_value": 0.028,
+                    "episode_count": 12,
+                    "comedy_protected": False,
+                },
+            ],
+        }
+        prompt = content_editor._build_analysis_prompt(
+            "sample transcript", engagement_context=engagement_context
+        )
+        assert "HISTORICALLY HIGH-PERFORMING CONTENT CATEGORIES" in prompt
+        assert "pop_science" in prompt
+        assert "true_crime" in prompt
+        assert "dating_social" in prompt
+
+    def test_no_engagement_context(self, content_editor):
+        """When engagement_context is None, prompt does NOT include engagement section."""
+        prompt = content_editor._build_analysis_prompt(
+            "sample transcript", engagement_context=None
+        )
+        assert "HISTORICALLY HIGH-PERFORMING CONTENT CATEGORIES" not in prompt
+
+    def test_engagement_context_insufficient_data(self, content_editor):
+        """When engagement_context has status=insufficient_data, prompt does NOT include section."""
+        engagement_context = {
+            "status": "insufficient_data",
+            "episodes_analyzed": 5,
+            "episodes_needed": 15,
+            "rankings": None,
+        }
+        prompt = content_editor._build_analysis_prompt(
+            "sample transcript", engagement_context=engagement_context
+        )
+        assert "HISTORICALLY HIGH-PERFORMING CONTENT CATEGORIES" not in prompt
+
+
 class TestAnalyzeContentSystemMessage:
     """Tests for system message and temperature in analyze_content API calls."""
 

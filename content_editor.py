@@ -24,7 +24,13 @@ class ContentEditor:
         self.client = openai.OpenAI(api_key=Config.OPENAI_API_KEY)
         logger.info("OpenAI GPT-4 ready")
 
-    def analyze_content(self, transcript_data, topic_context=None, audio_path=None):
+    def analyze_content(
+        self,
+        transcript_data,
+        topic_context=None,
+        audio_path=None,
+        engagement_context=None,
+    ):
         """
         Analyze transcript to find content to censor and identify best moments.
 
@@ -70,6 +76,7 @@ class ContentEditor:
             timestamped_text,
             topic_context=topic_context,
             energy_candidates=energy_candidates,
+            engagement_context=engagement_context,
         )
 
         try:
@@ -142,7 +149,11 @@ class ContentEditor:
         return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
     def _build_analysis_prompt(
-        self, timestamped_text, topic_context=None, energy_candidates=None
+        self,
+        timestamped_text,
+        topic_context=None,
+        energy_candidates=None,
+        engagement_context=None,
     ):
         """Build the prompt for Claude to analyze the content.
 
@@ -150,6 +161,7 @@ class ContentEditor:
             timestamped_text: Formatted transcript with timestamps
             topic_context: Optional list of scored topic dicts for clip prioritization
             energy_candidates: Optional list of high-energy segment dicts for clip prioritization
+            engagement_context: Optional dict from EngagementScorer.get_category_rankings()
         """
         names_list = ", ".join(Config.NAMES_TO_REMOVE)
 
@@ -182,6 +194,28 @@ class ContentEditor:
                 + "\n"
             )
 
+        # Build optional engagement history section
+        engagement_section = ""
+        if (
+            engagement_context
+            and engagement_context.get("status") == "ok"
+            and engagement_context.get("rankings")
+        ):
+            lines = []
+            for ranking in engagement_context["rankings"][:3]:  # Top 3 categories
+                category = ranking.get("category", "unknown")
+                correlation = ranking.get("correlation", 0.0)
+                direction = "positive" if correlation >= 0 else "neutral"
+                lines.append(
+                    f"  - {category} (correlation: {correlation:.2f}, {direction})"
+                )
+            engagement_section = (
+                "\n**HISTORICALLY HIGH-PERFORMING CONTENT CATEGORIES "
+                "(bias clip selection toward these when present in episode):**\n"
+                + "\n".join(lines)
+                + "\n"
+            )
+
         # Voice examples block to establish show tone
         voice_examples = """
 **VOICE EXAMPLES — match this tone in ALL output:**
@@ -208,7 +242,7 @@ GOOD: "turns out immortality is real, it just only applies to lobsters. link in 
 """
 
         prompt = f"""You are analyzing a podcast transcript for the "Fake Problems Podcast" to identify content that needs censoring and find the best moments for social media clips.
-{topic_section}{voice_examples}{energy_section}
+{topic_section}{engagement_section}{voice_examples}{energy_section}
 
 **YOUR TASKS:**
 
