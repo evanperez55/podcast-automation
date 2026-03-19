@@ -242,5 +242,33 @@ class TestCreateTikTokCaptionHook:
         assert "#custom" in caption
 
 
+class TestTikTokFunctionalFlag:
+    """Test cases for .functional flag on TikTokUploader."""
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", None)
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
+    def test_tiktok_functional_false_when_no_key(self):
+        """TikTokUploader sets .functional = False when client_key is None — no raise."""
+        uploader = TikTokUploader()
+        assert uploader.functional is False
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", "your_tiktok_client_key_here")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
+    def test_tiktok_functional_false_when_placeholder(self):
+        """TikTokUploader sets .functional = False when client_key is placeholder."""
+        uploader = TikTokUploader()
+        assert uploader.functional is False
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", "real_client_key")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "real_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "real_access_token")
+    def test_tiktok_functional_true_when_configured(self):
+        """TikTokUploader sets .functional = True when all real creds are set."""
+        uploader = TikTokUploader()
+        assert uploader.functional is True
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

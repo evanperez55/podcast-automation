@@ -362,5 +362,262 @@ class TestCorrelateTopics:
         assert result["engagement_score"] == 2.5
 
 
+class TestFetchTwitterAnalyticsNullImpressions:
+    """Tests for Twitter free-tier impression null handling."""
+
+    @patch("analytics.Path.mkdir")
+    def test_fetch_twitter_analytics_null_impressions(self, mock_mkdir):
+        """impression_count=0 returns result["impressions"] as None (free-tier sentinel)."""
+        collector = AnalyticsCollector()
+
+        mock_tweet = Mock()
+        mock_tweet.public_metrics = {
+            "impression_count": 0,
+            "reply_count": 2,
+            "retweet_count": 3,
+            "like_count": 10,
+            "quote_count": 1,
+        }
+
+        mock_response = Mock()
+        mock_response.data = [mock_tweet]
+
+        mock_client = Mock()
+        mock_client.search_recent_tweets.return_value = mock_response
+
+        with (
+            patch.object(Config, "TWITTER_API_KEY", "key"),
+            patch.object(Config, "TWITTER_API_SECRET", "secret"),
+            patch.object(Config, "TWITTER_ACCESS_TOKEN", "token"),
+            patch.object(Config, "TWITTER_ACCESS_SECRET", "token_secret"),
+            patch("tweepy.Client", return_value=mock_client),
+        ):
+            result = collector.fetch_twitter_analytics(25)
+
+        assert result is not None
+        assert result["impressions"] is None, (
+            "impression_count=0 on free tier should return None"
+        )
+
+    @patch("analytics.Path.mkdir")
+    def test_fetch_twitter_analytics_real_impressions(self, mock_mkdir):
+        """Non-zero impression_count returns the actual integer value."""
+        collector = AnalyticsCollector()
+
+        mock_tweet = Mock()
+        mock_tweet.public_metrics = {
+            "impression_count": 5000,
+            "reply_count": 5,
+            "retweet_count": 10,
+            "like_count": 30,
+            "quote_count": 2,
+        }
+
+        mock_response = Mock()
+        mock_response.data = [mock_tweet]
+
+        mock_client = Mock()
+        mock_client.search_recent_tweets.return_value = mock_response
+
+        with (
+            patch.object(Config, "TWITTER_API_KEY", "key"),
+            patch.object(Config, "TWITTER_API_SECRET", "secret"),
+            patch.object(Config, "TWITTER_ACCESS_TOKEN", "token"),
+            patch.object(Config, "TWITTER_ACCESS_SECRET", "token_secret"),
+            patch("tweepy.Client", return_value=mock_client),
+        ):
+            result = collector.fetch_twitter_analytics(25)
+
+        assert result is not None
+        assert result["impressions"] == 5000
+
+
+class TestCalculateEngagementScoreNullImpressions:
+    """Test null impression guard in calculate_engagement_score."""
+
+    def test_calculate_engagement_score_null_impressions(self):
+        """None impressions do not raise TypeError and score is still computed."""
+        scorer = TopicEngagementScorer()
+
+        analytics_data = {
+            "youtube": {"views": 1000, "likes": 20, "comments": 5},
+            "twitter": {
+                "impressions": None,
+                "engagements": 10,
+                "retweets": 2,
+                "likes": 5,
+            },
+        }
+
+        # Should not raise TypeError
+        score = scorer.calculate_engagement_score(analytics_data)
+
+        # YouTube: 1000*0.001 + 20*0.1 + 5*0.5 = 1.0 + 2.0 + 2.5 = 5.5
+        # Twitter: None impressions -> 0; 0*0.0001 + 10*0.05 + 2*0.2 + 5*0.1 = 0+0.5+0.4+0.5=1.4
+        assert isinstance(score, float)
+        assert score == 6.9
+
+
+class TestAppendToEngagementHistory:
+    """Tests for engagement_history.json accumulation."""
+
+    @patch("analytics.Path.mkdir")
+    def test_append_to_engagement_history_creates_file(self, mock_mkdir, tmp_path):
+        """When no history file exists, append creates the file with correct schema."""
+        collector = AnalyticsCollector()
+        history_path = tmp_path / "engagement_history.json"
+
+        analytics_data = {
+            "youtube": {"views": 1000, "likes": 50, "comments": 10, "video_id": "vid1"},
+            "twitter": {
+                "impressions": None,
+                "engagements": 20,
+                "retweets": 5,
+                "likes": 15,
+            },
+        }
+        platform_ids = {"youtube": "vid1", "twitter": "tw_123"}
+        topics = ["AI comedy", "Tech fails"]
+
+        with patch.object(
+            collector, "_engagement_history_path", return_value=history_path
+        ):
+            result = collector.append_to_engagement_history(
+                episode_number=29,
+                analytics_data=analytics_data,
+                platform_ids=platform_ids,
+                topics=topics,
+                post_timestamp="2026-03-16T18:19:32",
+            )
+
+        assert result.exists(), "engagement_history.json should be created"
+        history = json.loads(result.read_text(encoding="utf-8"))
+        assert isinstance(history, list)
+        assert len(history) == 1
+        record = history[0]
+        assert record["episode_number"] == 29
+        assert record["topics"] == topics
+        assert record["youtube"]["video_id"] == "vid1"
+        assert record["twitter"]["tweet_id"] == "tw_123"
+        assert record["twitter"]["impressions"] is None
+
+    @patch("analytics.Path.mkdir")
+    def test_append_to_engagement_history_upserts(self, mock_mkdir, tmp_path):
+        """Calling append twice for the same episode_number updates, not duplicates."""
+        collector = AnalyticsCollector()
+        history_path = tmp_path / "engagement_history.json"
+
+        analytics_data = {
+            "youtube": {"views": 500, "likes": 20, "comments": 5, "video_id": "vid1"},
+            "twitter": None,
+        }
+
+        with patch.object(
+            collector, "_engagement_history_path", return_value=history_path
+        ):
+            collector.append_to_engagement_history(
+                episode_number=25,
+                analytics_data=analytics_data,
+                platform_ids={"youtube": "vid1"},
+                topics=["Topic A"],
+                post_timestamp="2026-03-10T10:00:00",
+            )
+
+            # Update with new data for same episode
+            analytics_data["youtube"]["views"] = 1500
+            collector.append_to_engagement_history(
+                episode_number=25,
+                analytics_data=analytics_data,
+                platform_ids={"youtube": "vid1"},
+                topics=["Topic A"],
+                post_timestamp="2026-03-10T10:00:00",
+            )
+
+        history = json.loads(history_path.read_text(encoding="utf-8"))
+        assert len(history) == 1, "Upsert should not duplicate records"
+        assert history[0]["youtube"]["views"] == 1500
+
+    @patch("analytics.Path.mkdir")
+    def test_append_to_engagement_history_appends_new(self, mock_mkdir, tmp_path):
+        """Appending for different episode numbers creates separate records."""
+        collector = AnalyticsCollector()
+        history_path = tmp_path / "engagement_history.json"
+
+        analytics_data_ep1 = {
+            "youtube": {"views": 500, "likes": 10, "comments": 2, "video_id": "vid1"},
+            "twitter": None,
+        }
+        analytics_data_ep2 = {
+            "youtube": {"views": 800, "likes": 30, "comments": 8, "video_id": "vid2"},
+            "twitter": None,
+        }
+
+        with patch.object(
+            collector, "_engagement_history_path", return_value=history_path
+        ):
+            collector.append_to_engagement_history(
+                episode_number=1,
+                analytics_data=analytics_data_ep1,
+                platform_ids={"youtube": "vid1"},
+                topics=["Topic A"],
+                post_timestamp="2026-01-01T10:00:00",
+            )
+            collector.append_to_engagement_history(
+                episode_number=2,
+                analytics_data=analytics_data_ep2,
+                platform_ids={"youtube": "vid2"},
+                topics=["Topic B"],
+                post_timestamp="2026-01-08T10:00:00",
+            )
+
+        history = json.loads(history_path.read_text(encoding="utf-8"))
+        assert len(history) == 2
+        episode_numbers = [r["episode_number"] for r in history]
+        assert 1 in episode_numbers
+        assert 2 in episode_numbers
+
+
+class TestFetchYoutubeAnalyticsVideoId:
+    """Tests for video_id parameter shortcutting the search API."""
+
+    @patch("analytics.Path.mkdir")
+    def test_fetch_youtube_analytics_with_video_id(self, mock_mkdir):
+        """When video_id is provided, search().list() is NOT called, videos().list(id=...) IS called."""
+        collector = AnalyticsCollector()
+
+        mock_creds = Mock()
+        mock_creds.expired = False
+        mock_creds.refresh_token = "token"
+
+        mock_youtube = MagicMock()
+        mock_stats_response = {
+            "items": [
+                {
+                    "statistics": {
+                        "viewCount": "2000",
+                        "likeCount": "100",
+                        "commentCount": "20",
+                    }
+                }
+            ],
+        }
+        mock_youtube.videos().list().execute.return_value = mock_stats_response
+
+        with (
+            patch("builtins.open", mock_open()),
+            patch("analytics.Path.exists", return_value=True),
+            patch("pickle.load", return_value=mock_creds),
+            patch("googleapiclient.discovery.build", return_value=mock_youtube),
+        ):
+            result = collector.fetch_youtube_analytics(25, video_id="known_vid_xyz")
+
+        # search().list() should NOT have been called
+        mock_youtube.search.assert_not_called()
+
+        assert result is not None
+        assert result["views"] == 2000
+        assert result["video_id"] == "known_vid_xyz"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

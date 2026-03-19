@@ -301,5 +301,125 @@ class TestPostEpisodeAnnouncementAICaption:
             assert "https://youtube.com/watch?v=123" in tweets[0]
 
 
+class TestHashtagInjection:
+    """Test cases for hashtag injection in post_episode_announcement."""
+
+    def _make_uploader(self):
+        """Helper: create uploader with all credentials mocked."""
+        with (
+            patch.object(Config, "TWITTER_API_KEY", "valid_key"),
+            patch.object(Config, "TWITTER_API_SECRET", "valid_secret"),
+            patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token"),
+            patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret"),
+            patch("uploaders.twitter_uploader.tweepy.API"),
+            patch("uploaders.twitter_uploader.tweepy.Client"),
+        ):
+            return TwitterUploader()
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_hashtag_injection_appended_to_tweet(
+        self, mock_client_class, mock_api_class
+    ):
+        """Tweet text ends with '\\n\\n#comedy #podcast' when hashtags are provided."""
+        uploader = TwitterUploader()
+
+        with patch.object(uploader, "post_thread") as mock_post_thread:
+            mock_post_thread.return_value = [{"tweet_id": "1"}]
+
+            uploader.post_episode_announcement(
+                episode_number=25,
+                episode_summary="Great episode!",
+                twitter_caption="Short caption",
+                hashtags=["comedy", "podcast"],
+            )
+
+            call_args = mock_post_thread.call_args
+            tweets = call_args[0][0]
+            assert tweets[0].endswith("\n\n#comedy #podcast")
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_hashtag_injection_limited_to_two(self, mock_client_class, mock_api_class):
+        """Only first 2 hashtags appear in tweet when more are provided."""
+        uploader = TwitterUploader()
+
+        with patch.object(uploader, "post_thread") as mock_post_thread:
+            mock_post_thread.return_value = [{"tweet_id": "1"}]
+
+            uploader.post_episode_announcement(
+                episode_number=25,
+                episode_summary="Great episode!",
+                twitter_caption="Short caption",
+                hashtags=["a", "b", "c", "d"],
+            )
+
+            call_args = mock_post_thread.call_args
+            tweets = call_args[0][0]
+            assert "#a" in tweets[0]
+            assert "#b" in tweets[0]
+            assert "#c" not in tweets[0]
+            assert "#d" not in tweets[0]
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_hashtag_injection_none_skipped(self, mock_client_class, mock_api_class):
+        """No hashtag line added when hashtags=None."""
+        uploader = TwitterUploader()
+
+        with patch.object(uploader, "post_thread") as mock_post_thread:
+            mock_post_thread.return_value = [{"tweet_id": "1"}]
+
+            uploader.post_episode_announcement(
+                episode_number=25,
+                episode_summary="Great episode!",
+                twitter_caption="Short caption",
+                hashtags=None,
+            )
+
+            call_args = mock_post_thread.call_args
+            tweets = call_args[0][0]
+            # Should not contain a hashtag line
+            assert "\n\n#" not in tweets[0]
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_hashtag_injection_empty_list_skipped(
+        self, mock_client_class, mock_api_class
+    ):
+        """No hashtag line added when hashtags=[]."""
+        uploader = TwitterUploader()
+
+        with patch.object(uploader, "post_thread") as mock_post_thread:
+            mock_post_thread.return_value = [{"tweet_id": "1"}]
+
+            uploader.post_episode_announcement(
+                episode_number=25,
+                episode_summary="Great episode!",
+                twitter_caption="Short caption",
+                hashtags=[],
+            )
+
+            call_args = mock_post_thread.call_args
+            tweets = call_args[0][0]
+            assert "\n\n#" not in tweets[0]
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

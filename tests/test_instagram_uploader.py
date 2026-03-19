@@ -279,5 +279,30 @@ class TestCreateInstagramCaptionNewFields:
         assert "#clip_tag" not in caption
 
 
+class TestInstagramFunctionalFlag:
+    """Test cases for .functional flag on InstagramUploader."""
+
+    @patch.object(Config, "INSTAGRAM_ACCESS_TOKEN", None)
+    @patch.object(Config, "INSTAGRAM_ACCOUNT_ID", "valid_account_id")
+    def test_instagram_functional_false_when_no_token(self):
+        """InstagramUploader sets .functional = False when token is None — no raise."""
+        uploader = InstagramUploader()
+        assert uploader.functional is False
+
+    @patch.object(Config, "INSTAGRAM_ACCESS_TOKEN", "your_instagram_access_token_here")
+    @patch.object(Config, "INSTAGRAM_ACCOUNT_ID", "valid_account_id")
+    def test_instagram_functional_false_when_placeholder(self):
+        """InstagramUploader sets .functional = False when token is placeholder."""
+        uploader = InstagramUploader()
+        assert uploader.functional is False
+
+    @patch.object(Config, "INSTAGRAM_ACCESS_TOKEN", "real_token_abc123")
+    @patch.object(Config, "INSTAGRAM_ACCOUNT_ID", "real_account_id_456")
+    def test_instagram_functional_true_when_configured(self):
+        """InstagramUploader sets .functional = True when real creds are set."""
+        uploader = InstagramUploader()
+        assert uploader.functional is True
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
