@@ -84,7 +84,11 @@ Plans:
   1. `posting_time_optimizer.py` returns an optimal posting datetime per platform when engagement history meets the confidence threshold, or None when below threshold — callers fall through to static delays
   2. Platform-specific scheduling windows are configurable (YouTube and Twitter have different optimal windows) and documented in config.py with research-based defaults
   3. `scheduler.py` accepts computed optimal times from the optimizer via `get_optimal_publish_at()` — the existing fixed-delay config remains the fallback and the pipeline never blocks on missing history
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 11-01-PLAN.md — PostingTimeOptimizer module with per-platform config and tests
+- [ ] 11-02-PLAN.md — Wire optimizer into scheduler.py and distribute.py
 
 ## Progress
 
@@ -99,5 +103,5 @@ Plans:
 | 7. Episode Webpages | v1.1 | 2/2 | Complete | 2026-03-18 |
 | 8. Content Compliance | v1.1 | 2/2 | Complete | 2026-03-18 |
 | 9. Analytics Infrastructure | v1.2 | 3/3 | Complete | 2026-03-19 |
-| 10. Engagement Scoring | 2/2 | Complete    | 2026-03-19 | - |
-| 11. Smart Scheduling | v1.2 | 0/? | Not started | - |
+| 10. Engagement Scoring | v1.2 | 2/2 | Complete | 2026-03-19 |
+| 11. Smart Scheduling | v1.2 | 0/2 | Not started | - |
