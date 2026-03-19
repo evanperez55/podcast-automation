@@ -58,25 +58,25 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CAL-01 | TBD | Pending |
-| CAL-02 | TBD | Pending |
-| CAL-03 | TBD | Pending |
-| CAL-04 | TBD | Pending |
-| CI-01 | TBD | Pending |
-| CI-02 | TBD | Pending |
-| CI-03 | TBD | Pending |
-| CI-04 | TBD | Pending |
-| CI-05 | TBD | Pending |
-| SEC-01 | TBD | Pending |
-| SEC-02 | TBD | Pending |
-| SEC-03 | TBD | Pending |
-| SEC-04 | TBD | Pending |
+| CAL-01 | Phase 12 | Pending |
+| CAL-02 | Phase 12 | Pending |
+| CAL-03 | Phase 12 | Pending |
+| CAL-04 | Phase 12 | Pending |
+| CI-01 | Phase 13 | Pending |
+| CI-02 | Phase 13 | Pending |
+| CI-03 | Phase 13 | Pending |
+| CI-04 | Phase 13 | Pending |
+| CI-05 | Phase 13 | Pending |
+| SEC-01 | Phase 14 | Pending |
+| SEC-02 | Phase 14 | Pending |
+| SEC-03 | Phase 14 | Pending |
+| SEC-04 | Phase 14 | Pending |
 
 **Coverage:**
 - v1.3 requirements: 13 total
-- Mapped to phases: 0
-- Unmapped: 13
+- Mapped to phases: 13
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-19*
-*Last updated: 2026-03-19 after initial definition*
+*Last updated: 2026-03-19 — traceability mapped after roadmap creation*
