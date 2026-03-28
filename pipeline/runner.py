@@ -47,8 +47,21 @@ from pipeline.steps.distribute import run_distribute
 
 
 def _init_uploaders():
-    """Initialize social media uploaders if credentials are configured."""
+    """Initialize social media uploaders if credentials are configured.
+
+    Non-dropbox clients (RSS/local episode source) skip all uploaders to avoid
+    picking up Fake Problems' shared credentials from env vars and the credentials/
+    directory. Per-client uploaders can be enabled later via explicit YAML config.
+    """
     uploaders = {}
+
+    episode_source = getattr(Config, "EPISODE_SOURCE", "dropbox")
+    if episode_source != "dropbox":
+        logger.info(
+            "Uploaders skipped for non-dropbox client (episode_source=%s)",
+            episode_source,
+        )
+        return uploaders
 
     # YouTube (use per-client token path if configured)
     try:
