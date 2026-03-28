@@ -144,7 +144,9 @@ class BlogPostGenerator:
                 transcript_lines.append(text)
         full_transcript = "\n".join(transcript_lines)
 
-        blog_voice_intro = f"""Write this blog post in the voice of {Config.PODCAST_NAME} — irreverent, a little dark, casual, never corporate.
+        blog_voice_intro = getattr(Config, "BLOG_VOICE", None)
+        if not blog_voice_intro:
+            blog_voice_intro = f"""Write this blog post in the voice of {Config.PODCAST_NAME} — irreverent, a little dark, casual, never corporate.
 
 VOICE EXAMPLES for blog writing:
 BAD: "In this episode, the hosts delve into the fascinating science behind lobster immortality."

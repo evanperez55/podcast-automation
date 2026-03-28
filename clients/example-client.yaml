@@ -71,3 +71,17 @@ content:
   #   low_examples:
   #     - "Solved cases with no remaining mystery"
   #   categories: ["cold_case", "missing_person", "conspiracy", "forensic_science"]
+  # blog_voice: |          # Custom blog writing voice, or omit for default
+  #   Write this blog post in a professional but engaging tone.
+  #   BAD: "In this episode, the hosts delve into..."
+  #   GOOD: "Here's what we covered and why it matters."
+
+rss:
+  description: null        # Podcast description for RSS feed
+  author: null             # Author name (defaults to podcast_name)
+  email: null              # Contact email for RSS feed
+  website_url: null        # Podcast website URL
+  artwork_url: null        # Cover art URL (1400x1400+ recommended)
+  language: "en-us"
+  explicit: false
+  categories: ["Society & Culture"]  # iTunes categories

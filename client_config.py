@@ -44,6 +44,14 @@ _YAML_TO_CONFIG = {
     "content.num_clips": "NUM_CLIPS",
     "content.clip_min_duration": "CLIP_MIN_DURATION",
     "content.clip_max_duration": "CLIP_MAX_DURATION",
+    # RSS / podcast metadata
+    "rss.description": "RSS_DESCRIPTION",
+    "rss.author": "RSS_AUTHOR",
+    "rss.email": "RSS_EMAIL",
+    "rss.website_url": "RSS_WEBSITE_URL",
+    "rss.artwork_url": "RSS_ARTWORK_URL",
+    "rss.language": "RSS_LANGUAGE",
+    "rss.explicit": "RSS_EXPLICIT",
     # Output directories (optional — auto-derived from client name if not set)
     "output.dir": "OUTPUT_DIR",
     "output.downloads_dir": "DOWNLOAD_DIR",
@@ -112,6 +120,11 @@ def load_client_config(client_name: str) -> dict:
     if words is not None and isinstance(words, list):
         overrides["WORDS_TO_CENSOR"] = words
 
+    # Special handling: RSS categories (list)
+    rss_cats = _get_nested(data, "rss.categories")
+    if rss_cats is not None and isinstance(rss_cats, list):
+        overrides["RSS_CATEGORIES"] = rss_cats
+
     # Special handling: YouTube token path (per-client)
     youtube_token = _get_nested(data, "youtube.token_pickle")
     if youtube_token is not None:
@@ -121,6 +134,11 @@ def load_client_config(client_name: str) -> dict:
     voice_persona = _get_nested(data, "content.voice_persona")
     if voice_persona is not None:
         overrides["VOICE_PERSONA"] = voice_persona
+
+    # Special handling: blog voice
+    blog_voice = _get_nested(data, "content.blog_voice")
+    if blog_voice is not None:
+        overrides["BLOG_VOICE"] = blog_voice
 
     # Special handling: scoring profile (nested dict)
     scoring = _get_nested(data, "content.scoring_profile")
@@ -218,6 +236,55 @@ def init_client(client_name: str) -> None:
     print(f"  1. Edit {yaml_path} with your podcast details")
     print(f"  2. Add platform credentials to {creds_dir}/")
     print(f"  3. Run: uv run main.py --client {client_name} --dry-run")
+
+
+def get_client_names() -> list:
+    """Return list of available client names (excluding example template)."""
+    clients_dir = Config.BASE_DIR / "clients"
+    if not clients_dir.exists():
+        return []
+    yamls = sorted(clients_dir.glob("*.yaml")) + sorted(clients_dir.glob("*.yml"))
+    return [y.stem for y in yamls if y.stem != "example-client"]
+
+
+def process_all(args: dict) -> None:
+    """Process latest episode for every configured client.
+
+    Args:
+        args: CLI args dict (test_mode, dry_run, auto_approve, etc.)
+    """
+    clients = get_client_names()
+    if not clients:
+        print("No clients configured. Run: uv run main.py init-client <name>")
+        return
+
+    print(f"Processing {len(clients)} client(s): {', '.join(clients)}")
+    print("=" * 60)
+
+    results = {}
+    for client_name in clients:
+        print(f"\n{'=' * 60}")
+        print(f"CLIENT: {client_name}")
+        print(f"{'=' * 60}")
+
+        client_args = dict(args)
+        client_args["client_name"] = client_name
+
+        try:
+            from pipeline import run_with_notification
+
+            run_with_notification(client_args)
+            results[client_name] = "OK"
+        except Exception as e:
+            logger.warning("Client %s failed: %s", client_name, e)
+            results[client_name] = f"FAILED: {e}"
+
+    # Print summary
+    print(f"\n{'=' * 60}")
+    print("BATCH SUMMARY")
+    print(f"{'=' * 60}")
+    for name, status in results.items():
+        print(f"  {name:20s}  {status}")
 
 
 def list_clients() -> None:

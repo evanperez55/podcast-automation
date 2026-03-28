@@ -221,14 +221,16 @@ def main():
     if not metadata:
         metadata = {
             "title": Config.PODCAST_NAME,
-            "description": f"Welcome to {Config.PODCAST_NAME}.",
-            "website_url": "https://example.com",
-            "author": Config.PODCAST_NAME,
-            "email": "podcast@example.com",
-            "categories": ["Comedy"],
-            "language": "en-us",
-            "artwork_url": "https://www.dropbox.com/scl/fo/pjebq6m0sj60hlkw4mwtk/h?rlkey=83pqox6zgf28g5z8528cp38et&dl=1",
-            "explicit": True,
+            "description": getattr(Config, "RSS_DESCRIPTION", None)
+            or f"Welcome to {Config.PODCAST_NAME}.",
+            "website_url": getattr(Config, "RSS_WEBSITE_URL", None)
+            or "https://example.com",
+            "author": getattr(Config, "RSS_AUTHOR", None) or Config.PODCAST_NAME,
+            "email": getattr(Config, "RSS_EMAIL", None) or "podcast@example.com",
+            "categories": getattr(Config, "RSS_CATEGORIES", None) or ["Comedy"],
+            "language": getattr(Config, "RSS_LANGUAGE", None) or "en-us",
+            "artwork_url": getattr(Config, "RSS_ARTWORK_URL", None),
+            "explicit": getattr(Config, "RSS_EXPLICIT", True),
         }
 
     # Create fresh RSS feed

@@ -90,6 +90,10 @@ def _handle_client_command(cmd, args):
             print("Usage: uv run main.py status <name>")
             return True
         client_status(n)
+    elif cmd == "process-all":
+        from client_config import process_all
+
+        process_all(args)
     else:
         return False
     return True

@@ -516,7 +516,10 @@ def run_distribute(
                 # Extract keywords from social captions
                 keywords = []
                 if analysis.get("social_captions"):
-                    keywords = ["podcast", "comedy", "fake-problems"]
+                    keywords = [
+                        "podcast",
+                        Config.PODCAST_NAME.lower().replace(" ", "-"),
+                    ]
 
                 # Update RSS feed
                 rss_feed_path = uploaders["spotify"].update_rss_feed(
