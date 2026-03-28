@@ -360,6 +360,58 @@ class TestListClients:
         assert "No client configs found" in capsys.readouterr().out
 
 
+class TestValidateClient:
+    """Tests for validate_client() credential checks."""
+
+    def test_validate_shows_config_status(self, tmp_path, monkeypatch, capsys):
+        """validate_client prints status for each service."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "PODCAST_NAME", "Test Show")
+        monkeypatch.setattr(Config, "OUTPUT_DIR", tmp_path / "output")
+        monkeypatch.setattr(Config, "DOWNLOAD_DIR", tmp_path / "downloads")
+        monkeypatch.setattr(Config, "CLIPS_DIR", tmp_path / "clips")
+        monkeypatch.setattr(Config, "TOPIC_DATA_DIR", tmp_path / "topic_data")
+        monkeypatch.setattr(Config, "NAMES_TO_REMOVE", ["Alice"])
+        monkeypatch.setattr(Config, "WORDS_TO_CENSOR", ["badword"])
+        # Clear optional credentials
+        monkeypatch.setattr(Config, "DISCORD_WEBHOOK_URL", None)
+        monkeypatch.setattr(Config, "TWITTER_API_KEY", None)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        (clients_dir / "test-show.yaml").write_text(
+            'client_name: "test-show"\npodcast_name: "Test Show"\n'
+        )
+
+        from client_config import validate_client
+
+        validate_client("test-show")
+
+        output = capsys.readouterr().out
+        assert "Test Show" in output
+        assert "[OK]" in output
+        assert "Podcast Name" in output
+        assert "not configured" in output  # some services won't be configured
+
+    def test_validate_no_ping_by_default(self, tmp_path, monkeypatch, capsys):
+        """validate_client suggests --ping when not used."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
+        monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
+        monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
+        monkeypatch.setattr(Config, "TOPIC_DATA_DIR", Config.TOPIC_DATA_DIR)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        (clients_dir / "fp.yaml").write_text('client_name: "fp"\npodcast_name: "FP"\n')
+
+        from client_config import validate_client
+
+        validate_client("fp")
+
+        output = capsys.readouterr().out
+        assert "--ping" in output
+
+
 class TestBackwardCompatibility:
     """Verify no-client mode preserves default Fake Problems config."""
 

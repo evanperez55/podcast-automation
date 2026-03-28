@@ -238,6 +238,157 @@ def list_clients() -> None:
         print(f"  {yaml_path.stem:20s}  {podcast_name}")
 
 
+def validate_client(client_name: str, ping: bool = False) -> None:
+    """Validate a client's configuration and optionally test credentials.
+
+    Args:
+        client_name: Client to validate.
+        ping: If True, make live API calls to verify credentials work.
+    """
+    # Load and activate client config
+    activate_client(client_name)
+    print(f"Validating client: {client_name} ({Config.PODCAST_NAME})")
+    print()
+
+    results = []
+
+    # --- Required: Podcast identity ---
+    _check(results, "Podcast Name", bool(Config.PODCAST_NAME), Config.PODCAST_NAME)
+
+    # --- Dropbox ---
+    has_oauth = all(
+        [
+            getattr(Config, "DROPBOX_REFRESH_TOKEN", None),
+            getattr(Config, "DROPBOX_APP_KEY", None),
+            getattr(Config, "DROPBOX_APP_SECRET", None),
+        ]
+    )
+    has_token = bool(getattr(Config, "DROPBOX_ACCESS_TOKEN", None))
+    _check(
+        results,
+        "Dropbox",
+        has_oauth or has_token,
+        "OAuth" if has_oauth else "Access token" if has_token else None,
+    )
+    if ping and (has_oauth or has_token):
+        _ping(results, "Dropbox", _ping_dropbox)
+
+    # --- OpenAI ---
+    has_openai = bool(getattr(Config, "OPENAI_API_KEY", None))
+    _check(results, "OpenAI (GPT-4o)", has_openai)
+    if ping and has_openai:
+        _ping(results, "OpenAI", _ping_openai)
+
+    # --- YouTube ---
+    token_path = getattr(Config, "_YOUTUBE_TOKEN_PICKLE", None)
+    creds_path = Config.BASE_DIR / "credentials" / "youtube_credentials.json"
+    has_yt = creds_path.exists() or (token_path and Path(token_path).exists())
+    _check(
+        results,
+        "YouTube",
+        has_yt,
+        f"token: {token_path}" if token_path else "default credentials",
+    )
+
+    # --- Twitter ---
+    has_twitter = all(
+        [
+            getattr(Config, "TWITTER_API_KEY", None),
+            getattr(Config, "TWITTER_API_SECRET", None),
+            getattr(Config, "TWITTER_ACCESS_TOKEN", None),
+            getattr(Config, "TWITTER_ACCESS_SECRET", None),
+        ]
+    )
+    _check(results, "Twitter", has_twitter)
+
+    # --- Instagram ---
+    has_ig = bool(getattr(Config, "INSTAGRAM_ACCESS_TOKEN", None)) and bool(
+        getattr(Config, "INSTAGRAM_ACCOUNT_ID", None)
+    )
+    _check(results, "Instagram", has_ig)
+
+    # --- TikTok ---
+    has_tt = bool(getattr(Config, "TIKTOK_CLIENT_KEY", None)) and bool(
+        getattr(Config, "TIKTOK_ACCESS_TOKEN", None)
+    )
+    _check(results, "TikTok", has_tt)
+
+    # --- Discord ---
+    has_discord = bool(getattr(Config, "DISCORD_WEBHOOK_URL", None))
+    _check(results, "Discord", has_discord)
+
+    # --- Content settings ---
+    has_names = bool(getattr(Config, "NAMES_TO_REMOVE", None))
+    _check(
+        results,
+        "Censor names list",
+        has_names,
+        f"{len(Config.NAMES_TO_REMOVE)} names" if has_names else None,
+    )
+
+    has_words = bool(getattr(Config, "WORDS_TO_CENSOR", None))
+    _check(
+        results,
+        "Censor words list",
+        has_words,
+        f"{len(Config.WORDS_TO_CENSOR)} words" if has_words else None,
+    )
+
+    # --- Output dirs ---
+    _check(results, "Output dir", True, str(Config.OUTPUT_DIR))
+    _check(results, "Clips dir", True, str(Config.CLIPS_DIR))
+
+    # --- Print results ---
+    print()
+    configured = sum(1 for _, ok, _ in results if ok)
+    total = sum(1 for _, ok, _ in results if ok is not None)
+    skipped = sum(1 for _, ok, _ in results if ok is False)
+    print(f"{configured} configured, {skipped} not configured, {total} total")
+
+    if not ping:
+        print("\nRun with --ping to test live API connections:")
+        print(f"  uv run main.py validate-client {client_name} --ping")
+
+
+def _check(results, name, ok, detail=None):
+    """Record and print a validation check."""
+    if ok:
+        msg = f"  [OK]   {name}"
+        if detail:
+            msg += f"  ({detail})"
+    else:
+        msg = f"  [ ]    {name}  -- not configured"
+    print(msg)
+    results.append((name, ok, detail))
+
+
+def _ping(results, name, fn):
+    """Run a live API ping and record the result."""
+    try:
+        fn()
+        print("         ^ ping OK")
+    except Exception as e:
+        err = str(e)[:80]
+        print(f"         ^ ping FAILED: {err}")
+        results.append((f"{name} ping", False, err))
+
+
+def _ping_dropbox():
+    """Test Dropbox connection."""
+    from dropbox_handler import DropboxHandler
+
+    handler = DropboxHandler()
+    handler.dbx.files_list_folder(Config.DROPBOX_FOLDER_PATH)
+
+
+def _ping_openai():
+    """Test OpenAI API key."""
+    import openai
+
+    client = openai.OpenAI(api_key=Config.OPENAI_API_KEY)
+    client.models.list()
+
+
 def _list_available_clients() -> str:
     """List available client config files (for error messages)."""
     clients_dir = Config.BASE_DIR / "clients"

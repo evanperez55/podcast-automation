@@ -25,6 +25,7 @@ def _parse_flags():
         "--dry-run",
         "--auto-approve",
         "--force",
+        "--ping",
     }
     client_name = None
     cleaned = []
@@ -45,6 +46,7 @@ def _parse_flags():
         "dry_run": "--dry-run" in raw,
         "auto_approve": "--auto-approve" in raw,
         "force": "--force" in raw,
+        "ping": "--ping" in raw,
         "client_name": client_name,
     }
 
@@ -75,6 +77,16 @@ def main():
             from client_config import list_clients
 
             list_clients()
+            return
+
+        if cmd == "validate-client":
+            from client_config import validate_client
+
+            name = client_name or (sys.argv[2] if len(sys.argv) > 2 else None)
+            if not name:
+                print("Usage: uv run main.py validate-client <name>")
+                return
+            validate_client(name, ping=args.get("ping", False))
             return
 
         if cmd == "upload-scheduled":
