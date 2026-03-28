@@ -22,8 +22,8 @@ Requirements for Real-World Testing & Sales Readiness milestone.
 
 - [ ] **TEST-01**: User can process a real true crime episode end-to-end through the pipeline
 - [ ] **TEST-02**: User can process a real business/interview episode end-to-end through the pipeline
-- [ ] **TEST-03**: Clip scorer selects genre-appropriate moments (not just high-energy for non-comedy)
-- [ ] **TEST-04**: Compliance checker applies genre-appropriate sensitivity (stricter for true crime, lighter for comedy)
+- [x] **TEST-03**: Clip scorer selects genre-appropriate moments (not just high-energy for non-comedy)
+- [x] **TEST-04**: Compliance checker applies genre-appropriate sensitivity (stricter for true crime, lighter for comedy)
 
 ### Demo Packaging
 
@@ -67,8 +67,8 @@ Requirements for Real-World Testing & Sales Readiness milestone.
 | SRC-02 | Phase 16 | Complete |
 | TEST-01 | Phase 17 | Pending |
 | TEST-02 | Phase 17 | Pending |
-| TEST-03 | Phase 17 | Pending |
-| TEST-04 | Phase 17 | Pending |
+| TEST-03 | Phase 17 | Complete |
+| TEST-04 | Phase 17 | Complete |
 | DEMO-01 | Phase 18 | Pending |
 | DEMO-02 | Phase 18 | Pending |
 | DEMO-03 | Phase 18 | Pending |

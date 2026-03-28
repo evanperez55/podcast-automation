@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Real-World Testing & Sales Readiness
 status: planning
-stopped_at: Completed 16-02-PLAN.md — RSS pipeline wiring
-last_updated: "2026-03-28T19:03:47.792Z"
+stopped_at: Completed 17-01-PLAN.md — genre-aware clip selection and compliance prompt
+last_updated: "2026-03-28T21:29:56.468Z"
 last_activity: 2026-03-28 — Roadmap created, 4 phases, 12/12 requirements mapped
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 8
+  completed_plans: 7
   percent: 0
 ---
 
@@ -55,6 +55,8 @@ Progress: [░░░░░░░░░░] 0% (v1.4 phases not yet started)
 - [Phase 16-rss-episode-source]: extract_episode_number_from_filename is module-level (not class method) for cross-module reuse without coupling to DropboxHandler
 - [Phase 16-rss-episode-source]: RSS feed entries sorted by published_parsed descending before indexing — index=0 always means newest regardless of feed order
 - [Phase 16-rss-episode-source]: EPISODE_SOURCE defaults to 'dropbox' for backward compatibility; 'rss_source' key avoids collision with RSS output metadata; extract_episode_number_from_filename replaces Dropbox episode number extraction in all branches
+- [Phase 17-01]: clip_criteria conditional on VOICE_PERSONA presence: None = comedy criteria, set = content-quality criteria
+- [Phase 17-01]: COMPLIANCE_PROMPT renamed to COMPLIANCE_PROMPT_TEMPLATE with {context} placeholder; _build_compliance_prompt() reads COMPLIANCE_STYLE with permissive default for FP backward compat
 
 ### Blockers/Concerns
 
@@ -65,6 +67,6 @@ Progress: [░░░░░░░░░░] 0% (v1.4 phases not yet started)
 
 ## Session Continuity
 
-Last session: 2026-03-28T18:59:27.884Z
-Stopped at: Completed 16-02-PLAN.md — RSS pipeline wiring
+Last session: 2026-03-28T21:29:56.464Z
+Stopped at: Completed 17-01-PLAN.md — genre-aware clip selection and compliance prompt
 Resume file: None
