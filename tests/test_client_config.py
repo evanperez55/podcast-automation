@@ -441,6 +441,101 @@ class TestValidateClient:
         assert "Podcast Name" in output
         assert "not configured" in output  # some services won't be configured
 
+    def test_validate_prints_active_podcast_name(self, tmp_path, monkeypatch, capsys):
+        """validate_client prints Active content configuration with the client's podcast name."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "NAMES_TO_REMOVE", Config.NAMES_TO_REMOVE)
+        monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
+        monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
+        monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
+        monkeypatch.setattr(Config, "TOPIC_DATA_DIR", Config.TOPIC_DATA_DIR)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        (clients_dir / "cold-case.yaml").write_text(
+            'client_name: "cold-case"\npodcast_name: "Cold Case Chronicles"\ncontent:\n  names_to_remove: []\n'
+        )
+
+        from client_config import validate_client
+
+        validate_client("cold-case")
+
+        output = capsys.readouterr().out
+        assert "Active content configuration" in output
+        assert "Cold Case Chronicles" in output
+        # Podcast name line should show the client's name
+        assert "Podcast name:    Cold Case Chronicles" in output
+
+    def test_validate_prints_active_names_to_remove(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        """validate_client active config section shows the client's names_to_remove list."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "NAMES_TO_REMOVE", Config.NAMES_TO_REMOVE)
+        monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
+        monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
+        monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
+        monkeypatch.setattr(Config, "TOPIC_DATA_DIR", Config.TOPIC_DATA_DIR)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        yaml_content = (
+            'client_name: "mystery-pod"\npodcast_name: "Mystery Pod"\n'
+            "content:\n  names_to_remove:\n    - Host1\n    - Host2\n"
+        )
+        (clients_dir / "mystery-pod.yaml").write_text(yaml_content)
+
+        from client_config import validate_client
+
+        validate_client("mystery-pod")
+
+        output = capsys.readouterr().out
+        assert "Host1" in output
+        assert "Host2" in output
+        assert "names_to_remove" in output
+
+    def test_validate_prints_voice_persona_or_default(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        """validate_client shows voice persona preview or built-in default message."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "NAMES_TO_REMOVE", Config.NAMES_TO_REMOVE)
+        monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
+        monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
+        monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
+        monkeypatch.setattr(Config, "TOPIC_DATA_DIR", Config.TOPIC_DATA_DIR)
+        # Ensure VOICE_PERSONA is cleaned up after test (it may not exist initially)
+        if hasattr(Config, "VOICE_PERSONA"):
+            monkeypatch.setattr(Config, "VOICE_PERSONA", None)
+        else:
+            monkeypatch.delattr(Config, "VOICE_PERSONA", raising=False)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+
+        # (a) Client with voice_persona set
+        yaml_content = (
+            'client_name: "with-voice"\npodcast_name: "With Voice"\n'
+            'content:\n  names_to_remove: []\n  voice_persona: "You are a calm narrator."\n'
+        )
+        (clients_dir / "with-voice.yaml").write_text(yaml_content)
+
+        from client_config import validate_client
+
+        validate_client("with-voice")
+        output = capsys.readouterr().out
+        assert "You are a calm narrator." in output
+
+        # (b) Client without voice_persona — manually clear VOICE_PERSONA and test again
+        if hasattr(Config, "VOICE_PERSONA"):
+            delattr(Config, "VOICE_PERSONA")
+        (clients_dir / "no-voice.yaml").write_text(
+            'client_name: "no-voice"\npodcast_name: "No Voice"\ncontent:\n  names_to_remove: []\n'
+        )
+        validate_client("no-voice")
+        output = capsys.readouterr().out
+        assert "(built-in Fake Problems default)" in output
+
     def test_validate_no_ping_by_default(self, tmp_path, monkeypatch, capsys):
         """validate_client suggests --ping when not used."""
         monkeypatch.setattr(Config, "BASE_DIR", tmp_path)

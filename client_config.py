@@ -420,6 +420,44 @@ def validate_client(client_name: str, ping: bool = False) -> None:
     _check(results, "Output dir", True, str(Config.OUTPUT_DIR))
     _check(results, "Clips dir", True, str(Config.CLIPS_DIR))
 
+    # --- Active content configuration ---
+    print()
+    print("Active content configuration:")
+    print(f"  Podcast name:    {Config.PODCAST_NAME}")
+
+    voice = getattr(Config, "VOICE_PERSONA", None)
+    if voice:
+        preview = voice.strip().replace("\n", " ")[:80]
+        if len(voice.strip()) > 80:
+            preview += "..."
+        print(f"  Voice persona:   {preview}")
+    else:
+        print("  Voice persona:   (built-in Fake Problems default)")
+
+    names = Config.NAMES_TO_REMOVE
+    if names:
+        print(f"  names_to_remove: {names}")
+    else:
+        print("  names_to_remove: (empty -- no host censorship)")
+
+    words = Config.WORDS_TO_CENSOR
+    if words:
+        print(f"  words_to_censor: {len(words)} words")
+    else:
+        print("  words_to_censor: (empty)")
+
+    blog_voice = getattr(Config, "BLOG_VOICE", None)
+    if blog_voice:
+        print(f"  blog_voice:      configured ({len(blog_voice)} chars)")
+    else:
+        print("  blog_voice:      (not set)")
+
+    scoring = getattr(Config, "SCORING_PROFILE", None)
+    if scoring:
+        print("  scoring_profile: configured")
+    else:
+        print("  scoring_profile: (not set)")
+
     # --- Print results ---
     print()
     configured = sum(1 for _, ok, _ in results if ok)
