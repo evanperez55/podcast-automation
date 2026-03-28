@@ -60,7 +60,7 @@ See: Phase 12 details below.
 
 - [x] **Phase 15: Config Hardening** — Eliminate Fake Problems default leakage; author 2-3 real genre client YAMLs (completed 2026-03-28)
 - [x] **Phase 16: RSS Episode Source** — Add RSS ingest path to unblock non-Dropbox clients (completed 2026-03-28)
-- [ ] **Phase 17: Integration Testing & Genre Fixes** — Process real episodes per genre; fix what breaks
+- [x] **Phase 17: Integration Testing & Genre Fixes** — Process real episodes per genre; fix what breaks (completed 2026-03-28)
 - [ ] **Phase 18: Demo Packaging** — Assemble pipeline output into a presentable sales demo per client
 
 ## Phase Details
@@ -145,5 +145,5 @@ Plans:
 | 12. ContentCalendar Foundation | v1.3 | 2/2 | Complete | 2026-03-19 |
 | 15. Config Hardening | v1.4 | 2/2 | Complete | 2026-03-28 |
 | 16. RSS Episode Source | v1.4 | 2/2 | Complete | 2026-03-28 |
-| 17. Integration Testing & Genre Fixes | 1/2 | In Progress|  | - |
+| 17. Integration Testing & Genre Fixes | 2/2 | Complete   | 2026-03-28 | - |
 | 18. Demo Packaging | v1.4 | 0/TBD | Not started | - |

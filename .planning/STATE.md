@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Real-World Testing & Sales Readiness
 status: planning
-stopped_at: Completed 17-01-PLAN.md — genre-aware clip selection and compliance prompt
-last_updated: "2026-03-28T21:29:56.468Z"
+stopped_at: Completed 17-02-PLAN.md — genre client YAMLs and integration testing
+last_updated: "2026-03-28T23:49:17.985Z"
 last_activity: 2026-03-28 — Roadmap created, 4 phases, 12/12 requirements mapped
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 8
-  completed_plans: 7
+  completed_plans: 8
   percent: 0
 ---
 
@@ -57,6 +57,9 @@ Progress: [░░░░░░░░░░] 0% (v1.4 phases not yet started)
 - [Phase 16-rss-episode-source]: EPISODE_SOURCE defaults to 'dropbox' for backward compatibility; 'rss_source' key avoids collision with RSS output metadata; extract_episode_number_from_filename replaces Dropbox episode number extraction in all branches
 - [Phase 17-01]: clip_criteria conditional on VOICE_PERSONA presence: None = comedy criteria, set = content-quality criteria
 - [Phase 17-01]: COMPLIANCE_PROMPT renamed to COMPLIANCE_PROMPT_TEMPLATE with {context} placeholder; _build_compliance_prompt() reads COMPLIANCE_STYLE with permissive default for FP backward compat
+- [Phase 17-integration-testing-genre-fixes]: True crime client uses Casefile Acast feed URL (original Simplecast returns 403)
+- [Phase 17-integration-testing-genre-fixes]: Non-Dropbox clients skip ALL uploaders in distribute.py to prevent FP credential leakage
+- [Phase 17-integration-testing-genre-fixes]: normalize_audio uses temp file + rename to avoid FFmpeg in-place write crash
 
 ### Blockers/Concerns
 
@@ -67,6 +70,6 @@ Progress: [░░░░░░░░░░] 0% (v1.4 phases not yet started)
 
 ## Session Continuity
 
-Last session: 2026-03-28T21:29:56.464Z
-Stopped at: Completed 17-01-PLAN.md — genre-aware clip selection and compliance prompt
+Last session: 2026-03-28T23:49:17.981Z
+Stopped at: Completed 17-02-PLAN.md — genre client YAMLs and integration testing
 Resume file: None

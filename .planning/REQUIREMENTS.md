@@ -20,8 +20,8 @@ Requirements for Real-World Testing & Sales Readiness milestone.
 
 ### Integration Testing
 
-- [ ] **TEST-01**: User can process a real true crime episode end-to-end through the pipeline
-- [ ] **TEST-02**: User can process a real business/interview episode end-to-end through the pipeline
+- [x] **TEST-01**: User can process a real true crime episode end-to-end through the pipeline
+- [x] **TEST-02**: User can process a real business/interview episode end-to-end through the pipeline
 - [x] **TEST-03**: Clip scorer selects genre-appropriate moments (not just high-energy for non-comedy)
 - [x] **TEST-04**: Compliance checker applies genre-appropriate sensitivity (stricter for true crime, lighter for comedy)
 
@@ -65,8 +65,8 @@ Requirements for Real-World Testing & Sales Readiness milestone.
 | CFG-03 | Phase 15 | Complete |
 | SRC-01 | Phase 16 | Complete |
 | SRC-02 | Phase 16 | Complete |
-| TEST-01 | Phase 17 | Pending |
-| TEST-02 | Phase 17 | Pending |
+| TEST-01 | Phase 17 | Complete |
+| TEST-02 | Phase 17 | Complete |
 | TEST-03 | Phase 17 | Complete |
 | TEST-04 | Phase 17 | Complete |
 | DEMO-01 | Phase 18 | Pending |
