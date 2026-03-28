@@ -485,6 +485,79 @@ def client_status(client_name: str) -> None:
             pass
 
 
+def setup_client_platform(client_name: str, platform: str) -> None:
+    """Run credential setup for a specific platform and client.
+
+    Args:
+        client_name: Client to configure.
+        platform: Platform to set up (youtube, dropbox).
+    """
+    activate_client(client_name)
+
+    if platform == "youtube":
+        _setup_youtube(client_name)
+    elif platform == "dropbox":
+        print("Dropbox setup: Add these to your client YAML or .env:")
+        print("  dropbox.app_key, dropbox.app_secret, dropbox.refresh_token")
+        print("  See: https://www.dropbox.com/developers/apps")
+    else:
+        print(f"Unknown platform: {platform}")
+        print("Supported: youtube, dropbox")
+
+
+def _setup_youtube(client_name: str) -> None:
+    """Run YouTube OAuth flow for a specific client."""
+    # Determine token path
+    token_path = getattr(Config, "_YOUTUBE_TOKEN_PICKLE", None)
+    if not token_path:
+        # Default per-client location
+        token_path = str(
+            Config.BASE_DIR / "clients" / client_name / "youtube_token.pickle"
+        )
+
+    token_file = Path(token_path)
+    creds_path = Config.BASE_DIR / "credentials" / "youtube_credentials.json"
+
+    print(f"YouTube OAuth Setup for: {client_name}")
+    print(f"  Credentials: {creds_path}")
+    print(f"  Token will be saved to: {token_file}")
+    print()
+
+    if not creds_path.exists():
+        print(f"[ERROR] YouTube credentials file not found: {creds_path}")
+        print()
+        print("To set up YouTube:")
+        print("  1. Go to https://console.cloud.google.com/")
+        print("  2. Create OAuth 2.0 credentials (Desktop app)")
+        print("  3. Download as credentials/youtube_credentials.json")
+        return
+
+    # Delete expired token if it exists
+    if token_file.exists():
+        print(f"[INFO] Deleting existing token: {token_file}")
+        token_file.unlink()
+
+    token_file.parent.mkdir(parents=True, exist_ok=True)
+
+    print("This will open a browser window for Google authorization.")
+    input("Press Enter to continue...")
+    print()
+
+    try:
+        from uploaders import YouTubeUploader
+
+        YouTubeUploader(token_path=str(token_file))
+        print()
+        print("[SUCCESS] YouTube authentication complete!")
+        print(f"Token saved to: {token_file}")
+        print()
+        print("Make sure your client YAML points to this token:")
+        print("  youtube:")
+        print(f'    token_pickle: "clients/{client_name}/youtube_token.pickle"')
+    except Exception as e:
+        print(f"\n[ERROR] Authentication failed: {e}")
+
+
 def _list_available_clients() -> str:
     """List available client config files (for error messages)."""
     clients_dir = Config.BASE_DIR / "clients"

@@ -59,6 +59,42 @@ def _activate_client(client_name):
         activate_client(client_name)
 
 
+def _handle_client_command(cmd, args):
+    """Handle client management commands. Returns True if handled."""
+    name = args["client_name"]
+    if cmd == "init-client" and len(sys.argv) > 2:
+        from client_config import init_client
+
+        init_client(sys.argv[2])
+    elif cmd == "setup-client" and len(sys.argv) > 3:
+        from client_config import setup_client_platform
+
+        setup_client_platform(sys.argv[2], sys.argv[3])
+    elif cmd == "list-clients":
+        from client_config import list_clients
+
+        list_clients()
+    elif cmd == "validate-client":
+        from client_config import validate_client
+
+        n = name or (sys.argv[2] if len(sys.argv) > 2 else None)
+        if not n:
+            print("Usage: uv run main.py validate-client <name>")
+            return True
+        validate_client(n, ping=args.get("ping", False))
+    elif cmd == "status":
+        from client_config import client_status
+
+        n = name or (sys.argv[2] if len(sys.argv) > 2 else None)
+        if not n:
+            print("Usage: uv run main.py status <name>")
+            return True
+        client_status(n)
+    else:
+        return False
+    return True
+
+
 def main():
     """Main entry point."""
     args = _parse_flags()
@@ -67,53 +103,20 @@ def main():
     if len(sys.argv) > 1:
         cmd = sys.argv[1].lower()
 
-        if cmd == "init-client" and len(sys.argv) > 2:
-            from client_config import init_client
-
-            init_client(sys.argv[2])
-            return
-
-        if cmd == "list-clients":
-            from client_config import list_clients
-
-            list_clients()
-            return
-
-        if cmd == "validate-client":
-            from client_config import validate_client
-
-            name = client_name or (sys.argv[2] if len(sys.argv) > 2 else None)
-            if not name:
-                print("Usage: uv run main.py validate-client <name>")
-                return
-            validate_client(name, ping=args.get("ping", False))
-            return
-
-        if cmd == "status":
-            from client_config import client_status
-
-            name = client_name or (sys.argv[2] if len(sys.argv) > 2 else None)
-            if not name:
-                print("Usage: uv run main.py status <name>")
-                return
-            client_status(name)
+        if _handle_client_command(cmd, args):
             return
 
         if cmd == "upload-scheduled":
             _activate_client(client_name)
             run_upload_scheduled()
             return
-
         if cmd == "backfill-ids":
             run_backfill_ids()
             return
-
         if cmd == "analytics":
             _activate_client(client_name)
-            episode_arg = sys.argv[2] if len(sys.argv) > 2 else "all"
-            run_analytics(episode_arg)
+            run_analytics(sys.argv[2] if len(sys.argv) > 2 else "all")
             return
-
         if cmd == "search" and len(sys.argv) > 2:
             _activate_client(client_name)
             run_search(" ".join(sys.argv[2:]))
@@ -133,19 +136,19 @@ def main():
         elif arg.startswith("ep") or arg.startswith("episode"):
             match = re.search(r"(\d+)", arg)
             if match:
-                episode_num = int(match.group(1))
+                ep = int(match.group(1))
             elif len(sys.argv) > 2:
-                episode_num = int(sys.argv[2])
+                ep = int(sys.argv[2])
             else:
                 print("Usage: python main.py ep25 or python main.py episode 25")
                 return
-            run_with_notification(args, episode_number=episode_num)
+            run_with_notification(args, episode_number=ep)
         else:
-            file_path = sys.argv[1]
-            if file_path.startswith("/"):
-                run_with_notification(args, dropbox_path=file_path)
+            path = sys.argv[1]
+            if path.startswith("/"):
+                run_with_notification(args, dropbox_path=path)
             else:
-                run_with_notification(args, local_audio_path=file_path)
+                run_with_notification(args, local_audio_path=path)
     else:
         _interactive_mode(args)
 

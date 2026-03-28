@@ -476,6 +476,74 @@ class TestClientStatus:
         assert "No output directory" in output
 
 
+class TestSetupClientPlatform:
+    """Tests for setup_client_platform() credential setup."""
+
+    def test_unknown_platform(self, tmp_path, monkeypatch, capsys):
+        """Unknown platform prints helpful message."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
+        monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
+        monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
+        monkeypatch.setattr(Config, "TOPIC_DATA_DIR", Config.TOPIC_DATA_DIR)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        (clients_dir / "test.yaml").write_text(
+            'client_name: "test"\npodcast_name: "Test"\n'
+        )
+
+        from client_config import setup_client_platform
+
+        setup_client_platform("test", "unknown")
+
+        output = capsys.readouterr().out
+        assert "Unknown platform" in output
+        assert "youtube" in output
+
+    def test_youtube_missing_credentials(self, tmp_path, monkeypatch, capsys):
+        """YouTube setup reports missing credentials file."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
+        monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
+        monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
+        monkeypatch.setattr(Config, "TOPIC_DATA_DIR", Config.TOPIC_DATA_DIR)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        (clients_dir / "test.yaml").write_text(
+            'client_name: "test"\npodcast_name: "Test"\n'
+        )
+
+        from client_config import setup_client_platform
+
+        setup_client_platform("test", "youtube")
+
+        output = capsys.readouterr().out
+        assert "credentials file not found" in output
+
+    def test_dropbox_prints_instructions(self, tmp_path, monkeypatch, capsys):
+        """Dropbox setup prints configuration instructions."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
+        monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
+        monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
+        monkeypatch.setattr(Config, "TOPIC_DATA_DIR", Config.TOPIC_DATA_DIR)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        (clients_dir / "test.yaml").write_text(
+            'client_name: "test"\npodcast_name: "Test"\n'
+        )
+
+        from client_config import setup_client_platform
+
+        setup_client_platform("test", "dropbox")
+
+        output = capsys.readouterr().out
+        assert "app_key" in output
+
+
 class TestBackwardCompatibility:
     """Verify no-client mode preserves default Fake Problems config."""
 
