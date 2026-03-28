@@ -143,6 +143,6 @@ Plans:
 | 11. Smart Scheduling | v1.2 | 2/2 | Complete | 2026-03-19 |
 | 12. ContentCalendar Foundation | v1.3 | 2/2 | Complete | 2026-03-19 |
 | 15. Config Hardening | v1.4 | 2/2 | Complete | 2026-03-28 |
-| 16. RSS Episode Source | 2/2 | Complete   | 2026-03-28 | - |
+| 16. RSS Episode Source | 2/2 | Complete    | 2026-03-28 | - |
 | 17. Integration Testing & Genre Fixes | v1.4 | 0/TBD | Not started | - |
 | 18. Demo Packaging | v1.4 | 0/TBD | Not started | - |
