@@ -108,8 +108,9 @@ class AudioProcessor:
         if not audio_path.exists():
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
-        if output_path is None:
-            output_path = audio_path
+        in_place = output_path is None
+        if in_place:
+            output_path = audio_path.with_suffix(".norm" + audio_path.suffix)
         else:
             output_path = Path(output_path)
 
@@ -189,6 +190,11 @@ class AudioProcessor:
         except (ValueError, KeyError):
             output_lufs = float(Config.LUFS_TARGET)
             output_lra = float(stats.get("input_lra", "0"))
+
+        # If normalizing in-place, replace original with normalized file
+        if in_place:
+            output_path.replace(audio_path)
+            output_path = audio_path
 
         # Log normalization metrics
         gain_db = output_lufs - float(stats["input_i"])
