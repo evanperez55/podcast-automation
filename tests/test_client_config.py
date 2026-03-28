@@ -245,9 +245,6 @@ class TestNewYamlMappings:
         assert "content.compliance_style" in _YAML_TO_CONFIG
         assert _YAML_TO_CONFIG["content.compliance_style"] == "COMPLIANCE_STYLE"
 
-        # Cleanup
-        delattr(Config, "_YOUTUBE_TOKEN_PICKLE")
-
 
 class TestOutputIsolation:
     """Tests for per-client output directory isolation."""

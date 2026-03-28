@@ -29,7 +29,7 @@ SEVERITY_MAP = {
     "self_harm_promotion": "critical",
 }
 
-COMPLIANCE_PROMPT = """Analyze this podcast transcript for YouTube Community Guidelines violations.
+COMPLIANCE_PROMPT_TEMPLATE = """Analyze this podcast transcript for YouTube Community Guidelines violations.
 
 YouTube prohibits:
 - hate_speech: Dehumanizing content targeting protected groups (race, religion, gender, etc.)
@@ -53,8 +53,41 @@ Return ONLY a JSON array. Each element:
 
 If no violations found, return an empty array: []
 
-Context: This is a comedy podcast. Dark humor, profanity, and edgy jokes are NOT violations unless they specifically dehumanize real protected groups or contain genuinely dangerous false health claims that could physically harm listeners.
+{context}
 """
+
+_COMPLIANCE_CONTEXTS = {
+    "permissive": (
+        "Context: This is a comedy podcast. Dark humor, profanity, and edgy jokes are NOT "
+        "violations unless they specifically dehumanize real protected groups or contain "
+        "genuinely dangerous false health claims that could physically harm listeners."
+    ),
+    "strict": (
+        "Context: This is a serious factual podcast. Apply community guidelines strictly. "
+        "Flag any content that could be construed as harmful, misleading, or offensive to "
+        "a general audience, even if it may have been intended as humor."
+    ),
+    "standard": (
+        "Context: Apply standard YouTube community guidelines without additional leniency "
+        "or strictness. Flag clear violations as defined above."
+    ),
+}
+
+
+def _build_compliance_prompt(transcript: str) -> str:
+    """Build a genre-aware compliance prompt for the given transcript.
+
+    Reads COMPLIANCE_STYLE from Config (with default 'permissive' for backward compat).
+
+    Args:
+        transcript: Formatted transcript string to inject into the prompt.
+
+    Returns:
+        Complete prompt string ready to send to GPT-4o.
+    """
+    style = getattr(Config, "COMPLIANCE_STYLE", "permissive")
+    context = _COMPLIANCE_CONTEXTS.get(style, _COMPLIANCE_CONTEXTS["permissive"])
+    return COMPLIANCE_PROMPT_TEMPLATE.format(transcript=transcript, context=context)
 
 
 class ContentComplianceChecker:
@@ -101,7 +134,7 @@ class ContentComplianceChecker:
         formatted_transcript = self._format_transcript(transcript_data)
 
         # Build and send compliance prompt
-        prompt = COMPLIANCE_PROMPT.format(transcript=formatted_transcript)
+        prompt = _build_compliance_prompt(formatted_transcript)
 
         logger.info(
             "Checking transcript for content compliance (episode %s)...", episode_number

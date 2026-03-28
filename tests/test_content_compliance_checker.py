@@ -9,6 +9,7 @@ from content_compliance_checker import (
     ContentComplianceChecker,
     VIOLATION_CATEGORIES,
     SEVERITY_MAP,
+    _build_compliance_prompt,
 )
 
 
@@ -501,3 +502,73 @@ class TestSeverityMap:
         assert SEVERITY_MAP["graphic_violence"] == "warning"
         assert SEVERITY_MAP["harassment"] == "warning"
         assert SEVERITY_MAP["sexual_content"] == "warning"
+
+
+# ---------------------------------------------------------------------------
+# TestComplianceStylePrompt
+# ---------------------------------------------------------------------------
+
+
+class TestComplianceStylePrompt:
+    """Tests for genre-aware compliance prompt via _build_compliance_prompt()."""
+
+    def test_build_compliance_prompt_permissive(self, monkeypatch):
+        """COMPLIANCE_STYLE=permissive returns prompt containing comedy podcast context."""
+        from config import Config
+
+        monkeypatch.setattr(Config, "COMPLIANCE_STYLE", "permissive", raising=False)
+        result = _build_compliance_prompt("test transcript")
+        assert "comedy podcast" in result
+
+    def test_build_compliance_prompt_strict(self, monkeypatch):
+        """COMPLIANCE_STYLE=strict returns prompt containing serious factual podcast context."""
+        from config import Config
+
+        monkeypatch.setattr(Config, "COMPLIANCE_STYLE", "strict", raising=False)
+        result = _build_compliance_prompt("test transcript")
+        assert "serious factual podcast" in result
+
+    def test_build_compliance_prompt_standard(self, monkeypatch):
+        """COMPLIANCE_STYLE=standard returns prompt containing standard YouTube community guidelines context."""
+        from config import Config
+
+        monkeypatch.setattr(Config, "COMPLIANCE_STYLE", "standard", raising=False)
+        result = _build_compliance_prompt("test transcript")
+        assert "standard YouTube community guidelines" in result
+
+    def test_build_compliance_prompt_default_is_permissive(self, monkeypatch):
+        """When COMPLIANCE_STYLE is not set, defaults to permissive (comedy podcast context)."""
+        from config import Config
+
+        # Remove COMPLIANCE_STYLE if present
+        if hasattr(Config, "COMPLIANCE_STYLE"):
+            monkeypatch.delattr(Config, "COMPLIANCE_STYLE", raising=False)
+
+        result = _build_compliance_prompt("test transcript")
+        assert "comedy podcast" in result
+
+    def test_build_compliance_prompt_includes_transcript(self, monkeypatch):
+        """_build_compliance_prompt includes the transcript text."""
+        from config import Config
+
+        monkeypatch.setattr(Config, "COMPLIANCE_STYLE", "permissive", raising=False)
+        result = _build_compliance_prompt("my unique transcript content here")
+        assert "my unique transcript content here" in result
+
+    def test_check_transcript_uses_build_compliance_prompt(self, tmp_path):
+        """check_transcript() calls _build_compliance_prompt (not the old constant directly)."""
+        with patch("content_compliance_checker.openai.OpenAI"):
+            checker = ContentComplianceChecker()
+            checker.client = make_mock_client(SAMPLE_EMPTY_RESPONSE)
+
+            with patch(
+                "content_compliance_checker._build_compliance_prompt",
+                return_value="mocked prompt",
+            ) as mock_build:
+                checker.check_transcript(
+                    transcript_data=SAMPLE_TRANSCRIPT,
+                    episode_output_dir=tmp_path,
+                    episode_number=29,
+                )
+
+            mock_build.assert_called_once()
