@@ -72,6 +72,11 @@ class ContentEditor:
             )
             energy_candidates = sorted_segs[: Config.CLIP_AUDIO_TOP_N]
 
+        # Suppress energy candidates for content-driven genres (flat audio energy)
+        clip_selection_mode = getattr(Config, "CLIP_SELECTION_MODE", "energy")
+        if clip_selection_mode == "content":
+            energy_candidates = None
+
         # Build the prompt for the LLM
         prompt = self._build_analysis_prompt(
             timestamped_text,
@@ -259,9 +264,27 @@ class ContentEditor:
                 + "\n"
             )
 
+        # Build clip criteria based on genre (VOICE_PERSONA presence indicates non-comedy client)
+        custom_persona = getattr(Config, "VOICE_PERSONA", None)
+        if not custom_persona:
+            clip_criteria = (
+                "   - Funny or entertaining moments\n"
+                "   - Controversial or thought-provoking statements\n"
+                '   - Relatable "fake problems" discussions\n'
+                "   - Moments with good energy and pacing\n"
+                "   - Self-contained stories or bits"
+            )
+        else:
+            clip_criteria = (
+                "   - Moments with a clear, quotable insight or revelation\n"
+                "   - Self-contained segments that make sense out of context\n"
+                "   - Emotionally compelling or tension-building moments\n"
+                "   - Key data points, specific numbers, or case-breaking details\n"
+                "   - Strong narrative hooks that make someone want to hear more"
+            )
+
         # Only inject Fake Problems voice examples when no custom persona is configured.
         # Custom clients have their own voice in the system message — don't override with FP examples.
-        custom_persona = getattr(Config, "VOICE_PERSONA", None)
         if not custom_persona:
             voice_examples = """
 **VOICE EXAMPLES — match this tone in ALL output:**
@@ -313,11 +336,7 @@ GOOD: "turns out immortality is real, it just only applies to lobsters. link in 
 
 2. **IDENTIFY BEST MOMENTS FOR CLIPS (15-30 seconds):**
    Find {Config.NUM_CLIPS} compelling moments that would make great social media clips. Look for:
-   - Funny or entertaining moments
-   - Controversial or thought-provoking statements
-   - Relatable "fake problems" discussions
-   - Moments with good energy and pacing
-   - Self-contained stories or bits
+{clip_criteria}
 
    For each clip, provide start/end timestamps and explain why it's interesting.
 

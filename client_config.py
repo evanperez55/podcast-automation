@@ -45,6 +45,8 @@ _YAML_TO_CONFIG = {
     "content.num_clips": "NUM_CLIPS",
     "content.clip_min_duration": "CLIP_MIN_DURATION",
     "content.clip_max_duration": "CLIP_MAX_DURATION",
+    "content.clip_selection_mode": "CLIP_SELECTION_MODE",
+    "content.compliance_style": "COMPLIANCE_STYLE",
     # Episode source (dropbox | rss | local)
     "episode_source": "EPISODE_SOURCE",
     "rss_source.feed_url": "RSS_FEED_URL",

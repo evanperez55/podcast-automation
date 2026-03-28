@@ -766,6 +766,129 @@ class TestAnalyzeContentSystemMessage:
         )
 
 
+class TestGenreAwareClipSelection:
+    """Tests for genre-aware clip criteria and energy suppression."""
+
+    def test_clip_criteria_comedy_when_no_persona(self, content_editor, monkeypatch):
+        """When VOICE_PERSONA is None, prompt contains comedy clip criteria."""
+        from config import Config as RealConfig
+
+        monkeypatch.setattr(RealConfig, "VOICE_PERSONA", None, raising=False)
+
+        prompt = content_editor._build_analysis_prompt("some transcript text")
+
+        assert "Funny or entertaining" in prompt
+        assert "fake problems" in prompt
+
+    def test_clip_criteria_content_when_persona_set(self, content_editor, monkeypatch):
+        """When VOICE_PERSONA is set, prompt contains content-quality clip criteria."""
+        from config import Config as RealConfig
+
+        monkeypatch.setattr(
+            RealConfig,
+            "VOICE_PERSONA",
+            "You write for a true crime podcast.",
+            raising=False,
+        )
+
+        prompt = content_editor._build_analysis_prompt("some transcript text")
+
+        assert "quotable insight" in prompt
+        assert "fake problems" not in prompt
+        assert "Funny or entertaining" not in prompt
+
+    def test_energy_suppressed_when_content_mode(self, content_editor, monkeypatch):
+        """When CLIP_SELECTION_MODE=content, analyze_content passes energy_candidates=None."""
+        from config import Config as RealConfig
+        from unittest.mock import Mock, patch
+
+        monkeypatch.setattr(RealConfig, "CLIP_SELECTION_MODE", "content", raising=False)
+
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = """{
+            "episode_title": "Test",
+            "censor_timestamps": [],
+            "best_clips": [],
+            "episode_summary": "Test summary",
+            "social_captions": {"youtube": "", "instagram": "", "twitter": ""}
+        }"""
+        content_editor.client.chat.completions.create = Mock(return_value=mock_response)
+
+        transcript_data = {"words": [], "segments": []}
+
+        captured_energy = []
+
+        original_build = content_editor._build_analysis_prompt
+
+        def capture_build(text, **kwargs):
+            captured_energy.append(kwargs.get("energy_candidates"))
+            return original_build(text, **kwargs)
+
+        with patch.object(
+            content_editor, "_build_analysis_prompt", side_effect=capture_build
+        ):
+            with patch("content_editor.AudioClipScorer") as MockScorer:
+                mock_scorer_instance = Mock()
+                mock_scorer_instance.score_segments.return_value = [
+                    {"start": 0, "text": "hi", "audio_energy_score": 0.9}
+                ]
+                MockScorer.return_value = mock_scorer_instance
+
+                content_editor.analyze_content(
+                    transcript_data, audio_path="/fake/audio.wav"
+                )
+
+        assert len(captured_energy) == 1
+        assert captured_energy[0] is None
+
+    def test_energy_passed_when_energy_mode(self, content_editor, monkeypatch):
+        """When CLIP_SELECTION_MODE is not set, energy_candidates are passed through."""
+        from config import Config as RealConfig
+        from unittest.mock import Mock, patch
+
+        # Remove CLIP_SELECTION_MODE if present (should default to "energy")
+        if hasattr(RealConfig, "CLIP_SELECTION_MODE"):
+            monkeypatch.delattr(RealConfig, "CLIP_SELECTION_MODE", raising=False)
+
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = """{
+            "episode_title": "Test",
+            "censor_timestamps": [],
+            "best_clips": [],
+            "episode_summary": "Test summary",
+            "social_captions": {"youtube": "", "instagram": "", "twitter": ""}
+        }"""
+        content_editor.client.chat.completions.create = Mock(return_value=mock_response)
+
+        transcript_data = {"words": [], "segments": []}
+
+        captured_energy = []
+
+        original_build = content_editor._build_analysis_prompt
+
+        def capture_build(text, **kwargs):
+            captured_energy.append(kwargs.get("energy_candidates"))
+            return original_build(text, **kwargs)
+
+        with patch.object(
+            content_editor, "_build_analysis_prompt", side_effect=capture_build
+        ):
+            with patch("content_editor.AudioClipScorer") as MockScorer:
+                scored_segs = [{"start": 0, "text": "hi", "audio_energy_score": 0.9}]
+                mock_scorer_instance = Mock()
+                mock_scorer_instance.score_segments.return_value = scored_segs
+                MockScorer.return_value = mock_scorer_instance
+
+                content_editor.analyze_content(
+                    transcript_data, audio_path="/fake/audio.wav"
+                )
+
+        assert len(captured_energy) == 1
+        assert captured_energy[0] is not None
+
+
 class TestVoiceExamplesConditional:
     """Tests for conditional injection of Fake Problems voice examples."""
 

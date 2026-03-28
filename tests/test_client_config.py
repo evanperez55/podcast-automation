@@ -227,6 +227,24 @@ class TestApplyClientConfig:
         apply_client_config({"_YOUTUBE_TOKEN_PICKLE": "/some/path"})
         assert Config._YOUTUBE_TOKEN_PICKLE == "/some/path"
 
+
+class TestNewYamlMappings:
+    """Tests for new YAML -> Config attribute mappings added for genre awareness."""
+
+    def test_clip_selection_mode_mapping(self):
+        """content.clip_selection_mode maps to CLIP_SELECTION_MODE in _YAML_TO_CONFIG."""
+        from client_config import _YAML_TO_CONFIG
+
+        assert "content.clip_selection_mode" in _YAML_TO_CONFIG
+        assert _YAML_TO_CONFIG["content.clip_selection_mode"] == "CLIP_SELECTION_MODE"
+
+    def test_compliance_style_mapping(self):
+        """content.compliance_style maps to COMPLIANCE_STYLE in _YAML_TO_CONFIG."""
+        from client_config import _YAML_TO_CONFIG
+
+        assert "content.compliance_style" in _YAML_TO_CONFIG
+        assert _YAML_TO_CONFIG["content.compliance_style"] == "COMPLIANCE_STYLE"
+
         # Cleanup
         delattr(Config, "_YOUTUBE_TOKEN_PICKLE")
 
