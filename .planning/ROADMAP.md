@@ -59,7 +59,7 @@ See: Phase 12 details below.
 **Milestone Goal:** Prove the multi-client pipeline works with real non-Fake-Problems podcasts in different genres, fix what breaks, and package the output as a sales demo for prospective clients.
 
 - [x] **Phase 15: Config Hardening** — Eliminate Fake Problems default leakage; author 2-3 real genre client YAMLs (completed 2026-03-28)
-- [ ] **Phase 16: RSS Episode Source** — Add RSS ingest path to unblock non-Dropbox clients
+- [x] **Phase 16: RSS Episode Source** — Add RSS ingest path to unblock non-Dropbox clients (completed 2026-03-28)
 - [ ] **Phase 17: Integration Testing & Genre Fixes** — Process real episodes per genre; fix what breaks
 - [ ] **Phase 18: Demo Packaging** — Assemble pipeline output into a presentable sales demo per client
 
@@ -143,6 +143,6 @@ Plans:
 | 11. Smart Scheduling | v1.2 | 2/2 | Complete | 2026-03-19 |
 | 12. ContentCalendar Foundation | v1.3 | 2/2 | Complete | 2026-03-19 |
 | 15. Config Hardening | v1.4 | 2/2 | Complete | 2026-03-28 |
-| 16. RSS Episode Source | 1/2 | In Progress|  | - |
+| 16. RSS Episode Source | 2/2 | Complete   | 2026-03-28 | - |
 | 17. Integration Testing & Genre Fixes | v1.4 | 0/TBD | Not started | - |
 | 18. Demo Packaging | v1.4 | 0/TBD | Not started | - |

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Real-World Testing & Sales Readiness
 status: planning
-stopped_at: Completed 16-01-PLAN.md — RSSEpisodeFetcher with feedparser
-last_updated: "2026-03-28T18:49:15.905Z"
+stopped_at: Completed 16-02-PLAN.md — RSS pipeline wiring
+last_updated: "2026-03-28T18:59:27.888Z"
 last_activity: 2026-03-28 — Roadmap created, 4 phases, 12/12 requirements mapped
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
@@ -54,6 +54,7 @@ Progress: [░░░░░░░░░░] 0% (v1.4 phases not yet started)
 - [Phase 15-config-hardening]: genre YAMLs use getattr guard for VOICE_PERSONA — attribute not on Config by default; monkeypatch requires raising=False
 - [Phase 16-rss-episode-source]: extract_episode_number_from_filename is module-level (not class method) for cross-module reuse without coupling to DropboxHandler
 - [Phase 16-rss-episode-source]: RSS feed entries sorted by published_parsed descending before indexing — index=0 always means newest regardless of feed order
+- [Phase 16-rss-episode-source]: EPISODE_SOURCE defaults to 'dropbox' for backward compatibility; 'rss_source' key avoids collision with RSS output metadata; extract_episode_number_from_filename replaces Dropbox episode number extraction in all branches
 
 ### Blockers/Concerns
 
@@ -64,6 +65,6 @@ Progress: [░░░░░░░░░░] 0% (v1.4 phases not yet started)
 
 ## Session Continuity
 
-Last session: 2026-03-28T18:49:15.901Z
-Stopped at: Completed 16-01-PLAN.md — RSSEpisodeFetcher with feedparser
+Last session: 2026-03-28T18:59:27.884Z
+Stopped at: Completed 16-02-PLAN.md — RSS pipeline wiring
 Resume file: None
