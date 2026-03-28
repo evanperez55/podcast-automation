@@ -98,8 +98,8 @@ Plans:
   4. `uv run main.py --client truecrime validate-client --ping` confirms the RSS feed URL is reachable
 **Plans**: 2 plans
 Plans:
-- [ ] 15-01-PLAN.md — Harden load_client_config validation + active config printout in validate-client
-- [ ] 15-02-PLAN.md — Conditional voice examples + real genre client YAMLs
+- [ ] 16-01-PLAN.md — RSSEpisodeFetcher module with feedparser + streaming download + tests
+- [ ] 16-02-PLAN.md — Wire RSS into pipeline: conditional Dropbox, ingest branching, client YAML config
 
 ### Phase 17: Integration Testing & Genre Fixes
 **Goal**: A real true crime episode and a real business/interview episode each run end-to-end through the pipeline producing genre-appropriate output with no Fake Problems contamination
@@ -110,10 +110,9 @@ Plans:
   2. A real business/interview episode processes from RSS download through blog post and social captions with professional tone appropriate to the genre
   3. The 3 selected clips from an interview episode are the moments with the most substantive insight, not the highest audio energy peaks (flat-energy interview audio does not fool the scorer)
   4. The compliance checker applies genre-appropriate sensitivity — a true crime episode flagged for genuine dangerous content is blocked; a comedy episode with profanity is not blocked
-**Plans**: 2 plans
+**Plans**: TBD
 Plans:
-- [ ] 15-01-PLAN.md — Harden load_client_config validation + active config printout in validate-client
-- [ ] 15-02-PLAN.md — Conditional voice examples + real genre client YAMLs
+- [ ] TBD
 
 ### Phase 18: Demo Packaging
 **Goal**: Running one command per client produces a self-contained demo folder that a prospect can evaluate in a 30-minute meeting without the pipeline present
@@ -123,10 +122,9 @@ Plans:
   1. Running `uv run main.py --client truecrime package-demo ep01` produces a `demo/truecrime/ep01/` folder containing the processed MP3, captioned clips, thumbnail, show notes, social captions, and a self-contained HTML summary page
   2. The demo folder contains a 60-second before/after audio comparison clip (raw vs. normalized + censored) that demonstrates audio quality improvement without requiring technical explanation
   3. A DEMO.md exists per client in the demo folder stating what was automated, estimated time saved, cost per episode in OpenAI tokens, LUFS before/after, and clip selection rationale
-**Plans**: 2 plans
+**Plans**: TBD
 Plans:
-- [ ] 15-01-PLAN.md — Harden load_client_config validation + active config printout in validate-client
-- [ ] 15-02-PLAN.md — Conditional voice examples + real genre client YAMLs
+- [ ] TBD
 
 ## Progress
 
@@ -144,7 +142,7 @@ Plans:
 | 10. Engagement Scoring | v1.2 | 2/2 | Complete | 2026-03-19 |
 | 11. Smart Scheduling | v1.2 | 2/2 | Complete | 2026-03-19 |
 | 12. ContentCalendar Foundation | v1.3 | 2/2 | Complete | 2026-03-19 |
-| 15. Config Hardening | 2/2 | Complete    | 2026-03-28 | - |
-| 16. RSS Episode Source | v1.4 | 0/TBD | Not started | - |
+| 15. Config Hardening | v1.4 | 2/2 | Complete | 2026-03-28 |
+| 16. RSS Episode Source | v1.4 | 0/2 | Not started | - |
 | 17. Integration Testing & Genre Fixes | v1.4 | 0/TBD | Not started | - |
 | 18. Demo Packaging | v1.4 | 0/TBD | Not started | - |
