@@ -2,14 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Real-World Testing & Sales Readiness
-status: active
-last_updated: "2026-03-28"
-last_activity: 2026-03-28 — Roadmap created, 4 phases mapped to 12 requirements
+status: planning
+stopped_at: Completed 15-01-PLAN.md
+last_updated: "2026-03-28T18:25:26.893Z"
+last_activity: 2026-03-28 — Roadmap created, 4 phases, 12/12 requirements mapped
 progress:
-  total_phases: 4
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_phases: 5
+  completed_phases: 2
+  total_plans: 4
+  completed_plans: 4
   percent: 0
 ---
 
@@ -47,6 +48,8 @@ Progress: [░░░░░░░░░░] 0% (v1.4 phases not yet started)
 - [v1.4 demo format]: Self-contained HTML (not PDF — WeasyPrint requires GTK+/MSYS2; wkhtmltopdf archived Jan 2023)
 - [v1.4 dep]: `feedparser>=6.0.12` is the only new package needed for RSS ingest
 - [v1.4 before/after]: Pipeline must snapshot raw audio before Step 4 censor — not currently done; required for DEMO-02
+- [Phase 15-config-hardening]: null and empty list both valid for names_to_remove — field must be present, value need not be non-empty
+- [Phase 15-config-hardening]: Active config block in validate_client printed before summary count, after output dir checks
 
 ### Blockers/Concerns
 
@@ -57,6 +60,6 @@ Progress: [░░░░░░░░░░] 0% (v1.4 phases not yet started)
 
 ## Session Continuity
 
-Last session: 2026-03-28
-Stopped at: Roadmap created — ready to plan Phase 15
+Last session: 2026-03-28T18:25:06.068Z
+Stopped at: Completed 15-01-PLAN.md
 Resume file: None
