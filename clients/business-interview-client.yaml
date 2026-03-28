@@ -1,0 +1,96 @@
+# Business interview genre client config template
+# Demonstrates voice_persona, blog_voice, and scoring_profile for a founder interview podcast.
+# Usage: python main.py latest --client business-interview-client
+
+client_name: "business-interview-client"
+podcast_name: "Founders in the Field"
+
+dropbox:
+  folder_path: "/Founders in the Field/raw_files"
+  finished_folder: "/Founders in the Field/finished_files"
+  edited_folder: "/Founders in the Field/edited_files"
+  app_key: null          # Set here or use DROPBOX_APP_KEY env var
+  app_secret: null       # Set here or use DROPBOX_APP_SECRET env var
+  refresh_token: null    # Set here or use DROPBOX_REFRESH_TOKEN env var
+
+youtube:
+  client_id: null        # Set here or use YOUTUBE_CLIENT_ID env var
+  client_secret: null    # Set here or use YOUTUBE_CLIENT_SECRET env var
+  token_pickle: "clients/business-interview-client/youtube_token.pickle"
+
+twitter:
+  api_key: null
+  api_secret: null
+  access_token: null
+  access_secret: null
+
+instagram:
+  access_token: null
+  account_id: null
+
+tiktok:
+  client_key: null
+  client_secret: null
+  access_token: null
+
+discord:
+  webhook_url: null
+
+content:
+  num_clips: 3
+  clip_min_duration: 15
+  clip_max_duration: 30
+  names_to_remove: []    # No censorship for business interviews
+  words_to_censor: []    # No profanity list needed
+  voice_persona: |
+    You write for Founders in the Field — a business interview podcast
+    where entrepreneurs share real stories from building companies.
+    Your output is direct, substantive, and professional without being
+    corporate. Highlight concrete lessons, hard decisions, and numbers.
+    Never use hype language or exclamation points for enthusiasm.
+    Write for operators who want signal, not inspiration porn.
+  blog_voice: |
+    Write this blog post for a professional audience interested in
+    entrepreneurship and startup lessons.
+    BAD: "In this inspiring episode, our guest shares their amazing journey..."
+    GOOD: "Mira Chen built a $4M bootstrapped business in 18 months. Here's
+    what she learned about pricing, retention, and when to say no to investors."
+  scoring_profile:
+    description: "a business interview podcast for founders and operators"
+    criteria:
+      - name: "Actionable Insight"
+        key: "actionable_insight"
+        max: 3
+        description: "Does this topic yield concrete takeaways for founders?"
+      - name: "Contrarian or Non-Obvious"
+        key: "contrarian"
+        max: 3
+        description: "Does this challenge conventional business wisdom?"
+      - name: "Specific and Concrete"
+        key: "specific"
+        max: 2
+        description: "Does it include real numbers, names, or timelines?"
+      - name: "Broadly Relevant"
+        key: "broadly_relevant"
+        max: 2
+        description: "Does it apply across industries, not just one niche?"
+    style:
+      - "Concrete over inspirational"
+      - "Numbers and outcomes over feelings and process"
+    high_examples:
+      - '"How we hit $1M ARR with zero paid marketing"'
+      - '"Why we fired our first 5 enterprise customers"'
+    low_examples:
+      - "Generic advice everyone already knows"
+      - "Motivational content without substance"
+    categories: ["fundraising", "growth", "hiring", "product", "operations", "failure"]
+
+rss:
+  description: "Founders in the Field interviews entrepreneurs about the real decisions, failures, and numbers behind building companies. New episodes every two weeks."
+  author: "Founders in the Field"
+  email: null              # Contact email for RSS feed
+  website_url: null        # Podcast website URL
+  artwork_url: null        # Cover art URL (1400x1400+ recommended)
+  language: "en-us"
+  explicit: false
+  categories: ["Business", "Entrepreneurship"]

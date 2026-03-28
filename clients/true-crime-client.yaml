@@ -1,0 +1,96 @@
+# True crime genre client config template
+# Demonstrates voice_persona, blog_voice, and scoring_profile for a serious investigative podcast.
+# Usage: python main.py latest --client true-crime-client
+
+client_name: "true-crime-client"
+podcast_name: "Cold Case Chronicles"
+
+dropbox:
+  folder_path: "/Cold Case Chronicles/raw_files"
+  finished_folder: "/Cold Case Chronicles/finished_files"
+  edited_folder: "/Cold Case Chronicles/edited_files"
+  app_key: null          # Set here or use DROPBOX_APP_KEY env var
+  app_secret: null       # Set here or use DROPBOX_APP_SECRET env var
+  refresh_token: null    # Set here or use DROPBOX_REFRESH_TOKEN env var
+
+youtube:
+  client_id: null        # Set here or use YOUTUBE_CLIENT_ID env var
+  client_secret: null    # Set here or use YOUTUBE_CLIENT_SECRET env var
+  token_pickle: "clients/true-crime-client/youtube_token.pickle"
+
+twitter:
+  api_key: null
+  api_secret: null
+  access_token: null
+  access_secret: null
+
+instagram:
+  access_token: null
+  account_id: null
+
+tiktok:
+  client_key: null
+  client_secret: null
+  access_token: null
+
+discord:
+  webhook_url: null
+
+content:
+  num_clips: 3
+  clip_min_duration: 15
+  clip_max_duration: 30
+  names_to_remove: []    # True crime podcasts don't censor host names
+  words_to_censor: []    # No profanity list for this genre
+  voice_persona: |
+    You write for Cold Case Chronicles — a serious true crime podcast
+    examining unsolved cases and wrongful convictions. Your output is
+    measured, respectful to victims and families, and evidence-focused.
+    Avoid sensationalism. Write like a journalist, not an entertainer.
+    Never use humor about crimes or victims. Present facts clearly and
+    let the evidence speak for itself.
+  blog_voice: |
+    Write this blog post in a clear, investigative tone for an audience
+    interested in true crime and criminal justice.
+    BAD: "The hosts delve into a chilling case that will keep you up at night..."
+    GOOD: "This episode examines the 1987 disappearance of Maria Reyes, a case
+    that went cold for 30 years before new DNA evidence emerged in 2023."
+  scoring_profile:
+    description: "a true crime podcast focused on cold cases and wrongful convictions"
+    criteria:
+      - name: "Case Significance"
+        key: "case_significance"
+        max: 3
+        description: "How significant or newsworthy is this case?"
+      - name: "New Evidence"
+        key: "new_evidence"
+        max: 3
+        description: "Is there recent development, new evidence, or exoneration?"
+      - name: "Victim Centered"
+        key: "victim_centered"
+        max: 2
+        description: "Is the framing respectful to victims and families?"
+      - name: "Accessible"
+        key: "accessible"
+        max: 2
+        description: "Can a general audience follow without prior case knowledge?"
+    style:
+      - "Evidence-based analysis over speculation"
+      - "Respectful to victims and families at all times"
+    high_examples:
+      - '"New DNA evidence exonerates man convicted in 1992 murder"'
+      - '"Investigator reveals key evidence was withheld from defense in 1999 trial"'
+    low_examples:
+      - "Celebrity gossip repackaged as true crime"
+      - "Speculation without evidence"
+    categories: ["cold_case", "wrongful_conviction", "forensic_science", "missing_person"]
+
+rss:
+  description: "Cold Case Chronicles examines unsolved mysteries and wrongful convictions with evidence-based analysis. New episodes every two weeks."
+  author: "Cold Case Chronicles"
+  email: null              # Contact email for RSS feed
+  website_url: null        # Podcast website URL
+  artwork_url: null        # Cover art URL (1400x1400+ recommended)
+  language: "en-us"
+  explicit: false
+  categories: ["True Crime"]
