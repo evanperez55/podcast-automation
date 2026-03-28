@@ -4,9 +4,9 @@ milestone: v1.4
 milestone_name: Real-World Testing & Sales Readiness
 status: active
 last_updated: "2026-03-28"
-last_activity: 2026-03-28 — Milestone v1.4 started
+last_activity: 2026-03-28 — Roadmap created, 4 phases mapped to 12 requirements
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -19,15 +19,17 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-03-28)
 
-**Core value:** One command produces professional-quality, platform-ready podcast content that sounds hand-edited and captures the show's edgy comedy voice — without manual intervention.
-**Current focus:** v1.4 Real-World Testing & Sales Readiness
+**Core value:** One command produces professional-quality, platform-ready podcast content that sounds hand-edited and captures the show's voice — without manual intervention.
+**Current focus:** Phase 15 — Config Hardening
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-28 — Milestone v1.4 started
+Phase: 15 of 18 (v1.4) — Config Hardening
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-03-28 — Roadmap created, 4 phases, 12/12 requirements mapped
+
+Progress: [░░░░░░░░░░] 0% (v1.4 phases not yet started)
 
 ## Shipped Milestones
 
@@ -41,14 +43,20 @@ Last activity: 2026-03-28 — Milestone v1.4 started
 
 ### Decisions
 
-- [12-01]: Clip slots cap at 3 (D+2, D+4, D+6); plan_episode uses video_clip_paths count to decide how many clip slots to generate
-- [12-01]: Teaser slot requires best_clips[0].hook_caption to be non-empty; empty list or missing key skips teaser entirely
-- [12-01]: PostingTimeOptimizer instantiated once in __init__; falls back to Config.SCHEDULE_*_POSTING_HOUR when optimizer returns None
-- [Phase 12-02]: Late import (try/except) for ContentCalendar in distribute.py and runner.py keeps calendar optional — failures don't break pipeline
-- [Phase 12-02]: get_calendar_display() fixed to return dt as datetime object (was ISO string) for dry-run formatting
-- [v1.3]: CI/CD automation dropped — pipeline requires local GPU + Ollama; GitHub-hosted runners can't support this
+- [v1.4 scope]: Validation milestone — prove pipeline works for real genres, then package for sales
+- [v1.4 demo format]: Self-contained HTML (not PDF — WeasyPrint requires GTK+/MSYS2; wkhtmltopdf archived Jan 2023)
+- [v1.4 dep]: `feedparser>=6.0.12` is the only new package needed for RSS ingest
+- [v1.4 before/after]: Pipeline must snapshot raw audio before Step 4 censor — not currently done; required for DEMO-02
 
 ### Blockers/Concerns
 
+- [Phase 15]: `NAMES_TO_REMOVE` silently falls back to Fake Problems host names — must be a validate-client hard error
+- [Phase 16]: `DropboxHandler` unconditionally constructed in `runner.py` raises ValueError for every non-Dropbox client — critical blocker
+- [Phase 17]: Genre clip scoring + compliance calibration are empirical — cannot be fully specified until real audio runs
 - [Active]: `assets/podcast_logo.png` untracked (8.6MB) — needs Git LFS or compression
-- [Active]: 2 pre-existing test failures (analytics + audiogram enabled defaults)
+
+## Session Continuity
+
+Last session: 2026-03-28
+Stopped at: Roadmap created — ready to plan Phase 15
+Resume file: None

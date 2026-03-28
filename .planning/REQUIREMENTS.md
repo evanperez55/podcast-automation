@@ -60,24 +60,24 @@ Requirements for Real-World Testing & Sales Readiness milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CFG-01 | — | Pending |
-| CFG-02 | — | Pending |
-| CFG-03 | — | Pending |
-| SRC-01 | — | Pending |
-| SRC-02 | — | Pending |
-| TEST-01 | — | Pending |
-| TEST-02 | — | Pending |
-| TEST-03 | — | Pending |
-| TEST-04 | — | Pending |
-| DEMO-01 | — | Pending |
-| DEMO-02 | — | Pending |
-| DEMO-03 | — | Pending |
+| CFG-01 | Phase 15 | Pending |
+| CFG-02 | Phase 15 | Pending |
+| CFG-03 | Phase 15 | Pending |
+| SRC-01 | Phase 16 | Pending |
+| SRC-02 | Phase 16 | Pending |
+| TEST-01 | Phase 17 | Pending |
+| TEST-02 | Phase 17 | Pending |
+| TEST-03 | Phase 17 | Pending |
+| TEST-04 | Phase 17 | Pending |
+| DEMO-01 | Phase 18 | Pending |
+| DEMO-02 | Phase 18 | Pending |
+| DEMO-03 | Phase 18 | Pending |
 
 **Coverage:**
 - v1.4 requirements: 12 total
-- Mapped to phases: 0
-- Unmapped: 12 (pending roadmap)
+- Mapped to phases: 12
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-28*
-*Last updated: 2026-03-28 after initial definition*
+*Last updated: 2026-03-28 after roadmap creation*
