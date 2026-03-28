@@ -419,6 +419,10 @@ def run_distribute(
         logger.info("Would upload %d clips", len(clip_paths))
         finished_path = None
         uploaded_clip_paths = []
+    elif "dropbox" not in components or components["dropbox"] is None:
+        logger.info("Dropbox not configured — skipping upload")
+        finished_path = None
+        uploaded_clip_paths = []
     else:
         dropbox = components["dropbox"]
         # Upload censored MP3 to finished_files folder
