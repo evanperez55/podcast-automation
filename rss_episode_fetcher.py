@@ -231,7 +231,8 @@ class RSSEpisodeFetcher:
         dest_path.parent.mkdir(parents=True, exist_ok=True)
         logger.info("Downloading audio from %s -> %s", url, dest_path)
 
-        with requests.get(url, stream=True, timeout=60) as response:
+        headers = {"User-Agent": "PodcastAutomation/1.4 (podcast downloader)"}
+        with requests.get(url, stream=True, timeout=60, headers=headers) as response:
             response.raise_for_status()
             total = int(response.headers.get("content-length", 0)) or None
             chunk_size = 64 * 1024  # 64 KB

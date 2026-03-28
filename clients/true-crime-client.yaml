@@ -8,7 +8,7 @@ podcast_name: "Cold Case Chronicles"
 episode_source: "rss"
 
 rss_source:
-  feed_url: "https://feeds.simplecast.com/xl3WWLBP"  # Casefile True Crime
+  feed_url: "https://feeds.acast.com/public/shows/casefile-true-crime"  # Casefile True Crime
   episode_index: 0    # 0 = latest episode
 
 dropbox:
