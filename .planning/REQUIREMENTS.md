@@ -10,7 +10,7 @@ Requirements for Real-World Testing & Sales Readiness milestone.
 ### Config Hardening
 
 - [x] **CFG-01**: Pipeline uses only per-client config values (no Fake Problems defaults leak to other clients)
-- [ ] **CFG-02**: User can define genre-specific voice persona, blog voice, and scoring profile per client via YAML
+- [x] **CFG-02**: User can define genre-specific voice persona, blog voice, and scoring profile per client via YAML
 - [x] **CFG-03**: User can run validate-client to see active config values after client activation (names, words, voice, scoring)
 
 ### Episode Source
@@ -61,7 +61,7 @@ Requirements for Real-World Testing & Sales Readiness milestone.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | CFG-01 | Phase 15 | Complete |
-| CFG-02 | Phase 15 | Pending |
+| CFG-02 | Phase 15 | Complete |
 | CFG-03 | Phase 15 | Complete |
 | SRC-01 | Phase 16 | Pending |
 | SRC-02 | Phase 16 | Pending |

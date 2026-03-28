@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Real-World Testing & Sales Readiness
 status: planning
-stopped_at: Completed 15-01-PLAN.md
-last_updated: "2026-03-28T18:25:26.893Z"
+stopped_at: Completed 15-02-PLAN.md — conditional voice examples + genre YAMLs
+last_updated: "2026-03-28T18:25:53.158Z"
 last_activity: 2026-03-28 — Roadmap created, 4 phases, 12/12 requirements mapped
 progress:
   total_phases: 5
@@ -50,6 +50,8 @@ Progress: [░░░░░░░░░░] 0% (v1.4 phases not yet started)
 - [v1.4 before/after]: Pipeline must snapshot raw audio before Step 4 censor — not currently done; required for DEMO-02
 - [Phase 15-config-hardening]: null and empty list both valid for names_to_remove — field must be present, value need not be non-empty
 - [Phase 15-config-hardening]: Active config block in validate_client printed before summary count, after output dir checks
+- [Phase 15-config-hardening]: voice_examples conditional on VOICE_PERSONA: FP comedy BAD/GOOD examples only injected when no custom persona set — prevents voice leakage to non-FP clients
+- [Phase 15-config-hardening]: genre YAMLs use getattr guard for VOICE_PERSONA — attribute not on Config by default; monkeypatch requires raising=False
 
 ### Blockers/Concerns
 
@@ -60,6 +62,6 @@ Progress: [░░░░░░░░░░] 0% (v1.4 phases not yet started)
 
 ## Session Continuity
 
-Last session: 2026-03-28T18:25:06.068Z
-Stopped at: Completed 15-01-PLAN.md
+Last session: 2026-03-28T18:25:53.154Z
+Stopped at: Completed 15-02-PLAN.md — conditional voice examples + genre YAMLs
 Resume file: None
