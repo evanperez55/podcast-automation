@@ -122,6 +122,11 @@ def load_client_config(client_name: str) -> dict:
     if voice_persona is not None:
         overrides["VOICE_PERSONA"] = voice_persona
 
+    # Special handling: scoring profile (nested dict)
+    scoring = _get_nested(data, "content.scoring_profile")
+    if scoring is not None and isinstance(scoring, dict):
+        overrides["SCORING_PROFILE"] = scoring
+
     # Special handling: output directories are Path objects
     for dir_attr in ("OUTPUT_DIR", "DOWNLOAD_DIR", "CLIPS_DIR", "TOPIC_DATA_DIR"):
         if dir_attr in overrides:

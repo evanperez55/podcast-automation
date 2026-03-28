@@ -44,3 +44,30 @@ content:
   names_to_remove: []    # First names/full names of hosts to censor
   words_to_censor: []    # Slurs/words to beep out (matched case-insensitive)
   voice_persona: null    # Custom GPT-4o persona prompt, or null for default
+  # scoring_profile:     # Custom topic scoring criteria, or omit for comedy defaults
+  #   description: "a true crime podcast exploring unsolved mysteries"
+  #   criteria:
+  #     - name: "Mystery Factor"
+  #       key: "mystery_factor"
+  #       max: 3
+  #       description: "How mysterious or unsolved is this?"
+  #     - name: "Public Interest"
+  #       key: "public_interest"
+  #       max: 3
+  #       description: "How much does the general public care about this case?"
+  #     - name: "Narrative Potential"
+  #       key: "narrative_potential"
+  #       max: 2
+  #       description: "Can this be told as a compelling story?"
+  #     - name: "Evidence Available"
+  #       key: "evidence_available"
+  #       max: 2
+  #       description: "Is there enough evidence to discuss meaningfully?"
+  #   style:
+  #     - "Investigative deep-dives with respect for victims"
+  #     - "Evidence-based analysis without speculation"
+  #   high_examples:
+  #     - '"The Somerton Man case just got DNA results after 70 years"'
+  #   low_examples:
+  #     - "Solved cases with no remaining mystery"
+  #   categories: ["cold_case", "missing_person", "conspiracy", "forensic_science"]

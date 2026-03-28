@@ -1,4 +1,4 @@
-"""AI-powered topic scorer for Fake Problems Podcast."""
+"""AI-powered topic scorer — configurable per client via scoring profiles."""
 
 import json
 from pathlib import Path
@@ -7,13 +7,79 @@ from config import Config
 from ollama_client import Ollama
 from datetime import datetime
 
+# Default scoring profile (comedy podcast). Clients can override via YAML.
+DEFAULT_SCORING_PROFILE = {
+    "description": "a comedy podcast about absurd scenarios, weird news, and modern life's ridiculous moments",
+    "criteria": [
+        {
+            "name": "Shock Value",
+            "key": "shock_value",
+            "max": 3,
+            "description": "How surprising/unexpected is this? Does it make you say 'wait, WHAT?'",
+        },
+        {
+            "name": "Relatability",
+            "key": "relatability",
+            "max": 2,
+            "description": "Can the audience connect to this? Is it a universal experience?",
+        },
+        {
+            "name": "Absurdity",
+            "key": "absurdity",
+            "max": 2,
+            "description": "How ridiculous is the logic/scenario? Does it have comedic potential?",
+        },
+        {
+            "name": "Title Hook",
+            "key": "title_hook",
+            "max": 2,
+            "description": "Would this make a great clip title? Does it make you want to click?",
+        },
+        {
+            "name": "Visual Imagery",
+            "key": "visual_imagery",
+            "max": 1,
+            "description": "Can you easily picture this scenario? Does it create a mental image?",
+        },
+    ],
+    "style": [
+        "Dark/shock humor (disturbing content made funny)",
+        "Relatable awkwardness (universal cringe)",
+        "Absurd logic (ridiculous premises taken seriously)",
+        "Self-deprecation and modern life commentary",
+        '"Fake problems" framing allows any topic',
+    ],
+    "high_examples": [
+        '"Gas-powered adult toys existed before electric ones" (absurd history)',
+        '"Plane emergency landing due to explosive diarrhea" (shocking + relatable)',
+        '"Cats will eat their dead owners, dogs won\'t" (dark + surprising)',
+        '"Guy ate 6-9 pounds of cheese daily, started oozing cholesterol from hands" (shocking + visual)',
+    ],
+    "low_examples": [
+        "Generic political news without absurd angle",
+        "Requires too much context to understand",
+        "Too niche or technical",
+        "No comedic potential",
+    ],
+    "categories": [
+        "shocking_news",
+        "absurd_hypothetical",
+        "dating_social",
+        "pop_science",
+        "cultural_observation",
+    ],
+}
+
 
 class TopicScorer:
-    """Score topics using Ollama (local LLM) based on Fake Problems success criteria."""
+    """Score topics using Ollama (local LLM) based on configurable scoring criteria."""
 
     def __init__(self):
-        """Initialize Ollama client."""
+        """Initialize Ollama client and load scoring profile."""
         self.client = Ollama()
+        self.profile = (
+            getattr(Config, "SCORING_PROFILE", None) or DEFAULT_SCORING_PROFILE
+        )
         print("[OK] Ollama AI topic scorer ready (FREE)")
 
     def score_topics(self, topics: List[Dict], batch_size: int = 10) -> List[Dict]:
@@ -55,83 +121,7 @@ class TopicScorer:
 
         topic_text = "\n".join(topic_list)
 
-        prompt = f"""You are a podcast content analyst for "{Config.PODCAST_NAME}" - a comedy podcast about absurd scenarios, weird news, and modern life's ridiculous moments.
-
-**SCORING CRITERIA** (Total: 0-10 points):
-
-1. **Shock Value** (0-3 points):
-   - How surprising/unexpected is this?
-   - Does it make you say "wait, WHAT?"
-   - 3pts: Totally shocking, 2pts: Very surprising, 1pt: Mildly unexpected, 0pts: Boring
-
-2. **Relatability** (0-2 points):
-   - Can the audience connect to this?
-   - Is it a universal experience or feeling?
-   - 2pts: Very relatable, 1pt: Somewhat relatable, 0pts: Too niche
-
-3. **Absurdity** (0-2 points):
-   - How ridiculous is the logic/scenario?
-   - Does it have comedic potential?
-   - 2pts: Highly absurd, 1pt: Moderately absurd, 0pts: Too normal
-
-4. **Title Hook** (0-2 points):
-   - Would this make a great clip title?
-   - Does it make you want to click/listen?
-   - 2pts: Amazing hook, 1pt: Decent hook, 0pts: Boring title
-
-5. **Visual Imagery** (0-1 point):
-   - Can you easily picture this scenario?
-   - Does it create a mental image?
-   - 1pt: Strong visual, 0pts: Abstract/hard to visualize
-
-**PODCAST STYLE**:
-- Dark/shock humor (disturbing content made funny)
-- Relatable awkwardness (universal cringe)
-- Absurd logic (ridiculous premises taken seriously)
-- Self-deprecation and modern life commentary
-- "Fake problems" framing allows any topic
-
-**EXAMPLES OF HIGH-SCORING TOPICS** (8-10 points):
-- "Gas-powered adult toys existed before electric ones" (absurd history)
-- "Plane emergency landing due to explosive diarrhea" (shocking + relatable)
-- "Cats will eat their dead owners, dogs won't" (dark + surprising)
-- "Guy ate 6-9 pounds of cheese daily, started oozing cholesterol from hands" (shocking + visual)
-
-**EXAMPLES OF LOW-SCORING TOPICS** (0-3 points):
-- Generic political news without absurd angle
-- Requires too much context to understand
-- Too niche or technical
-- No comedic potential
-
-**YOUR TASK**:
-Score each topic below (1-{len(topics)}). For each topic, provide:
-- Total score (0-10)
-- Breakdown by category
-- Brief reason (1 sentence)
-- Suggested category: "shocking_news", "absurd_hypothetical", "dating_social", "pop_science", "cultural_observation"
-- Recommended: true/false (recommend if score >= 6)
-
-**TOPICS TO SCORE**:
-{topic_text}
-
-**OUTPUT FORMAT** (JSON only, no other text):
-[
-  {{
-    "topic_number": 1,
-    "total_score": 7.5,
-    "shock_value": 2,
-    "relatability": 2,
-    "absurdity": 2,
-    "title_hook": 1,
-    "visual_imagery": 0.5,
-    "reason": "Brief explanation of score",
-    "category": "shocking_news",
-    "recommended": true
-  }},
-  ...
-]
-
-Return ONLY the JSON array."""
+        prompt = self._build_scoring_prompt(topics, topic_text)
 
         try:
             response = self.client.messages.create(
@@ -161,19 +151,19 @@ Return ONLY the JSON array."""
             for i, topic in enumerate(topics):
                 if i < len(scores):
                     score_data = scores[i]
-                    topic["score"] = {
+                    score = {
                         "total": score_data.get("total_score", 0),
-                        "shock_value": score_data.get("shock_value", 0),
-                        "relatability": score_data.get("relatability", 0),
-                        "absurdity": score_data.get("absurdity", 0),
-                        "title_hook": score_data.get("title_hook", 0),
-                        "visual_imagery": score_data.get("visual_imagery", 0),
                         "reason": score_data.get("reason", ""),
                         "category": score_data.get("category", "uncategorized"),
                         "recommended": score_data.get("recommended", False),
                         "scored_at": datetime.now().isoformat(),
                         "engagement_bonus": None,
                     }
+                    # Extract per-criterion scores using profile keys
+                    for criterion in self.profile.get("criteria", []):
+                        key = criterion["key"]
+                        score[key] = score_data.get(key, 0)
+                    topic["score"] = score
                     # Add engagement bonus from analytics if available
                     try:
                         from analytics import TopicEngagementScorer
@@ -197,6 +187,71 @@ Return ONLY the JSON array."""
             print(f"[ERROR] Scoring failed: {e}")
             # Return original topics without scores
             return topics
+
+    def _build_scoring_prompt(self, topics: List[Dict], topic_text: str) -> str:
+        """Build the LLM scoring prompt from the active scoring profile."""
+        p = self.profile
+        total_max = sum(c["max"] for c in p["criteria"])
+
+        # Build criteria section
+        criteria_lines = []
+        for i, c in enumerate(p["criteria"], 1):
+            criteria_lines.append(f"{i}. **{c['name']}** (0-{c['max']} points):")
+            criteria_lines.append(f"   - {c['description']}")
+
+        # Build style section
+        style_lines = "\n".join(f"- {s}" for s in p.get("style", []))
+
+        # Build examples
+        high_ex = "\n".join(f"- {ex}" for ex in p.get("high_examples", []))
+        low_ex = "\n".join(f"- {ex}" for ex in p.get("low_examples", []))
+
+        # Build output format with dynamic keys
+        example_scores = ", ".join(
+            f'"{c["key"]}": {c["max"] - 1}' for c in p["criteria"]
+        )
+        categories = ", ".join(f'"{c}"' for c in p.get("categories", []))
+
+        return f"""You are a podcast content analyst for "{Config.PODCAST_NAME}" - {p["description"]}.
+
+**SCORING CRITERIA** (Total: 0-{total_max} points):
+
+{chr(10).join(criteria_lines)}
+
+**PODCAST STYLE**:
+{style_lines}
+
+**EXAMPLES OF HIGH-SCORING TOPICS** (8-10 points):
+{high_ex}
+
+**EXAMPLES OF LOW-SCORING TOPICS** (0-3 points):
+{low_ex}
+
+**YOUR TASK**:
+Score each topic below (1-{len(topics)}). For each topic, provide:
+- Total score (0-{total_max})
+- Breakdown by category
+- Brief reason (1 sentence)
+- Suggested category: {categories}
+- Recommended: true/false (recommend if score >= 6)
+
+**TOPICS TO SCORE**:
+{topic_text}
+
+**OUTPUT FORMAT** (JSON only, no other text):
+[
+  {{
+    "topic_number": 1,
+    "total_score": 7.5,
+    {example_scores},
+    "reason": "Brief explanation of score",
+    "category": "{p.get("categories", ["general"])[0]}",
+    "recommended": true
+  }},
+  ...
+]
+
+Return ONLY the JSON array."""
 
     def filter_recommended(self, scored_topics: List[Dict]) -> List[Dict]:
         """Filter to only recommended topics (score >= 6)."""
@@ -291,7 +346,7 @@ Return ONLY the JSON array."""
 def score_scraped_topics(input_file: str = None):
     """Score topics from a scraped topics file."""
     print("=" * 60)
-    print("FAKE PROBLEMS - TOPIC SCORER")
+    print(f"{Config.PODCAST_NAME.upper()} - TOPIC SCORER")
     print("=" * 60)
     print()
 
