@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An automated podcast production pipeline for the "Fake Problems Podcast" — an edgy comedy show. One command takes raw audio through transcription, AI content analysis with the show's comedy voice, smooth audio ducking censorship, LUFS-normalized mastering, chapter markers, clip generation scored by audio energy, Hormozi-style subtitle clips, SEO-optimized episode webpages, content compliance checking, engagement-optimized scheduling, and multi-platform distribution (YouTube, Spotify, Twitter, Instagram, TikTok). Shipped v1.2 with data-driven engagement optimization.
+A multi-client automated podcast production pipeline. One command takes raw audio through transcription, AI content analysis with configurable voice persona, smooth audio ducking censorship, LUFS-normalized mastering, chapter markers, clip generation scored by audio energy, Hormozi-style subtitle clips, SEO-optimized episode webpages, content compliance checking, engagement-optimized scheduling, and multi-platform distribution (YouTube, Spotify, Twitter, Instagram, TikTok). Shipped through v1.3 with multi-client YAML configs, output isolation, and per-client voice/scoring/RSS customization.
 
 ## Core Value
 
@@ -64,12 +64,18 @@ One command produces professional-quality, platform-ready podcast content that s
 - ✓ Smart scheduling with per-platform optimal posting windows — v1.2
 - ✓ Backfill-ids CLI command for existing episodes — v1.2
 - ✓ topic_scorer episode number bug fix — v1.2
+- ✓ Content calendar planner for bi-weekly episode + clip distribution — v1.3
+- ✓ Multi-client YAML configs with output isolation — post-v1.3
+- ✓ Per-client voice persona, blog voice, topic scoring profiles — post-v1.3
+- ✓ Per-client RSS metadata and video input support — post-v1.3
+- ✓ CLI: init-client, setup-client, validate-client, status, list-clients, process-all — post-v1.3
 
-### Active (v1.3 — Content Calendar & CI/CD)
+### Active (v1.4 — Real-World Testing & Sales Readiness)
 
-- [ ] Content calendar planner for bi-weekly episode + clip distribution strategy
-- [ ] GitHub Actions automation (scheduled + manual trigger, Dropbox polling)
-- [ ] Clip distribution timing optimization (spread vs. same-day — research needed)
+- [ ] Identify and configure 2-3 real podcast clients in different genres
+- [ ] Process a full episode from each client through the pipeline end-to-end
+- [ ] Fix integration issues surfaced by non-comedy content
+- [ ] Package pipeline output as a presentable demo/sales pitch per client
 
 ### Future
 
@@ -126,15 +132,15 @@ One command produces professional-quality, platform-ready podcast content that s
 | 15-episode confidence gate | Below threshold, optimizer returns nothing — pipeline uses fixed delays | ✓ Good — prevents noisy early recommendations |
 | Store video_id at upload time | Avoids 100-unit YouTube search API call per episode during analytics | ✓ Good — quota-safe from day one |
 
-## Current Milestone: v1.3 Content Calendar & CI/CD
+## Current Milestone: v1.4 Real-World Testing & Sales Readiness
 
-**Goal:** Automate the entire bi-weekly release cycle — a content calendar plans when to drop the episode and spread clips across the week, and GitHub Actions runs the pipeline without manual intervention.
+**Goal:** Prove the multi-client pipeline works with real non-Fake-Problems podcasts in different genres, fix what breaks, and package the output as a sales demo for prospective clients.
 
 **Target features:**
-- Content calendar: bi-weekly episode schedule with clip distribution strategy
-- GitHub Actions workflow (scheduled Dropbox polling + manual dispatch)
-- Self-hosted runner or cloud runner (research needed for GPU/Whisper tradeoffs)
-- Clip timing optimization based on engagement research
+- Research and select 2-3 target podcasts (different genres: true crime, business, interview, etc.)
+- Set up client configs and process a real public episode per client
+- Fix genre-specific integration issues (voice persona, scoring, censorship tuning)
+- Package output (clips, thumbnails, blog post, social captions) as a presentable demo
 
 ---
-*Last updated: 2026-03-19 after v1.3 milestone start*
+*Last updated: 2026-03-28 after v1.4 milestone start*
