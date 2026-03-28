@@ -110,9 +110,10 @@ Plans:
   2. A real business/interview episode processes from RSS download through blog post and social captions with professional tone appropriate to the genre
   3. The 3 selected clips from an interview episode are the moments with the most substantive insight, not the highest audio energy peaks (flat-energy interview audio does not fool the scorer)
   4. The compliance checker applies genre-appropriate sensitivity — a true crime episode flagged for genuine dangerous content is blocked; a comedy episode with profanity is not blocked
-**Plans**: TBD
+**Plans**: 2 plans
 Plans:
-- [ ] TBD
+- [ ] 17-01-PLAN.md — Genre-aware clip selection + compliance code fixes with TDD tests
+- [ ] 17-02-PLAN.md — Update genre YAMLs with RSS + process real episodes (human checkpoint)
 
 ### Phase 18: Demo Packaging
 **Goal**: Running one command per client produces a self-contained demo folder that a prospect can evaluate in a 30-minute meeting without the pipeline present
@@ -143,6 +144,6 @@ Plans:
 | 11. Smart Scheduling | v1.2 | 2/2 | Complete | 2026-03-19 |
 | 12. ContentCalendar Foundation | v1.3 | 2/2 | Complete | 2026-03-19 |
 | 15. Config Hardening | v1.4 | 2/2 | Complete | 2026-03-28 |
-| 16. RSS Episode Source | 2/2 | Complete    | 2026-03-28 | - |
-| 17. Integration Testing & Genre Fixes | v1.4 | 0/TBD | Not started | - |
+| 16. RSS Episode Source | v1.4 | 2/2 | Complete | 2026-03-28 |
+| 17. Integration Testing & Genre Fixes | v1.4 | 0/2 | Not started | - |
 | 18. Demo Packaging | v1.4 | 0/TBD | Not started | - |
