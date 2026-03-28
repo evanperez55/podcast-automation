@@ -5,6 +5,12 @@
 client_name: "true-crime-client"
 podcast_name: "Cold Case Chronicles"
 
+episode_source: "rss"
+
+rss_source:
+  feed_url: "https://feeds.simplecast.com/xl3WWLBP"  # Casefile True Crime
+  episode_index: 0    # 0 = latest episode
+
 dropbox:
   folder_path: "/Cold Case Chronicles/raw_files"
   finished_folder: "/Cold Case Chronicles/finished_files"
@@ -40,6 +46,9 @@ content:
   num_clips: 3
   clip_min_duration: 15
   clip_max_duration: 30
+  whisper_model: "small"          # Better accuracy for Australian accent
+  clip_selection_mode: "content"  # Suppress RMS energy hints (flat audio)
+  compliance_style: "strict"      # Conservative flagging for real crime content
   names_to_remove: []    # True crime podcasts don't censor host names
   words_to_censor: []    # No profanity list for this genre
   voice_persona: |

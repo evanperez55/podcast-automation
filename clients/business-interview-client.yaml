@@ -5,6 +5,12 @@
 client_name: "business-interview-client"
 podcast_name: "Founders in the Field"
 
+episode_source: "rss"
+
+rss_source:
+  feed_url: "https://feeds.simplecast.com/4T39_jAj"  # How I Built This (NPR)
+  episode_index: 0    # 0 = latest episode
+
 dropbox:
   folder_path: "/Founders in the Field/raw_files"
   finished_folder: "/Founders in the Field/finished_files"
@@ -40,6 +46,8 @@ content:
   num_clips: 3
   clip_min_duration: 15
   clip_max_duration: 30
+  clip_selection_mode: "content"  # Favor substantive insight over energy peaks
+  compliance_style: "standard"   # Standard YouTube guidelines
   names_to_remove: []    # No censorship for business interviews
   words_to_censor: []    # No profanity list needed
   voice_persona: |

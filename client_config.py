@@ -47,6 +47,7 @@ _YAML_TO_CONFIG = {
     "content.clip_max_duration": "CLIP_MAX_DURATION",
     "content.clip_selection_mode": "CLIP_SELECTION_MODE",
     "content.compliance_style": "COMPLIANCE_STYLE",
+    "content.whisper_model": "WHISPER_MODEL",
     # Episode source (dropbox | rss | local)
     "episode_source": "EPISODE_SOURCE",
     "rss_source.feed_url": "RSS_FEED_URL",
