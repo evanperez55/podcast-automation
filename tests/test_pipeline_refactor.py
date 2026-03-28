@@ -288,3 +288,304 @@ class TestForceFlag:
             force=True,
         )
         assert ctx_forced.force is True
+
+
+class TestInitComponentsRSS:
+    """_init_components with EPISODE_SOURCE=rss constructs RSSEpisodeFetcher, not DropboxHandler."""
+
+    def test_rss_source_does_not_construct_dropbox(self, monkeypatch):
+        """With EPISODE_SOURCE=rss, DropboxHandler is never imported or constructed."""
+        from unittest.mock import MagicMock, patch
+
+        monkeypatch.setattr("config.Config.EPISODE_SOURCE", "rss")
+
+        mock_rss_fetcher_instance = MagicMock()
+        mock_rss_fetcher_cls = MagicMock(return_value=mock_rss_fetcher_instance)
+
+        with (
+            patch("pipeline.runner.DropboxHandler") as mock_dropbox,
+            patch("pipeline.runner.Config.validate"),
+            patch("pipeline.runner.Config.create_directories"),
+            patch("pipeline.runner.Transcriber"),
+            patch("pipeline.runner.ContentEditor"),
+            patch("pipeline.runner.AudioProcessor"),
+            patch("pipeline.runner.VideoConverter"),
+            patch("pipeline.runner._init_uploaders", return_value={}),
+            patch("pipeline.runner.DiscordNotifier"),
+            patch("pipeline.runner.UploadScheduler"),
+            patch("pipeline.runner.BlogPostGenerator"),
+            patch("pipeline.runner.ThumbnailGenerator"),
+            patch("pipeline.runner.ClipPreviewer"),
+            patch("pipeline.runner.EpisodeSearchIndex"),
+            patch("pipeline.runner.AudiogramGenerator"),
+            patch("pipeline.runner.ChapterGenerator"),
+            patch("pipeline.runner.SubtitleClipGenerator"),
+            patch("pipeline.runner.EpisodeWebpageGenerator"),
+            patch("pipeline.runner.ContentComplianceChecker"),
+            patch("rss_episode_fetcher.RSSEpisodeFetcher", mock_rss_fetcher_cls),
+        ):
+            from pipeline.runner import _init_components
+
+            components = _init_components()
+
+        mock_dropbox.assert_not_called()
+        assert "rss_fetcher" in components
+        assert "dropbox" not in components
+
+    def test_rss_source_includes_rss_fetcher(self, monkeypatch):
+        """With EPISODE_SOURCE=rss, components includes rss_fetcher key."""
+        from unittest.mock import MagicMock, patch
+
+        monkeypatch.setattr("config.Config.EPISODE_SOURCE", "rss")
+
+        with (
+            patch("pipeline.runner.DropboxHandler"),
+            patch("pipeline.runner.Config.validate"),
+            patch("pipeline.runner.Config.create_directories"),
+            patch("pipeline.runner.Transcriber"),
+            patch("pipeline.runner.ContentEditor"),
+            patch("pipeline.runner.AudioProcessor"),
+            patch("pipeline.runner.VideoConverter"),
+            patch("pipeline.runner._init_uploaders", return_value={}),
+            patch("pipeline.runner.DiscordNotifier"),
+            patch("pipeline.runner.UploadScheduler"),
+            patch("pipeline.runner.BlogPostGenerator"),
+            patch("pipeline.runner.ThumbnailGenerator"),
+            patch("pipeline.runner.ClipPreviewer"),
+            patch("pipeline.runner.EpisodeSearchIndex"),
+            patch("pipeline.runner.AudiogramGenerator"),
+            patch("pipeline.runner.ChapterGenerator"),
+            patch("pipeline.runner.SubtitleClipGenerator"),
+            patch("pipeline.runner.EpisodeWebpageGenerator"),
+            patch("pipeline.runner.ContentComplianceChecker"),
+            patch("rss_episode_fetcher.RSSEpisodeFetcher") as mock_cls,
+        ):
+            mock_cls.return_value = MagicMock()
+            from pipeline.runner import _init_components
+
+            components = _init_components()
+
+        assert "rss_fetcher" in components
+
+
+class TestInitComponentsDryRunRSS:
+    """_init_components dry_run with EPISODE_SOURCE=rss returns rss_fetcher:None."""
+
+    def test_dry_run_rss_has_rss_fetcher_not_dropbox(self, monkeypatch):
+        """dry_run with EPISODE_SOURCE=rss sets rss_fetcher:None, not dropbox:None."""
+        monkeypatch.setattr("config.Config.EPISODE_SOURCE", "rss")
+
+        from unittest.mock import patch
+
+        with (
+            patch("pipeline.runner.Config.create_directories"),
+            patch("pipeline.runner.DiscordNotifier"),
+            patch("pipeline.runner.UploadScheduler"),
+            patch("pipeline.runner.BlogPostGenerator"),
+            patch("pipeline.runner.ThumbnailGenerator"),
+            patch("pipeline.runner.ClipPreviewer"),
+            patch("pipeline.runner.AudiogramGenerator"),
+            patch("pipeline.runner.ChapterGenerator"),
+            patch("pipeline.runner.SubtitleClipGenerator"),
+            patch("pipeline.runner.EpisodeWebpageGenerator"),
+            patch("pipeline.runner.ContentComplianceChecker"),
+        ):
+            from pipeline.runner import _init_components
+
+            components = _init_components(dry_run=True)
+
+        assert "rss_fetcher" in components
+        assert components["rss_fetcher"] is None
+        assert "dropbox" not in components
+
+    def test_dry_run_dropbox_has_dropbox_not_rss_fetcher(self, monkeypatch):
+        """dry_run with EPISODE_SOURCE=dropbox sets dropbox:None, not rss_fetcher."""
+        monkeypatch.setattr("config.Config.EPISODE_SOURCE", "dropbox")
+
+        from unittest.mock import patch
+
+        with (
+            patch("pipeline.runner.Config.create_directories"),
+            patch("pipeline.runner.DiscordNotifier"),
+            patch("pipeline.runner.UploadScheduler"),
+            patch("pipeline.runner.BlogPostGenerator"),
+            patch("pipeline.runner.ThumbnailGenerator"),
+            patch("pipeline.runner.ClipPreviewer"),
+            patch("pipeline.runner.AudiogramGenerator"),
+            patch("pipeline.runner.ChapterGenerator"),
+            patch("pipeline.runner.SubtitleClipGenerator"),
+            patch("pipeline.runner.EpisodeWebpageGenerator"),
+            patch("pipeline.runner.ContentComplianceChecker"),
+        ):
+            from pipeline.runner import _init_components
+
+            components = _init_components(dry_run=True)
+
+        assert "dropbox" in components
+        assert components["dropbox"] is None
+        assert "rss_fetcher" not in components
+
+
+class TestRunIngestRSS:
+    """run_ingest with EPISODE_SOURCE=rss calls rss_fetcher instead of Dropbox."""
+
+    def test_run_ingest_rss_calls_fetcher(self, tmp_path, monkeypatch):
+        """run_ingest with EPISODE_SOURCE=rss calls fetch_episode and download_audio."""
+        from unittest.mock import MagicMock
+        from pipeline.context import PipelineContext
+        from pipeline.steps.ingest import run_ingest
+
+        monkeypatch.setattr("config.Config.EPISODE_SOURCE", "rss")
+        monkeypatch.setattr(
+            "config.Config.RSS_FEED_URL", "https://feeds.example.com/show.xml"
+        )
+        monkeypatch.setattr("config.Config.RSS_EPISODE_INDEX", 0)
+        monkeypatch.setattr("config.Config.DOWNLOAD_DIR", tmp_path)
+        monkeypatch.setattr("config.Config.OUTPUT_DIR", tmp_path)
+
+        # Create a fake audio file that the fetcher "downloads"
+        fake_audio = tmp_path / "ep_42_show.wav"
+        fake_audio.write_bytes(b"fake")
+
+        mock_meta = MagicMock()
+        mock_meta.episode_number = 42
+        mock_meta.audio_url = "https://cdn.example.com/ep42.wav"
+
+        mock_fetcher = MagicMock()
+        mock_fetcher.fetch_episode.return_value = mock_meta
+        mock_fetcher.download_audio.return_value = fake_audio
+
+        ctx = PipelineContext(
+            episode_folder="",
+            episode_number=None,
+            episode_output_dir=tmp_path,
+            timestamp="20240101_000000",
+        )
+
+        components = {"rss_fetcher": mock_fetcher}
+
+        result = run_ingest(ctx, components)
+
+        mock_fetcher.fetch_episode.assert_called_once_with(
+            "https://feeds.example.com/show.xml", 0
+        )
+        mock_fetcher.download_audio.assert_called_once_with(
+            mock_meta.audio_url, tmp_path
+        )
+        assert result.audio_file == fake_audio
+        assert result.episode_number == 42
+
+    def test_run_ingest_rss_fallback_episode_number(self, tmp_path, monkeypatch):
+        """run_ingest with EPISODE_SOURCE=rss falls back to filename extraction when meta.episode_number is None."""
+        from unittest.mock import MagicMock
+        from pipeline.context import PipelineContext
+        from pipeline.steps.ingest import run_ingest
+
+        monkeypatch.setattr("config.Config.EPISODE_SOURCE", "rss")
+        monkeypatch.setattr(
+            "config.Config.RSS_FEED_URL", "https://feeds.example.com/show.xml"
+        )
+        monkeypatch.setattr("config.Config.RSS_EPISODE_INDEX", 0)
+        monkeypatch.setattr("config.Config.DOWNLOAD_DIR", tmp_path)
+        monkeypatch.setattr("config.Config.OUTPUT_DIR", tmp_path)
+
+        fake_audio = tmp_path / "ep_7_show.wav"
+        fake_audio.write_bytes(b"fake")
+
+        mock_meta = MagicMock()
+        mock_meta.episode_number = None  # No episode number in feed metadata
+        mock_meta.audio_url = "https://cdn.example.com/ep7.wav"
+
+        mock_fetcher = MagicMock()
+        mock_fetcher.fetch_episode.return_value = mock_meta
+        mock_fetcher.download_audio.return_value = fake_audio
+
+        ctx = PipelineContext(
+            episode_folder="",
+            episode_number=None,
+            episode_output_dir=tmp_path,
+            timestamp="20240101_000000",
+        )
+
+        components = {"rss_fetcher": mock_fetcher}
+
+        result = run_ingest(ctx, components)
+
+        # Should extract from filename "ep_7_show.wav" → 7
+        assert result.episode_number == 7
+
+
+class TestRunIngestLocalNoDropbox:
+    """run_ingest with local audio_file does NOT access components['dropbox']."""
+
+    def test_local_file_no_dropbox_key(self, tmp_path, monkeypatch):
+        """run_ingest with pre-set ctx.audio_file succeeds with no 'dropbox' key in components."""
+        from pipeline.context import PipelineContext
+        from pipeline.steps.ingest import run_ingest
+
+        monkeypatch.setattr("config.Config.EPISODE_SOURCE", "dropbox")
+        monkeypatch.setattr("config.Config.OUTPUT_DIR", tmp_path)
+
+        fake_audio = tmp_path / "ep_5_show.wav"
+        fake_audio.write_bytes(b"fake")
+
+        ctx = PipelineContext(
+            episode_folder="",
+            episode_number=None,
+            episode_output_dir=tmp_path,
+            timestamp="20240101_000000",
+            audio_file=fake_audio,
+        )
+
+        # No 'dropbox' key — proves run_ingest doesn't access it for local files
+        components = {}
+
+        result = run_ingest(ctx, components)
+
+        assert result.audio_file == fake_audio
+        assert result.episode_number == 5
+
+
+class TestRunIngestDropboxPreserved:
+    """run_ingest with EPISODE_SOURCE=dropbox still uses components['dropbox'] as before."""
+
+    def test_dropbox_source_uses_dropbox_component(self, tmp_path, monkeypatch):
+        """run_ingest with EPISODE_SOURCE=dropbox downloads from Dropbox."""
+        from unittest.mock import MagicMock
+        from pipeline.context import PipelineContext
+        from pipeline.steps.ingest import run_ingest
+
+        monkeypatch.setattr("config.Config.EPISODE_SOURCE", "dropbox")
+        monkeypatch.setattr("config.Config.OUTPUT_DIR", tmp_path)
+
+        fake_audio = tmp_path / "ep_10_show.wav"
+        fake_audio.write_bytes(b"fake")
+
+        mock_dropbox = MagicMock()
+        mock_dropbox.get_latest_episode.return_value = {
+            "name": "ep_10_show.wav",
+            "path": "/Podcast/ep_10_show.wav",
+        }
+        mock_dropbox.download_episode.return_value = fake_audio
+
+        ctx = PipelineContext(
+            episode_folder="",
+            episode_number=None,
+            episode_output_dir=tmp_path,
+            timestamp="20240101_000000",
+        )
+
+        components = {"dropbox": mock_dropbox}
+
+        result = run_ingest(ctx, components)
+
+        mock_dropbox.get_latest_episode.assert_called_once()
+        mock_dropbox.download_episode.assert_called_once()
+        assert result.audio_file == fake_audio
+        assert result.episode_number == 10
+
+
+if __name__ == "__main__":
+    import pytest
+
+    pytest.main([__file__, "-v"])

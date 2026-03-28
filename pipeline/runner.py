@@ -121,8 +121,8 @@ def _init_components(
     if dry_run:
         # Dry run: skip validation and heavy initialization
         Config.create_directories()
-        return {
-            "dropbox": None,
+        episode_source = getattr(Config, "EPISODE_SOURCE", "dropbox")
+        dry_run_components = {
             "transcriber": None,
             "editor": None,
             "audio_processor": None,
@@ -141,13 +141,27 @@ def _init_components(
             "webpage_generator": EpisodeWebpageGenerator(),
             "compliance_checker": ContentComplianceChecker(),
         }
+        if episode_source == "rss":
+            dry_run_components["rss_fetcher"] = None
+        else:
+            dry_run_components["dropbox"] = None
+        return dry_run_components
 
     # Validate configuration
     Config.validate()
     Config.create_directories()
 
     # Initialize components
-    dropbox = DropboxHandler()
+    episode_source = getattr(Config, "EPISODE_SOURCE", "dropbox")
+    if episode_source == "rss":
+        from rss_episode_fetcher import RSSEpisodeFetcher
+
+        rss_fetcher = RSSEpisodeFetcher()
+        logger.info("RSS episode fetcher initialized")
+        dropbox = None
+    else:
+        dropbox = DropboxHandler()
+        rss_fetcher = None
     transcriber = Transcriber()
     editor = ContentEditor()
     audio_processor = AudioProcessor()
@@ -183,8 +197,7 @@ def _init_components(
 
     print()
 
-    return {
-        "dropbox": dropbox,
+    components = {
         "transcriber": transcriber,
         "editor": editor,
         "audio_processor": audio_processor,
@@ -203,6 +216,11 @@ def _init_components(
         "webpage_generator": webpage_generator,
         "compliance_checker": compliance_checker,
     }
+    if episode_source == "rss":
+        components["rss_fetcher"] = rss_fetcher
+    else:
+        components["dropbox"] = dropbox
+    return components
 
 
 def _load_scored_topics():
