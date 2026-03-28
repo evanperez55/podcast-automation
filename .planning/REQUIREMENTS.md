@@ -15,7 +15,7 @@ Requirements for Real-World Testing & Sales Readiness milestone.
 
 ### Episode Source
 
-- [ ] **SRC-01**: User can download a podcast episode by pointing at a public RSS feed URL
+- [x] **SRC-01**: User can download a podcast episode by pointing at a public RSS feed URL
 - [ ] **SRC-02**: Pipeline runs without Dropbox credentials when episode source is RSS or local file
 
 ### Integration Testing
@@ -63,7 +63,7 @@ Requirements for Real-World Testing & Sales Readiness milestone.
 | CFG-01 | Phase 15 | Complete |
 | CFG-02 | Phase 15 | Complete |
 | CFG-03 | Phase 15 | Complete |
-| SRC-01 | Phase 16 | Pending |
+| SRC-01 | Phase 16 | Complete |
 | SRC-02 | Phase 16 | Pending |
 | TEST-01 | Phase 17 | Pending |
 | TEST-02 | Phase 17 | Pending |

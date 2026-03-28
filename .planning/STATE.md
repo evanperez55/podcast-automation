@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Real-World Testing & Sales Readiness
 status: planning
-stopped_at: Completed 15-02-PLAN.md — conditional voice examples + genre YAMLs
-last_updated: "2026-03-28T18:30:19.736Z"
+stopped_at: Completed 16-01-PLAN.md — RSSEpisodeFetcher with feedparser
+last_updated: "2026-03-28T18:49:15.905Z"
 last_activity: 2026-03-28 — Roadmap created, 4 phases, 12/12 requirements mapped
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 6
+  completed_plans: 5
   percent: 0
 ---
 
@@ -52,6 +52,8 @@ Progress: [░░░░░░░░░░] 0% (v1.4 phases not yet started)
 - [Phase 15-config-hardening]: Active config block in validate_client printed before summary count, after output dir checks
 - [Phase 15-config-hardening]: voice_examples conditional on VOICE_PERSONA: FP comedy BAD/GOOD examples only injected when no custom persona set — prevents voice leakage to non-FP clients
 - [Phase 15-config-hardening]: genre YAMLs use getattr guard for VOICE_PERSONA — attribute not on Config by default; monkeypatch requires raising=False
+- [Phase 16-rss-episode-source]: extract_episode_number_from_filename is module-level (not class method) for cross-module reuse without coupling to DropboxHandler
+- [Phase 16-rss-episode-source]: RSS feed entries sorted by published_parsed descending before indexing — index=0 always means newest regardless of feed order
 
 ### Blockers/Concerns
 
@@ -62,6 +64,6 @@ Progress: [░░░░░░░░░░] 0% (v1.4 phases not yet started)
 
 ## Session Continuity
 
-Last session: 2026-03-28T18:25:53.154Z
-Stopped at: Completed 15-02-PLAN.md — conditional voice examples + genre YAMLs
+Last session: 2026-03-28T18:49:15.901Z
+Stopped at: Completed 16-01-PLAN.md — RSSEpisodeFetcher with feedparser
 Resume file: None
