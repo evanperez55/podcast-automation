@@ -15,7 +15,10 @@ Automated production pipeline: transcription, AI content analysis, auto-censorsh
 - Multi-client: `uv run main.py --client <name> latest`
 - Init new client: `uv run main.py init-client <name>`
 - List clients: `uv run main.py list-clients`
-- Flags: `--dry-run`, `--test`, `--auto-approve`, `--client <name>`
+- Validate client: `uv run main.py validate-client <name> [--ping]`
+- Setup credentials: `uv run main.py setup-client <name> youtube`
+- Client status: `uv run main.py status <name>`
+- Flags: `--dry-run`, `--test`, `--auto-approve`, `--client <name>`, `--ping`
 
 ## Pipeline Step Order
 1 Download -> 2 Transcribe -> 3 Analyze -> 3.5 Topic tracker -> 4 Censor -> 4.5 Normalize -> 5 Clips -> 5.1 Clip approval -> 5.4 Subtitles -> 5.5 Video/Audiogram -> 5.6 Thumbnail -> 6 MP3 -> 7 Dropbox -> 7.5 RSS -> 8 Social media -> 8.5 Blog post -> 9 Search index
