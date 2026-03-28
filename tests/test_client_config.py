@@ -238,6 +238,7 @@ class TestOutputIsolation:
         """When --client is used, output dirs include client name."""
         monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
         monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "NAMES_TO_REMOVE", Config.NAMES_TO_REMOVE)
         monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
         monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
         clients_dir = tmp_path / "clients"
@@ -314,6 +315,7 @@ class TestActivateClient:
         """activate_client patches Config and auto-derives output dirs."""
         monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
         monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "NAMES_TO_REMOVE", Config.NAMES_TO_REMOVE)
         monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
         monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
         monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
@@ -443,6 +445,7 @@ class TestValidateClient:
         """validate_client suggests --ping when not used."""
         monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
         monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "NAMES_TO_REMOVE", Config.NAMES_TO_REMOVE)
         monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
         monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
         monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
@@ -468,6 +471,7 @@ class TestClientStatus:
         """status shows episode folders and their state."""
         monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
         monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "NAMES_TO_REMOVE", Config.NAMES_TO_REMOVE)
         monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
         monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
         monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
@@ -506,6 +510,7 @@ class TestClientStatus:
         """status handles missing output directory gracefully."""
         monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
         monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "NAMES_TO_REMOVE", Config.NAMES_TO_REMOVE)
         monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
         monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
         monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
@@ -532,6 +537,7 @@ class TestSetupClientPlatform:
         """Unknown platform prints helpful message."""
         monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
         monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "NAMES_TO_REMOVE", Config.NAMES_TO_REMOVE)
         monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
         monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
         monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
@@ -554,6 +560,7 @@ class TestSetupClientPlatform:
         """YouTube setup reports missing credentials file."""
         monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
         monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "NAMES_TO_REMOVE", Config.NAMES_TO_REMOVE)
         monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
         monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
         monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
@@ -575,6 +582,7 @@ class TestSetupClientPlatform:
         """Dropbox setup prints configuration instructions."""
         monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
         monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "NAMES_TO_REMOVE", Config.NAMES_TO_REMOVE)
         monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
         monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
         monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)

@@ -103,6 +103,16 @@ def load_client_config(client_name: str) -> dict:
     if not data or not isinstance(data, dict):
         raise ValueError(f"Invalid client config (empty or not a mapping): {yaml_path}")
 
+    # Required field: content.names_to_remove must be explicitly present in YAML
+    # (even if null or empty list) to prevent Fake Problems host names leaking
+    content_section = data.get("content", {}) or {}
+    if "names_to_remove" not in content_section:
+        raise ValueError(
+            f"Client config '{client_name}' is missing required field: "
+            "content.names_to_remove\n"
+            "Set to an empty list [] if this client has no host names to censor."
+        )
+
     overrides = {}
 
     # Map YAML keys to Config attributes
