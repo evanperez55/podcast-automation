@@ -713,5 +713,224 @@ class TestBackwardCompatibility:
         assert not hasattr(Config, "VOICE_PERSONA") or Config.VOICE_PERSONA is None
 
 
+class TestEpisodeSourceYAMLMapping:
+    """Tests for episode_source and rss_source YAML-to-Config mapping."""
+
+    def test_episode_source_rss_maps_to_config(self, tmp_path, monkeypatch):
+        """episode_source: rss in YAML sets Config.EPISODE_SOURCE to 'rss'."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        yaml_content = (
+            'client_name: "rss-show"\npodcast_name: "RSS Show"\n'
+            'episode_source: "rss"\n'
+            "rss_source:\n"
+            '  feed_url: "https://feeds.example.com/show.xml"\n'
+            "  episode_index: 0\n"
+            "content:\n  names_to_remove: []\n"
+        )
+        (clients_dir / "rss-show.yaml").write_text(yaml_content)
+
+        from client_config import load_client_config
+
+        overrides = load_client_config("rss-show")
+
+        assert overrides["EPISODE_SOURCE"] == "rss"
+        assert overrides["RSS_FEED_URL"] == "https://feeds.example.com/show.xml"
+        assert overrides["RSS_EPISODE_INDEX"] == 0
+
+    def test_episode_index_as_int(self, tmp_path, monkeypatch):
+        """rss_source.episode_index is loaded as int, not string."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        yaml_content = (
+            'client_name: "idx-show"\npodcast_name: "Idx Show"\n'
+            "rss_source:\n"
+            '  feed_url: "https://feeds.example.com/show.xml"\n'
+            "  episode_index: 2\n"
+            "content:\n  names_to_remove: []\n"
+        )
+        (clients_dir / "idx-show.yaml").write_text(yaml_content)
+
+        from client_config import load_client_config
+
+        overrides = load_client_config("idx-show")
+
+        assert overrides["RSS_EPISODE_INDEX"] == 2
+        assert isinstance(overrides["RSS_EPISODE_INDEX"], int)
+
+    def test_missing_episode_source_not_in_overrides(self, tmp_path, monkeypatch):
+        """YAML without episode_source does not add EPISODE_SOURCE override."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        (clients_dir / "minimal.yaml").write_text(
+            'client_name: "minimal"\npodcast_name: "Minimal"\ncontent:\n  names_to_remove: []\n'
+        )
+
+        from client_config import load_client_config
+
+        overrides = load_client_config("minimal")
+
+        assert "EPISODE_SOURCE" not in overrides
+        assert "RSS_FEED_URL" not in overrides
+
+
+class TestValidateClientRSS:
+    """Tests for validate_client() with episode_source=rss."""
+
+    def _setup_rss_client(self, tmp_path, monkeypatch, feed_url=None):
+        """Create a client YAML with episode_source=rss and set up Config."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "NAMES_TO_REMOVE", Config.NAMES_TO_REMOVE)
+        monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
+        monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
+        monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
+        monkeypatch.setattr(Config, "TOPIC_DATA_DIR", Config.TOPIC_DATA_DIR)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        feed_line = f'  feed_url: "{feed_url}"' if feed_url else "  feed_url: null"
+        yaml_content = (
+            'client_name: "rss-client"\npodcast_name: "RSS Client"\n'
+            'episode_source: "rss"\n'
+            f"rss_source:\n{feed_line}\n"
+            "content:\n  names_to_remove: []\n"
+        )
+        (clients_dir / "rss-client.yaml").write_text(yaml_content)
+
+    def test_validate_rss_client_skips_dropbox_check(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        """validate_client with episode_source=rss does not check Dropbox credentials."""
+        self._setup_rss_client(
+            tmp_path, monkeypatch, feed_url="https://feeds.example.com/show.xml"
+        )
+
+        from client_config import validate_client
+
+        validate_client("rss-client")
+
+        output = capsys.readouterr().out
+        assert "Dropbox" not in output
+
+    def test_validate_rss_client_checks_feed_url(self, tmp_path, monkeypatch, capsys):
+        """validate_client with episode_source=rss checks RSS_FEED_URL is set."""
+        self._setup_rss_client(
+            tmp_path, monkeypatch, feed_url="https://feeds.example.com/show.xml"
+        )
+
+        from client_config import validate_client
+
+        validate_client("rss-client")
+
+        output = capsys.readouterr().out
+        assert "RSS Feed URL" in output
+        assert "[OK]" in output
+
+    def test_validate_rss_client_shows_episode_source(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        """validate_client active config shows episode_source: rss."""
+        self._setup_rss_client(
+            tmp_path, monkeypatch, feed_url="https://feeds.example.com/show.xml"
+        )
+
+        from client_config import validate_client
+
+        validate_client("rss-client")
+
+        output = capsys.readouterr().out
+        assert "episode_source" in output
+        assert "rss" in output
+
+    def test_validate_rss_client_no_feed_url_shows_not_configured(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        """validate_client with episode_source=rss and no feed_url shows not configured."""
+        self._setup_rss_client(tmp_path, monkeypatch, feed_url=None)
+
+        from client_config import validate_client
+
+        validate_client("rss-client")
+
+        output = capsys.readouterr().out
+        assert "RSS Feed URL" in output
+        assert "not configured" in output
+
+
+class TestPingRSSFeed:
+    """Tests for _ping_rss_feed() live connectivity check."""
+
+    def test_ping_rss_feed_success(self, monkeypatch):
+        """_ping_rss_feed returns without error when HEAD request succeeds."""
+        from unittest.mock import MagicMock, patch
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+
+        with patch(
+            "client_config.requests.head", return_value=mock_response
+        ) as mock_head:
+            from client_config import _ping_rss_feed
+
+            monkeypatch.setattr(
+                Config, "RSS_FEED_URL", "https://feeds.example.com/show.xml"
+            )
+            _ping_rss_feed()
+
+        mock_head.assert_called_once_with(
+            "https://feeds.example.com/show.xml", timeout=10, allow_redirects=True
+        )
+        mock_response.raise_for_status.assert_called_once()
+
+    def test_ping_rss_feed_failure_raises(self, monkeypatch):
+        """_ping_rss_feed raises when HEAD request fails."""
+        from unittest.mock import patch
+        import requests as req
+
+        with patch(
+            "client_config.requests.head",
+            side_effect=req.RequestException("Connection refused"),
+        ):
+            from client_config import _ping_rss_feed
+
+            monkeypatch.setattr(
+                Config, "RSS_FEED_URL", "https://feeds.example.com/show.xml"
+            )
+
+            with pytest.raises(req.RequestException):
+                _ping_rss_feed()
+
+    def test_validate_rss_ping_calls_ping_rss_feed(self, tmp_path, monkeypatch, capsys):
+        """validate_client with episode_source=rss and ping=True calls _ping_rss_feed."""
+        from unittest.mock import patch
+
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "NAMES_TO_REMOVE", Config.NAMES_TO_REMOVE)
+        monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
+        monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
+        monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
+        monkeypatch.setattr(Config, "TOPIC_DATA_DIR", Config.TOPIC_DATA_DIR)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        yaml_content = (
+            'client_name: "rss-ping"\npodcast_name: "RSS Ping"\n'
+            'episode_source: "rss"\n'
+            'rss_source:\n  feed_url: "https://feeds.example.com/show.xml"\n'
+            "content:\n  names_to_remove: []\n"
+        )
+        (clients_dir / "rss-ping.yaml").write_text(yaml_content)
+
+        with patch("client_config._ping_rss_feed") as mock_ping:
+            from client_config import validate_client
+
+            validate_client("rss-ping", ping=True)
+
+        mock_ping.assert_called_once()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

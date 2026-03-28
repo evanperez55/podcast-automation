@@ -37,6 +37,11 @@ class Config:
     # API Keys
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+    # Episode source (dropbox | rss | local)
+    EPISODE_SOURCE = os.getenv("EPISODE_SOURCE", "dropbox")
+    RSS_FEED_URL = os.getenv("RSS_FEED_URL", None)
+    RSS_EPISODE_INDEX = int(os.getenv("RSS_EPISODE_INDEX", "0"))
+
     # Dropbox - Short-lived access token (deprecated)
     DROPBOX_ACCESS_TOKEN = os.getenv("DROPBOX_ACCESS_TOKEN")
 

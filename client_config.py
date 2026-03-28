@@ -7,6 +7,7 @@ env var defaults.
 
 from pathlib import Path
 
+import requests
 import yaml
 
 from config import Config
@@ -44,6 +45,10 @@ _YAML_TO_CONFIG = {
     "content.num_clips": "NUM_CLIPS",
     "content.clip_min_duration": "CLIP_MIN_DURATION",
     "content.clip_max_duration": "CLIP_MAX_DURATION",
+    # Episode source (dropbox | rss | local)
+    "episode_source": "EPISODE_SOURCE",
+    "rss_source.feed_url": "RSS_FEED_URL",
+    "rss_source.episode_index": "RSS_EPISODE_INDEX",
     # RSS / podcast metadata
     "rss.description": "RSS_DESCRIPTION",
     "rss.author": "RSS_AUTHOR",
@@ -154,6 +159,10 @@ def load_client_config(client_name: str) -> dict:
     scoring = _get_nested(data, "content.scoring_profile")
     if scoring is not None and isinstance(scoring, dict):
         overrides["SCORING_PROFILE"] = scoring
+
+    # Special handling: RSS_EPISODE_INDEX must be int
+    if "RSS_EPISODE_INDEX" in overrides:
+        overrides["RSS_EPISODE_INDEX"] = int(overrides["RSS_EPISODE_INDEX"])
 
     # Special handling: output directories are Path objects
     for dir_attr in ("OUTPUT_DIR", "DOWNLOAD_DIR", "CLIPS_DIR", "TOPIC_DATA_DIR"):
@@ -337,23 +346,38 @@ def validate_client(client_name: str, ping: bool = False) -> None:
     # --- Required: Podcast identity ---
     _check(results, "Podcast Name", bool(Config.PODCAST_NAME), Config.PODCAST_NAME)
 
-    # --- Dropbox ---
-    has_oauth = all(
-        [
-            getattr(Config, "DROPBOX_REFRESH_TOKEN", None),
-            getattr(Config, "DROPBOX_APP_KEY", None),
-            getattr(Config, "DROPBOX_APP_SECRET", None),
-        ]
-    )
-    has_token = bool(getattr(Config, "DROPBOX_ACCESS_TOKEN", None))
-    _check(
-        results,
-        "Dropbox",
-        has_oauth or has_token,
-        "OAuth" if has_oauth else "Access token" if has_token else None,
-    )
-    if ping and (has_oauth or has_token):
-        _ping(results, "Dropbox", _ping_dropbox)
+    # --- Episode source ---
+    episode_source = getattr(Config, "EPISODE_SOURCE", "dropbox")
+
+    if episode_source == "rss":
+        # RSS source: check RSS_FEED_URL instead of Dropbox credentials
+        has_feed_url = bool(getattr(Config, "RSS_FEED_URL", None))
+        _check(
+            results,
+            "RSS Feed URL",
+            has_feed_url,
+            getattr(Config, "RSS_FEED_URL", None) if has_feed_url else None,
+        )
+        if ping and has_feed_url:
+            _ping(results, "RSS Feed", _ping_rss_feed)
+    else:
+        # Dropbox source (default)
+        has_oauth = all(
+            [
+                getattr(Config, "DROPBOX_REFRESH_TOKEN", None),
+                getattr(Config, "DROPBOX_APP_KEY", None),
+                getattr(Config, "DROPBOX_APP_SECRET", None),
+            ]
+        )
+        has_token = bool(getattr(Config, "DROPBOX_ACCESS_TOKEN", None))
+        _check(
+            results,
+            "Dropbox",
+            has_oauth or has_token,
+            "OAuth" if has_oauth else "Access token" if has_token else None,
+        )
+        if ping and (has_oauth or has_token):
+            _ping(results, "Dropbox", _ping_dropbox)
 
     # --- OpenAI ---
     has_openai = bool(getattr(Config, "OPENAI_API_KEY", None))
@@ -424,6 +448,7 @@ def validate_client(client_name: str, ping: bool = False) -> None:
     print()
     print("Active content configuration:")
     print(f"  Podcast name:    {Config.PODCAST_NAME}")
+    print(f"  episode_source:  {episode_source}")
 
     voice = getattr(Config, "VOICE_PERSONA", None)
     if voice:
@@ -507,6 +532,13 @@ def _ping_openai():
 
     client = openai.OpenAI(api_key=Config.OPENAI_API_KEY)
     client.models.list()
+
+
+def _ping_rss_feed():
+    """Test RSS feed URL reachability via HTTP HEAD request."""
+    url = getattr(Config, "RSS_FEED_URL", None)
+    r = requests.head(url, timeout=10, allow_redirects=True)
+    r.raise_for_status()
 
 
 def client_status(client_name: str) -> None:

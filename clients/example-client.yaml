@@ -6,6 +6,15 @@
 client_name: "your-client-name"
 podcast_name: "Your Podcast Name"
 
+# Episode source: where to download audio from (dropbox | rss | local)
+# Default is "dropbox" — set to "rss" to download from a podcast RSS feed.
+episode_source: "dropbox"  # Change to "rss" for RSS-based ingest
+
+# RSS source settings — only required when episode_source is "rss"
+# rss_source:
+#   feed_url: "https://feeds.example.com/your-show.xml"  # Your RSS feed URL
+#   episode_index: 0  # 0 = latest, 1 = second newest, etc.
+
 dropbox:
   folder_path: "/Your Podcast/raw_files"
   finished_folder: "/Your Podcast/finished_files"
