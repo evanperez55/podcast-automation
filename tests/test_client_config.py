@@ -412,6 +412,70 @@ class TestValidateClient:
         assert "--ping" in output
 
 
+class TestClientStatus:
+    """Tests for client_status() reporting."""
+
+    def test_status_with_episodes(self, tmp_path, monkeypatch, capsys):
+        """status shows episode folders and their state."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
+        monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
+        monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
+        monkeypatch.setattr(Config, "TOPIC_DATA_DIR", Config.TOPIC_DATA_DIR)
+
+        # Create client config
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        (clients_dir / "test.yaml").write_text(
+            'client_name: "test"\npodcast_name: "Test"\n'
+        )
+
+        # Create output structure
+        output_dir = tmp_path / "output" / "test"
+        (output_dir / "ep_1").mkdir(parents=True)
+        (output_dir / "ep_2").mkdir(parents=True)
+
+        # Add platform IDs to ep_1
+        import json
+
+        (output_dir / "ep_1" / "platform_ids.json").write_text(
+            json.dumps({"youtube": "abc123"})
+        )
+
+        from client_config import client_status
+
+        client_status("test")
+
+        output = capsys.readouterr().out
+        assert "Episodes processed: 2" in output
+        assert "ep_1" in output
+        assert "ep_2" in output
+        assert "youtube" in output
+
+    def test_status_no_output_dir(self, tmp_path, monkeypatch, capsys):
+        """status handles missing output directory gracefully."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
+        monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
+        monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
+        monkeypatch.setattr(Config, "TOPIC_DATA_DIR", Config.TOPIC_DATA_DIR)
+
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        (clients_dir / "empty.yaml").write_text(
+            'client_name: "empty"\npodcast_name: "Empty"\n'
+        )
+
+        from client_config import client_status
+
+        client_status("empty")
+
+        output = capsys.readouterr().out
+        assert "No output directory" in output
+
+
 class TestBackwardCompatibility:
     """Verify no-client mode preserves default Fake Problems config."""
 

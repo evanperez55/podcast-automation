@@ -89,6 +89,16 @@ def main():
             validate_client(name, ping=args.get("ping", False))
             return
 
+        if cmd == "status":
+            from client_config import client_status
+
+            name = client_name or (sys.argv[2] if len(sys.argv) > 2 else None)
+            if not name:
+                print("Usage: uv run main.py status <name>")
+                return
+            client_status(name)
+            return
+
         if cmd == "upload-scheduled":
             _activate_client(client_name)
             run_upload_scheduled()

@@ -394,6 +394,97 @@ def _ping_openai():
     client.models.list()
 
 
+def client_status(client_name: str) -> None:
+    """Show processing status for a client's episodes."""
+    import json as _json
+
+    activate_client(client_name)
+    output_dir = Config.OUTPUT_DIR
+    state_dir = output_dir / ".pipeline_state"
+
+    print(f"Status for: {client_name} ({Config.PODCAST_NAME})")
+    print(f"Output dir: {output_dir}")
+    print()
+
+    if not output_dir.exists():
+        print("No output directory yet. Run your first episode:")
+        print(f"  uv run main.py --client {client_name} latest")
+        return
+
+    # Find episode folders
+    ep_dirs = sorted(
+        [d for d in output_dir.iterdir() if d.is_dir() and d.name.startswith("ep_")],
+        key=lambda d: d.name,
+    )
+
+    if not ep_dirs:
+        print("No episodes processed yet.")
+        return
+
+    print(f"Episodes processed: {len(ep_dirs)}")
+    print()
+
+    for ep_dir in ep_dirs:
+        ep_name = ep_dir.name
+        line = f"  {ep_name:20s}"
+
+        # Check pipeline state
+        state_file = state_dir / f"{ep_name}.json"
+        if state_file.exists():
+            try:
+                state = _json.loads(state_file.read_text(encoding="utf-8"))
+                steps = list(state.get("completed_steps", {}).keys())
+                updated = state.get("updated_at", "")[:16]
+                line += f"  steps: {len(steps):2d}  last: {updated}"
+            except Exception:
+                line += "  (state unreadable)"
+        else:
+            line += "  (no state file)"
+
+        # Check platform uploads
+        platforms = []
+        pid_file = ep_dir / "platform_ids.json"
+        if pid_file.exists():
+            try:
+                pids = _json.loads(pid_file.read_text(encoding="utf-8"))
+                platforms = list(pids.keys())
+            except Exception:
+                pass
+
+        sched_file = ep_dir / "upload_schedule.json"
+        pending = 0
+        if sched_file.exists():
+            try:
+                sched = _json.loads(sched_file.read_text(encoding="utf-8"))
+                for plat, info in sched.get("platforms", {}).items():
+                    if info.get("status") == "pending" and plat not in platforms:
+                        pending += 1
+            except Exception:
+                pass
+
+        if platforms:
+            line += f"  uploaded: {', '.join(platforms)}"
+        if pending:
+            line += f"  pending: {pending}"
+
+        print(line)
+
+    # Content calendar summary
+    cal_path = Config.TOPIC_DATA_DIR / "content_calendar.json"
+    if cal_path.exists():
+        try:
+            cal = _json.loads(cal_path.read_text(encoding="utf-8"))
+            pending_slots = 0
+            for ep_data in cal.values():
+                for slot in ep_data.get("slots", {}).values():
+                    if slot.get("status") == "pending":
+                        pending_slots += 1
+            if pending_slots:
+                print(f"\nContent calendar: {pending_slots} pending slot(s)")
+        except Exception:
+            pass
+
+
 def _list_available_clients() -> str:
     """List available client config files (for error messages)."""
     clients_dir = Config.BASE_DIR / "clients"
