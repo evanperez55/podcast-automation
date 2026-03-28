@@ -259,8 +259,11 @@ class ContentEditor:
                 + "\n"
             )
 
-        # Voice examples block to establish show tone
-        voice_examples = """
+        # Only inject Fake Problems voice examples when no custom persona is configured.
+        # Custom clients have their own voice in the system message — don't override with FP examples.
+        custom_persona = getattr(Config, "VOICE_PERSONA", None)
+        if not custom_persona:
+            voice_examples = """
 **VOICE EXAMPLES — match this tone in ALL output:**
 
 Episode titles:
@@ -283,6 +286,9 @@ BAD: "Listen to this week's episode for an eye-opening discussion 🎙️"
 GOOD: "turns out immortality is real, it just only applies to lobsters. link in bio 🦞"
 
 """
+        else:
+            # Custom voice persona is set in system message — don't override with FP examples
+            voice_examples = ""
 
         prompt = f"""You are analyzing a podcast transcript for "{Config.PODCAST_NAME}" to identify content that needs censoring and find the best moments for social media clips.
 {topic_section}{engagement_section}{voice_examples}{energy_section}

@@ -764,3 +764,60 @@ class TestAnalyzeContentSystemMessage:
         assert temperature == 0.7, (
             f"Expected temperature=0.7, got temperature={temperature}"
         )
+
+
+class TestVoiceExamplesConditional:
+    """Tests for conditional injection of Fake Problems voice examples."""
+
+    def test_voice_examples_excluded_with_custom_persona(
+        self, content_editor, monkeypatch
+    ):
+        """When Config.VOICE_PERSONA is set, FP voice examples must NOT appear in prompt."""
+        from config import Config as RealConfig
+
+        monkeypatch.setattr(
+            RealConfig,
+            "VOICE_PERSONA",
+            "You write for a true crime podcast.",
+            raising=False,
+        )
+
+        prompt = content_editor._build_analysis_prompt("some transcript text")
+
+        assert "VOICE EXAMPLES" not in prompt, (
+            "Custom persona clients must NOT receive FP voice examples"
+        )
+        assert "Lobster" not in prompt, (
+            "Custom persona clients must NOT receive FP-specific Lobster example"
+        )
+        assert "Rube Goldberg" not in prompt, (
+            "Custom persona clients must NOT receive FP-specific Rube Goldberg example"
+        )
+
+    def test_voice_examples_included_without_custom_persona(
+        self, content_editor, monkeypatch
+    ):
+        """When Config.VOICE_PERSONA is not set (None), FP voice examples ARE included."""
+        from config import Config as RealConfig
+
+        monkeypatch.setattr(RealConfig, "VOICE_PERSONA", None, raising=False)
+
+        prompt = content_editor._build_analysis_prompt("some transcript text")
+
+        assert "VOICE EXAMPLES" in prompt, (
+            "Default (no custom persona) clients must receive FP voice examples"
+        )
+
+    def test_voice_examples_included_when_persona_is_none(
+        self, content_editor, monkeypatch
+    ):
+        """When Config.VOICE_PERSONA is explicitly None, voice examples ARE included."""
+        from config import Config as RealConfig
+
+        monkeypatch.setattr(RealConfig, "VOICE_PERSONA", None, raising=False)
+
+        prompt = content_editor._build_analysis_prompt("some transcript text")
+
+        assert "VOICE EXAMPLES" in prompt, (
+            "Explicit None persona must still include FP voice examples"
+        )

@@ -41,6 +41,8 @@ content:
 MINIMAL_YAML = """
 client_name: "minimal"
 podcast_name: "Minimal Podcast"
+content:
+  names_to_remove: []
 """
 
 EMPTY_YAML = ""
@@ -103,7 +105,8 @@ class TestLoadClientConfig:
         overrides = load_client_config("minimal")
 
         assert overrides["PODCAST_NAME"] == "Minimal Podcast"
-        assert len(overrides) == 1  # Only podcast_name was non-null
+        assert overrides["NAMES_TO_REMOVE"] == []
+        assert len(overrides) == 2  # podcast_name + NAMES_TO_REMOVE (empty list)
 
     def test_missing_file_raises(self, tmp_path, monkeypatch):
         """Loading a nonexistent client raises FileNotFoundError."""
@@ -139,6 +142,46 @@ class TestLoadClientConfig:
 
         with pytest.raises(ValueError, match="Invalid client config"):
             load_client_config("bad")
+
+    def test_missing_names_to_remove_raises(self, tmp_path, monkeypatch):
+        """YAML without content.names_to_remove raises ValueError with clear message."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        yaml_content = 'client_name: "no-names"\npodcast_name: "No Names Podcast"\n'
+        (clients_dir / "no-names.yaml").write_text(yaml_content)
+
+        from client_config import load_client_config
+
+        with pytest.raises(ValueError, match="content.names_to_remove"):
+            load_client_config("no-names")
+
+    def test_null_names_to_remove_is_valid(self, tmp_path, monkeypatch):
+        """YAML with names_to_remove: null loads without error (field is present)."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        yaml_content = 'client_name: "null-names"\npodcast_name: "Null Names"\ncontent:\n  names_to_remove: null\n'
+        (clients_dir / "null-names.yaml").write_text(yaml_content)
+
+        from client_config import load_client_config
+
+        overrides = load_client_config("null-names")
+        # null means field is present; NAMES_TO_REMOVE is NOT in overrides (value is null)
+        assert "NAMES_TO_REMOVE" not in overrides
+
+    def test_empty_names_to_remove_is_valid(self, tmp_path, monkeypatch):
+        """YAML with names_to_remove: [] loads without error and sets NAMES_TO_REMOVE to []."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        yaml_content = 'client_name: "empty-names"\npodcast_name: "Empty Names"\ncontent:\n  names_to_remove: []\n'
+        (clients_dir / "empty-names.yaml").write_text(yaml_content)
+
+        from client_config import load_client_config
+
+        overrides = load_client_config("empty-names")
+        assert overrides["NAMES_TO_REMOVE"] == []
 
     def test_youtube_token_path(self, tmp_path, monkeypatch):
         """YouTube token pickle path is resolved relative to BASE_DIR."""
@@ -226,6 +269,8 @@ class TestOutputIsolation:
         yaml_content = """
 client_name: "custom"
 podcast_name: "Custom Podcast"
+content:
+  names_to_remove: []
 output:
   dir: "/custom/output/path"
 """
@@ -246,6 +291,8 @@ output:
         yaml_content = """
 client_name: "pathtest"
 podcast_name: "Path Test"
+content:
+  names_to_remove: []
 output:
   dir: "/some/output"
   clips_dir: "/some/clips"
@@ -274,7 +321,7 @@ class TestActivateClient:
         clients_dir = tmp_path / "clients"
         clients_dir.mkdir()
         (clients_dir / "acme.yaml").write_text(
-            'client_name: "acme"\npodcast_name: "Acme Show"\n'
+            'client_name: "acme"\npodcast_name: "Acme Show"\ncontent:\n  names_to_remove: []\n'
         )
 
         from client_config import activate_client
@@ -379,7 +426,7 @@ class TestValidateClient:
         clients_dir = tmp_path / "clients"
         clients_dir.mkdir()
         (clients_dir / "test-show.yaml").write_text(
-            'client_name: "test-show"\npodcast_name: "Test Show"\n'
+            'client_name: "test-show"\npodcast_name: "Test Show"\ncontent:\n  names_to_remove: []\n'
         )
 
         from client_config import validate_client
@@ -402,7 +449,9 @@ class TestValidateClient:
         monkeypatch.setattr(Config, "TOPIC_DATA_DIR", Config.TOPIC_DATA_DIR)
         clients_dir = tmp_path / "clients"
         clients_dir.mkdir()
-        (clients_dir / "fp.yaml").write_text('client_name: "fp"\npodcast_name: "FP"\n')
+        (clients_dir / "fp.yaml").write_text(
+            'client_name: "fp"\npodcast_name: "FP"\ncontent:\n  names_to_remove: []\n'
+        )
 
         from client_config import validate_client
 
@@ -428,7 +477,7 @@ class TestClientStatus:
         clients_dir = tmp_path / "clients"
         clients_dir.mkdir()
         (clients_dir / "test.yaml").write_text(
-            'client_name: "test"\npodcast_name: "Test"\n'
+            'client_name: "test"\npodcast_name: "Test"\ncontent:\n  names_to_remove: []\n'
         )
 
         # Create output structure
@@ -465,7 +514,7 @@ class TestClientStatus:
         clients_dir = tmp_path / "clients"
         clients_dir.mkdir()
         (clients_dir / "empty.yaml").write_text(
-            'client_name: "empty"\npodcast_name: "Empty"\n'
+            'client_name: "empty"\npodcast_name: "Empty"\ncontent:\n  names_to_remove: []\n'
         )
 
         from client_config import client_status
@@ -490,7 +539,7 @@ class TestSetupClientPlatform:
         clients_dir = tmp_path / "clients"
         clients_dir.mkdir()
         (clients_dir / "test.yaml").write_text(
-            'client_name: "test"\npodcast_name: "Test"\n'
+            'client_name: "test"\npodcast_name: "Test"\ncontent:\n  names_to_remove: []\n'
         )
 
         from client_config import setup_client_platform
@@ -512,7 +561,7 @@ class TestSetupClientPlatform:
         clients_dir = tmp_path / "clients"
         clients_dir.mkdir()
         (clients_dir / "test.yaml").write_text(
-            'client_name: "test"\npodcast_name: "Test"\n'
+            'client_name: "test"\npodcast_name: "Test"\ncontent:\n  names_to_remove: []\n'
         )
 
         from client_config import setup_client_platform
@@ -533,7 +582,7 @@ class TestSetupClientPlatform:
         clients_dir = tmp_path / "clients"
         clients_dir.mkdir()
         (clients_dir / "test.yaml").write_text(
-            'client_name: "test"\npodcast_name: "Test"\n'
+            'client_name: "test"\npodcast_name: "Test"\ncontent:\n  names_to_remove: []\n'
         )
 
         from client_config import setup_client_platform
