@@ -1,244 +1,158 @@
 # Pitfalls Research
 
-**Domain:** Podcast automation pipeline — content calendar + GitHub Actions CI/CD
-**Researched:** 2026-03-18
-**Confidence:** HIGH (most pitfalls verified by official docs + multiple independent sources)
-**Milestone:** v1.3 Content Calendar & CI/CD
+**Domain:** Cross-genre podcast pipeline testing — adapting a comedy-tuned pipeline to real-world client content
+**Researched:** 2026-03-28
+**Confidence:** HIGH (based on direct codebase analysis; most pitfalls are confirmed code-level issues, not hypothetical)
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewritten workflows, security incidents, or content crises.
+### Pitfall 1: Config.NAMES_TO_REMOVE Is Loaded at Import Time with Hardcoded Host Names
+
+**What goes wrong:**
+`config.py` defines `NAMES_TO_REMOVE` as a class-level list with Joey, Evan, Dom, Dominique, and their last names baked in. `content_editor.py` reads `Config.NAMES_TO_REMOVE` in `_build_analysis_prompt()` and `_find_words_to_censor_directly()`. If you process a client episode without explicitly setting `names_to_remove` in the client YAML, the Fake Problems host names are injected into the censorship prompt and the direct-search censor loop runs against the new client's transcript. A client episode that happens to feature a guest named "Evan" or mentions "Gross" as an adjective will trigger incorrect censorship.
+
+**Why it happens:**
+`Config` is a class with static attributes — it's evaluated at import time. `client_config.py` patches these via `apply_client_config()`, but that only fires if `--client` is passed AND the YAML has a non-null `names_to_remove` list. An empty list `[]` in the YAML correctly overrides to empty. But if the YAML field is omitted entirely (e.g., a client config copied before v1.3 YAML fields were added), the fallback stays as the Fake Problems list.
+
+**How to avoid:**
+Require `names_to_remove` to be an explicit field in every client YAML — treat absence as a validation error, not a fallback to defaults. Add a `validate-client` check that flags missing content section fields. When `names_to_remove: []` is set, verify the override actually clears `Config.NAMES_TO_REMOVE` to `[]` (it does, per `client_config.py:117`, but test this explicitly with a real episode).
+
+**Warning signs:**
+- Demo output for a non-comedy client has audio gaps where no slurs exist
+- GPT-4o prompt contains names like "Joey", "Evan" in the names-to-censor section when processing a true crime or business podcast
+- `logger.info("Items to censor: %d", ...)` shows unexpectedly high count
+
+**Phase to address:**
+Phase 1 (Client Configuration) — before any real episode is processed. Add a `--dry-run` path that prints the active `Config.NAMES_TO_REMOVE` and `Config.WORDS_TO_CENSOR` so it's auditable before processing.
 
 ---
 
-### Pitfall 1: Secrets Baked Into the Self-Hosted Runner Environment
+### Pitfall 2: Voice Persona Is Comedy-Specific and Will Corrupt All AI-Generated Output for Non-Comedy Clients
 
 **What goes wrong:**
-OAuth tokens, API keys, and credential files that live locally (credentials/ directory, .env) get hardcoded into workflow YAML as env blocks or mounted as file paths. A supply chain attack on a third-party action — like the March 2025 tj-actions/changed-files compromise that exposed secrets in 23,000+ repositories — or a developer mistake printing a secret in a run step exfiltrates all credentials in a single job log.
+The fallback `VOICE_PERSONA` in `content_editor.py` is hardcoded as Fake Problems voice: "irreverent comedy show," "dark, weird, and absurd topics," "deadpan confidence." This affects the episode title, social captions, show notes, chapter titles, and blog post. For a true crime podcast or a business interview show, this produces unusable output — chapter titles come out deadpan-comic, show notes read as if the hosts are joking about murder cases, and social captions use comedy framing that will alienate the target audience.
 
-The Fake Problems pipeline has more credential surface area than a typical project: Dropbox API, YouTube OAuth (google_docs_token.json is a JSON file with multiple fields), Twitter OAuth 1.0a (four keys), OpenAI, Google Docs. JSON credential files are particularly dangerous because GitHub's automatic log redaction does not reliably redact structured data — only scalar string values get masked.
+The prompt itself also contains voice examples with Fake Problems-branded BAD/GOOD pairs (lines 263–285 of `content_editor.py`) that are embedded directly in the prompt string, not driven by config. Even if `voice_persona` is set in the YAML, these example blocks remain in the prompt.
 
 **Why it happens:**
-The existing pipeline reads credentials from local files. The instinct when moving to CI is "just make it find the same files on the runner." This treats the runner like a dev machine and puts credential files in repository-accessible paths.
+The voice examples block is a string literal inside `_build_analysis_prompt()` and is not conditional on whether the client has set a custom voice. The `VOICE_PERSONA` constant is the fallback but the inline voice-examples block always fires regardless.
 
 **How to avoid:**
-- Store every secret as a GitHub Actions repository secret — Dropbox token, YouTube client_id/client_secret/refresh_token (three separate secrets, not one JSON blob), Twitter four-key set, OpenAI API key.
-- For OAuth JSON files (google_docs_token.json), split the JSON into individual secrets or base64-encode the JSON and reconstruct the file in a step that uses `::add-mask::` on the decoded value.
-- Pin every third-party action to a full commit SHA: `uses: actions/checkout@a81bbbf8298c0fa03ea29cdc473d45769f953675` not `@v4`.
-- Never echo any secret-derived value in a run step. If a debug log is needed, write it only to `$GITHUB_STEP_SUMMARY` (never persisted to external logs).
-- Scope secrets to individual steps (not job-level `env:`) so they are in memory for the minimum time.
+Make the voice-examples block conditional — only include Fake Problems-specific examples if the active client is `fake-problems` or no custom persona is set. For new clients, replace the example block with genre-appropriate examples drawn from the client config, or omit it entirely and rely on the `voice_persona` field to provide tone guidance.
 
 **Warning signs:**
-- Workflow YAML contains file paths like `credentials/google_docs_token.json` in a run step
-- `env:` blocks at job level with API keys
-- Actions pinned with a version tag (`@v3`, `@main`) instead of a full SHA
-- Any `cat`, `echo`, or `print` of a variable containing a credential in CI logs
+- Blog post for a true crime client opens with deadpan humor about the subject matter
+- YouTube description for a business podcast reads as ironic/comedic
+- Chapter titles sound like Fake Problems episode beats ("POV: You Don't Know What POV Means" style)
 
 **Phase to address:**
-Phase 1 (CI Foundation). Must be verified before any workflow that can write to external platforms is merged.
+Phase 1 (Client Configuration) — configure `voice_persona` for each test client before processing. Phase 2 (Integration Fix) — make the voice-examples block conditional on client type or omit when custom persona is provided.
 
 ---
 
-### Pitfall 2: Concurrent Pipeline Runs Corrupting Episode State
+### Pitfall 3: Audio Energy Scoring Favors High-Volume Comedy Delivery, Not Substantive Moments
 
 **What goes wrong:**
-Two runs start for the same episode simultaneously: a scheduled Dropbox poll fires while a manual dispatch is still running, or a developer re-runs a failed job while the retry is still running. Both write to `output/epN/`, both update the checkpoint JSON, both may reach the upload step. The result is duplicate YouTube uploads, duplicate Twitter threads, or a corrupted checkpoint file that records the episode as complete when it stopped halfway through.
+`AudioClipScorer` ranks segments by RMS energy. Comedy podcasts generate high-energy peaks from shouting, laughter, and fast crosstalk — these map well to "best moments." True crime, business, and interview podcasts often have their most compelling moments during quiet, measured delivery: a revealing confession, a key data point, a moment of tension. RMS scoring will favor segments with the most volume, not the most substance — potentially selecting the wrong clips entirely.
+
+For a solo-host or interview podcast where one person speaks at a consistent volume, energy scores will be nearly flat across all segments, making the energy signal useless as a differentiator. GPT-4o still picks clips, but loses its primary pre-selection signal and will instead pick from whatever the energy_candidates list happens to contain.
 
 **Why it happens:**
-GitHub Actions has no default mutual exclusion. Scheduled triggers fire on the clock regardless of whether a previous run is active. Manual dispatches do not automatically cancel scheduled runs. The existing checkpoint system uses file writes that are not atomic under concurrent access.
+RMS energy is a reasonable heuristic for high-energy comedy but conflates volume with interest. The `energy_candidates` are passed to GPT-4o as a strong hint with the instruction "prioritize these for clips" — the model will follow this even when energy scores don't correlate with content quality.
 
 **How to avoid:**
-Add a `concurrency:` block to every workflow, with `cancel-in-progress: false` (queue, do not cancel — a cancelled upload mid-flight is worse than waiting):
-
-```yaml
-concurrency:
-  group: podcast-pipeline-${{ github.event.inputs.episode_number || 'scheduled' }}
-  cancel-in-progress: false
-```
-
-For manual dispatch, include the episode number in the concurrency group so different episodes can run in parallel, but the same episode cannot. For the scheduled Dropbox-polling workflow, use a fixed group name so two polls cannot overlap.
-
-Additionally, verify the existing checkpoint system handles the case where a checkpoint file is written by two processes: use atomic file rename (write to `.tmp`, rename to final name) or check that the runner's single-threaded process model prevents this in practice.
+In the client's `voice_persona` field, explicitly instruct GPT-4o to weight content quality over audio energy for this show type. Alternatively, add a `clip_selection_mode` field to the client YAML (`energy` vs. `content`) that controls whether the energy candidates block is included in the prompt at all.
 
 **Warning signs:**
-- No `concurrency:` block in any workflow YAML
-- Checkpoint file `last_modified` timestamp is from a different run than expected
-- Duplicate YouTube uploads or Twitter threads appearing
-- `output/epN/` contains files with two different creation timestamps for the same step
+- Selected clips are all loud/overlapping-talk moments, not substantive ones
+- For solo-host podcasts, all energy scores cluster in a narrow range (0.3–0.7 for all segments)
+- GPT-4o picks clips from the energy candidates list even when the transcript content is mundane
 
 **Phase to address:**
-Phase 1 (CI Foundation). Must be in the initial workflow design, not retrofitted after a race condition causes a duplicate post.
+Phase 2 (Integration Fix) — after first-pass processing reveals clip quality issues for non-comedy genres.
 
 ---
 
-### Pitfall 3: 700MB WAV Files Destroying CI Performance and Disk
+### Pitfall 4: Compliance Checker Is Tuned to Not Flag Comedy Content, Which May Miss Real Violations in Other Genres
 
 **What goes wrong:**
-The pipeline downloads a ~700MB WAV from Dropbox as step 1. In CI this causes three distinct failure modes:
-
-1. **Artifact storage blowup:** If the workflow is split into multiple jobs and the WAV is passed between jobs via `actions/upload-artifact`, it immediately consumes GitHub artifact storage quota (2GB free on the Free plan) and will fail uploads silently for large payloads.
-2. **Runner disk exhaustion:** GitHub-hosted runners have ~14GB free. A Windows Server 2025 hosted runner recently lost its D: drive and now has ~33GB total. After 2-3 episodes' worth of intermediate files accumulate without cleanup, the runner runs out of disk mid-job.
-3. **Repeated downloads on retry:** If step 1 (download) completes but step 2 (transcription) fails and the job retries, the 700MB download runs again from scratch unless the checkpoint is respected.
+The compliance checker prompt was explicitly calibrated to avoid over-flagging: "Dark humor and profanity are NOT violations; only genuine hate speech and dangerous misinformation." For a true crime podcast discussing sensitive topics (child abuse, racial violence, extremism), the permissive threshold may under-flag content that YouTube's actual moderation would catch. The inverse is also true: if the client runs a family-friendly or educational channel, profanity that the checker ignores is a genuine violation for that client's context.
 
 **Why it happens:**
-Developers split workflows into jobs for parallelism without accounting for the audio file size. Artifact passing is the standard pattern for multi-job workflows, but it was designed for kilobytes-to-megabytes assets, not audio files.
+`ContentComplianceChecker` uses a single hardcoded prompt. There is no per-client compliance profile. The checker was validated against comedy content only and its calibration reflects that.
 
 **How to avoid:**
-- Keep the entire pipeline as a single job (not multi-job). The 2-episode/month cadence does not benefit from job-level parallelism, and the complexity cost is high.
-- Never use `actions/upload-artifact` for audio files. The WAV lives on the runner's local disk only for the job's lifetime.
-- Add a disk-space check at job start: fail fast with a clear error if `df -h` shows less than 10GB free.
-- Add a cleanup step at the END of each run: delete `output/epN/` intermediate files (WAV, uncompressed audio), keeping only final deliverables (MP3, videos, subtitle files). Keep final deliverables for N days for re-upload purposes.
-- Respect the existing checkpoint: if the WAV download checkpoint exists and the file is on disk with the expected size, skip re-download.
+Add a `compliance_style` field to the client YAML (`permissive` / `standard` / `strict`). For demo purposes, manually review compliance checker output for the first episode per genre before treating it as reliable. Do not include compliance results in the sales demo without manual verification.
 
 **Warning signs:**
-- Workflow has multiple jobs passing files between them
-- `actions/upload-artifact` appears anywhere near audio processing steps
-- Runner disk usage climbs episode over episode with no cleanup step
-- Job fails with "no space left on device" error mid-transcription
+- True crime episode discussing racial violence gets 0 compliance flags
+- Family-friendly podcast episode with incidental profanity gets 0 compliance flags
+- All clients across all genres produce identical compliance result patterns
 
 **Phase to address:**
-Phase 1 (CI Foundation). The single-job architecture decision must be made before writing any YAML.
+Phase 2 (Integration Fix) — after first processing run surfaces compliance gaps per genre.
 
 ---
 
-### Pitfall 4: Auto-Posting Edgy Comedy Content Without Human Review Gate
+### Pitfall 5: Whisper Base Model Degrades Significantly on Real-World Client Audio Quality
 
 **What goes wrong:**
-The workflow is configured with `--auto-approve` covering all pipeline steps including distribution (step 8 onward). The pipeline processes and posts to YouTube, Twitter, and Shorts overnight without any human seeing the content first. An episode with dark humor that aged badly, a misunderstood joke, or a topic that was fine during recording but became problematic by release day (see: ep29 cancer misinformation strike) gets published while the host is asleep. Recovery window: until someone notices, which could be hours.
-
-The existing compliance checker (GPT-4o at temp=0.1) is a safety gate — but it has documented false-negative rates on comedy content that uses real-world events as comedic setups. It was designed to catch clear violations, not to make editorial judgment calls.
+Whisper (`base` model by default) was validated on Fake Problems WAV files: ~700MB, 70-minute studio recordings with two close-mic'd hosts. Real podcast clients may supply heavily compressed MP3s, phone recordings, laptop mic audio, multi-room echo, or non-native English speakers. Transcription accuracy on these inputs can drop from ~95% word accuracy to 70–80%, which cascades into broken censor timestamps (direct word search misses misspelled words), poor clip selection (GPT-4o works from a garbled transcript), and unusable subtitle clips.
 
 **Why it happens:**
-`--auto-approve` was built for speed on local runs where a human just finished reviewing the content. In CI it removes the last human checkpoint, and developers configure it this way because it's the default "fast" mode.
+`Config.WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")` — model is configurable but defaults to `base`, the weakest Whisper variant. No per-client model override exists in the client YAML.
 
 **How to avoid:**
-- CI pipeline must stop after step 6 (MP3 + Dropbox upload) and fire a Discord notification requesting human review before upload.
-- Distribution steps (7.5 RSS, 8 Social, 8.5 Blog, 8.6 Webpage) must be a separate manual-trigger-only workflow, or require a GitHub Actions `environment: production` gate with required reviewers.
-- The `environment: production` gate pauses the workflow in the GitHub UI until a named reviewer approves — this is a first-class GitHub feature, not a workaround.
-- Never set `--force` on the compliance safety gate in CI workflow YAML. The `--force` flag bypasses the compliance gate entirely.
-- Send the Discord notification with a direct link to the GitHub Actions approval URL so the host can approve from mobile.
+Add `whisper_model` to the client YAML content section. For new clients with unknown audio quality, use `small` or `medium` for the initial test run. Validate transcript quality by skimming the output JSON before continuing past Step 2. Set a pre-flight minimum quality bar (e.g., no severe clipping, file at least -30 LUFS average).
 
 **Warning signs:**
-- `python main.py ep$N --auto-approve` covers the full pipeline including steps 8+ in CI YAML
-- No `environment:` with required reviewers on any distribution job
-- Discord notification is sent after upload completes, not before
-- `--force` appears anywhere in CI workflow YAML for upload steps
+- Transcript contains obvious wrong words or garbled proper nouns
+- Episode title generated by GPT-4o doesn't match episode content at all
+- `censor_timestamps` is empty even when host names are known to appear in the episode
 
 **Phase to address:**
-Phase 1 (CI Foundation) for the architecture. Phase 2 (Content Calendar) for the notification and approval UX.
+Phase 1 (Client Setup) — confirm audio quality and set appropriate Whisper model before processing. Add a manual transcript spot-check step before proceeding.
 
 ---
 
-### Pitfall 5: OAuth Token Expiry Silently Failing Uploads in CI
+### Pitfall 6: Episode Numbering Assumption Breaks for Non-Sequential or Non-Numeric Episode IDs
 
 **What goes wrong:**
-YouTube, Twitter, and Google Docs OAuth tokens expire or get revoked. On a developer's machine this triggers an interactive re-auth browser flow. In CI there is no terminal — the job quietly fails with a `401 Unauthorized` or similar error, the Discord notification may not fire (if the notification step is after the failed upload step), and the episode is stuck in limbo. No one notices for days.
-
-YouTube OAuth apps in "testing" status in Google Cloud Console issue tokens that expire every 7 days. If the app is still in testing status (unverified OAuth consent screen), every refresh token becomes invalid after one week. This is a silent killer for CI.
+The pipeline parses episode numbers from filenames using the `ep25` convention. Many podcasts use date-based filenames (`2024-03-15-episode-title.wav`), descriptive slugs (`cold-case-greenville.mp3`), or season/episode notation (`S01E03`). The `episode_number` field in `PipelineContext` drives checkpoint keys, output directory names, analytics storage, RSS entry creation, and search index entries. If parsing fails and resolves to `None`, all episodes map to the same state key — which silently breaks checkpoint resume (subsequent runs overwrite the first) and analytics (records overwrite each other).
 
 **Why it happens:**
-Developers don't notice because local re-auth happens automatically. The testing vs. published distinction in Google Cloud Console is not obvious. CI has no fallback re-auth path, so the first time a token expires in CI, there is no graceful error message — just a 401.
+Episode number extraction in `run_ingest` is built around the Fake Problems naming convention. There is no per-client episode number extraction strategy in the current YAML schema.
 
 **How to avoid:**
-- Check Google Cloud Console: if the YouTube OAuth app is in "Testing" status, either publish it (requires OAuth verification if using sensitive scopes) or add the podcast's Google account as a "Test user" to get consistent refresh behavior.
-- Add a pre-flight credential check step at job start that calls a low-cost read endpoint for each platform before attempting any writes: YouTube `channels.list` (1 quota unit), Twitter `users/me`, Dropbox `check/user`.
-- The pre-flight step must exit non-zero on 401 — do not silently continue to the upload step.
-- Store the refresh token (not just the access token) in GitHub Secrets. Access tokens expire in minutes; refresh tokens last until revoked.
-- Set a calendar reminder for manual token refresh for any platform that does not support headless token refresh from a stored refresh token.
+Before processing a real client's first episode, run `--dry-run` and confirm the resolved `episode_number` is meaningful. For date-based filenames, pre-rename files to the `ep01_original-name` convention before processing, or derive a sequential number from the Dropbox folder listing order.
 
 **Warning signs:**
-- YouTube OAuth consent screen in Google Cloud Console shows status "Testing"
-- Credential JSON files contain `access_token` but no `refresh_token`
-- Upload steps complete with exit code 0 but no video appears on YouTube (silent 401 swallowed by the uploader)
-- No pre-flight credential check step in the workflow
+- Output directory named `ep_None` or `ep_0`
+- Checkpoint file named with `None` as the episode key
+- Second episode processing overwrites the first episode's checkpoint state
 
 **Phase to address:**
-Phase 1 (CI Foundation). Credential health check must be a first-class workflow step before the first production run.
+Phase 1 (Client Setup) — verify with `--dry-run` before live processing.
 
 ---
 
-### Pitfall 6: Windows Self-Hosted Runner Becoming Unmaintained Infrastructure
+### Pitfall 7: Hardcoded Podcast Name in GPT-4o Prompt Leaks into Client AI Output
 
 **What goes wrong:**
-The self-hosted runner on the dev Windows 11 machine accumulates problems over time: CUDA driver updates break WhisperX, Python venv becomes stale after `pip install -r requirements.txt` silently upgrades a transitive dependency, disk fills with episode intermediates from previous runs, Windows Update reboots the machine mid-job. The machine is also the developer's daily driver — a 60-minute Whisper transcription job competes with everything else.
-
-Starting March 2026, GitHub requires self-hosted runners to be at minimum version v2.329.0 or they are blocked from receiving jobs. This minimum version requirement will increase over time.
+`content_editor.py` line 287 embeds `Config.PODCAST_NAME` directly into the analysis prompt: `You are analyzing a podcast transcript for "{Config.PODCAST_NAME}"`. The blog generator also reads `Config.NAMES_TO_REMOVE` for its own prompt. If `activate_client()` is called before components are instantiated, the overrides are applied correctly. But if any component is instantiated before `activate_client()` — or in test/dry-run mode where client config isn't loaded — Fake Problems values bleed through.
 
 **Why it happens:**
-Self-hosted runners are treated as set-and-forget after initial setup. The runner is not resilient to reboots unless explicitly configured as a Windows Service. CUDA drivers are updated via Windows Update or manually, with no pin to a known-good version.
-
-**How to avoid:**
-- Install the runner as a Windows Service using `./config.cmd --runasservice` so it survives reboots automatically.
-- Add a disk cleanup step at the END of every pipeline run: delete intermediate files in `output/epN/` older than the last completed episode, keeping only final deliverables.
-- Lock Python dependencies to a hash-pinned lockfile (`pip freeze > requirements-lock.txt`) for the CI environment, separate from the development `requirements.txt`.
-- Add a weekly smoke-test workflow that runs `python -c "import whisperx; print('ok')"` and alerts Discord if it fails — catches CUDA/venv breakage before the next episode.
-- Subscribe to GitHub's `actions/runner` release notes; update the runner binary before the minimum version enforcement deadline.
-- Pin CUDA toolkit version in a runner setup document; do not allow Windows Update to auto-update GPU drivers.
+`Config` class attributes are read at the moment `_build_analysis_prompt()` is called, not at component init time. This is correct behavior. But the risk is that any path through the code that bypasses `activate_client()` (a test, an isolated dry-run, a direct runner invocation) will use Fake Problems defaults.
 
 **Warning signs:**
-- Runner service is not in `services.msc` (not installed as a service, will not survive reboots)
-- `output/` directory accumulating files across multiple episodes with no cleanup
-- Runner binary version is more than 3 minor versions behind current
-- No health-check workflow running periodically
+- Blog post for a client mentions "Fake Problems Podcast"
+- Social captions reference the wrong show name
+- `validate-client` passes but processed output contains wrong podcast name
 
 **Phase to address:**
-Phase 1 (CI Foundation) for initial runner setup. Ongoing operational runbook for maintenance.
-
----
-
-### Pitfall 7: Dropbox Polling Triggering False-Positive Pipeline Runs
-
-**What goes wrong:**
-The scheduled workflow polls Dropbox for new episodes. Dropbox's folder also contains sync metadata files (`.dropbox`, `~$` lock files from apps that touch the folder), partially-synced files (Dropbox creates a temp file during upload that is renamed on completion), and potentially renamed or re-uploaded older episodes. Any of these triggers a pipeline run for a non-episode file or a partial upload.
-
-If a partial 700MB upload is detected at 300MB (Dropbox sync in progress), WhisperX will attempt to transcribe a truncated WAV, produce a corrupted transcript, and mark the episode as "analyzed" in the checkpoint — preventing a clean re-run without manual checkpoint deletion.
-
-**Why it happens:**
-File-presence detection without content validation is the simplest implementation. Dropbox's sync model means a file "exists" in the API before it is fully uploaded. The existing `python main.py latest` command may use filename or modification-time heuristics that are fooled by partial syncs.
-
-**How to avoid:**
-- Filter by explicit filename pattern: only trigger on files matching the episode naming convention (e.g., `ep[0-9]+\.(wav|mp3)` or whatever convention is used). Reject all other files.
-- Add a file-size sanity check: a real 70-minute episode WAV is 650-750MB. Reject files below 100MB as incomplete.
-- Add a file-age check: only trigger on files whose `server_modified` timestamp (Dropbox's server-side timestamp, set when upload completes) is more than 5 minutes in the past. This guards against triggering on files mid-upload.
-- Deduplicate: persist the last-processed episode identifier (number or filename) in a file in the repo or a GitHub Actions variable. Skip any detected file that matches an already-processed episode.
-
-**Warning signs:**
-- Pipeline runs triggered by files that are not episodes
-- Episode processed twice (same content appears in output twice)
-- WAV download step completes in under 30 seconds (too fast for 700MB — file is smaller than expected)
-- Checkpoint shows "analyzed" for an episode that does not appear on YouTube
-
-**Phase to address:**
-Phase 2 (Content Calendar / CI Trigger Design). Polling logic must include all four guards before the first scheduled run.
-
----
-
-### Pitfall 8: Content Calendar Posting Schedule Surviving Sensitive Current Events
-
-**What goes wrong:**
-The content calendar plans clip releases for the week following an episode drop. A clip that was funny in isolation gets scheduled to post the day after a real-world tragedy that happens to overlap with the joke topic. The comedy podcast with dark humor is particularly exposed: clips about death, cancer, crime, or political topics can age badly within hours of being scheduled.
-
-With GitHub Actions scheduling, the clip posts automatically because no one reviewed the schedule after the tragic event. The post goes live, gets reported, and triggers a platform response.
-
-**Why it happens:**
-Content calendar automation assumes the world stays static between planning and posting. For edgy comedy content, this assumption fails more often than for mainstream content.
-
-**How to avoid:**
-- No clip should auto-post without a 24-hour human review window between "scheduled" and "live."
-- The Discord notification for each scheduled clip must include: the clip title, the topic, the scheduled time, and a one-click link to cancel the post. The host must affirmatively confirm or let it expire.
-- Build a "pause all scheduled posts" kill switch: a single GitHub Actions dispatch workflow that sets a flag (a file in the repo, a repository variable) that the posting workflows check before executing.
-- Treat the content calendar as a planning tool, not an execution tool. CI generates the calendar and sends it to the host for approval; the host manually approves each post or accepts the schedule.
-
-**Warning signs:**
-- Scheduled posts fire automatically with no confirmation step
-- No "pause all" mechanism exists in the workflow design
-- Discord notifications are informational only (no approve/cancel action)
-- Calendar planning and post execution happen in the same workflow step
-
-**Phase to address:**
-Phase 2 (Content Calendar). Human-in-the-loop design is required before building the calendar feature at all.
+Phase 1 (Client Setup) — add an assertion in `validate-client` that checks `Config.PODCAST_NAME` matches the YAML `podcast_name` after activation.
 
 ---
 
@@ -246,12 +160,11 @@ Phase 2 (Content Calendar). Human-in-the-loop design is required before building
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Run full pipeline in one CI job | Simple, no artifact passing | Slow (60-90 min per episode); no partial retry | Always — 2 episodes/month makes complexity unjustified |
-| Store episode state in local output/ files | Zero infrastructure | Concurrent run corruption risk | Acceptable with concurrency group lock in place |
-| Use personal OAuth apps (not service accounts) | Quick setup | Token expiry, quota tied to personal account | Acceptable for MVP; migrate to service account if account is suspended |
-| Pin `--auto-approve` in CI for pre-upload steps only | Faster pipeline | Easy to accidentally extend to uploads | Only for steps 1-6; never for distribution steps 7.5+ |
-| Hardcode episode number detection by filename | Works for current naming convention | Breaks if naming changes without updating polling logic | Acceptable with documented naming convention and validation |
-| Skip disk cleanup for first CI run | Reduces initial complexity | Disk fills after 3-4 episodes | Never — add cleanup from the first workflow version |
+| Hardcoded voice examples in `_build_analysis_prompt` | Works perfectly for Fake Problems | Every new genre requires code changes, not config changes | Never for multi-client use |
+| `Config.NAMES_TO_REMOVE` falls back to Fake Problems list | Safe default for original use case | Incorrect censorship for all new clients unless explicitly cleared in YAML | Never — should default to empty list for new clients |
+| Single compliance prompt for all clients | Simple, no per-client complexity | Under/over-flags content for different genres | Only for single-client deployment |
+| `WHISPER_MODEL = "base"` global default | Fast processing on known good audio | Poor accuracy on real-world client audio | Acceptable for Fake Problems only |
+| Episode number from filename convention | Simple, works for ep25 naming | Breaks for any client using date or slug naming | Acceptable only after explicit pre-flight check |
 
 ---
 
@@ -259,14 +172,11 @@ Phase 2 (Content Calendar). Human-in-the-loop design is required before building
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| YouTube OAuth | Leaving app in "Testing" status | Publish OAuth app or add account as test user; testing-status tokens expire every 7 days |
-| YouTube Data API | Upload + analytics in same pipeline job | Separate analytics into a distinct weekly scheduled workflow; 10k units/day quota is shared |
-| Twitter API v2 | Assuming bearer token works for posting | Bearer is read-only; posting requires OAuth 1.0a user context or OAuth 2.0 with write scope |
-| Dropbox API | Triggering on any file change event | Filter by filename pattern + file size + file age before triggering the pipeline |
-| GitHub Actions secrets | Passing JSON credential files as a single secret | Split into discrete scalar secrets to ensure log redaction works reliably |
-| OpenAI API in CI | No timeout set on API calls | Network latency in CI is higher and less predictable; set `timeout=60` and add retry with backoff |
-| WhisperX CUDA | Assuming CUDA driver survives Windows Update | Pin CUDA toolkit version in runner setup documentation; verify with `nvidia-smi` at job start |
-| GitHub environment gates | Assuming workflow YAML is sufficient | `environment: production` with required reviewers must be configured in the GitHub repo Settings > Environments UI — YAML alone does nothing |
+| Dropbox for new client | Assuming episode files are WAV; many clients deliver MP3 | Confirm file format before processing; pydub handles MP3 but some path logic assumes WAV extension |
+| YouTube token per client | Using the global token pickle path without setting `youtube.token_pickle` in the client YAML | Each client needs its own token pickle path — they cannot share a single OAuth token |
+| RSS feed output | All clients write to the same `podcast_feed.xml` unless output dirs are isolated | Confirm `OUTPUT_DIR` is client-specific before the RSS step runs |
+| Compliance checker | Running compliance before reviewing transcription accuracy | Compliance results are only meaningful if the transcript is accurate — spot-check transcript first |
+| Audio energy candidates | Passing energy candidates to GPT-4o for a flat-energy interview podcast | Consider suppressing the energy block for shows where RMS variance is low |
 
 ---
 
@@ -274,11 +184,9 @@ Phase 2 (Content Calendar). Human-in-the-loop design is required before building
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Re-downloading 700MB WAV on every retry | Job restart from step 1 re-fetches full file from Dropbox | Checkpoint step 1 with file hash; skip download if WAV already on disk with expected size | Every retry after a failed transcription job |
-| WhisperX model not cached on runner | First 2-3 minutes of every run spent downloading model weights | Pre-download Whisper model during runner setup; smoke-test verifies cache exists | Every fresh runner setup or after an accidental cache clear |
-| OpenAI calls not checkpointed | GPT-4o analyze + compliance re-run from scratch on resume | Verify existing checkpoint keys `analyze` and `censor` are honored; do not re-call if checkpoint file exists | Any re-run after partial failure at or after step 3 |
-| No job timeout set | Hung Whisper job (CUDA OOM, corrupt WAV) occupies runner indefinitely | Set `timeout-minutes: 120` at job level | First corrupt WAV or CUDA out-of-memory stall |
-| Scheduled analytics collection during pipeline run | Analytics and upload compete for YouTube API quota | Run analytics collection in a separate weekly workflow, never in the episode pipeline | First episode where upload + analytics shares the 10k daily quota |
+| Whisper `base` on CPU | 30–45 min transcription per episode | Confirm CUDA is available; set `WHISPER_MODEL=small` minimum for unknown audio | Immediately on CPU-only or shared machines |
+| pydub loading full 700MB WAV | ~4GB RAM peak during energy scoring | Not a new issue but confirm client files aren't multi-track or unusually large | Files >90 min or files larger than ~800MB |
+| GPT-4o cost for demo run | ~$0.50–0.80 per episode × 3 clients | Budget ~$3 for initial test runs; not a problem at this scale | Non-issue at 2–3 client demo scale |
 
 ---
 
@@ -286,50 +194,33 @@ Phase 2 (Content Calendar). Human-in-the-loop design is required before building
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Echoing secrets in debug steps | Secret appears in job log, stored in GitHub for 90 days | Never `echo $SECRET`; use `::add-mask::` if a derived value must be printed |
-| Third-party action pinned by tag not SHA | Supply chain compromise (tj-actions March 2025) changes action behavior silently | Pin all `uses:` to full commit SHA; audit action code before trust |
-| `pull_request_target` trigger with secrets access | Untrusted fork PR can read secrets | Use `pull_request` (not `pull_request_target`) for untrusted contributor workflows |
-| Credential files in git-tracked paths | Token exposure via git history | Confirm `credentials/` and `*.json` OAuth files are in `.gitignore` and not currently tracked |
-| Runner token with org-wide scope | Compromised runner gets access to all org repos | Use fine-grained repository tokens scoped only to the podcast repo |
-| `--auto-approve` + `--force` in CI for distribution | Bypasses compliance gate; auto-posts content that may violate YouTube guidelines | Remove `--force` from all CI YAML; require human approval before any distribution step |
-| Dropbox app with full account access | Compromised Dropbox token can access all files in the account | Restrict Dropbox app scope to the specific podcast folder only |
+| Committing real client credentials in YAML | Credential exposure in git history | Confirm `clients/*.yaml` is in `.gitignore` except `example-client.yaml`; use `null` values + env vars |
+| Demo using private client episode content | Client content shared without consent | Use publicly available episodes for demos; get explicit permission before processing private audio |
+| Shared Dropbox credentials across clients | One client's revoked token breaks all | Each client config specifies its own Dropbox credentials |
 
 ---
 
-## Comedy Content Specific Risks
+## UX Pitfalls
 
-### Auto-Posting Raises the Stakes of Every Compliance False Negative
-
-The v1.1 compliance checker uses GPT-4o at temp=0.1 to classify YouTube guideline violations. It was designed to pass/fail on clear violations while preserving comedy content — dark humor and profanity are explicitly not violations in the prompt. However, the checker has a documented false-negative rate for edge cases: jokes about real medical conditions, extreme political content framed as comedy, content referencing ongoing news events.
-
-In manual mode, a false negative means the host reviews the content and catches it. In CI auto-post mode, a false negative means the video goes live immediately. Given ep29's cancer misinformation strike history, this is not hypothetical.
-
-**Prevention:** The compliance gate in CI must stop the pipeline and request human review, not gate the auto-post decision. The gate answers "should a human review this?" not "is this safe to auto-post?"
-
-### Rigid Posting Schedule Is Tone-Deaf to Current Events
-
-Dark comedy about sensitive topics (death, crime, health crises) can be completely appropriate when the episode releases and become deeply inappropriate 48 hours later due to breaking news. A content calendar that automatically drips clips all week has no mechanism to pause when the world changes.
-
-**Prevention:** Every scheduled post beyond the initial episode upload requires same-day human confirmation. The calendar is a suggestion, not a commitment.
-
-### Bulk Upload Pattern May Trigger YouTube Detection
-
-In 2025, YouTube's detection systems became more aggressive about identifying bulk upload patterns combined with other automation signals. For a comedy podcast, uploading one full episode + three Shorts + thumbnail updates in rapid succession within a single CI job may trigger detection, especially if the uploads are closely spaced in time.
-
-**Prevention:** Add configurable delays between upload steps (30-60 seconds minimum between each upload API call). Avoid uploading all Shorts in the same minute. This also reduces quota spike risk.
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| `--auto-approve` on first client test run | Bad clips reach the demo package without review | Always run interactively on first episode per client to calibrate expectations |
+| Demo output not reviewed before presenting | Prospective client sees wrong tone, wrong podcast name, or garbled AI output | Establish a manual review gate before packaging any demo artifact |
+| Clip approval UI showing no genre context | Reviewer can't tell if a quiet moment is good for true crime vs. comedy | Add genre note from `voice_persona` to clip approval display, or add reviewer notes in the demo package |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Secrets split correctly:** YouTube OAuth is split into individual secrets (client_id, client_secret, refresh_token) — not a single JSON blob. Verify log redaction works by checking a dry-run job's log for any credential fragments.
-- [ ] **Concurrency guard works:** Test by dispatching two manual runs with the same episode number simultaneously. Confirm the second run queues and waits, not runs in parallel.
-- [ ] **Human upload gate is real:** `environment: production` with required reviewers must exist in GitHub repo Settings > Environments UI — the YAML alone does not create the gate.
-- [ ] **Token pre-flight actually fails on 401:** Manually revoke a test token, run the pre-flight step, confirm it exits non-zero and fires a Discord alert before reaching any upload step.
-- [ ] **Disk cleanup runs:** Run two episodes back-to-back. Check `output/` on the runner after both complete. Intermediate files should not accumulate.
-- [ ] **Dropbox dedup works:** Upload a dummy file to the Dropbox watch folder that does not match the filename pattern. Confirm the scheduled workflow does not trigger a pipeline run.
-- [ ] **WhisperX model is cached:** Delete `~/.cache/whisper` on the runner and run the smoke-test workflow. Confirm it downloads the model and re-caches it without requiring a full episode run.
-- [ ] **`--force` is absent from CI YAML:** Run `grep -r '\-\-force' .github/` before every merge. The compliance safety gate must never be overridden in CI.
+- [ ] **Config override active:** After `activate_client()`, print `Config.PODCAST_NAME`, `Config.NAMES_TO_REMOVE`, `Config.WORDS_TO_CENSOR` — confirm they match the client YAML, not Fake Problems defaults
+- [ ] **Voice persona in prompt:** Check debug log of `_call_openai_with_retry` — confirm system prompt is the client voice, not the Fake Problems fallback
+- [ ] **Voice examples block:** Confirm Fake Problems-specific BAD/GOOD examples (lobster immortality, etc.) are absent from the GPT-4o prompt for non-comedy clients
+- [ ] **Output directory isolation:** Confirm `Config.OUTPUT_DIR`, `Config.CLIPS_DIR`, and `Config.DOWNLOAD_DIR` are client-specific paths before ingest starts
+- [ ] **RSS isolation:** Verify RSS generator writes to client-specific output dir, not global `podcast_feed.xml`
+- [ ] **Episode number resolves:** Run `--dry-run` and confirm `episode_number` is a meaningful value for the client's filename convention
+- [ ] **Transcript quality:** Skim first 10 segments of the generated transcript JSON before proceeding past Step 2
+- [ ] **Compliance calibration:** Manually review compliance output for first episode per genre — confirm it's appropriate for that content type and channel
+- [ ] **Demo artifacts reviewed:** All demo output (clips, thumbnail, blog post, social captions) manually reviewed for correct client voice before presenting to prospective client
 
 ---
 
@@ -337,14 +228,12 @@ In 2025, YouTube's detection systems became more aggressive about identifying bu
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Secret exposed in job log | HIGH | Rotate all secrets immediately; check GitHub log retention settings; revoke any tokens that may have been seen; audit for unauthorized API calls |
-| Duplicate YouTube upload | MEDIUM | Delete duplicate in YouTube Studio before it gets indexed; check for duplicate Twitter threads and delete; review concurrency group config |
-| Concurrent run corrupted checkpoint | MEDIUM | Delete checkpoint file for the affected episode; re-run from scratch with `--no-resume`; verify concurrency group is set correctly |
-| OAuth token expired mid-upload | LOW | Re-auth locally to get new refresh token; update the corresponding GitHub Secret; re-run distribution-only steps |
-| Runner disk full mid-transcription | LOW | SSH to runner; delete old episode intermediates; verify remaining disk > 10GB; re-run from download checkpoint |
-| Dropbox false-positive processed wrong file | HIGH | Identify and delete any content that was incorrectly processed and uploaded; fix polling filter logic before next scheduled run |
-| Auto-post of episode that receives YouTube strike | HIGH | Submit YouTube strike appeal immediately; set all future posts to manual-only until appeal resolves; add the violated topic to the compliance prompt's negative examples |
-| Content posted during breaking news crisis | HIGH | Manually delete or private the post on all platforms immediately; implement "pause all" kill switch before next calendar cycle; review all remaining scheduled posts for the week |
+| Wrong host names censored | LOW | Fix YAML `names_to_remove`, delete `analyze` and `censor` checkpoint keys, re-run from Step 3 (transcription preserved) |
+| Wrong voice persona in output | LOW | Fix YAML `voice_persona`, delete `analyze` checkpoint key, re-run Step 3 and downstream |
+| Poor transcript quality | MEDIUM | Set `WHISPER_MODEL=small` or `medium` in client YAML, delete `transcribe` checkpoint, re-run all steps |
+| Episode number parsed as None | LOW | Rename source file to `ep01_original-name.ext` convention before re-run |
+| Demo presented with wrong tone or podcast name | HIGH | Full re-run with corrected config + manual review of all output before re-presenting |
+| Fake Problems host names censored in client audio | LOW | Fix YAML `names_to_remove: []`, delete `analyze` and `censor` checkpoints, re-run from Step 3 |
 
 ---
 
@@ -352,37 +241,28 @@ In 2025, YouTube's detection systems became more aggressive about identifying bu
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Secrets exposure | Phase 1 (CI Foundation) | Audit all workflow YAML for file paths and hardcoded values; grep for any credential patterns |
-| Concurrent run corruption | Phase 1 (CI Foundation) | Test dual simultaneous dispatch; confirm only one run proceeds |
-| 700MB file handling + disk exhaustion | Phase 1 (CI Foundation) | Run two back-to-back episodes; check runner disk usage and absence of accumulated intermediates |
-| Auto-post without human review | Phase 1 (CI Foundation) + Phase 2 (Content Calendar) | Confirm `environment: production` is configured in GitHub UI; perform end-to-end approval flow test |
-| OAuth token expiry | Phase 1 (CI Foundation) | Revoke a test token; confirm pre-flight step fails and alerts Discord before any upload attempt |
-| Runner maintenance / service setup | Phase 1 (CI Foundation) | Verify runner appears in `services.msc`; simulate reboot and confirm runner reconnects |
-| Dropbox false-positive trigger | Phase 2 (Content Calendar / Trigger Design) | Upload dummy file to Dropbox folder; confirm no pipeline run fires |
-| Current events sensitivity | Phase 2 (Content Calendar) | Verify no clip auto-posts without same-day confirmation; test the "pause all" kill switch |
-| Third-party action supply chain | Phase 1 (CI Foundation) | Grep all `uses:` lines for SHA pinning before any workflow is merged |
-| Bulk upload YouTube detection | Phase 1 (CI Foundation) | Add inter-upload delays to workflow; verify delay between each upload step |
+| NAMES_TO_REMOVE leakage | Phase 1: Client Config Setup | `--dry-run` prints active `Config.NAMES_TO_REMOVE`; confirm it is empty or matches client hosts |
+| Voice persona not applied | Phase 1: Client Config Setup | Check GPT-4o system prompt in debug log before full run |
+| Fake Problems voice examples in prompt | Phase 2: Integration Fixes | Review analysis output for first client; fix prompt logic if genre mismatch detected |
+| Energy scoring wrong for genre | Phase 2: Integration Fixes | Review clip selection quality after first client run; suppress energy block if needed |
+| Compliance calibration wrong | Phase 2: Integration Fixes | Manual review of compliance output for first episode per genre |
+| Whisper model too weak | Phase 1: Client Config Setup | Add `whisper_model` to client YAML; use `small` minimum for unknown audio quality |
+| Episode number parse failure | Phase 1: Client Config Setup | `--dry-run` confirms `episode_number` resolves to a non-None value |
+| Hardcoded podcast name leaks | Phase 1: Client Config Setup | `validate-client` checks `Config.PODCAST_NAME` matches YAML after activation |
+| Demo output not reviewed | Phase 3: Demo Packaging | Manual review gate before packaging; never use `--auto-approve` on first client run |
 
 ---
 
 ## Sources
 
-- [Top 10 GitHub Actions Security Pitfalls](https://arctiq.com/blog/top-10-github-actions-security-pitfalls-the-ultimate-guide-to-bulletproof-workflows) — MEDIUM confidence (vendor blog corroborated by official docs)
-- [GitHub Actions Secure Use Reference](https://docs.github.com/en/actions/reference/security/secure-use) — HIGH confidence (official GitHub docs)
-- [tj-actions Supply Chain Compromise March 2025](https://thehackernews.com/2025/03/github-action-compromise-puts-cicd.html) — HIGH confidence (reported incident with public disclosure)
-- [GitHub Actions Concurrency Docs](https://docs.github.com/en/actions/concepts/workflows-and-actions/concurrency) — HIGH confidence (official GitHub docs)
-- [GitHub Actions Control Concurrency](https://docs.github.com/actions/writing-workflows/choosing-what-your-workflow-does/control-the-concurrency-of-workflows-and-jobs) — HIGH confidence (official GitHub docs)
-- [GitHub Actions GPU Runners Generally Available](https://github.blog/changelog/2024-07-08-github-actions-gpu-hosted-runners-are-now-generally-available/) — HIGH confidence (official GitHub changelog)
-- [Windows Server 2025 Runner Disk Space Issue](https://github.com/actions/runner-images/issues/12609) — HIGH confidence (official runner-images issue tracker)
-- [Self-Hosted Runner Minimum Version Enforcement](https://github.blog/changelog/2026-02-05-github-actions-self-hosted-runner-minimum-version-enforcement-extended/) — HIGH confidence (official GitHub changelog)
-- [Dropbox Webhooks Developer Reference](https://www.dropbox.com/developers/reference/webhooks) — HIGH confidence (official Dropbox docs)
-- [Concurrency Control in GitHub Actions — OneUptime](https://oneuptime.com/blog/post/2025-12-20-concurrency-control-github-actions/view) — MEDIUM confidence (practitioner blog, consistent with official docs)
-- [YouTube Strike Policy Update Nov 2025](https://medium.com/@info.shaludroid/youtube-strike-policy-update-everything-creators-must-know-effective-17-nov-2025-6376baadf6e2) — MEDIUM confidence (third-party summary; cross-reference YouTube Help Center before acting on specifics)
-- [YouTube Bulk Upload Detection Risk 2025](https://x.com/1of10media/status/1995176099303596381) — LOW confidence (social media post; treat as directional signal only)
-- [Challenges of Social Media Automation 2025](https://vistasocial.com/insights/challenges-of-social-media-automation/) — MEDIUM confidence (vendor blog, consistent with platform documentation)
-- [Managing Secrets in GitHub Actions — Doppler](https://www.doppler.com/blog/managing-secrets-ci-cd-environments-github-actions-advanced-techniques) — MEDIUM confidence (vendor blog, technically accurate)
-- Project CLAUDE.md, PROJECT.md, existing pipeline code — HIGH confidence (source of truth for project constraints and known issues)
+- Direct codebase analysis: `content_editor.py` lines 11–17, 85, 209, 263–285, 287, 465–570
+- Direct codebase analysis: `config.py` lines 132, 141–186
+- Direct codebase analysis: `client_config.py` lines 77–182
+- Direct codebase analysis: `audio_clip_scorer.py` full file
+- Direct codebase analysis: `pipeline/steps/analysis.py`, `pipeline/steps/audio.py`
+- Project history: `PROJECT.md` lines 129–130 (compliance calibration decisions and rationale)
+- Client config templates: `clients/example-client.yaml`, `clients/fake-problems.yaml`
 
 ---
-*Pitfalls research for: podcast automation — content calendar + GitHub Actions CI/CD (v1.3)*
-*Researched: 2026-03-18*
+*Pitfalls research for: Cross-genre podcast pipeline testing (v1.4 real-world client testing)*
+*Researched: 2026-03-28*

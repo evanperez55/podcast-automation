@@ -1,95 +1,101 @@
 # Architecture Research
 
-**Domain:** Content calendar and GitHub Actions CI/CD — v1.3 integration into existing pipeline
-**Researched:** 2026-03-19
-**Confidence:** HIGH — based on direct code inspection of all relevant existing modules + official GitHub Actions docs
+**Domain:** Real-world podcast client testing and sales demo packaging — v1.4 integration into existing multi-client pipeline
+**Researched:** 2026-03-28
+**Confidence:** HIGH — based on direct code inspection of all relevant modules (ingest.py, client_config.py, dropbox_handler.py, runner.py, pipeline/steps/, config.py)
 
 ---
 
-## Current Architecture (as-built, v1.2)
+## Current Architecture (as-built, post-v1.3)
 
 ```
 main.py (134-line CLI shim)
     |
-pipeline/runner.py (orchestrator, component factory, checkpoint logic)
+    +-- client_config.py:activate_client()   (applied before runner starts)
     |
-    +---> pipeline/context.py (PipelineContext dataclass)
+pipeline/runner.py (orchestrator, component factory)
     |
-    +---> pipeline/steps/ingest.py     (Step 1: download)
-    +---> pipeline/steps/analysis.py   (Steps 3-3.5: AI analysis + topic tracker)
-    +---> pipeline/steps/video.py      (Steps 5.1-5.6: clips, subs, video, thumb)
-    +---> pipeline/steps/distribute.py (Steps 7-9: Dropbox, RSS, social, blog, search)
+    +---> pipeline/steps/ingest.py      (Step 1: download from Dropbox OR local file)
+    +---> pipeline/steps/analysis.py    (Steps 2-3.5: transcribe, analyze, topics)
+    +---> pipeline/steps/audio.py       (Steps 4-4.5: censor, normalize)
+    +---> pipeline/steps/video.py       (Steps 5-5.6: clips, subtitles, video, thumb)
+    +---> pipeline/steps/distribute.py  (Steps 6-9: MP3, Dropbox, RSS, social, blog, search)
 
-State files (per-episode):
-    output/ep_N/upload_schedule.json    — platform upload schedule + status
-    output/.pipeline_state/ep_N.json    — step checkpoint state
-
-Cross-episode data:
-    topic_data/engagement_history.json  — posting time outcomes (v1.2)
-    topic_data/analytics/               — per-episode platform metrics
+Client configs:
+    clients/<name>.yaml          — per-client overrides applied to Config class
+    clients/<name>/              — per-client credential files (YouTube token, etc.)
+    output/<client>/             — per-client output isolation
+    downloads/<client>/          — per-client download isolation
 ```
 
-Key facts about scheduling in the existing system:
-
-- `scheduler.py` — `UploadScheduler.create_schedule()` writes `upload_schedule.json` per episode at pipeline creation time. `run_upload_scheduled()` in `pipeline/runner.py` polls existing schedule files and fires any pending platform uploads whose `publish_at` has passed.
-- `posting_time_optimizer.py` — `PostingTimeOptimizer` computes the next optimal weekday+hour for a platform. Returns `None` if fewer than 15 episodes of history exist.
-- No content calendar exists yet. Clip distribution timing is the same as episode publishing — all clips and episode are produced together, published with fixed platform delays.
-- No CI/CD exists. All runs are manual via `python main.py latest` or `python main.py epN` on the local Windows machine.
+Critical constraint in ingest.py (line 45):
+```python
+# Even when audio_file is pre-set from local path, ingest still calls:
+dropbox = components["dropbox"]
+episode_number = dropbox.extract_episode_number(audio_file.name)
+```
+This means `DropboxHandler` is **always instantiated** even for local-file processing. This is the primary blocker for clients without Dropbox credentials.
 
 ---
 
-## System Overview: v1.3 Additions
+## System Overview: v1.4 Additions
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                  TRIGGER LAYER (NEW)                                  │
+│                  EPISODE SOURCE LAYER (NEW)                           │
 │                                                                       │
-│  GitHub Actions (.github/workflows/)                                  │
-│  ┌──────────────────────┐  ┌───────────────────────────────────────┐ │
-│  │  poll.yml            │  │  manual.yml                           │ │
-│  │  schedule: cron      │  │  on: workflow_dispatch                │ │
-│  │  → python ci/poll.py │  │  inputs: episode_number, flags        │ │
-│  │  if new file found:  │  │  → python main.py epN --auto-approve  │ │
-│  │    dispatch process  │  └───────────────────────────────────────┘ │
-│  └──────────────────────┘                                             │
-│                                                                       │
-│  runs-on: self-hosted (Windows 11, NVIDIA GPU, CUDA)                  │
-├──────────────────────────────────────────────────────────────────────┤
-│                  CALENDAR LAYER (NEW)                                 │
-│                                                                       │
-│  content_calendar.py                                                  │
+│  rss_episode_fetcher.py                                               │
 │  ┌─────────────────────────────────────────────────────────────────┐ │
-│  │  ContentCalendar                                                  │ │
-│  │  - plan_episode(episode_number, release_date) → CalendarEntry    │ │
-│  │  - plan_clips(episode_number, clips) → List[ClipSlot]            │ │
-│  │  - get_pending_slots(now) → List[ClipSlot]                       │ │
-│  │  reads/writes: topic_data/content_calendar.json                  │ │
-│  └────────────────────────────┬────────────────────────────────────┘ │
-│                               │                                       │
-│  ci/poll.py                   │                                       │
-│  ┌────────────────────────────▼────────────────────────────────────┐ │
-│  │  - list Dropbox new_raw_files                                     │ │
-│  │  - compare against content_calendar.json processed episodes      │ │
-│  │  - if unprocessed WAV found → write ci/pending_episode.txt       │ │
-│  │  - exit 0 (new file) or exit 1 (nothing new)                     │ │
+│  │  RSSEpisodeFetcher                                                │ │
+│  │  - fetch_latest(rss_url) → EpisodeMeta                           │ │
+│  │  - fetch_episode(rss_url, n) → EpisodeMeta                       │ │
+│  │  - download_audio(url, dest_path) → Path                         │ │
+│  │  - extract_episode_number(filename_or_url) → Optional[int]       │ │
+│  │                                                                   │ │
+│  │  EpisodeMeta: title, audio_url, pub_date, description,           │ │
+│  │               episode_number, duration_seconds                    │ │
 │  └─────────────────────────────────────────────────────────────────┘ │
+│                                                                       │
+│  client YAML config (new fields):                                     │
+│    episode_source: "rss" | "dropbox" | "local"  (default: dropbox)   │
+│    rss:                                                               │
+│      feed_url: "https://feeds.example.com/podcast.rss"               │
 ├──────────────────────────────────────────────────────────────────────┤
-│                  EXISTING PIPELINE (v1.2, unchanged)                  │
+│                  GENRE-AWARE PIPELINE (MODIFIED)                      │
 │                                                                       │
-│  main.py → pipeline/runner.py → pipeline/steps/                      │
-│  upload_schedule.json + .pipeline_state/ep_N.json                    │
+│  client YAML config (new fields):                                     │
+│    content:                                                           │
+│      genre: "comedy" | "true-crime" | "business" | "interview"       │
+│      compliance_enabled: true/false                                   │
+│      censor_enabled: true/false                                       │
+│      clip_scoring_mode: "energy" | "topic-match" | "balanced"        │
 │                                                                       │
-│  MODIFIED: pipeline/steps/distribute.py                              │
-│  - After clips produced: ContentCalendar.plan_clips()                │
-│  - Assigns clip publish slots spread across the week                 │
-│  - Clip uploads read slot datetimes from content_calendar.json       │
+│  pipeline/steps/analysis.py (MODIFIED):                              │
+│    reads genre from Config; adjusts compliance and clip-scoring       │
+│    passes genre context into ContentEditor prompt                     │
 ├──────────────────────────────────────────────────────────────────────┤
-│                  STATE & SECRETS                                      │
+│                  DEMO PACKAGING LAYER (NEW)                           │
 │                                                                       │
-│  topic_data/content_calendar.json  — calendar entries (local file)   │
-│  .env (local, never committed)     — all API keys                    │
-│  GitHub Actions Secrets            — mirrors of .env vars            │
-│  (runner reads .env from disk; Actions secrets used in cloud fallback)│
+│  demo_packager.py                                                     │
+│  ┌─────────────────────────────────────────────────────────────────┐ │
+│  │  DemoPackager                                                     │ │
+│  │  - package_demo(client_name, episode_folder) → Path              │ │
+│  │  - generates demo/<client>/<episode>/                            │ │
+│  │      summary.html      — single-page visual summary              │ │
+│  │      clips/            — clip mp4s (already exist in output/)    │ │
+│  │      thumbnails/       — thumbnails (already exist)              │ │
+│  │      captions.txt      — platform captions from analysis.json    │ │
+│  │      blog_post.html    — blog post (already exists)              │ │
+│  │      README.md         — what client receives and how to use it  │ │
+│  └─────────────────────────────────────────────────────────────────┘ │
+│                                                                       │
+│  CLI: python main.py package-demo <client> [ep_N]                    │
+├──────────────────────────────────────────────────────────────────────┤
+│                  EXISTING PIPELINE (post-v1.3, unchanged core)        │
+│                                                                       │
+│  pipeline/runner.py → pipeline/steps/                                │
+│  client_config.py:activate_client() applies YAML overrides to Config │
+│  output/<client>/ep_N/ isolation already in place                    │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -99,230 +105,214 @@ Key facts about scheduling in the existing system:
 
 ```
 podcast-automation/
-├── main.py                              # UNCHANGED
-├── config.py                           # MODIFIED: CALENDAR_CLIP_SPREAD_DAYS, DROPBOX_POLL_INTERVAL
-├── content_calendar.py                 # NEW: ContentCalendar class
+├── main.py                              # MODIFIED: add package-demo command
+├── config.py                           # MODIFIED: EPISODE_SOURCE, GENRE, CLIP_SCORING_MODE
+├── client_config.py                    # MODIFIED: map new YAML fields to Config
+├── rss_episode_fetcher.py              # NEW: RSS download + episode metadata
+├── demo_packager.py                    # NEW: demo output packaging
 ├── pipeline/
 │   └── steps/
-│       └── distribute.py              # MODIFIED: call calendar.plan_clips() after clip creation
-├── ci/
-│   ├── poll.py                        # NEW: Dropbox polling script for GitHub Actions
-│   └── trigger_episode.py             # NEW: invoke pipeline for discovered episode
-├── .github/
-│   └── workflows/
-│       ├── poll.yml                   # NEW: scheduled cron, calls ci/poll.py
-│       └── manual.yml                 # NEW: workflow_dispatch for manual episode trigger
-├── topic_data/
-│   ├── content_calendar.json          # NEW: persistent calendar state
-│   ├── engagement_history.json        # EXISTING (v1.2)
-│   └── analytics/                     # EXISTING
+│       ├── ingest.py                   # MODIFIED: RSS/local source routing, decouple Dropbox
+│       └── analysis.py                 # MODIFIED: genre-aware compliance + clip scoring
+├── clients/
+│   ├── example-client.yaml            # MODIFIED: add episode_source, genre, new fields
+│   ├── fake-problems.yaml             # EXISTING (unchanged behavior)
+│   ├── <new-client-1>.yaml            # NEW (e.g., true-crime-client.yaml)
+│   └── <new-client-2>.yaml            # NEW (e.g., business-podcast.yaml)
+├── demo/
+│   └── <client>/
+│       └── <episode>/                 # Generated demo packages (gitignored)
 └── tests/
-    └── test_content_calendar.py       # NEW
+    ├── test_rss_episode_fetcher.py     # NEW
+    └── test_demo_packager.py           # NEW
 ```
 
 ### Structure Rationale
 
-- **`ci/` directory** — separates CI-specific scripts (poll, trigger) from the main pipeline. These scripts are thin: they read Dropbox state and invoke `main.py`. No business logic here.
-- **`content_calendar.py` at root** — follows project convention of flat module structure. Peer to `scheduler.py` and `posting_time_optimizer.py`.
-- **`topic_data/content_calendar.json`** — co-located with existing cross-episode data files (`engagement_history.json`, `scored_topics_*.json`). Consistent discovery pattern.
-- **`.github/workflows/`** — standard location; two workflows (poll + manual) to keep concerns separate.
+- **`rss_episode_fetcher.py` at root** — follows project convention of flat module structure. Peer to `dropbox_handler.py`. Both satisfy the "episode source" role; ingest.py chooses between them.
+- **`demo_packager.py` at root** — standalone post-processing tool, not part of the core pipeline loop. Same level as `analytics.py`, `content_calendar.py`.
+- **`demo/` directory** — separate from `output/` (which is pipeline working state). Demo output is presentation-ready, curated copies.
 
 ---
 
 ## Architectural Patterns
 
-### Pattern 1: Content Calendar as a JSON State File (Not Config)
+### Pattern 1: Episode Source Abstraction via Config Flag
 
-**What:** `content_calendar.json` is a generated, mutable state file — not a hand-edited config. `ContentCalendar` generates it when `plan_episode()` or `plan_clips()` is called, and updates it as slots are consumed.
+**What:** `ingest.py` reads `Config.EPISODE_SOURCE` (set from `episode_source` in client YAML) and branches to either `DropboxHandler` or `RSSEpisodeFetcher`. The `DropboxHandler` instantiation is moved inside the `dropbox` branch — it is no longer unconditionally constructed.
 
-**When to use:** After the distribute step creates clips; before `run_upload_scheduled()` fires.
+**When to use:** Any client whose audio lives in a public RSS feed rather than a shared Dropbox.
 
-**Trade-offs:** Zero new database dependency. Trivially inspectable (`cat topic_data/content_calendar.json`). Atomic write pattern (`.tmp` rename) prevents corrupt state on crash. Scales adequately to a bi-weekly show (~50 entries/year). No web UI or external calendar service needed.
+**Trade-offs:** No interface/abstract class needed — three branches (dropbox, rss, local) are simple `if/elif`. Adding a fourth source type later is a 10-line addition. The episode number extraction must be handled by each source type — RSS fetchers can parse episode numbers from the `<itunes:episode>` tag or from the audio filename in the enclosure URL.
 
-**Schema:**
-```json
-{
-  "episodes": {
-    "ep_30": {
-      "episode_number": 30,
-      "release_date": "2026-03-25T14:00:00",
-      "status": "scheduled",
-      "dropbox_path": "/Fake Problems Podcast/new_raw_files/ep30.wav",
-      "clips": [
-        {
-          "clip_index": 0,
-          "clip_path": "output/ep_30/clip_0_subtitled.mp4",
-          "platforms": {
-            "twitter":  { "publish_at": "2026-03-26T10:00:00", "status": "pending" },
-            "tiktok":   { "publish_at": "2026-03-27T12:00:00", "status": "pending" },
-            "youtube":  { "publish_at": "2026-03-25T14:00:00", "status": "uploaded", "video_id": "abc123" }
-          }
-        },
-        {
-          "clip_index": 1,
-          "clip_path": "output/ep_30/clip_1_subtitled.mp4",
-          "platforms": {
-            "twitter":  { "publish_at": "2026-03-28T10:00:00", "status": "pending" },
-            "tiktok":   { "publish_at": "2026-03-29T12:00:00", "status": "pending" }
-          }
-        }
-      ]
-    }
-  },
-  "last_updated": "2026-03-19T12:00:00"
-}
+**Implementation in ingest.py:**
+```python
+episode_source = getattr(Config, "EPISODE_SOURCE", "dropbox")
+
+if ctx.audio_file and ctx.audio_file.exists():
+    audio_file = ctx.audio_file  # local path provided directly
+elif episode_source == "rss":
+    fetcher = components["rss_fetcher"]
+    meta = fetcher.fetch_latest(Config.RSS_FEED_URL)
+    audio_file = fetcher.download_audio(meta.audio_url, Config.DOWNLOAD_DIR)
+    ctx.episode_meta = meta  # carry forward for RSS field population
+else:  # dropbox (default)
+    dropbox = components["dropbox"]
+    latest = dropbox.get_latest_episode()
+    audio_file = dropbox.download_episode(latest["path"])
+
+# Episode number extraction: each source provides its own
 ```
 
-Clip spread strategy: episode day = Clip 0 (YouTube Short); day+1 = Clip 0 Twitter/TikTok; day+3 = Clip 1 Twitter/TikTok; day+5 = Clip 2 if exists. This gives 5 social touchpoints across the week from a single episode.
+The `components` dict in `runner.py` conditionally includes `"rss_fetcher"` or `"dropbox"` based on `Config.EPISODE_SOURCE`. This prevents `DropboxHandler.__init__()` from raising `ValueError` for clients with no Dropbox credentials.
 
-### Pattern 2: GitHub Actions Self-Hosted Runner on the Existing Windows Machine
+### Pattern 2: Genre Config as Prompt Context Injection
 
-**What:** Install the GitHub Actions runner as a Windows service on the existing local machine. The runner listens for job triggers from GitHub. Workflows run `python main.py` exactly as the host already does — same GPU, same FFmpeg, same `.env` file.
+**What:** The `genre` field in the client YAML maps to `Config.PODCAST_GENRE`. The `ContentEditor.analyze_content()` method receives genre as a parameter and injects it into the GPT-4o prompt, adjusting tone expectations, clip selection criteria, and compliance sensitivity.
 
-**When to use:** This is the only option that keeps GPU access (Whisper requires CUDA), avoids uploading 700MB WAV files to cloud runners, and costs nothing extra.
+**When to use:** Any non-comedy podcast. Without this, GPT-4o generates comedy-voiced show notes and over-censors non-profanity content.
 
-**Setup:**
+**Trade-offs:** Genre is a soft hint to the AI, not a hard rule switch. The existing `VOICE_PERSONA` field in client YAML already provides the primary tone control. Genre is additive context that helps the AI understand what "good" looks like for this show type. Do not create separate ContentEditor subclasses per genre — that's premature.
+
+**Genre effects on pipeline:**
 ```
-# Install runner as Windows service (run once, as Administrator)
-# Download from: github.com/{repo}/settings/actions/runners/new
-# Config registers the runner with labels: self-hosted, windows, gpu
+comedy (default, existing behavior):
+    compliance_enabled: optional (default false for edgy content)
+    clip_scoring: energy-based (AudioClipScorer)
+    censorship: names + words lists
 
-# Workflow targets it:
-runs-on: [self-hosted, windows, gpu]
-```
+true-crime:
+    compliance_enabled: true (check for identifying victims, legal risk)
+    clip_scoring: balanced (topic relevance + energy)
+    censorship: typically light (no profanity lists needed)
 
-**Trade-offs:** Runner requires the host machine to be on and the service running. Acceptable for a bi-weekly show — no SLA requirement. If the machine is off when the cron fires, GitHub Actions re-runs the scheduled workflow at the next opportunity (within ~1h window). Alternative (cloud GPU runner at $0.07/min) costs ~$5/episode for Whisper — not worth it at current scale.
-
-**Secrets vs .env:** The self-hosted runner executes on the machine that already has `.env`. The workflow can simply invoke `python main.py` — `load_dotenv()` in `config.py` reads `.env` at runtime. No GitHub Secrets needed for the self-hosted path. GitHub Secrets are the fallback if a cloud runner is ever used.
-
-### Pattern 3: Dropbox Polling via Lightweight CI Script
-
-**What:** `ci/poll.py` is a small script (not part of the main pipeline) that:
-1. Connects to Dropbox (reads credentials from `.env`)
-2. Lists files in `DROPBOX_FOLDER_PATH`
-3. Compares against episodes already in `content_calendar.json`
-4. If an unprocessed WAV is found, writes its filename to `ci/pending_episode.txt` and exits 0
-5. If nothing new, exits 1 (which allows the GitHub Actions workflow to skip the expensive pipeline run)
-
-**When to use:** Called from `poll.yml` on a cron schedule (e.g., every 6 hours). The workflow checks the exit code and only runs the episode pipeline step if exit 0.
-
-```yaml
-# .github/workflows/poll.yml
-on:
-  schedule:
-    - cron: '0 */6 * * *'   # every 6 hours
-  workflow_dispatch:          # always include for manual testing
-
-jobs:
-  poll:
-    runs-on: [self-hosted, windows, gpu]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Poll Dropbox for new episodes
-        id: poll
-        run: python ci/poll.py
-        continue-on-error: true
-      - name: Process new episode
-        if: steps.poll.outcome == 'success'
-        run: python main.py latest --auto-approve
+business/interview:
+    compliance_enabled: false (low-risk content)
+    clip_scoring: topic-match weighted (quotable insights > loud moments)
+    censorship: typically empty lists
 ```
 
-**Trade-offs:** Simple and transparent. The poll script is ~30 lines, fully unit-testable with mock Dropbox. No webhooks or event subscriptions needed. Polling interval of 6h is fine for a bi-weekly show.
+### Pattern 3: Demo Package as a Read-Only View of Existing Output
 
-### Pattern 4: Clip Distribution Spread vs. Same-Day
+**What:** `DemoPackager` does NOT re-generate content. It reads what the pipeline already produced in `output/<client>/ep_N/` and assembles a demo-ready copy in `demo/<client>/ep_N/`. The summary HTML is the only new artifact — it wraps existing outputs in a visual layout.
 
-**What:** Rather than uploading all clips on episode release day, spread short-form clips across the week. The `ContentCalendar.plan_clips()` method assigns each clip to a specific platform+day slot.
+**When to use:** After a full pipeline run completes. Invoked manually via `python main.py package-demo <client> [ep_N]`.
 
-**Recommended spread for 3 clips, bi-weekly schedule:**
+**Trade-offs:** This pattern avoids any risk of demo packaging breaking the core pipeline. Demo packaging can fail without affecting episode output. Copying files (not moving) preserves the original pipeline artifacts. The summary HTML is a static single-file document (no web server needed) so it's shareable as an email attachment or Dropbox link.
+
+**What the demo package contains:**
 ```
-Day 0 (release): Episode full video → YouTube
-Day 1:           Clip 0 → YouTube Short, Twitter, TikTok
-Day 3:           Clip 1 → Twitter, TikTok
-Day 5:           Clip 2 → Twitter, TikTok
-```
-
-**Rationale:** Social algorithms reward consistent posting (not spikes). Spreading clips extends the promotion window from 1 day to 5 days. Each clip post can reference the full episode, driving late listeners to the back catalog. Evidence from content calendar research: weekly drip sustains engagement for longer than same-day dump.
-
-**Trade-offs:** Clip uploads can no longer happen in a single `run_upload_scheduled()` call. The `upload-scheduled` command must be run periodically (daily via cron) to fire due slots. `main.py upload-scheduled` already exists and iterates pending schedules — it just needs to also read `content_calendar.json` clip slots.
-
-### Pattern 5: Clip Upload via Existing `run_upload_scheduled()` Path
-
-**What:** The clip calendar slots are consumed by extending `run_upload_scheduled()` to also check `content_calendar.json` for due clip slots. No new CLI command needed.
-
-**When to use:** Daily cron in `poll.yml` (or a separate `upload.yml` that runs `python main.py upload-scheduled` daily at 9am).
-
-**Integration point:**
-```
-pipeline/runner.py:run_upload_scheduled()
-    EXISTING: reads output/ep_N/upload_schedule.json for episode-level platform uploads
-    NEW: also calls ContentCalendar.get_pending_slots(now)
-         for each due clip slot: calls clip-appropriate uploader
-         marks slot as uploaded in content_calendar.json
+demo/<client>/ep_N/
+    README.md               — "Here's what we produced for your episode"
+    summary.html            — visual overview: thumbnail, captions, clips list
+    clips/
+        clip_0.mp4          — copy of subtitled clip video
+        clip_1.mp4
+        clip_2.mp4
+    thumbnail.png           — copy of generated thumbnail
+    blog_post.html          — copy of blog post
+    captions.txt            — extracted social captions (Twitter, YouTube, LinkedIn)
 ```
 
-This reuses all existing platform uploader code. The calendar is a scheduling layer on top of the existing upload machinery.
+The `summary.html` is generated with Python's `string.Template` or simple f-string concatenation — no external template engine needed. It embeds the thumbnail as a base64 data URL so the file is self-contained.
+
+### Pattern 4: Conditional Component Initialization in runner.py
+
+**What:** `runner.py:_init_components()` already uses try/except to build the `components` dict, silently omitting unavailable uploaders. The same pattern extends to episode source components: if `EPISODE_SOURCE = "rss"`, only `RSSEpisodeFetcher` is constructed (no Dropbox attempt). If `EPISODE_SOURCE = "dropbox"`, only `DropboxHandler` is constructed.
+
+**Current pattern (runner.py):**
+```python
+# Uploaders already conditional:
+try:
+    uploaders["youtube"] = YouTubeUploader(token_path=youtube_token)
+except (ValueError, FileNotFoundError) as e:
+    logger.info("YouTube uploader not available: %s", ...)
+```
+
+**Extension for episode sources:**
+```python
+episode_source = getattr(Config, "EPISODE_SOURCE", "dropbox")
+if episode_source == "rss":
+    from rss_episode_fetcher import RSSEpisodeFetcher
+    components["rss_fetcher"] = RSSEpisodeFetcher()
+else:
+    components["dropbox"] = DropboxHandler()  # existing behavior
+```
+
+This is the minimal change needed to un-block non-Dropbox clients.
 
 ---
 
 ## Data Flow
 
-### Full Episode Processing + Calendar Planning
+### RSS Episode Processing Flow
 
 ```
-GitHub Actions poll.yml cron trigger
+python main.py --client true-crime-client latest
     |
-ci/poll.py
-    +-- DropboxHandler.list_episodes()
-    +-- ContentCalendar.is_processed(filename)
-    |   if processed: exit 1 (no-op)
+client_config.py:activate_client("true-crime-client")
+    - applies episode_source: "rss" → Config.EPISODE_SOURCE = "rss"
+    - applies rss.feed_url → Config.RSS_FEED_URL = "https://..."
+    - applies content.genre → Config.PODCAST_GENRE = "true-crime"
+    - applies voice_persona, scoring_profile overrides
     |
-    v (new episode found)
-python main.py latest --auto-approve
+pipeline/runner.py:_init_components()
+    - sees EPISODE_SOURCE = "rss" → constructs RSSEpisodeFetcher
+    - skips DropboxHandler construction entirely
     |
-pipeline/steps/ingest.py      → download WAV
-pipeline/steps/analysis.py    → transcribe, analyze, select clips
-pipeline/steps/video.py       → render clip videos (subtitled)
-pipeline/steps/distribute.py  → upload episode (YouTube, Spotify, RSS)
-                               → ContentCalendar.plan_episode(episode_num, release_dt)
-                               → ContentCalendar.plan_clips(episode_num, clip_paths)
-                               → saves topic_data/content_calendar.json
+pipeline/steps/ingest.py
+    - calls rss_fetcher.fetch_latest(Config.RSS_FEED_URL)
+    - returns EpisodeMeta(title, audio_url, episode_number, pub_date)
+    - calls rss_fetcher.download_audio(meta.audio_url, DOWNLOAD_DIR / <client>)
+    - sets ctx.audio_file, ctx.episode_number, ctx.episode_meta
+    |
+pipeline/steps/analysis.py (MODIFIED)
+    - reads Config.PODCAST_GENRE, Config.COMPLIANCE_ENABLED
+    - injects genre context into ContentEditor prompt
+    - skips compliance check if Config.COMPLIANCE_ENABLED = False
+    |
+[remaining steps: audio, video, distribute — unchanged]
+    |
+output/true-crime-client/ep_N/
+    {stem}_transcript.json
+    {stem}_analysis.json
+    clip_0.mp4, clip_1.mp4, clip_2.mp4
+    thumbnail.png
+    blog_post.html
 ```
 
-### Daily Clip Distribution
+### Demo Package Flow
 
 ```
-GitHub Actions upload.yml daily cron (or same poll.yml with upload step)
+python main.py package-demo true-crime-client ep_42
     |
-python main.py upload-scheduled
+demo_packager.py:DemoPackager.package_demo("true-crime-client", "ep_42")
     |
-pipeline/runner.py:run_upload_scheduled()
+    +-- reads output/true-crime-client/ep_42/{stem}_analysis.json
+    |   extracts: episode_title, social_captions, show_notes
     |
-    +-- [EXISTING] iterate output/ep_N/upload_schedule.json files
-    |                check publish_at <= now, fire pending platform uploads
+    +-- locates: clip_*_subtitled.mp4, thumbnail.png, blog_post.html
     |
-    +-- [NEW] ContentCalendar.get_pending_slots(now)
-              for each due ClipSlot:
-                  call platform uploader (twitter, tiktok, youtube)
-                  ContentCalendar.mark_slot_uploaded(episode, clip_index, platform, result)
-                  saves content_calendar.json (atomic write)
+    +-- creates demo/true-crime-client/ep_42/
+    |       copies clips/, thumbnail.png, blog_post.html
+    |       writes captions.txt (formatted from analysis.social_captions)
+    |       writes summary.html (template, embeds thumbnail as base64)
+    |       writes README.md
+    |
+    +-- prints: "Demo package ready: demo/true-crime-client/ep_42/"
 ```
 
-### CI/CD Secrets Flow
+### Client Config Application (existing + new fields)
 
 ```
-.env (local file, never committed)
-    |
-    +-- config.py:load_dotenv()    (production: local Windows machine)
-    |
-    +-- GitHub Actions Secrets     (future: if cloud runner needed)
-           OPENAI_API_KEY
-           DROPBOX_APP_KEY / DROPBOX_APP_SECRET / DROPBOX_REFRESH_TOKEN
-           YOUTUBE_CLIENT_ID / YOUTUBE_CLIENT_SECRET
-           TWITTER_* / INSTAGRAM_* / TIKTOK_*
-           DISCORD_WEBHOOK_URL
+clients/<name>.yaml
+    episode_source: "rss"           → Config.EPISODE_SOURCE
+    rss.feed_url: "https://..."     → Config.RSS_FEED_URL        (NEW)
+    content.genre: "true-crime"     → Config.PODCAST_GENRE        (NEW)
+    content.compliance_enabled: true → Config.COMPLIANCE_ENABLED  (NEW)
+    content.censor_enabled: false   → Config.CENSOR_ENABLED       (NEW)
+    [all existing fields unchanged]
 ```
-
-For self-hosted runner: `.env` is present on disk, `load_dotenv()` works as-is. No GitHub Secrets configuration required for initial setup. Add secrets only if/when switching to cloud runner.
 
 ---
 
@@ -332,106 +322,111 @@ For self-hosted runner: `.env` is present on disk, `load_dotenv()` works as-is. 
 
 | Module | Integrates With | Direction |
 |--------|-----------------|-----------|
-| `content_calendar.py` | `pipeline/steps/distribute.py` | distribute calls `plan_episode()`, `plan_clips()` after uploads |
-| `content_calendar.py` | `pipeline/runner.py:run_upload_scheduled()` | scheduler reads `get_pending_slots()` to fire clip uploads |
-| `content_calendar.py` | `topic_data/content_calendar.json` | reads/writes file (atomic) |
-| `ci/poll.py` | `dropbox_handler.py` (indirectly, via Dropbox SDK) | poll reads Dropbox listing |
-| `ci/poll.py` | `content_calendar.py` | poll reads processed episode set |
-| `.github/workflows/poll.yml` | `ci/poll.py`, `main.py` | workflow invokes scripts |
+| `rss_episode_fetcher.py` | `pipeline/runner.py` | runner constructs it; passes via `components["rss_fetcher"]` |
+| `rss_episode_fetcher.py` | `pipeline/steps/ingest.py` | ingest calls `fetch_latest()` + `download_audio()` |
+| `demo_packager.py` | `pipeline/steps/distribute.py` output | reads analysis JSON + copies output files |
+| `demo_packager.py` | `main.py` | new `package-demo` CLI command routes to it |
 
 ### Modified Existing Modules
 
 | Module | Change | Risk |
 |--------|--------|------|
-| `pipeline/steps/distribute.py` | Call `ContentCalendar.plan_clips()` after clips are uploaded. Pass `release_date` from analysis to `plan_episode()`. | LOW — additive; no existing call sites change |
-| `pipeline/runner.py:run_upload_scheduled()` | Add ContentCalendar `get_pending_slots()` check alongside existing `upload_schedule.json` loop. | LOW — additive block; existing episode schedule loop untouched |
-| `config.py` | Add `CALENDAR_CLIP_SPREAD_DAYS` (default: 5), `DROPBOX_POLL_INTERVAL_HOURS` (default: 6). | MINIMAL |
-| `main.py` | No change required — `upload-scheduled` already routes to `run_upload_scheduled()`. | NONE |
+| `pipeline/steps/ingest.py` | Branch on `Config.EPISODE_SOURCE`; move Dropbox instantiation inside `else` branch; add RSS fetch path | LOW — additive branching; Dropbox path is behaviorally identical |
+| `pipeline/runner.py` | Conditional component construction (rss_fetcher vs dropbox) based on `EPISODE_SOURCE` | LOW — existing try/except pattern already handles optional components |
+| `pipeline/steps/analysis.py` | Inject genre context into ContentEditor call; respect `COMPLIANCE_ENABLED` flag | LOW — additive prompt context; compliance skip already has `self.enabled` pattern |
+| `client_config.py` | Map new YAML fields (`episode_source`, `rss.feed_url`, `content.genre`, etc.) to Config | MINIMAL — additive to `_YAML_TO_CONFIG` dict |
+| `config.py` | Add `EPISODE_SOURCE`, `RSS_FEED_URL`, `PODCAST_GENRE`, `COMPLIANCE_ENABLED`, `CENSOR_ENABLED` with env-var defaults | MINIMAL — all new, no existing attribute changes |
+| `clients/example-client.yaml` | Add commented-out new fields with documentation | NONE — purely additive, no existing clients affected |
+| `main.py` | Add `package-demo` command routing | LOW — new elif branch in command dispatch |
 
 ### Internal Boundaries
 
 | Boundary | Communication | Notes |
 |----------|---------------|-------|
-| `ContentCalendar` ↔ `distribute.py` | `plan_episode()` + `plan_clips()` return void, write file | Called after real uploads complete; safe to skip on dry-run |
-| `ContentCalendar` ↔ `run_upload_scheduled()` | `get_pending_slots(now)` returns list of due ClipSlot objects | Returns empty list if calendar missing — no-op behavior |
-| `ci/poll.py` ↔ `content_calendar.json` | Read-only: checks processed episode set | Graceful: if calendar missing, assume no episodes processed |
-| `ContentCalendar` write path | Atomic `.tmp` rename (matches `scheduler.py` pattern) | Prevents corrupt state if process killed mid-write |
-| GitHub Actions ↔ self-hosted runner | HTTPS long-poll from runner to GitHub API | Runner initiates connection; no inbound firewall rule needed |
+| `RSSEpisodeFetcher` ↔ `ingest.py` | `EpisodeMeta` dataclass return from `fetch_latest()` | Store on `ctx.episode_meta` for downstream use (RSS distribution step may want pub_date) |
+| `ingest.py` ↔ `runner.py` | `components` dict key: `"rss_fetcher"` vs `"dropbox"` | Only one is present per run; ingest checks which key exists |
+| `DemoPackager` ↔ output files | Read-only access to `output/<client>/ep_N/` | Never modifies pipeline output; only copies |
+| `ContentEditor` ↔ genre config | Genre passed as parameter to `analyze_content()` | Not stored in ContentEditor instance — Config is the source of truth |
+| `Config.CENSOR_ENABLED` ↔ audio step | Audio step skips `apply_censorship()` if False | Must check flag, not rely on empty word lists (empty lists currently still run the duck-fade pass) |
 
 ---
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Storing Calendar in a Hand-Edited Config File
+### Anti-Pattern 1: Subclassing DropboxHandler for RSS
 
-**What people do:** Define the release schedule as static config (e.g., `RELEASE_DAYS = ["Tuesday", "Thursday"]` in config.py).
-**Why it's wrong:** The calendar needs per-episode state (was ep30 processed? which clips have been uploaded?). A config value can't track mutable state. Stateless config + mutable state = no safe way to avoid double-uploads.
-**Do this instead:** `content_calendar.json` is generated state, not config. Release cadence preferences (spread days, posting hours) live in config.py as constants; the episode-specific schedule lives in the JSON file.
+**What people do:** Create `RSSHandler(DropboxHandler)` or add `download_from_rss()` to the existing DropboxHandler class.
+**Why it's wrong:** DropboxHandler owns Dropbox-specific auth, retry logic, and folder path conventions. These are meaningless for RSS. Subclassing adds dead weight and confuses future readers.
+**Do this instead:** Separate `rss_episode_fetcher.py` module. Both DropboxHandler and RSSEpisodeFetcher are peers in the `components` dict. Ingest selects one based on `Config.EPISODE_SOURCE`.
 
-### Anti-Pattern 2: Using GitHub-Hosted Cloud Runners for Whisper
+### Anti-Pattern 2: Genre-Specific ContentEditor Subclasses
 
-**What people do:** Run the full pipeline on GitHub-hosted runners (ubuntu-latest or windows-latest).
-**Why it's wrong:** (a) No GPU — Whisper CPU mode is 3x slower, ~35 minutes for a 70-minute episode. (b) No CUDA — WhisperX/pyannote diarization won't run. (c) 700MB WAV uploads needed. (d) Cost: $0.007/min for Windows hosted runner = ~$25/episode at full duration.
-**Do this instead:** Self-hosted runner on the existing Windows machine. GPU is present, CUDA is configured, WAV files don't move. Cost: $0.
+**What people do:** `TrueCrimeContentEditor(ContentEditor)`, `BusinessContentEditor(ContentEditor)` with overridden prompts.
+**Why it's wrong:** Subclass proliferation for what is really just a config difference. The ContentEditor prompt is already parameterized by `VOICE_PERSONA`. Genre is additive context, not a code branch.
+**Do this instead:** Single ContentEditor with genre injected as prompt context: `"This is a {genre} podcast. Adjust your analysis accordingly."` + the existing `VOICE_PERSONA` per-client config.
 
-### Anti-Pattern 3: Committing `.env` or Credentials to the Repo
+### Anti-Pattern 3: Demo Packager Regenerating Content
 
-**What people do:** Add API keys to `.github/workflows/*.yml` as inline values, or commit a `.env.ci` file for convenience.
-**Why it's wrong:** Leaks credentials. GitHub Actions workflow files are public in public repos. Even in private repos, this is a security risk if the repo is ever made public or shared.
-**Do this instead:** Self-hosted runner reads `.env` from disk via `load_dotenv()` — nothing in the workflow files. If cloud runners are used in future, secrets go in GitHub Actions Secrets (`${{ secrets.OPENAI_API_KEY }}`), injected as environment variables in the workflow step.
+**What people do:** Make the demo packager re-run GPT-4o to produce "cleaner" or "demo-ready" captions.
+**Why it's wrong:** (a) Costs money. (b) Produces inconsistency between what the demo shows and what the pipeline actually delivered. (c) Adds latency.
+**Do this instead:** The demo is a presentation of what was actually produced. If the output isn't good enough for a demo, fix the pipeline config (voice_persona, genre) and re-run the episode. The demo package is a mirror, not a polish layer.
 
-### Anti-Pattern 4: Firing All Clip Uploads in the Main Pipeline Run
+### Anti-Pattern 4: Unconditional DropboxHandler Construction
 
-**What people do:** Upload all clips to all platforms in the same `run_distribute()` call that uploads the full episode.
-**Why it's wrong:** (a) Destroys the spread strategy — all clips land on day 0. (b) Makes the pipeline run ~30-60 minutes longer if Twitter/TikTok rate-limit. (c) If one clip upload fails, it can't be retried without re-running the whole pipeline.
-**Do this instead:** Main pipeline uploads only the full episode (YouTube, Spotify, RSS). Clips are planned into `content_calendar.json` with future dates. Daily `upload-scheduled` fires due clip slots. This mirrors the existing `upload_schedule.json` pattern already in use for delayed episode uploads.
+**What people do:** Leave `DropboxHandler()` construction in `_init_components()` regardless of `EPISODE_SOURCE`.
+**Why it's wrong:** `DropboxHandler.__init__()` raises `ValueError` if no Dropbox credentials are configured. Real clients won't have Dropbox credentials. This blocks the entire pipeline for any RSS-sourced client.
+**Do this instead:** Gate `DropboxHandler` construction behind `episode_source == "dropbox"` check. This is the primary architectural fix needed for v1.4.
 
-### Anti-Pattern 5: Separate CLI Command for Calendar Management
+### Anti-Pattern 5: Storing Demo in output/ Directory
 
-**What people do:** Add `python main.py calendar show`, `python main.py calendar plan ep30`, etc.
-**Why it's wrong:** Adds surface area that must be maintained, tested, and documented. The calendar should be invisible plumbing — it updates automatically during the pipeline run.
-**Do this instead:** Calendar operations are internal to `content_calendar.py` and triggered by existing pipeline hooks. The only user-visible interaction is: things get uploaded at the right times without manual intervention. If inspection is needed, `cat topic_data/content_calendar.json` is sufficient.
+**What people do:** Write demo files into `output/<client>/ep_N/demo/` alongside pipeline artifacts.
+**Why it's wrong:** `output/` is ephemeral working state — it may be cleaned, regenerated, or gitignored entirely. Demos are persistent deliverables meant to be shared with clients.
+**Do this instead:** Separate `demo/<client>/<episode>/` tree. Clearly communicates intent. Can be committed to git, zipped and emailed, or hosted on Dropbox independently of pipeline state.
 
 ---
 
 ## Build Order (Dependency-Driven)
 
 ```
-Phase A — ContentCalendar foundation (no pipeline dependencies):
-  1. content_calendar.py
-     - CalendarEntry and ClipSlot dataclasses
-     - plan_episode(), plan_clips() — compute spread schedule
-     - get_pending_slots(now) — returns due slots
-     - mark_slot_uploaded() — updates status + atomic write
-     - Standalone, testable with mock data
-  2. tests/test_content_calendar.py
+Phase A — RSS episode source (prerequisite for real client testing):
+  1. rss_episode_fetcher.py
+     - fetch_latest(rss_url) → EpisodeMeta
+     - download_audio(url, dest) → Path with progress bar (tqdm, already dep)
+     - extract_episode_number() using itunes:episode tag, then filename fallback
+     - Standalone, no pipeline dependencies
+  2. tests/test_rss_episode_fetcher.py
+     - mock requests.get for RSS XML parsing tests
+     - mock urllib.request for audio download tests
 
-Phase B — CI/polling scripts (depends on ContentCalendar for episode check):
-  3. ci/poll.py
-     - Dropbox list → compare against content_calendar.json
-     - exit 0/1 for workflow conditional
-  4. .github/workflows/poll.yml
-     - cron trigger + workflow_dispatch
-     - calls poll.py then main.py if new episode
-  5. .github/workflows/manual.yml (or add episode input to poll.yml)
-     - workflow_dispatch with episode_number input
+Phase B — Ingest decoupling (unblocks non-Dropbox clients):
+  3. config.py: add EPISODE_SOURCE, RSS_FEED_URL, PODCAST_GENRE,
+                COMPLIANCE_ENABLED, CENSOR_ENABLED
+  4. client_config.py: map new YAML fields in _YAML_TO_CONFIG
+  5. clients/example-client.yaml: add commented new fields
+  6. pipeline/runner.py: conditional component construction
+  7. pipeline/steps/ingest.py: branch on EPISODE_SOURCE
+     - RSS path uses RSSEpisodeFetcher
+     - Dropbox path unchanged (existing behavior preserved)
 
-Phase C — Pipeline integration (depends on ContentCalendar):
-  6. pipeline/steps/distribute.py
-     - call plan_episode() + plan_clips() after upload
-  7. pipeline/runner.py:run_upload_scheduled()
-     - add ContentCalendar.get_pending_slots() check
-  8. config.py
-     - CALENDAR_CLIP_SPREAD_DAYS, DROPBOX_POLL_INTERVAL_HOURS
+Phase C — Genre-aware pipeline (quality for real clients):
+  8. pipeline/steps/analysis.py: inject genre context into ContentEditor
+     - Read Config.PODCAST_GENRE, pass to analyze_content()
+     - Respect Config.COMPLIANCE_ENABLED flag
+     - Respect Config.CENSOR_ENABLED flag in audio step
+  9. Create real client YAML configs (2-3 genres)
+     - Set voice_persona, genre, scoring_profile, censor lists appropriately
+  10. Test run: process one real RSS episode per client, fix breakage
 
-Phase D — Self-hosted runner setup (ops, not code):
-  9. Install GitHub Actions runner as Windows service on local machine
-     - Register at github.com/{repo}/settings/actions/runners
-     - Labels: [self-hosted, windows, gpu]
-     - Install as service so it survives reboots
+Phase D — Demo packaging (sales readiness):
+  11. demo_packager.py
+      - package_demo(client_name, episode_folder) reads output/ → writes demo/
+      - Generates summary.html (self-contained, base64 thumbnail)
+      - Copies clips, captions, blog post
+  12. tests/test_demo_packager.py
+  13. main.py: add package-demo command
 ```
 
-Phases A and B are independent. Phase C requires Phase A. Phase D is ops-only (no code changes).
+Phases A and B must complete before real client testing. Phase C requires B. Phase D requires a successful Phase C test run (needs real output to package).
 
 ---
 
@@ -439,24 +434,20 @@ Phases A and B are independent. Phase C requires Phase A. Phase D is ops-only (n
 
 | Scale | Architecture Adjustments |
 |-------|--------------------------|
-| Current (bi-weekly, ~50 eps/year) | JSON calendar file, local runner, adequate |
-| Daily show (~365 eps/year) | Calendar JSON grows to ~5MB — add rolling trim (keep last 60 episodes) |
-| Multiple shows | Parameterize calendar with show_id; separate `content_calendar_{show}.json` files |
-| Cloud runner needed | Add GitHub Secrets for all API keys; `config.py` already reads from env vars, zero code change |
+| 2-3 clients (v1.4 target) | Current YAML-per-client approach is adequate; no changes needed |
+| 10+ clients | `process-all` command already exists; add concurrency flag (ProcessPoolExecutor) |
+| 50+ clients (SaaS path) | Client YAML → database; output/ → cloud storage; pipeline as a service |
+| Unsupported audio hosts | Extend `RSSEpisodeFetcher` with host-specific download logic (e.g., Anchor CDN, Spreaker) |
 
 ---
 
 ## Sources
 
-- Direct code inspection: `scheduler.py`, `posting_time_optimizer.py`, `pipeline/runner.py`, `pipeline/steps/distribute.py`, `main.py`, `config.py`, `pipeline_state.py`, `dropbox_handler.py`
-- [GitHub Actions: Configuring self-hosted runner as a service (Windows)](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/configuring-the-self-hosted-runner-application-as-a-service) — MEDIUM confidence (Windows-specific permission docs sparse)
-- [GitHub Actions: Events that trigger workflows](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows) — HIGH confidence (official docs)
-- [GitHub Actions: Using secrets](https://docs.github.com/actions/security-guides/using-secrets-in-github-actions) — HIGH confidence (official docs)
-- [GitHub Actions: Self-hosted runners reference](https://docs.github.com/en/actions/reference/runners/self-hosted-runners) — HIGH confidence (official docs)
-- Existing patterns in codebase: `scheduler.py:save_schedule()` atomic write, `pipeline/runner.py:run_upload_scheduled()` polling pattern, `PipelineState` checkpoint JSON
-- Podcast clip distribution research: WebSearch (MEDIUM confidence) — drip > dump for sustained week-long engagement; evidence from [Simplecast: Leveraging Podcast Clips for Cross-Promotion](https://blog.simplecast.com/how-to-leverage-podcast-clips-for-cross-promotion)
+- Direct code inspection: `pipeline/steps/ingest.py`, `pipeline/runner.py`, `client_config.py`, `dropbox_handler.py`, `config.py`, `clients/example-client.yaml`, `content_compliance_checker.py`, `audio_processor.py`
+- `feedparser` library — standard Python RSS/Atom parsing library, available on PyPI, HIGH confidence for RSS feed parsing
+- Project conventions: flat module structure, `self.enabled` pattern, `components` dict pattern in runner.py, `try/except ValueError` for optional component init
 
 ---
 
-*Architecture research for: v1.3 Content Calendar & CI/CD — Fake Problems Podcast Automation*
-*Researched: 2026-03-19*
+*Architecture research for: v1.4 Real-World Testing & Sales Readiness — Podcast Automation Pipeline*
+*Researched: 2026-03-28*
