@@ -38,7 +38,7 @@ try:
             for i, ep in enumerate(episodes, 1):
                 print(f"  {i}. {ep['name']}")
                 print(f"     Released: {ep['release_date']}")
-                duration_min = ep['duration_ms'] // 60000
+                duration_min = ep["duration_ms"] // 60000
                 print(f"     Duration: {duration_min} minutes")
                 print()
         else:

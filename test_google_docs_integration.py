@@ -1,15 +1,14 @@
 """Test script for Google Docs Topic Tracker integration."""
 
 import sys
-from pathlib import Path
 from google_docs_tracker import GoogleDocsTopicTracker
 
 
 def test_basic_functionality():
     """Test basic Google Docs functionality."""
-    print("="*60)
+    print("=" * 60)
     print("GOOGLE DOCS TOPIC TRACKER - INTEGRATION TEST")
-    print("="*60)
+    print("=" * 60)
     print()
 
     try:
@@ -33,7 +32,7 @@ def test_basic_functionality():
         if topics:
             print("\n  First 5 topics:")
             for i, topic in enumerate(topics[:5], 1):
-                topic_text = topic['text'][:60]
+                topic_text = topic["text"][:60]
                 print(f"    {i}. {topic_text}...")
         print()
 
@@ -48,23 +47,27 @@ def test_basic_functionality():
         We also briefly mention some robot cafes in Japan as an example of unique dining experiences.
         """
 
-        sample_summary = "Discussion about extreme cheese consumption and its health consequences"
+        sample_summary = (
+            "Discussion about extreme cheese consumption and its health consequences"
+        )
 
         if topics:
             matched = tracker.match_topics_with_transcript(
                 topics[:10],  # Test with first 10 topics only
                 sample_transcript,
                 sample_summary,
-                episode_number=999
+                episode_number=999,
             )
 
             if matched:
                 print(f"  [OK] Matched {len(matched)} topics from sample")
                 for topic in matched:
-                    conf_pct = int(topic['confidence'] * 100)
+                    conf_pct = int(topic["confidence"] * 100)
                     print(f"    - {topic['text'][:50]}... ({conf_pct}%)")
             else:
-                print("  [OK] No topics matched (this is normal if your topics don't mention cheese)")
+                print(
+                    "  [OK] No topics matched (this is normal if your topics don't mention cheese)"
+                )
         print()
 
         # Show section structure
@@ -74,12 +77,14 @@ def test_basic_functionality():
         if discussed_section:
             print("  [OK] Found 'Discussed Topics' section")
         else:
-            print("  [INFO] No 'Discussed Topics' section yet (will be created automatically)")
+            print(
+                "  [INFO] No 'Discussed Topics' section yet (will be created automatically)"
+            )
         print()
 
-        print("="*60)
+        print("=" * 60)
         print("[SUCCESS] ALL TESTS PASSED")
-        print("="*60)
+        print("=" * 60)
         print()
         print("Your Google Docs Topic Tracker is ready to use!")
         print()
@@ -105,6 +110,7 @@ def test_basic_functionality():
         print(f"[ERROR] {e}")
         print()
         import traceback
+
         traceback.print_exc()
         print()
         print("Troubleshooting:")
@@ -117,9 +123,9 @@ def test_basic_functionality():
 
 def test_dry_run():
     """Test a full update without actually modifying the document."""
-    print("="*60)
+    print("=" * 60)
     print("DRY RUN TEST - NO CHANGES WILL BE MADE")
-    print("="*60)
+    print("=" * 60)
     print()
     print("This test shows what WOULD happen during episode processing")
     print("without actually modifying your Google Doc.")
@@ -152,8 +158,8 @@ def test_dry_run():
         )
 
         print("Sample Episode Info:")
-        print(f"  Episode: 999 (Test Episode)")
-        print(f"  Topics: Cheese addiction, Robot cafes")
+        print("  Episode: 999 (Test Episode)")
+        print("  Topics: Cheese addiction, Robot cafes")
         print()
 
         # Fetch and display topics
@@ -166,17 +172,14 @@ def test_dry_run():
         # Match topics
         print("Running Claude topic matching...")
         matched = tracker.match_topics_with_transcript(
-            topics,
-            sample_transcript,
-            sample_summary,
-            episode_number=999
+            topics, sample_transcript, sample_summary, episode_number=999
         )
 
         if matched:
             print()
             print(f"Would move {len(matched)} topics:")
             for topic in matched:
-                conf_pct = int(topic['confidence'] * 100)
+                conf_pct = int(topic["confidence"] * 100)
                 print(f"\n  Topic: {topic['text']}")
                 print(f"  Confidence: {conf_pct}%")
                 print(f"  Reason: {topic['reason']}")
@@ -185,9 +188,9 @@ def test_dry_run():
             print("No topics matched (try topics about cheese or robots)")
 
         print()
-        print("="*60)
+        print("=" * 60)
         print("DRY RUN COMPLETE - No changes made to your doc")
-        print("="*60)
+        print("=" * 60)
         print()
 
         return True
@@ -195,12 +198,13 @@ def test_dry_run():
     except Exception as e:
         print(f"Error: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
 
-if __name__ == '__main__':
-    if len(sys.argv) > 1 and sys.argv[1] == '--dry-run':
+if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--dry-run":
         success = test_dry_run()
     else:
         success = test_basic_functionality()

@@ -33,10 +33,12 @@ try:
         print("[3/3] Testing tweet posting...")
         response = input("Do you want to post a test tweet? (yes/no): ").strip().lower()
 
-        if response in ['yes', 'y']:
+        if response in ["yes", "y"]:
             print()
             print("Posting test tweet...")
-            result = uploader.post_tweet("🎙️ Testing podcast automation! This is a test tweet from my new automation system. #PodcastAutomation")
+            result = uploader.post_tweet(
+                "🎙️ Testing podcast automation! This is a test tweet from my new automation system. #PodcastAutomation"
+            )
 
             if result:
                 print("[OK] Test tweet posted successfully!")

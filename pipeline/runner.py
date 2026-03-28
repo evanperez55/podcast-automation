@@ -50,9 +50,10 @@ def _init_uploaders():
     """Initialize social media uploaders if credentials are configured."""
     uploaders = {}
 
-    # YouTube
+    # YouTube (use per-client token path if configured)
     try:
-        uploaders["youtube"] = YouTubeUploader()
+        youtube_token = getattr(Config, "_YOUTUBE_TOKEN_PICKLE", None)
+        uploaders["youtube"] = YouTubeUploader(token_path=youtube_token)
         logger.info("YouTube uploader initialized")
     except (ValueError, FileNotFoundError) as e:
         logger.info("YouTube uploader not available: %s", str(e).split("\n")[0])
@@ -105,7 +106,7 @@ def _init_components(
         force: If True, --force flag was passed (bypass compliance upload block)
     """
     print("=" * 60)
-    print("FAKE PROBLEMS PODCAST AUTOMATION")
+    print(f"{Config.PODCAST_NAME.upper()} AUTOMATION")
     if dry_run:
         print("[DRY RUN] - Validating pipeline with mock data")
     elif test_mode:
@@ -284,6 +285,31 @@ def run(args):
         auto_approve = getattr(args, "auto_approve", False)
         resume = getattr(args, "resume", False)
         force = getattr(args, "force", False)
+
+    # Load client config if specified
+    client_name = None
+    if isinstance(args, dict):
+        client_name = args.get("client_name")
+    else:
+        client_name = getattr(args, "client_name", None)
+
+    if client_name:
+        from client_config import load_client_config, apply_client_config
+
+        client_overrides = load_client_config(client_name)
+        apply_client_config(client_overrides)
+
+        # Auto-isolate output directories per client (unless explicitly set in YAML)
+        if "OUTPUT_DIR" not in client_overrides:
+            Config.OUTPUT_DIR = Config.BASE_DIR / "output" / client_name
+        if "DOWNLOAD_DIR" not in client_overrides:
+            Config.DOWNLOAD_DIR = Config.BASE_DIR / "downloads" / client_name
+        if "CLIPS_DIR" not in client_overrides:
+            Config.CLIPS_DIR = Config.BASE_DIR / "clips" / client_name
+        if "TOPIC_DATA_DIR" not in client_overrides:
+            Config.TOPIC_DATA_DIR = Config.BASE_DIR / "topic_data" / client_name
+
+        logger.info("Using client config: %s", client_name)
 
     components = _init_components(
         test_mode=test_mode,

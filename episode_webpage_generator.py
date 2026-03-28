@@ -12,6 +12,7 @@ from typing import Any, Optional
 
 from jinja2 import Environment, FileSystemLoader
 
+from config import Config
 from logger import logger
 
 # PyGithub import — optional at module level so the module loads without it
@@ -23,8 +24,8 @@ except ImportError:  # pragma: no cover
 # Sitemaps.org XML namespace
 _SITEMAP_NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
 
-# Podcast series name (matches config.py PODCAST_NAME)
-_PODCAST_NAME = "Fake Problems Podcast"
+# Podcast series name — pulled from Config for multi-client support
+_PODCAST_NAME = Config.PODCAST_NAME
 
 
 class EpisodeWebpageGenerator:
@@ -152,6 +153,7 @@ class EpisodeWebpageGenerator:
             jsonld=jsonld,
             thumbnail_url=thumbnail_url,
             audio_url=audio_url,
+            podcast_name=Config.PODCAST_NAME,
         )
 
     def generate_sitemap(

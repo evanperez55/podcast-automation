@@ -37,7 +37,9 @@ try:
     print("Quota Information:")
     print(f"  Daily Limit: {quota_info['daily_limit']:,} units")
     print(f"  Upload Cost: {quota_info['upload_cost']:,} units per video")
-    print(f"  Estimated uploads/day: ~{quota_info['daily_limit'] // quota_info['upload_cost']}")
+    print(
+        f"  Estimated uploads/day: ~{quota_info['daily_limit'] // quota_info['upload_cost']}"
+    )
     print()
     print("=" * 60)
     print("SUCCESS! YouTube is configured!")

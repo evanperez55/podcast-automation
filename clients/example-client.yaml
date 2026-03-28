@@ -1,0 +1,46 @@
+# Example client config template
+# Copy this file and rename to your-client-name.yaml
+# Set null for any value that should fall back to environment variables.
+# Usage: python main.py latest --client your-client-name
+
+client_name: "your-client-name"
+podcast_name: "Your Podcast Name"
+
+dropbox:
+  folder_path: "/Your Podcast/raw_files"
+  finished_folder: "/Your Podcast/finished_files"
+  edited_folder: "/Your Podcast/edited_files"
+  app_key: null          # Set here or use DROPBOX_APP_KEY env var
+  app_secret: null       # Set here or use DROPBOX_APP_SECRET env var
+  refresh_token: null    # Set here or use DROPBOX_REFRESH_TOKEN env var
+
+youtube:
+  client_id: null        # Set here or use YOUTUBE_CLIENT_ID env var
+  client_secret: null    # Set here or use YOUTUBE_CLIENT_SECRET env var
+  token_pickle: "clients/your-client-name/youtube_token.pickle"
+
+twitter:
+  api_key: null
+  api_secret: null
+  access_token: null
+  access_secret: null
+
+instagram:
+  access_token: null
+  account_id: null
+
+tiktok:
+  client_key: null
+  client_secret: null
+  access_token: null
+
+discord:
+  webhook_url: null
+
+content:
+  num_clips: 3
+  clip_min_duration: 15
+  clip_max_duration: 30
+  names_to_remove: []    # First names/full names of hosts to censor
+  words_to_censor: []    # Slurs/words to beep out (matched case-insensitive)
+  voice_persona: null    # Custom GPT-4o persona prompt, or null for default

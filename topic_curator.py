@@ -2,10 +2,9 @@
 
 import json
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict
 from datetime import datetime
 from google_docs_tracker import GoogleDocsTopicTracker
-from config import Config
 
 
 class TopicCurator:
@@ -13,42 +12,42 @@ class TopicCurator:
 
     # Category mapping with emoji and section headers
     CATEGORY_CONFIG = {
-        'shocking_news': {
-            'emoji': '🔥',
-            'name': 'Shocking News Stories',
-            'description': 'Real-world incidents with visceral impact',
-            'target_per_episode': 3
+        "shocking_news": {
+            "emoji": "🔥",
+            "name": "Shocking News Stories",
+            "description": "Real-world incidents with visceral impact",
+            "target_per_episode": 3,
         },
-        'absurd_hypothetical': {
-            'emoji': '🤔',
-            'name': 'Absurd Hypotheticals',
-            'description': 'Logical-but-ridiculous thought experiments',
-            'target_per_episode': 3
+        "absurd_hypothetical": {
+            "emoji": "🤔",
+            "name": "Absurd Hypotheticals",
+            "description": "Logical-but-ridiculous thought experiments",
+            "target_per_episode": 3,
         },
-        'dating_social': {
-            'emoji': '💔',
-            'name': 'Dating & Social Commentary',
-            'description': 'Modern relationship dynamics and awkwardness',
-            'target_per_episode': 2
+        "dating_social": {
+            "emoji": "💔",
+            "name": "Dating & Social Commentary",
+            "description": "Modern relationship dynamics and awkwardness",
+            "target_per_episode": 2,
         },
-        'pop_science': {
-            'emoji': '🧪',
-            'name': 'Pop Science & Technology',
-            'description': 'Evolutionary changes, tech skepticism, medical topics',
-            'target_per_episode': 2
+        "pop_science": {
+            "emoji": "🧪",
+            "name": "Pop Science & Technology",
+            "description": "Evolutionary changes, tech skepticism, medical topics",
+            "target_per_episode": 2,
         },
-        'cultural_observation': {
-            'emoji': '🙄',
-            'name': 'Cultural Observations',
-            'description': 'Workplace annoyances, social norms, consumer behavior',
-            'target_per_episode': 2
+        "cultural_observation": {
+            "emoji": "🙄",
+            "name": "Cultural Observations",
+            "description": "Workplace annoyances, social norms, consumer behavior",
+            "target_per_episode": 2,
         },
-        'personal_anecdote': {
-            'emoji': '😬',
-            'name': 'Personal Anecdotes (Host Stories)',
-            'description': 'Your embarrassing, wild, or relatable life experiences',
-            'target_per_episode': 2
-        }
+        "personal_anecdote": {
+            "emoji": "😬",
+            "name": "Personal Anecdotes (Host Stories)",
+            "description": "Your embarrassing, wild, or relatable life experiences",
+            "target_per_episode": 2,
+        },
     }
 
     def __init__(self):
@@ -63,11 +62,11 @@ class TopicCurator:
     def load_scored_topics(self, filename: str = None) -> Dict:
         """Load scored topics from JSON file."""
         if filename is None:
-            topic_data_dir = Path('topic_data')
+            topic_data_dir = Path("topic_data")
             if not topic_data_dir.exists():
                 raise FileNotFoundError("No topic_data directory found")
 
-            scored_files = list(topic_data_dir.glob('scored_topics_*.json'))
+            scored_files = list(topic_data_dir.glob("scored_topics_*.json"))
             if not scored_files:
                 raise FileNotFoundError("No scored topics files found")
 
@@ -75,16 +74,16 @@ class TopicCurator:
 
         print(f"[INFO] Loading scored topics from: {filename}")
 
-        with open(filename, 'r', encoding='utf-8') as f:
+        with open(filename, "r", encoding="utf-8") as f:
             return json.load(f)
 
     def format_topic_for_doc(self, topic: Dict) -> str:
         """Format a topic for Google Doc entry."""
-        title = topic['title']
-        score = topic.get('score', {})
-        total_score = score.get('total', 0)
-        source = topic.get('source', 'Unknown')
-        url = topic.get('url', '')
+        title = topic["title"]
+        score = topic.get("score", {})
+        total_score = score.get("total", 0)
+        source = topic.get("source", "Unknown")
+        topic.get("url", "")
 
         # Create formatted entry
         entry = f"{title}"
@@ -120,14 +119,14 @@ class TopicCurator:
             print("[ERROR] Google Docs not connected")
             return False
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("RESTRUCTURING GOOGLE DOC")
-        print("="*60)
+        print("=" * 60)
 
         try:
             # Get recommended topics by category
-            topics_by_category = scored_data.get('topics_by_category', {})
-            stats = scored_data.get('statistics', {})
+            topics_by_category = scored_data.get("topics_by_category", {})
+            stats = scored_data.get("statistics", {})
 
             # Build new document structure
             doc_content = []
@@ -137,14 +136,18 @@ class TopicCurator:
             doc_content.append("FAKE PROBLEMS PODCAST - TOPIC BANK")
             doc_content.append("=" * 60)
             doc_content.append("")
-            doc_content.append(f"Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+            doc_content.append(
+                f"Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            )
             doc_content.append(f"Total Topics: {stats.get('total_topics', 0)}")
             doc_content.append(f"Recommended Topics: {stats.get('recommended', 0)}")
             doc_content.append("")
             doc_content.append("HOW TO USE:")
             doc_content.append("1. Pick 8-12 topics for your next episode")
             doc_content.append("2. Mix categories for variety (see target mix below)")
-            doc_content.append("3. After recording, automation will move discussed topics to bottom")
+            doc_content.append(
+                "3. After recording, automation will move discussed topics to bottom"
+            )
             doc_content.append("4. Run weekly scraper to refresh topics")
             doc_content.append("")
             doc_content.append("IDEAL EPISODE MIX:")
@@ -160,10 +163,10 @@ class TopicCurator:
 
             # Add each category section
             for category_key, config in self.CATEGORY_CONFIG.items():
-                emoji = config['emoji']
-                name = config['name']
-                description = config['description']
-                target = config['target_per_episode']
+                emoji = config["emoji"]
+                name = config["name"]
+                description = config["description"]
+                target = config["target_per_episode"]
 
                 doc_content.append(f"{emoji} {name.upper()}")
                 doc_content.append(f"({description})")
@@ -175,8 +178,9 @@ class TopicCurator:
 
                 # Filter to recommended only (score >= 6)
                 recommended = [
-                    t for t in category_topics
-                    if t.get('score', {}).get('recommended', False)
+                    t
+                    for t in category_topics
+                    if t.get("score", {}).get("recommended", False)
                 ]
 
                 if recommended:
@@ -207,9 +211,9 @@ class TopicCurator:
             print("  ...")
 
             # For now, save to a text file instead of replacing doc
-            output_file = Path('topic_data') / 'structured_topics.txt'
-            with open(output_file, 'w', encoding='utf-8') as f:
-                f.write('\n'.join(doc_content))
+            output_file = Path("topic_data") / "structured_topics.txt"
+            with open(output_file, "w", encoding="utf-8") as f:
+                f.write("\n".join(doc_content))
 
             print(f"\n[OK] Structured topics saved to: {output_file}")
             print("[INFO] Review this file, then copy/paste into your Google Doc")
@@ -220,14 +224,12 @@ class TopicCurator:
         except Exception as e:
             print(f"[ERROR] Restructuring failed: {e}")
             import traceback
+
             traceback.print_exc()
             return False
 
     def add_topics_to_existing_doc(
-        self,
-        scored_data: Dict,
-        min_score: float = 7.0,
-        max_per_category: int = 10
+        self, scored_data: Dict, min_score: float = 7.0, max_per_category: int = 10
     ) -> bool:
         """
         Add new high-scoring topics to existing Google Doc structure.
@@ -246,19 +248,18 @@ class TopicCurator:
             print("[ERROR] Google Docs not connected")
             return False
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print(f"ADDING TOPICS TO GOOGLE DOC (score >= {min_score})")
-        print("="*60)
+        print("=" * 60)
 
         try:
-            topics_by_category = scored_data.get('topics_by_category', {})
+            topics_by_category = scored_data.get("topics_by_category", {})
             added_count = 0
 
             for category_key, topics in topics_by_category.items():
                 # Filter high-scoring topics
                 high_scoring = [
-                    t for t in topics
-                    if t.get('score', {}).get('total', 0) >= min_score
+                    t for t in topics if t.get("score", {}).get("total", 0) >= min_score
                 ]
 
                 if not high_scoring:
@@ -268,18 +269,20 @@ class TopicCurator:
                 to_add = high_scoring[:max_per_category]
 
                 config = self.CATEGORY_CONFIG.get(category_key, {})
-                category_name = config.get('name', category_key)
+                category_name = config.get("name", category_key)
 
                 print(f"\n[{category_name}] Adding {len(to_add)} topics:")
 
                 for topic in to_add:
                     formatted = self.format_topic_for_doc(topic)
-                    score = topic.get('score', {}).get('total', 0)
+                    score = topic.get("score", {}).get("total", 0)
                     print(f"  [{score:.1f}] {formatted[:80]}...")
                     added_count += 1
 
             print(f"\n[OK] Would add {added_count} topics")
-            print("[INFO] Manual implementation: Copy topics above into your Google Doc")
+            print(
+                "[INFO] Manual implementation: Copy topics above into your Google Doc"
+            )
             print("[INFO] Or implement automatic insertion in google_docs_tracker.py")
 
             return True
@@ -298,68 +301,71 @@ class TopicCurator:
         Returns:
             Episode plan with suggested topics
         """
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("EPISODE PLANNER")
-        print("="*60)
+        print("=" * 60)
 
-        topics_by_category = scored_data.get('topics_by_category', {})
+        topics_by_category = scored_data.get("topics_by_category", {})
         episode_plan = {
-            'planned_at': datetime.now().isoformat(),
-            'categories': {},
-            'total_topics': 0
+            "planned_at": datetime.now().isoformat(),
+            "categories": {},
+            "total_topics": 0,
         }
 
         for category_key, config in self.CATEGORY_CONFIG.items():
-            target = config['target_per_episode']
+            target = config["target_per_episode"]
             category_topics = topics_by_category.get(category_key, [])
 
             # Filter recommended
             recommended = [
-                t for t in category_topics
-                if t.get('score', {}).get('recommended', False)
+                t
+                for t in category_topics
+                if t.get("score", {}).get("recommended", False)
             ]
 
             # Pick top N for this category
             selected = recommended[:target]
 
-            episode_plan['categories'][category_key] = {
-                'name': config['name'],
-                'emoji': config['emoji'],
-                'target': target,
-                'selected': len(selected),
-                'topics': selected
+            episode_plan["categories"][category_key] = {
+                "name": config["name"],
+                "emoji": config["emoji"],
+                "target": target,
+                "selected": len(selected),
+                "topics": selected,
             }
 
-            episode_plan['total_topics'] += len(selected)
+            episode_plan["total_topics"] += len(selected)
 
         # Print plan
         print("\nSuggested Episode Structure:")
         print()
 
-        for category_key, plan in episode_plan['categories'].items():
-            emoji = plan['emoji']
-            name = plan['name']
-            selected = plan['selected']
-            target = plan['target']
+        for category_key, plan in episode_plan["categories"].items():
+            emoji = plan["emoji"]
+            name = plan["name"]
+            selected = plan["selected"]
+            target = plan["target"]
 
             print(f"{emoji} {name}: {selected}/{target} topics")
 
-            for i, topic in enumerate(plan['topics'], 1):
-                title = topic['title'][:70]
-                score = topic.get('score', {}).get('total', 0)
+            for i, topic in enumerate(plan["topics"], 1):
+                title = topic["title"][:70]
+                score = topic.get("score", {}).get("total", 0)
                 print(f"  {i}. [{score:.1f}] {title}...")
 
             print()
 
         print(f"Total: {episode_plan['total_topics']} topics")
         print()
-        print("="*60)
+        print("=" * 60)
 
         # Save plan
-        output_dir = Path('topic_data')
-        output_file = output_dir / f"episode_plan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        output_dir = Path("topic_data")
+        output_file = (
+            output_dir / f"episode_plan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        )
 
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             json.dump(episode_plan, f, indent=2, ensure_ascii=False)
 
         print(f"[OK] Episode plan saved to: {output_file}")
@@ -367,16 +373,16 @@ class TopicCurator:
         return episode_plan
 
 
-def run_curation(mode: str = 'add'):
+def run_curation(mode: str = "add"):
     """
     Run topic curation.
 
     Args:
         mode: 'restructure', 'add', or 'plan'
     """
-    print("="*60)
+    print("=" * 60)
     print("FAKE PROBLEMS - TOPIC CURATOR")
-    print("="*60)
+    print("=" * 60)
     print()
 
     curator = TopicCurator()
@@ -384,15 +390,17 @@ def run_curation(mode: str = 'add'):
     # Load scored topics
     scored_data = curator.load_scored_topics()
 
-    if mode == 'restructure':
+    if mode == "restructure":
         # Full doc restructure
         curator.restructure_google_doc(scored_data)
 
-    elif mode == 'add':
+    elif mode == "add":
         # Add high-scoring topics to existing doc
-        curator.add_topics_to_existing_doc(scored_data, min_score=7.0, max_per_category=10)
+        curator.add_topics_to_existing_doc(
+            scored_data, min_score=7.0, max_per_category=10
+        )
 
-    elif mode == 'plan':
+    elif mode == "plan":
         # Plan next episode
         curator.plan_next_episode(scored_data)
 
@@ -401,8 +409,8 @@ def run_curation(mode: str = 'add'):
         print("Valid modes: 'restructure', 'add', 'plan'")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
 
-    mode = sys.argv[1] if len(sys.argv) > 1 else 'plan'
+    mode = sys.argv[1] if len(sys.argv) > 1 else "plan"
     run_curation(mode)

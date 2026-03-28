@@ -198,6 +198,57 @@ def run_video(
                     else None,
                 },
             )
+    elif ctx.has_video_source and clip_paths:
+        # Video source: cut clips from original video instead of static logo
+        from video_utils import cut_video_clip, mux_audio_to_video
+
+        logger.info("Cutting clips from source video (9:16 vertical crop)...")
+        best_clips = analysis.get("best_clips", [])
+        for i, clip_path in enumerate(clip_paths):
+            if i < len(best_clips):
+                clip_info = best_clips[i]
+                start = clip_info.get("start_seconds", 0)
+                end = clip_info.get("end_seconds", 30)
+                output = Path(str(clip_path).replace(".wav", "_video.mp4"))
+                video_path = cut_video_clip(
+                    str(ctx.source_video_path),
+                    start,
+                    end,
+                    str(output),
+                    crop_vertical=True,
+                )
+                if video_path:
+                    video_clip_paths.append(Path(video_path))
+                else:
+                    logger.warning("Failed to cut video clip %d", i + 1)
+
+        logger.info("Cut %d video clips from source", len(video_clip_paths))
+
+        # Full episode: mux censored audio onto source video
+        if censored_audio and ctx.source_video_path:
+            full_ep_output = str(
+                episode_output_dir / f"{audio_file.stem}_{timestamp}_episode.mp4"
+            )
+            full_episode_video_path = mux_audio_to_video(
+                str(ctx.source_video_path),
+                str(censored_audio),
+                full_ep_output,
+            )
+            if full_episode_video_path:
+                logger.info("Full episode video: %s", full_episode_video_path)
+            else:
+                logger.warning("Failed to create full episode video from source")
+
+        if state:
+            state.complete_step(
+                "convert_videos",
+                {
+                    "video_clip_paths": [str(p) for p in video_clip_paths],
+                    "full_episode_video_path": str(full_episode_video_path)
+                    if full_episode_video_path
+                    else None,
+                },
+            )
     elif video_converter and clip_paths:
         logger.info("Creating vertical videos (9:16) for Shorts/Reels/TikTok...")
 

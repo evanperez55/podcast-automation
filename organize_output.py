@@ -1,6 +1,5 @@
 """Organize output files into episode subfolders."""
 
-import os
 import shutil
 from pathlib import Path
 import re
@@ -24,19 +23,23 @@ def organize_output_folder():
 
     for file in files:
         # Skip RSS/metadata files
-        if file.name in ['podcast_feed.xml', 'test_podcast_feed.xml', 'podcast_metadata.json']:
+        if file.name in [
+            "podcast_feed.xml",
+            "test_podcast_feed.xml",
+            "podcast_metadata.json",
+        ]:
             other_files.append(file)
             continue
 
         # Extract episode number from filename
         # Pattern: "Episode #X - Title" or "ep_X_raw_..."
-        match = re.search(r'Episode #(\d+)', file.name)
+        match = re.search(r"Episode #(\d+)", file.name)
         if match:
             episode_num = int(match.group(1))
             episode_key = f"ep_{episode_num}"
         else:
             # Check for ep_25_raw pattern
-            match = re.search(r'ep_(\d+)_raw', file.name)
+            match = re.search(r"ep_(\d+)_raw", file.name)
             if match:
                 episode_num = int(match.group(1))
                 episode_key = f"ep_{episode_num}"
@@ -77,5 +80,5 @@ def organize_output_folder():
         print(f"  - {file.name}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     organize_output_folder()

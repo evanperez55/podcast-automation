@@ -2,6 +2,7 @@
 
 import openai
 import json
+import time
 from audio_clip_scorer import AudioClipScorer
 from config import Config
 from logger import logger
@@ -80,16 +81,9 @@ class ContentEditor:
         )
 
         try:
-            # Call OpenAI API
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                max_tokens=6000,
-                temperature=0.7,
-                messages=[
-                    {"role": "system", "content": VOICE_PERSONA},
-                    {"role": "user", "content": prompt},
-                ],
-            )
+            # Call OpenAI API with retry on transient failures
+            voice = getattr(Config, "VOICE_PERSONA", None) or VOICE_PERSONA
+            response = self._call_openai_with_retry(voice, prompt)
 
             # Parse GPT-4's response
             response_text = response.choices[0].message.content
@@ -128,6 +122,55 @@ class ContentEditor:
         except Exception as e:
             logger.error("OpenAI analysis error: %s", e)
             raise
+
+    def _call_openai_with_retry(self, voice_persona, prompt, max_retries=3):
+        """Call OpenAI API with exponential backoff on transient errors.
+
+        Args:
+            voice_persona: System message for the LLM.
+            prompt: User message content.
+            max_retries: Maximum retry attempts.
+
+        Returns:
+            OpenAI ChatCompletion response.
+
+        Raises:
+            Exception: After all retries exhausted.
+        """
+        last_error = None
+        for attempt in range(max_retries + 1):
+            try:
+                return self.client.chat.completions.create(
+                    model="gpt-4o",
+                    max_tokens=6000,
+                    temperature=0.7,
+                    messages=[
+                        {"role": "system", "content": voice_persona},
+                        {"role": "user", "content": prompt},
+                    ],
+                )
+            except (
+                openai.RateLimitError,
+                openai.APIError,
+                openai.APIConnectionError,
+                openai.APITimeoutError,
+            ) as e:
+                last_error = e
+                if attempt < max_retries:
+                    delay = min(2.0 * (2**attempt), 60.0)
+                    logger.warning(
+                        "OpenAI API error (attempt %d/%d): %s — retrying in %.0fs",
+                        attempt + 1,
+                        max_retries,
+                        e,
+                        delay,
+                    )
+                    time.sleep(delay)
+                else:
+                    logger.error(
+                        "OpenAI API failed after %d retries: %s", max_retries, e
+                    )
+        raise last_error
 
     def _format_transcript_for_analysis(self, words, segments):
         """Format transcript with timestamps for Claude to analyze."""
@@ -241,7 +284,7 @@ GOOD: "turns out immortality is real, it just only applies to lobsters. link in 
 
 """
 
-        prompt = f"""You are analyzing a podcast transcript for the "Fake Problems Podcast" to identify content that needs censoring and find the best moments for social media clips.
+        prompt = f"""You are analyzing a podcast transcript for "{Config.PODCAST_NAME}" to identify content that needs censoring and find the best moments for social media clips.
 {topic_section}{engagement_section}{voice_examples}{energy_section}
 
 **YOUR TASKS:**

@@ -22,7 +22,7 @@ try:
         clips = list(clips_dir.glob("*.wav"))
         if clips:
             test_clip = clips[0]
-            print(f"[2/3] Converting test clip to video...")
+            print("[2/3] Converting test clip to video...")
             print(f"[INFO] Test clip: {test_clip.name}")
             print()
 
@@ -30,8 +30,8 @@ try:
             print("[INFO] Creating vertical video (9:16 for Shorts/Reels)...")
             vertical_video = converter.audio_to_video(
                 audio_path=str(test_clip),
-                output_path=str(test_clip.with_suffix('.mp4')),
-                format_type='vertical'
+                output_path=str(test_clip.with_suffix(".mp4")),
+                format_type="vertical",
             )
 
             if vertical_video:
@@ -66,6 +66,7 @@ except Exception as e:
     print("[ERROR]:")
     print(f"  {e}")
     import traceback
+
     traceback.print_exc()
 
 print()

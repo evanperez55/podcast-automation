@@ -25,6 +25,11 @@ class PipelineContext:
     censored_audio: Optional[Path] = None
     mp3_path: Optional[Path] = None
 
+    # Source video (when input is a video file, not audio-only)
+    source_video_path: Optional[Path] = None
+    video_metadata: Optional[dict] = None
+    has_video_source: bool = False
+
     # Clips and video
     clip_paths: list = field(default_factory=list)
     video_clip_paths: list = field(default_factory=list)

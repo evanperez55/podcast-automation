@@ -1,11 +1,10 @@
 """Re-authenticate YouTube OAuth credentials."""
 
-import os
 from pathlib import Path
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("YOUTUBE OAUTH AUTHENTICATION")
-print("="*60)
+print("=" * 60)
 print()
 print("About Google OAuth tokens:")
 print("- Access tokens expire after 1 hour")
@@ -29,22 +28,22 @@ input("Press Enter to continue...")
 print()
 
 # Initialize uploader (will trigger OAuth flow)
-from uploaders import YouTubeUploader
+from uploaders import YouTubeUploader  # noqa: E402
 
 try:
     uploader = YouTubeUploader()
     print()
-    print("="*60)
+    print("=" * 60)
     print("[SUCCESS] YouTube authentication complete!")
-    print("="*60)
+    print("=" * 60)
     print()
     print("Your credentials are saved and will be used for future uploads.")
     print("You can now run the automation with YouTube uploads enabled.")
 except Exception as e:
     print()
-    print("="*60)
+    print("=" * 60)
     print("[ERROR] Authentication failed")
-    print("="*60)
+    print("=" * 60)
     print()
     print(f"Error: {e}")
     print()

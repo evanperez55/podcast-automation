@@ -23,12 +23,19 @@ def _clean_env(monkeypatch):
 # 1. test_init_defaults
 # ---------------------------------------------------------------------------
 class TestInitDefaults:
-    def test_disabled_and_default_colors(self):
+    def test_enabled_by_default_and_default_colors(self):
+        """Default init has audiogram enabled (USE_AUDIOGRAM defaults to 'true')."""
         gen = AudiogramGenerator()
-        assert gen.enabled is False
+        assert gen.enabled is True
         assert gen.bg_color == "0x1a1a2e"
         assert gen.wave_color == "0xe94560"
         assert gen.ffmpeg_path == Config.FFMPEG_PATH
+
+    def test_explicitly_disabled(self, monkeypatch):
+        """Setting USE_AUDIOGRAM=false disables audiogram."""
+        monkeypatch.setenv("USE_AUDIOGRAM", "false")
+        gen = AudiogramGenerator()
+        assert gen.enabled is False
 
 
 # ---------------------------------------------------------------------------

@@ -15,33 +15,43 @@ from pipeline import (
 )
 
 
-def main():
-    """Main entry point."""
-    # Check for flags
-    test_mode = "--test" in sys.argv or "--test-mode" in sys.argv
-    resume = "--resume" in sys.argv
-    _dry_run = "--dry-run" in sys.argv
-    auto_approve = "--auto-approve" in sys.argv
-    force = "--force" in sys.argv
-
-    # Strip flags from argv before parsing positional args
-    flag_args = [
+def _parse_flags():
+    """Parse and strip flags from sys.argv, return args dict."""
+    raw = sys.argv[:]
+    flags = {
         "--test",
         "--test-mode",
         "--resume",
         "--dry-run",
         "--auto-approve",
         "--force",
-    ]
-    sys.argv = [arg for arg in sys.argv if arg not in flag_args]
-
-    args = {
-        "test_mode": test_mode,
-        "resume": resume,
-        "dry_run": _dry_run,
-        "auto_approve": auto_approve,
-        "force": force,
+    }  # noqa: E501
+    client_name = None
+    cleaned = []
+    skip_next = False
+    for i, arg in enumerate(raw):
+        if skip_next:
+            skip_next = False
+            continue
+        if arg == "--client" and i + 1 < len(raw):
+            client_name = raw[i + 1]
+            skip_next = True
+        elif arg not in flags:
+            cleaned.append(arg)
+    sys.argv = cleaned
+    return {
+        "test_mode": "--test" in raw or "--test-mode" in raw,
+        "resume": "--resume" in raw,
+        "dry_run": "--dry-run" in raw,
+        "auto_approve": "--auto-approve" in raw,
+        "force": "--force" in raw,
+        "client_name": client_name,
     }
+
+
+def main():
+    """Main entry point."""
+    args = _parse_flags()
 
     # Handle commands that don't need full component init
     if len(sys.argv) > 1:
@@ -66,7 +76,7 @@ def main():
             return
 
     # Dry run mode: validate pipeline and exit
-    if _dry_run:
+    if args["dry_run"]:
         dry_run()
         return
 
@@ -97,42 +107,41 @@ def main():
             else:
                 run_with_notification(args, local_audio_path=file_path)
     else:
-        # Interactive mode
-        print("Podcast Automation - Interactive Mode")
-        print()
-        print("Options:")
-        print("  1. Process latest episode from Dropbox")
-        print("  2. Process episode by episode number (e.g., Episode 25)")
-        print("  3. List all episodes sorted by number")
-        print("  4. List all episodes by date")
-        print("  5. Process specific Dropbox episode by path")
-        print("  6. Process local audio file")
-        print()
+        _interactive_mode(args)
 
-        choice = input("Enter choice (1-6): ").strip()
 
-        if choice == "1":
-            run_with_notification(args)
-        elif choice == "2":
-            list_episodes_by_number()
-            episode_num = input("\nEnter episode number: ").strip()
-            try:
-                run_with_notification(args, episode_number=int(episode_num))
-            except ValueError:
-                print("Invalid episode number")
-        elif choice == "3":
-            list_episodes_by_number()
-        elif choice == "4":
-            list_available_episodes()
-        elif choice == "5":
-            list_available_episodes()
-            path = input("\nEnter Dropbox path: ").strip()
-            run_with_notification(args, dropbox_path=path)
-        elif choice == "6":
-            path = input("Enter local audio file path: ").strip()
-            run_with_notification(args, local_audio_path=path)
-        else:
-            print("Invalid choice")
+def _interactive_mode(args):
+    """Prompt user for action when no command is given."""
+    print("Podcast Automation - Interactive Mode\n")
+    print("  1. Process latest episode from Dropbox")
+    print("  2. Process episode by number")
+    print("  3. List episodes by number")
+    print("  4. List episodes by date")
+    print("  5. Process Dropbox episode by path")
+    print("  6. Process local audio file\n")
+    choice = input("Enter choice (1-6): ").strip()
+    if choice == "1":
+        run_with_notification(args)
+    elif choice == "2":
+        list_episodes_by_number()
+        ep = input("\nEnter episode number: ").strip()
+        try:
+            run_with_notification(args, episode_number=int(ep))
+        except ValueError:
+            print("Invalid episode number")
+    elif choice == "3":
+        list_episodes_by_number()
+    elif choice == "4":
+        list_available_episodes()
+    elif choice == "5":
+        list_available_episodes()
+        run_with_notification(
+            args, dropbox_path=input("\nEnter Dropbox path: ").strip()
+        )
+    elif choice == "6":
+        run_with_notification(args, local_audio_path=input("Enter path: ").strip())
+    else:
+        print("Invalid choice")
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 from typing import List, Dict
+from config import Config
 from ollama_client import Ollama
 from datetime import datetime
 
@@ -54,7 +55,7 @@ class TopicScorer:
 
         topic_text = "\n".join(topic_list)
 
-        prompt = f"""You are a podcast content analyst for "Fake Problems Podcast" - a comedy podcast about absurd scenarios, weird news, and modern life's ridiculous moments.
+        prompt = f"""You are a podcast content analyst for "{Config.PODCAST_NAME}" - a comedy podcast about absurd scenarios, weird news, and modern life's ridiculous moments.
 
 **SCORING CRITERIA** (Total: 0-10 points):
 

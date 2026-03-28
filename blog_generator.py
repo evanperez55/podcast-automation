@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any
 
 from config import Config
 from logger import logger
-from content_editor import VOICE_PERSONA
+from content_editor import VOICE_PERSONA as _DEFAULT_VOICE_PERSONA
 
 
 class BlogPostGenerator:
@@ -55,7 +55,11 @@ class BlogPostGenerator:
                     max_tokens=4000,
                     temperature=0.7,
                     messages=[
-                        {"role": "system", "content": VOICE_PERSONA},
+                        {
+                            "role": "system",
+                            "content": getattr(Config, "VOICE_PERSONA", None)
+                            or _DEFAULT_VOICE_PERSONA,
+                        },
                         {"role": "user", "content": prompt},
                     ],
                 )
@@ -140,7 +144,7 @@ class BlogPostGenerator:
                 transcript_lines.append(text)
         full_transcript = "\n".join(transcript_lines)
 
-        blog_voice_intro = """Write this blog post in the voice of the Fake Problems Podcast — irreverent, a little dark, casual, never corporate.
+        blog_voice_intro = f"""Write this blog post in the voice of {Config.PODCAST_NAME} — irreverent, a little dark, casual, never corporate.
 
 VOICE EXAMPLES for blog writing:
 BAD: "In this episode, the hosts delve into the fascinating science behind lobster immortality."
@@ -153,7 +157,7 @@ No filler phrases. No 'delve into'. No 'fascinating'. Write like you'd explain i
 
 """
 
-        prompt = f"""{blog_voice_intro}You are a skilled blog writer for the "Fake Problems Podcast". Your job is to transform a podcast episode transcript and analysis into an engaging, well-structured markdown blog post.
+        prompt = f"""{blog_voice_intro}You are a skilled blog writer for "{Config.PODCAST_NAME}". Your job is to transform a podcast episode transcript and analysis into an engaging, well-structured markdown blog post.
 
 **EPISODE INFO:**
 - Episode Number: {episode_number}

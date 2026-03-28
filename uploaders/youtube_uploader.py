@@ -23,12 +23,19 @@ class YouTubeUploader:
     # YouTube API scopes
     SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 
-    # Token storage path
+    # Default token storage path
     TOKEN_PATH = Config.BASE_DIR / "credentials" / "youtube_token.pickle"
     CREDENTIALS_PATH = Config.BASE_DIR / "credentials" / "youtube_credentials.json"
 
-    def __init__(self):
-        """Initialize YouTube uploader."""
+    def __init__(self, token_path=None):
+        """Initialize YouTube uploader.
+
+        Args:
+            token_path: Optional path to YouTube OAuth token pickle file.
+                If provided, overrides the default TOKEN_PATH for per-client support.
+        """
+        if token_path:
+            self.TOKEN_PATH = Path(token_path)
         self.youtube = None
         self._authenticate()
 

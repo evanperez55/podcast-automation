@@ -7,7 +7,6 @@ generate new access tokens without manual intervention.
 
 import dropbox
 from dropbox import DropboxOAuth2FlowNoRedirect
-import os
 from pathlib import Path
 
 
@@ -21,9 +20,9 @@ def setup_dropbox_oauth():
     3. Generating a refresh token that never expires
     """
 
-    print("="*60)
+    print("=" * 60)
     print("DROPBOX OAUTH SETUP - PERMANENT TOKEN REFRESH")
-    print("="*60)
+    print("=" * 60)
     print()
     print("This setup will give you a refresh token that automatically")
     print("generates new access tokens, so you never have to manually")
@@ -66,7 +65,7 @@ def setup_dropbox_oauth():
     auth_flow = DropboxOAuth2FlowNoRedirect(
         app_key,
         app_secret,
-        token_access_type='offline'  # This requests a refresh token
+        token_access_type="offline",  # This requests a refresh token
     )
 
     # Get authorization URL
@@ -92,9 +91,9 @@ def setup_dropbox_oauth():
         oauth_result = auth_flow.finish(auth_code)
 
         print()
-        print("="*60)
+        print("=" * 60)
         print("SUCCESS! OAuth Setup Complete")
-        print("="*60)
+        print("=" * 60)
         print()
 
         # Save to .env file
@@ -102,7 +101,7 @@ def setup_dropbox_oauth():
         env_lines = []
 
         if env_file.exists():
-            with open(env_file, 'r') as f:
+            with open(env_file, "r") as f:
                 env_lines = f.readlines()
 
         # Update or add OAuth credentials
@@ -110,33 +109,37 @@ def setup_dropbox_oauth():
         new_lines = []
 
         for line in env_lines:
-            if line.startswith('DROPBOX_APP_KEY='):
-                new_lines.append(f'DROPBOX_APP_KEY={app_key}\n')
-                updated_keys.add('DROPBOX_APP_KEY')
-            elif line.startswith('DROPBOX_APP_SECRET='):
-                new_lines.append(f'DROPBOX_APP_SECRET={app_secret}\n')
-                updated_keys.add('DROPBOX_APP_SECRET')
-            elif line.startswith('DROPBOX_REFRESH_TOKEN='):
-                new_lines.append(f'DROPBOX_REFRESH_TOKEN={oauth_result.refresh_token}\n')
-                updated_keys.add('DROPBOX_REFRESH_TOKEN')
-            elif line.startswith('DROPBOX_ACCESS_TOKEN='):
+            if line.startswith("DROPBOX_APP_KEY="):
+                new_lines.append(f"DROPBOX_APP_KEY={app_key}\n")
+                updated_keys.add("DROPBOX_APP_KEY")
+            elif line.startswith("DROPBOX_APP_SECRET="):
+                new_lines.append(f"DROPBOX_APP_SECRET={app_secret}\n")
+                updated_keys.add("DROPBOX_APP_SECRET")
+            elif line.startswith("DROPBOX_REFRESH_TOKEN="):
+                new_lines.append(
+                    f"DROPBOX_REFRESH_TOKEN={oauth_result.refresh_token}\n"
+                )
+                updated_keys.add("DROPBOX_REFRESH_TOKEN")
+            elif line.startswith("DROPBOX_ACCESS_TOKEN="):
                 # Keep the old access token line but comment it out
-                new_lines.append(f'# {line}')
-                new_lines.append(f'# NOTE: Access token is now auto-generated from refresh token\n')
+                new_lines.append(f"# {line}")
+                new_lines.append(
+                    "# NOTE: Access token is now auto-generated from refresh token\n"
+                )
             else:
                 new_lines.append(line)
 
         # Add missing keys
-        if 'DROPBOX_APP_KEY' not in updated_keys:
-            new_lines.append(f'\n# Dropbox OAuth Credentials\n')
-            new_lines.append(f'DROPBOX_APP_KEY={app_key}\n')
-        if 'DROPBOX_APP_SECRET' not in updated_keys:
-            new_lines.append(f'DROPBOX_APP_SECRET={app_secret}\n')
-        if 'DROPBOX_REFRESH_TOKEN' not in updated_keys:
-            new_lines.append(f'DROPBOX_REFRESH_TOKEN={oauth_result.refresh_token}\n')
+        if "DROPBOX_APP_KEY" not in updated_keys:
+            new_lines.append("\n# Dropbox OAuth Credentials\n")
+            new_lines.append(f"DROPBOX_APP_KEY={app_key}\n")
+        if "DROPBOX_APP_SECRET" not in updated_keys:
+            new_lines.append(f"DROPBOX_APP_SECRET={app_secret}\n")
+        if "DROPBOX_REFRESH_TOKEN" not in updated_keys:
+            new_lines.append(f"DROPBOX_REFRESH_TOKEN={oauth_result.refresh_token}\n")
 
         # Write back to .env
-        with open(env_file, 'w') as f:
+        with open(env_file, "w") as f:
             f.writelines(new_lines)
 
         print("[OK] Credentials saved to .env file")
@@ -154,7 +157,7 @@ def setup_dropbox_oauth():
         dbx = dropbox.Dropbox(
             app_key=app_key,
             app_secret=app_secret,
-            oauth2_refresh_token=oauth_result.refresh_token
+            oauth2_refresh_token=oauth_result.refresh_token,
         )
 
         # Test by getting account info
@@ -167,13 +170,15 @@ def setup_dropbox_oauth():
         print(f"[ERROR] Failed to complete authorization: {e}")
         print()
         print("Common issues:")
-        print("- Make sure you enabled the required permissions in the Dropbox app settings")
+        print(
+            "- Make sure you enabled the required permissions in the Dropbox app settings"
+        )
         print("- Make sure you clicked 'Submit' after selecting permissions")
         print("- Try generating a new authorization code")
         return
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         setup_dropbox_oauth()
     except KeyboardInterrupt:
@@ -181,4 +186,5 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"\n[ERROR] {e}")
         import traceback
+
         traceback.print_exc()

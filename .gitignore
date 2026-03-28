@@ -47,6 +47,9 @@ assets/*.wav
 credentials/
 *.pickle
 
+# Per-client credential directories (keep .yaml templates tracked)
+clients/*/
+
 # IDE
 .vscode/
 .idea/

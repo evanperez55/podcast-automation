@@ -2,9 +2,9 @@
 
 from uploaders.spotify_uploader import SpotifyUploader
 
-print("="*60)
+print("=" * 60)
 print("RSS FEED METADATA SETUP")
-print("="*60)
+print("=" * 60)
 print()
 print("This script configures your podcast information for the RSS feed.")
 print("You only need to run this once.")
@@ -30,15 +30,18 @@ else:
 
 print()
 explicit_input = input("Contains explicit content? (yes/no): ").strip().lower()
-explicit = explicit_input in ['yes', 'y', 'true']
+explicit = explicit_input in ["yes", "y", "true"]
 
 print()
-artwork_url = input("Podcast logo URL (leave blank for now if you don't have it): ").strip() or None
+artwork_url = (
+    input("Podcast logo URL (leave blank for now if you don't have it): ").strip()
+    or None
+)
 
 print()
-print("-"*60)
+print("-" * 60)
 print("Summary of your podcast information:")
-print("-"*60)
+print("-" * 60)
 print(f"Title: {title}")
 print(f"Description: {description}")
 print(f"Author: {author}")
@@ -51,7 +54,7 @@ print()
 
 confirm = input("Save this information? (yes/no): ").strip().lower()
 
-if confirm in ['yes', 'y']:
+if confirm in ["yes", "y"]:
     # Initialize Spotify uploader
     try:
         uploader = SpotifyUploader()
@@ -65,13 +68,13 @@ if confirm in ['yes', 'y']:
             website_url=website_url,
             categories=categories,
             artwork_url=artwork_url,
-            explicit=explicit
+            explicit=explicit,
         )
 
         print()
-        print("="*60)
+        print("=" * 60)
         print("SUCCESS! Podcast metadata saved!")
-        print("="*60)
+        print("=" * 60)
         print()
         print("Next steps:")
         print("1. If you haven't set artwork URL yet:")

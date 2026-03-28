@@ -31,7 +31,9 @@ def get_device():
     return "cpu"
 
 
-def diarize(audio_path, num_speakers=None, model_size="large-v2", output_path=None, batch_size=4):
+def diarize(
+    audio_path, num_speakers=None, model_size="large-v2", output_path=None, batch_size=4
+):
     """Run full diarization pipeline: transcribe, align, diarize.
 
     Args:
@@ -85,8 +87,12 @@ def diarize(audio_path, num_speakers=None, model_size="large-v2", output_path=No
         language_code=result["language"], device=device
     )
     result = whisperx.align(
-        result["segments"], align_model, metadata, audio, device,
-        return_char_alignments=False
+        result["segments"],
+        align_model,
+        metadata,
+        audio,
+        device,
+        return_char_alignments=False,
     )
     print(f"  Aligned {sum(len(s.get('words', [])) for s in result['segments'])} words")
 
@@ -130,7 +136,9 @@ def diarize(audio_path, num_speakers=None, model_size="large-v2", output_path=No
         speakers[spk]["speaking_time"] = round(speakers[spk]["speaking_time"], 1)
 
     # Sort speakers by speaking time (most first)
-    speakers = dict(sorted(speakers.items(), key=lambda x: x[1]["speaking_time"], reverse=True))
+    speakers = dict(
+        sorted(speakers.items(), key=lambda x: x[1]["speaking_time"], reverse=True)
+    )
 
     # Build output
     output = {
@@ -168,25 +176,34 @@ def main():
     )
     parser.add_argument("audio", help="Path to audio file (WAV, MP3, etc.)")
     parser.add_argument(
-        "--speakers", type=int, default=None,
-        help="Expected number of speakers (improves accuracy)"
+        "--speakers",
+        type=int,
+        default=None,
+        help="Expected number of speakers (improves accuracy)",
     )
     parser.add_argument(
-        "--model", default="large-v2",
-        help="Whisper model size (default: large-v2)"
+        "--model", default="large-v2", help="Whisper model size (default: large-v2)"
     )
     parser.add_argument(
-        "--output", default=None,
-        help="Output JSON path (default: <audio_stem>_diarized.json)"
+        "--output",
+        default=None,
+        help="Output JSON path (default: <audio_stem>_diarized.json)",
     )
     parser.add_argument(
-        "--batch-size", type=int, default=4,
-        help="Transcription batch size - lower uses less memory (default: 4)"
+        "--batch-size",
+        type=int,
+        default=4,
+        help="Transcription batch size - lower uses less memory (default: 4)",
     )
 
     args = parser.parse_args()
-    diarize(args.audio, num_speakers=args.speakers, model_size=args.model,
-            output_path=args.output, batch_size=args.batch_size)
+    diarize(
+        args.audio,
+        num_speakers=args.speakers,
+        model_size=args.model,
+        output_path=args.output,
+        batch_size=args.batch_size,
+    )
 
 
 if __name__ == "__main__":

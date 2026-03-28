@@ -3,9 +3,9 @@
 import sys
 from pathlib import Path
 
-print("="*60)
+print("=" * 60)
 print("PODCAST AUTOMATION - SETUP TEST")
-print("="*60)
+print("=" * 60)
 print()
 
 # Test 1: Python version
@@ -24,19 +24,19 @@ print()
 print("Test 2: Required Packages")
 print("-" * 60)
 required_packages = [
-    'dotenv',
-    'openai',
-    'anthropic',
-    'pydub',
-    'dropbox',
-    'tqdm',
-    'yaml'
+    "dotenv",
+    "openai",
+    "anthropic",
+    "pydub",
+    "dropbox",
+    "tqdm",
+    "yaml",
 ]
 
 missing = []
 for package in required_packages:
     try:
-        __import__(package.replace('-', '_'))
+        __import__(package.replace("-", "_"))
         print(f"[OK] {package}")
     except ImportError:
         print(f"[ERROR] {package} - NOT INSTALLED")
@@ -80,7 +80,7 @@ try:
 
     # Check directories
     Config.create_directories()
-    print(f"[OK] Directories created:")
+    print("[OK] Directories created:")
     print(f"   - {Config.DOWNLOAD_DIR}")
     print(f"   - {Config.OUTPUT_DIR}")
     print(f"   - {Config.CLIPS_DIR}")
@@ -91,19 +91,19 @@ try:
     print("API Keys:")
 
     if Config.OPENAI_API_KEY:
-        print(f"[OK] OPENAI_API_KEY configured")
+        print("[OK] OPENAI_API_KEY configured")
     else:
-        print(f"[ERROR] OPENAI_API_KEY missing")
+        print("[ERROR] OPENAI_API_KEY missing")
 
     if Config.ANTHROPIC_API_KEY:
-        print(f"[OK] ANTHROPIC_API_KEY configured")
+        print("[OK] ANTHROPIC_API_KEY configured")
     else:
-        print(f"[ERROR] ANTHROPIC_API_KEY missing")
+        print("[ERROR] ANTHROPIC_API_KEY missing")
 
     if Config.DROPBOX_ACCESS_TOKEN:
-        print(f"[OK] DROPBOX_ACCESS_TOKEN configured")
+        print("[OK] DROPBOX_ACCESS_TOKEN configured")
     else:
-        print(f"[WARNING] DROPBOX_ACCESS_TOKEN missing (optional)")
+        print("[WARNING] DROPBOX_ACCESS_TOKEN missing (optional)")
 
     # Validate
     try:
@@ -129,25 +129,21 @@ print()
 print("Test 5: Module Imports")
 print("-" * 60)
 try:
-    from dropbox_handler import DropboxHandler
     print("[OK] dropbox_handler")
 except Exception as e:
     print(f"[ERROR] dropbox_handler: {e}")
 
 try:
-    from transcription import Transcriber
     print("[OK] transcription")
 except Exception as e:
     print(f"[ERROR] transcription: {e}")
 
 try:
-    from content_editor import ContentEditor
     print("[OK] content_editor")
 except Exception as e:
     print(f"[ERROR] content_editor: {e}")
 
 try:
-    from audio_processor import AudioProcessor
     print("[OK] audio_processor")
 except Exception as e:
     print(f"[ERROR] audio_processor: {e}")
@@ -161,6 +157,7 @@ print("-" * 60)
 # Test OpenAI
 try:
     import openai
+
     client = openai.OpenAI(api_key=Config.OPENAI_API_KEY)
     # Don't actually call the API, just check initialization
     print("[OK] OpenAI client initialized")
@@ -170,6 +167,7 @@ except Exception as e:
 # Test Anthropic
 try:
     import anthropic
+
     client = anthropic.Anthropic(api_key=Config.ANTHROPIC_API_KEY)
     print("[OK] Anthropic client initialized")
 except Exception as e:
@@ -179,6 +177,7 @@ except Exception as e:
 if Config.DROPBOX_ACCESS_TOKEN:
     try:
         import dropbox
+
         dbx = dropbox.Dropbox(Config.DROPBOX_ACCESS_TOKEN)
         account = dbx.users_get_current_account()
         print(f"[OK] Dropbox connected: {account.name.display_name}")
@@ -190,9 +189,9 @@ else:
 print()
 
 # Final summary
-print("="*60)
+print("=" * 60)
 print("[OK] SETUP TEST COMPLETE")
-print("="*60)
+print("=" * 60)
 print()
 print("Your podcast automation system is ready!")
 print()

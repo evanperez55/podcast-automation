@@ -44,9 +44,9 @@ def identify_speakers(data):
 
     for spk, info in speakers.items():
         mins = info["speaking_time"] / 60
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"{spk}  |  {mins:.1f} min  |  {info['segment_count']} segments")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         # Collect segments for this speaker
         spk_segments = [s for s in segments if s.get("speaker") == spk]
@@ -66,7 +66,9 @@ def identify_speakers(data):
     print("Use --speaker SPEAKER_XX to extract clips for a specific speaker.")
 
 
-def extract_clips(data, speaker_id, audio_path, output_dir, min_duration=10.0, merge_gap=2.0):
+def extract_clips(
+    data, speaker_id, audio_path, output_dir, min_duration=10.0, merge_gap=2.0
+):
     """Extract audio clips for the target speaker.
 
     Merges consecutive segments from the same speaker into "turns",
@@ -82,7 +84,9 @@ def extract_clips(data, speaker_id, audio_path, output_dir, min_duration=10.0, m
     # Check speaker exists
     speakers = data.get("speakers", {})
     if speaker_id not in speakers:
-        print(f"[ERROR] Speaker '{speaker_id}' not found. Available: {', '.join(speakers.keys())}")
+        print(
+            f"[ERROR] Speaker '{speaker_id}' not found. Available: {', '.join(speakers.keys())}"
+        )
         sys.exit(1)
 
     # Filter segments for target speaker
@@ -98,7 +102,9 @@ def extract_clips(data, speaker_id, audio_path, output_dir, min_duration=10.0, m
     print(f"[INFO] {len(long_turns)} turns >= {min_duration}s")
 
     if not long_turns:
-        print("[WARN] No turns meet the minimum duration. Try --min-duration with a lower value.")
+        print(
+            "[WARN] No turns meet the minimum duration. Try --min-duration with a lower value."
+        )
         return []
 
     # Setup output directory
@@ -122,14 +128,16 @@ def extract_clips(data, speaker_id, audio_path, output_dir, min_duration=10.0, m
 
         # Preview text (truncate to 80 chars)
         preview = turn["text"][:80] + ("..." if len(turn["text"]) > 80 else "")
-        print(f"  [{i}/{len(long_turns)}] {_fmt_time(turn['start'])} -> {_fmt_time(turn['end'])} "
-              f"({turn['duration']:.1f}s)")
+        print(
+            f"  [{i}/{len(long_turns)}] {_fmt_time(turn['start'])} -> {_fmt_time(turn['end'])} "
+            f"({turn['duration']:.1f}s)"
+        )
         print(f"           {preview}")
 
     print(f"\n[OK] Extracted {len(clip_paths)} clips to: {output_dir}")
 
     # Print summary
-    print(f"\nSummary:")
+    print("\nSummary:")
     total_duration = sum(t["duration"] for t in long_turns)
     print(f"  Total clip duration: {total_duration / 60:.1f} min")
     print(f"  Longest turn: {max(t['duration'] for t in long_turns):.1f}s")
@@ -204,29 +212,29 @@ def main():
     )
     parser.add_argument("transcript", help="Path to diarized transcript JSON")
     parser.add_argument(
-        "--identify", action="store_true",
-        help="Print sample text from each speaker for identification"
+        "--identify",
+        action="store_true",
+        help="Print sample text from each speaker for identification",
     )
     parser.add_argument(
-        "--speaker", default=None,
-        help="Speaker ID to extract (e.g., SPEAKER_02)"
+        "--speaker", default=None, help="Speaker ID to extract (e.g., SPEAKER_02)"
     )
     parser.add_argument(
-        "--audio", default=None,
-        help="Path to audio file (required with --speaker)"
+        "--audio", default=None, help="Path to audio file (required with --speaker)"
     )
     parser.add_argument(
-        "--min-duration", type=float, default=10.0,
-        help="Minimum turn duration in seconds (default: 10)"
+        "--min-duration",
+        type=float,
+        default=10.0,
+        help="Minimum turn duration in seconds (default: 10)",
     )
     parser.add_argument(
-        "--merge-gap", type=float, default=2.0,
-        help="Max gap in seconds to merge consecutive segments (default: 2.0)"
+        "--merge-gap",
+        type=float,
+        default=2.0,
+        help="Max gap in seconds to merge consecutive segments (default: 2.0)",
     )
-    parser.add_argument(
-        "--output-dir", default=None,
-        help="Output directory for clips"
-    )
+    parser.add_argument("--output-dir", default=None, help="Output directory for clips")
 
     args = parser.parse_args()
     data = load_transcript(args.transcript)

@@ -1,0 +1,78 @@
+# Fake Problems Podcast — default client config
+# This matches the current hardcoded values for backward compatibility.
+# Null values fall back to environment variables.
+
+client_name: "fake-problems"
+podcast_name: "Fake Problems Podcast"
+
+dropbox:
+  folder_path: "/Fake Problems Podcast/new_raw_files"
+  finished_folder: "/Fake Problems Podcast/finished_files"
+  edited_folder: "/Fake Problems Podcast/edited_files"
+  app_key: null
+  app_secret: null
+  refresh_token: null
+
+youtube:
+  client_id: null
+  client_secret: null
+  token_pickle: "clients/fake-problems/youtube_token.pickle"
+
+twitter:
+  api_key: null
+  api_secret: null
+  access_token: null
+  access_secret: null
+
+instagram:
+  access_token: null
+  account_id: null
+
+tiktok:
+  client_key: null
+  client_secret: null
+  access_token: null
+
+discord:
+  webhook_url: null
+
+content:
+  num_clips: 3
+  clip_min_duration: 15
+  clip_max_duration: 30
+  names_to_remove:
+    - "Joey"
+    - "Evan"
+    - "Dom"
+    - "Dominique"
+    - "Evan Perez"
+    - "Joey Gross"
+    - "Dominique Karolczak"
+    - "Perez"
+    - "Gross"
+    - "Karolczak"
+  words_to_censor:
+    - "fag"
+    - "fags"
+    - "faggot"
+    - "faggots"
+    - "dyke"
+    - "dykes"
+    - "nigga"
+    - "niggas"
+    - "nigger"
+    - "niggers"
+    - "chink"
+    - "chinks"
+    - "spic"
+    - "spics"
+    - "wetback"
+    - "wetbacks"
+    - "kike"
+    - "kikes"
+    - "gook"
+    - "gooks"
+    - "retard"
+    - "retards"
+    - "retarded"
+  voice_persona: null

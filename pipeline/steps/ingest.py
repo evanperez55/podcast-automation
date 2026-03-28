@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from config import Config
 from pipeline.context import PipelineContext
@@ -51,6 +52,31 @@ def run_ingest(
     # Create episode output subfolder
     episode_output_dir = Config.OUTPUT_DIR / episode_folder
     episode_output_dir.mkdir(exist_ok=True, parents=True)
+
+    # Check if input is a video file — extract audio for transcription pipeline
+    from video_utils import is_video_file, probe_video, extract_audio
+
+    if is_video_file(audio_file):
+        logger.info("Video input detected: %s", audio_file.name)
+        ctx.source_video_path = audio_file
+        ctx.has_video_source = True
+        ctx.video_metadata = probe_video(str(audio_file))
+        if ctx.video_metadata:
+            logger.info(
+                "Video: %dx%d, %.1fs, %s",
+                ctx.video_metadata["width"],
+                ctx.video_metadata["height"],
+                ctx.video_metadata["duration"],
+                ctx.video_metadata["codec"],
+            )
+
+        # Extract audio track for the rest of the pipeline
+        extracted_path = Config.DOWNLOAD_DIR / f"{audio_file.stem}_extracted.wav"
+        extracted = extract_audio(str(audio_file), str(extracted_path))
+        if not extracted:
+            raise Exception(f"Failed to extract audio from video: {audio_file}")
+        audio_file = Path(extracted)
+        logger.info("Using extracted audio: %s", audio_file)
 
     ctx.audio_file = audio_file
     ctx.episode_folder = episode_folder

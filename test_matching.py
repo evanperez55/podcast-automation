@@ -1,7 +1,5 @@
 """Test topic matching with a small sample."""
 
-import json
-from pathlib import Path
 from match_topics_to_episodes import TopicMatcher
 
 
@@ -24,8 +22,10 @@ def test_matching():
 
     print(f"\nResults: {len(matches)} matches")
     for match in matches:
-        print(f"  - {match['topic_text'][:50]}: discussed={match['discussed']}, confidence={match['confidence']}")
+        print(
+            f"  - {match['topic_text'][:50]}: discussed={match['discussed']}, confidence={match['confidence']}"
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_matching()

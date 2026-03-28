@@ -18,9 +18,17 @@ class TestAnalyticsCollectorInit:
     """Tests for AnalyticsCollector initialization."""
 
     @patch("analytics.Path.mkdir")
+    def test_collector_init_default_enabled(self, mock_mkdir):
+        """Default init has analytics enabled (ANALYTICS_ENABLED defaults to 'true')."""
+        collector = AnalyticsCollector()
+
+        assert collector.enabled is True
+        mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
+
+    @patch("analytics.Path.mkdir")
     def test_collector_init_disabled(self, mock_mkdir):
-        """Default init has analytics disabled."""
-        with patch.dict("os.environ", {}, clear=True):
+        """Explicitly setting ANALYTICS_ENABLED=false disables analytics."""
+        with patch.dict("os.environ", {"ANALYTICS_ENABLED": "false"}):
             collector = AnalyticsCollector()
 
         assert collector.enabled is False

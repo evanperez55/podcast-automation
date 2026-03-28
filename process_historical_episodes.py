@@ -17,10 +17,10 @@ class HistoricalEpisodeProcessor:
 
     def __init__(self):
         """Initialize all components."""
-        print("="*60)
+        print("=" * 60)
         print("HISTORICAL PODCAST EPISODE PROCESSOR")
         print("Transcribe, Clip, Upload to Dropbox (NO social media)")
-        print("="*60)
+        print("=" * 60)
         print()
 
         # Validate configuration
@@ -51,9 +51,9 @@ class HistoricalEpisodeProcessor:
             print(f"[ERROR] File not found: {audio_file}")
             return None
 
-        print("="*60)
+        print("=" * 60)
         print(f"PROCESSING: {audio_file.name}")
-        print("="*60)
+        print("=" * 60)
         print()
 
         # Extract episode number from filename
@@ -61,11 +61,11 @@ class HistoricalEpisodeProcessor:
         if episode_number:
             print(f"[INFO] Detected Episode #{episode_number}")
         else:
-            print(f"[WARNING] Could not detect episode number from filename")
+            print("[WARNING] Could not detect episode number from filename")
             episode_number = 0
 
         episode_folder = f"ep_{episode_number}" if episode_number else "ep_unknown"
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # Create episode output subfolder
         episode_output_dir = Config.OUTPUT_DIR / episode_folder
@@ -85,7 +85,7 @@ class HistoricalEpisodeProcessor:
 
         # Save analysis
         analysis_path = episode_output_dir / f"{audio_file.stem}_analysis.json"
-        with open(analysis_path, 'w', encoding='utf-8') as f:
+        with open(analysis_path, "w", encoding="utf-8") as f:
             json.dump(analysis, f, indent=2, ensure_ascii=False)
         print(f"[OK] Analysis saved to: {analysis_path}")
         print()
@@ -95,9 +95,7 @@ class HistoricalEpisodeProcessor:
         print("-" * 60)
         censored_audio_path = episode_output_dir / f"{audio_file.stem}_censored.wav"
         censored_audio = self.audio_processor.apply_censorship(
-            audio_file,
-            analysis.get('censor_timestamps', []),
-            censored_audio_path
+            audio_file, analysis.get("censor_timestamps", []), censored_audio_path
         )
         print()
 
@@ -108,9 +106,7 @@ class HistoricalEpisodeProcessor:
         clip_dir.mkdir(exist_ok=True, parents=True)
 
         clip_paths = self.audio_processor.create_clips(
-            censored_audio,
-            analysis.get('best_clips', []),
-            clip_dir
+            censored_audio, analysis.get("best_clips", []), clip_dir
         )
         print()
 
@@ -125,10 +121,11 @@ class HistoricalEpisodeProcessor:
         print("-" * 60)
 
         # Upload transcription
-        print(f"\n[INFO] Uploading transcription to /podcast/transcriptions/{episode_folder}/")
+        print(
+            f"\n[INFO] Uploading transcription to /podcast/transcriptions/{episode_folder}/"
+        )
         transcription_dropbox_path = self.dropbox.upload_transcription(
-            transcript_path,
-            episode_folder_name=episode_folder
+            transcript_path, episode_folder_name=episode_folder
         )
         if transcription_dropbox_path:
             print(f"[OK] Transcription uploaded to: {transcription_dropbox_path}")
@@ -136,10 +133,10 @@ class HistoricalEpisodeProcessor:
             print("[WARNING] Failed to upload transcription")
 
         # Upload censored MP3 to finished_files folder
-        print(f"\n[INFO] Uploading censored audio to /podcast/finished_files/")
+        print("\n[INFO] Uploading censored audio to /podcast/finished_files/")
         finished_path = self.dropbox.upload_finished_episode(
             mp3_path,
-            episode_name=f"Episode_{episode_number}_{audio_file.stem}_censored.mp3"
+            episode_name=f"Episode_{episode_number}_{audio_file.stem}_censored.mp3",
         )
 
         if finished_path:
@@ -149,7 +146,9 @@ class HistoricalEpisodeProcessor:
 
         # Upload clips to clips folder
         print(f"\n[INFO] Uploading clips to /podcast/clips/{episode_folder}/")
-        uploaded_clip_paths = self.dropbox.upload_clips(clip_paths, episode_folder_name=episode_folder)
+        uploaded_clip_paths = self.dropbox.upload_clips(
+            clip_paths, episode_folder_name=episode_folder
+        )
 
         if uploaded_clip_paths:
             print(f"[OK] Uploaded {len(uploaded_clip_paths)} clips")
@@ -162,29 +161,29 @@ class HistoricalEpisodeProcessor:
 
         # Prepare results
         results = {
-            'episode_number': episode_number,
-            'original_audio': str(audio_file),
-            'transcript': str(transcript_path),
-            'analysis': str(analysis_path),
-            'censored_audio_wav': str(censored_audio),
-            'censored_audio_mp3': str(mp3_path),
-            'clips': [str(p) for p in clip_paths],
-            'dropbox_transcription_path': transcription_dropbox_path,
-            'dropbox_finished_path': finished_path,
-            'dropbox_clip_paths': uploaded_clip_paths,
-            'episode_summary': analysis.get('episode_summary'),
-            'best_clips_info': analysis.get('best_clips'),
-            'censor_count': len(analysis.get('censor_timestamps', [])),
+            "episode_number": episode_number,
+            "original_audio": str(audio_file),
+            "transcript": str(transcript_path),
+            "analysis": str(analysis_path),
+            "censored_audio_wav": str(censored_audio),
+            "censored_audio_mp3": str(mp3_path),
+            "clips": [str(p) for p in clip_paths],
+            "dropbox_transcription_path": transcription_dropbox_path,
+            "dropbox_finished_path": finished_path,
+            "dropbox_clip_paths": uploaded_clip_paths,
+            "episode_summary": analysis.get("episode_summary"),
+            "best_clips_info": analysis.get("best_clips"),
+            "censor_count": len(analysis.get("censor_timestamps", [])),
         }
 
         # Save results summary
         results_path = episode_output_dir / f"{audio_file.stem}_results.json"
-        with open(results_path, 'w', encoding='utf-8') as f:
+        with open(results_path, "w", encoding="utf-8") as f:
             json.dump(results, f, indent=2, ensure_ascii=False)
 
-        print("="*60)
+        print("=" * 60)
         print(f"[SUCCESS] EPISODE {episode_number} PROCESSING COMPLETE!")
-        print("="*60)
+        print("=" * 60)
         print()
         print(f"Episode Summary: {results['episode_summary'][:100]}...")
         print(f"Censored items: {results['censor_count']}")
@@ -193,7 +192,9 @@ class HistoricalEpisodeProcessor:
 
         return results
 
-    def process_all_historical_episodes(self, folder_path="historical_ep", start_episode=None):
+    def process_all_historical_episodes(
+        self, folder_path="historical_ep", start_episode=None
+    ):
         """
         Process all episodes in the historical_ep folder.
 
@@ -208,7 +209,7 @@ class HistoricalEpisodeProcessor:
             return
 
         # Find all audio files (mp4, m4a, wav, mp3)
-        audio_extensions = ['.mp4', '.m4a', '.wav', '.mp3']
+        audio_extensions = [".mp4", ".m4a", ".wav", ".mp3"]
         audio_files = []
         for ext in audio_extensions:
             audio_files.extend(folder.glob(f"*{ext}"))
@@ -237,34 +238,46 @@ class HistoricalEpisodeProcessor:
             if start_episode and episode_num < start_episode:
                 print(f"[INFO] Skipping Episode #{episode_num} (already processed)")
                 continue
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"PROCESSING FILE {i}/{len(audio_files)}")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
             try:
                 results = self.process_historical_episode(audio_file)
                 if results:
-                    print(f"[OK] Successfully processed episode {results['episode_number']}")
+                    print(
+                        f"[OK] Successfully processed episode {results['episode_number']}"
+                    )
                 else:
                     print(f"[ERROR] Failed to process {audio_file.name}")
             except Exception as e:
                 print(f"[ERROR] Exception processing {audio_file.name}: {e}")
                 import traceback
+
                 traceback.print_exc()
 
                 # Auto-continue on network errors, ask on other errors
                 error_str = str(e).lower()
-                if 'ssl' in error_str or 'connection' in error_str or 'timeout' in error_str or 'max retries' in error_str:
-                    print("[INFO] Network error detected - automatically continuing with next episode")
-                    print("[INFO] You may want to manually re-process this episode later")
+                if (
+                    "ssl" in error_str
+                    or "connection" in error_str
+                    or "timeout" in error_str
+                    or "max retries" in error_str
+                ):
+                    print(
+                        "[INFO] Network error detected - automatically continuing with next episode"
+                    )
+                    print(
+                        "[INFO] You may want to manually re-process this episode later"
+                    )
                     continue
                 else:
                     print("[INFO] Non-network error - continuing with next episode")
                     continue
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("ALL HISTORICAL EPISODES PROCESSED!")
-        print("="*60)
+        print("=" * 60)
 
 
 def main():
@@ -273,7 +286,7 @@ def main():
 
     # Check command line arguments
     if len(sys.argv) > 1:
-        if sys.argv[1] == 'all':
+        if sys.argv[1] == "all":
             # Process all historical episodes
             folder = "historical_ep"
             start_episode = None
@@ -286,7 +299,9 @@ def main():
                 except ValueError:
                     folder = sys.argv[2]
 
-            processor.process_all_historical_episodes(folder, start_episode=start_episode)
+            processor.process_all_historical_episodes(
+                folder, start_episode=start_episode
+            )
         else:
             # Process single file
             file_path = sys.argv[1]
@@ -302,16 +317,16 @@ def main():
 
         choice = input("Enter choice (1-2): ").strip()
 
-        if choice == '1':
+        if choice == "1":
             processor.process_all_historical_episodes()
-        elif choice == '2':
+        elif choice == "2":
             file_path = input("Enter path to audio file: ").strip()
             processor.process_historical_episode(file_path)
         else:
             print("Invalid choice")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
@@ -320,5 +335,6 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"\n\n[ERROR] {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

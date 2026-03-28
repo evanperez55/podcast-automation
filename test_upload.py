@@ -19,8 +19,7 @@ print("TEST 1: Uploading censored MP3 to finished_files...")
 print("-" * 60)
 if mp3_file.exists():
     result = handler.upload_finished_episode(
-        mp3_file,
-        episode_name="ep_25_censored.mp3"
+        mp3_file, episode_name="ep_25_censored.mp3"
     )
     if result:
         print(f"[SUCCESS] Uploaded to: {result}")
