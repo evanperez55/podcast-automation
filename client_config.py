@@ -149,8 +149,97 @@ def apply_client_config(overrides: dict) -> None:
     logger.info("Applied %d client config overrides", applied)
 
 
+def activate_client(client_name: str) -> dict:
+    """Load and apply a client config, including output directory isolation.
+
+    Convenience function combining load + apply + auto-derive output dirs.
+    Returns the overrides dict for inspection.
+    """
+    overrides = load_client_config(client_name)
+    apply_client_config(overrides)
+
+    # Auto-isolate output directories per client (unless explicitly set in YAML)
+    if "OUTPUT_DIR" not in overrides:
+        Config.OUTPUT_DIR = Config.BASE_DIR / "output" / client_name
+    if "DOWNLOAD_DIR" not in overrides:
+        Config.DOWNLOAD_DIR = Config.BASE_DIR / "downloads" / client_name
+    if "CLIPS_DIR" not in overrides:
+        Config.CLIPS_DIR = Config.BASE_DIR / "clips" / client_name
+    if "TOPIC_DATA_DIR" not in overrides:
+        Config.TOPIC_DATA_DIR = Config.BASE_DIR / "topic_data" / client_name
+
+    logger.info("Using client config: %s", client_name)
+    return overrides
+
+
+def init_client(client_name: str) -> None:
+    """Scaffold a new client config from the example template.
+
+    Creates clients/{name}.yaml and clients/{name}/ credentials directory.
+    """
+    clients_dir = Config.BASE_DIR / "clients"
+    clients_dir.mkdir(exist_ok=True)
+
+    yaml_path = clients_dir / f"{client_name}.yaml"
+    creds_dir = clients_dir / client_name
+
+    if yaml_path.exists():
+        print(f"Client config already exists: {yaml_path}")
+        return
+
+    # Copy from example template
+    template_path = clients_dir / "example-client.yaml"
+    if not template_path.exists():
+        print(f"Template not found: {template_path}")
+        return
+
+    template_text = template_path.read_text(encoding="utf-8")
+    # Replace placeholder values with the actual client name
+    client_text = template_text.replace("your-client-name", client_name)
+    client_text = client_text.replace(
+        "Your Podcast Name", client_name.replace("-", " ").title()
+    )
+    client_text = client_text.replace(
+        "Your Podcast", client_name.replace("-", " ").title()
+    )
+
+    yaml_path.write_text(client_text, encoding="utf-8")
+    creds_dir.mkdir(exist_ok=True)
+
+    print(f"Created client config: {yaml_path}")
+    print(f"Created credentials dir: {creds_dir}/")
+    print()
+    print("Next steps:")
+    print(f"  1. Edit {yaml_path} with your podcast details")
+    print(f"  2. Add platform credentials to {creds_dir}/")
+    print(f"  3. Run: uv run main.py --client {client_name} --dry-run")
+
+
+def list_clients() -> None:
+    """Print available client configs."""
+    clients_dir = Config.BASE_DIR / "clients"
+    if not clients_dir.exists():
+        print("No clients/ directory found. Run: uv run main.py init-client <name>")
+        return
+
+    yamls = sorted(clients_dir.glob("*.yaml")) + sorted(clients_dir.glob("*.yml"))
+    # Exclude the example template
+    yamls = [y for y in yamls if y.stem != "example-client"]
+
+    if not yamls:
+        print("No client configs found. Run: uv run main.py init-client <name>")
+        return
+
+    print("Available clients:")
+    for yaml_path in yamls:
+        with open(yaml_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        podcast_name = data.get("podcast_name", "(unnamed)")
+        print(f"  {yaml_path.stem:20s}  {podcast_name}")
+
+
 def _list_available_clients() -> str:
-    """List available client config files."""
+    """List available client config files (for error messages)."""
     clients_dir = Config.BASE_DIR / "clients"
     if not clients_dir.exists():
         return "(no clients/ directory)"

@@ -294,22 +294,9 @@ def run(args):
         client_name = getattr(args, "client_name", None)
 
     if client_name:
-        from client_config import load_client_config, apply_client_config
+        from client_config import activate_client
 
-        client_overrides = load_client_config(client_name)
-        apply_client_config(client_overrides)
-
-        # Auto-isolate output directories per client (unless explicitly set in YAML)
-        if "OUTPUT_DIR" not in client_overrides:
-            Config.OUTPUT_DIR = Config.BASE_DIR / "output" / client_name
-        if "DOWNLOAD_DIR" not in client_overrides:
-            Config.DOWNLOAD_DIR = Config.BASE_DIR / "downloads" / client_name
-        if "CLIPS_DIR" not in client_overrides:
-            Config.CLIPS_DIR = Config.BASE_DIR / "clips" / client_name
-        if "TOPIC_DATA_DIR" not in client_overrides:
-            Config.TOPIC_DATA_DIR = Config.BASE_DIR / "topic_data" / client_name
-
-        logger.info("Using client config: %s", client_name)
+        activate_client(client_name)
 
     components = _init_components(
         test_mode=test_mode,

@@ -260,5 +260,122 @@ output:
         assert isinstance(overrides["CLIPS_DIR"], Path)
 
 
+class TestActivateClient:
+    """Tests for activate_client() — combined load + apply + output isolation."""
+
+    def test_activate_sets_config_and_output_dirs(self, tmp_path, monkeypatch):
+        """activate_client patches Config and auto-derives output dirs."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "PODCAST_NAME", Config.PODCAST_NAME)
+        monkeypatch.setattr(Config, "OUTPUT_DIR", Config.OUTPUT_DIR)
+        monkeypatch.setattr(Config, "DOWNLOAD_DIR", Config.DOWNLOAD_DIR)
+        monkeypatch.setattr(Config, "CLIPS_DIR", Config.CLIPS_DIR)
+        monkeypatch.setattr(Config, "TOPIC_DATA_DIR", Config.TOPIC_DATA_DIR)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        (clients_dir / "acme.yaml").write_text(
+            'client_name: "acme"\npodcast_name: "Acme Show"\n'
+        )
+
+        from client_config import activate_client
+
+        activate_client("acme")
+
+        assert Config.PODCAST_NAME == "Acme Show"
+        assert Config.OUTPUT_DIR == tmp_path / "output" / "acme"
+        assert Config.DOWNLOAD_DIR == tmp_path / "downloads" / "acme"
+        assert Config.CLIPS_DIR == tmp_path / "clips" / "acme"
+        assert Config.TOPIC_DATA_DIR == tmp_path / "topic_data" / "acme"
+
+
+class TestInitClient:
+    """Tests for init_client() — scaffolding new client configs."""
+
+    def test_creates_yaml_and_creds_dir(self, tmp_path, monkeypatch):
+        """init_client creates YAML config and credentials directory."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        # Write a minimal example template
+        (clients_dir / "example-client.yaml").write_text(
+            'client_name: "your-client-name"\npodcast_name: "Your Podcast Name"\n'
+        )
+
+        from client_config import init_client
+
+        init_client("cool-show")
+
+        yaml_path = clients_dir / "cool-show.yaml"
+        assert yaml_path.exists()
+        content = yaml_path.read_text()
+        assert "cool-show" in content
+        assert "Cool Show" in content
+        assert (clients_dir / "cool-show").is_dir()
+
+    def test_does_not_overwrite_existing(self, tmp_path, monkeypatch, capsys):
+        """init_client refuses to overwrite an existing config."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        (clients_dir / "existing.yaml").write_text("original content")
+
+        from client_config import init_client
+
+        init_client("existing")
+
+        assert (clients_dir / "existing.yaml").read_text() == "original content"
+        assert "already exists" in capsys.readouterr().out
+
+
+class TestListClients:
+    """Tests for list_clients() output."""
+
+    def test_lists_clients_excluding_example(self, tmp_path, monkeypatch, capsys):
+        """list_clients shows real clients but not the example template."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        (clients_dir / "example-client.yaml").write_text('podcast_name: "Example"\n')
+        (clients_dir / "my-show.yaml").write_text('podcast_name: "My Show"\n')
+
+        from client_config import list_clients
+
+        list_clients()
+
+        output = capsys.readouterr().out
+        assert "my-show" in output
+        assert "My Show" in output
+        assert "example-client" not in output
+
+    def test_empty_directory(self, tmp_path, monkeypatch, capsys):
+        """list_clients handles no clients gracefully."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+
+        from client_config import list_clients
+
+        list_clients()
+
+        assert "No client configs found" in capsys.readouterr().out
+
+
+class TestBackwardCompatibility:
+    """Verify no-client mode preserves default Fake Problems config."""
+
+    def test_defaults_unchanged_without_client(self):
+        """Without --client, Config keeps Fake Problems defaults."""
+        assert Config.PODCAST_NAME == "Fake Problems Podcast"
+        assert "Joey" in Config.NAMES_TO_REMOVE
+        assert "Evan" in Config.NAMES_TO_REMOVE
+        assert Config.OUTPUT_DIR == Config.BASE_DIR / "output"
+        assert Config.CLIPS_DIR == Config.BASE_DIR / "clips"
+        assert Config.DOWNLOAD_DIR == Config.BASE_DIR / "downloads"
+
+    def test_voice_persona_not_on_config_by_default(self):
+        """Config doesn't have VOICE_PERSONA unless set by client config."""
+        assert not hasattr(Config, "VOICE_PERSONA") or Config.VOICE_PERSONA is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

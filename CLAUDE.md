@@ -12,7 +12,10 @@ Automated production pipeline: transcription, AI content analysis, auto-censorsh
 - Tests: `uv run pytest` (or `uv run pytest --cov`)
 - Lint: `uv run ruff check .` / `uv run ruff format .`
 - Topic engine: `uv run topic_scraper.py` / `uv run topic_scorer.py`
-- Flags: `--dry-run`, `--test`, `--auto-approve`
+- Multi-client: `uv run main.py --client <name> latest`
+- Init new client: `uv run main.py init-client <name>`
+- List clients: `uv run main.py list-clients`
+- Flags: `--dry-run`, `--test`, `--auto-approve`, `--client <name>`
 
 ## Pipeline Step Order
 1 Download -> 2 Transcribe -> 3 Analyze -> 3.5 Topic tracker -> 4 Censor -> 4.5 Normalize -> 5 Clips -> 5.1 Clip approval -> 5.4 Subtitles -> 5.5 Video/Audiogram -> 5.6 Thumbnail -> 6 MP3 -> 7 Dropbox -> 7.5 RSS -> 8 Social media -> 8.5 Blog post -> 9 Search index

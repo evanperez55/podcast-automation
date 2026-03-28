@@ -25,7 +25,7 @@ def _parse_flags():
         "--dry-run",
         "--auto-approve",
         "--force",
-    }  # noqa: E501
+    }
     client_name = None
     cleaned = []
     skip_next = False
@@ -49,15 +49,36 @@ def _parse_flags():
     }
 
 
+def _activate_client(client_name):
+    """Apply client config if specified."""
+    if client_name:
+        from client_config import activate_client
+
+        activate_client(client_name)
+
+
 def main():
     """Main entry point."""
     args = _parse_flags()
+    client_name = args["client_name"]
 
-    # Handle commands that don't need full component init
     if len(sys.argv) > 1:
         cmd = sys.argv[1].lower()
 
+        if cmd == "init-client" and len(sys.argv) > 2:
+            from client_config import init_client
+
+            init_client(sys.argv[2])
+            return
+
+        if cmd == "list-clients":
+            from client_config import list_clients
+
+            list_clients()
+            return
+
         if cmd == "upload-scheduled":
+            _activate_client(client_name)
             run_upload_scheduled()
             return
 
@@ -66,30 +87,28 @@ def main():
             return
 
         if cmd == "analytics":
+            _activate_client(client_name)
             episode_arg = sys.argv[2] if len(sys.argv) > 2 else "all"
             run_analytics(episode_arg)
             return
 
         if cmd == "search" and len(sys.argv) > 2:
-            query = " ".join(sys.argv[2:])
-            run_search(query)
+            _activate_client(client_name)
+            run_search(" ".join(sys.argv[2:]))
             return
 
-    # Dry run mode: validate pipeline and exit
     if args["dry_run"]:
+        _activate_client(client_name)
         dry_run()
         return
 
-    # Check command line arguments
     if len(sys.argv) > 1:
         arg = sys.argv[1].lower()
-
         if arg == "list":
             list_episodes_by_number()
         elif arg == "latest":
             run_with_notification(args)
         elif arg.startswith("ep") or arg.startswith("episode"):
-            # Support formats: ep25, episode25, ep 25, episode 25
             match = re.search(r"(\d+)", arg)
             if match:
                 episode_num = int(match.group(1))
@@ -100,7 +119,6 @@ def main():
                 return
             run_with_notification(args, episode_number=episode_num)
         else:
-            # Process specific file (local or dropbox path)
             file_path = sys.argv[1]
             if file_path.startswith("/"):
                 run_with_notification(args, dropbox_path=file_path)
