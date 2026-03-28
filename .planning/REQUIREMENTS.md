@@ -1,56 +1,83 @@
-# Requirements: Fake Problems Podcast — Content Calendar
+# Requirements: Podcast Automation
 
-**Defined:** 2026-03-19
-**Core Value:** One command produces professional-quality, platform-ready podcast content that sounds hand-edited and captures the show's edgy comedy voice — without manual intervention.
+**Defined:** 2026-03-28
+**Core Value:** One command produces professional-quality, platform-ready podcast content that sounds hand-edited and captures the show's voice — without manual intervention.
 
-## v1.3 Requirements
+## v1.4 Requirements
 
-### Content Calendar
+Requirements for Real-World Testing & Sales Readiness milestone.
 
-- [x] **CAL-01**: Content calendar generates a 5-slot distribution plan per episode (D-1 teaser, D0 episode + clip 1, D+2 clip 2, D+4 clip 3)
-- [x] **CAL-02**: Calendar tracks per-slot, per-platform upload status in `topic_data/content_calendar.json`
-- [x] **CAL-03**: `python main.py upload-scheduled` fires due slots from the calendar (extends existing scheduled upload)
-- [x] **CAL-04**: Dry run displays the full calendar plan with slot dates and platform assignments
+### Config Hardening
 
-## v2 Requirements
+- [ ] **CFG-01**: Pipeline uses only per-client config values (no Fake Problems defaults leak to other clients)
+- [ ] **CFG-02**: User can define genre-specific voice persona, blog voice, and scoring profile per client via YAML
+- [ ] **CFG-03**: User can run validate-client to see active config values after client activation (names, words, voice, scoring)
+
+### Episode Source
+
+- [ ] **SRC-01**: User can download a podcast episode by pointing at a public RSS feed URL
+- [ ] **SRC-02**: Pipeline runs without Dropbox credentials when episode source is RSS or local file
+
+### Integration Testing
+
+- [ ] **TEST-01**: User can process a real true crime episode end-to-end through the pipeline
+- [ ] **TEST-02**: User can process a real business/interview episode end-to-end through the pipeline
+- [ ] **TEST-03**: Clip scorer selects genre-appropriate moments (not just high-energy for non-comedy)
+- [ ] **TEST-04**: Compliance checker applies genre-appropriate sensitivity (stricter for true crime, lighter for comedy)
+
+### Demo Packaging
+
+- [ ] **DEMO-01**: User can run a package-demo command to assemble all pipeline output into a presentable demo folder
+- [ ] **DEMO-02**: Demo includes a before/after audio comparison clip (raw vs processed)
+- [ ] **DEMO-03**: Demo includes a DEMO.md narrative per client (what was automated, time saved, cost, metrics)
+
+## Future Requirements
 
 ### Distribution Expansion
 
-- **DIST-02**: Instagram Reels automatically uploaded via pipeline
-- **DIST-03**: Bluesky posting via atproto SDK
-- **DIST-04**: Threads posting via Meta API
+- **DIST-01**: Instagram Reels auto-upload via pipeline
+- **DIST-02**: Bluesky posting via atproto SDK
+- **DIST-03**: Threads posting via Meta API
 
-### Audio Enhancement
+### Sales Tooling
 
-- **AUDIO-04**: Filler word removal (ums/ahs) with configurable threshold and preview
-
-### Content & SEO
-
-- **VOICE-08**: Subtitle style presets (Hormozi/minimal/pop) and speaker labels
+- **SALES-01**: White-label output (remove pipeline branding from generated content)
+- **SALES-02**: Demo video walkthrough (screen recording + narration, 3-5 min)
+- **SALES-03**: Proposal email generator from episode metadata
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| CI/CD automation | Pipeline requires GPU + Ollama locally; GitHub-hosted runners can't support this |
-| Instagram/TikTok clip slots | Uploaders are stubs — calendar generates slots but skips non-functional platforms |
-| ML engagement prediction | Dataset still too small; scipy correlations sufficient |
-| Web dashboard for calendar | CLI-driven pipeline — calendar viewable via dry-run output |
+| Filler word removal | Kills comedy timing; degrades interview cadence (confirmed by user feedback) |
+| Live upload demo to prospect's platforms | Requires their OAuth credentials; security risk; cannot do in a meeting |
+| Real-time processing during demo meeting | 20-40 min Whisper + 5-10 min analysis; no prospect sits through that |
+| Dynamic ad insertion | Requires CDN hosting; incompatible with zero-cost constraint |
+| Self-serve onboarding UI | CLI-driven workflow; prospects are shown output, not the tool |
+| Genre-tuned clip scoring via ML | Dataset too small; empirical tuning via YAML profiles is sufficient |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CAL-01 | Phase 12 | Complete |
-| CAL-02 | Phase 12 | Complete |
-| CAL-03 | Phase 12 | Complete |
-| CAL-04 | Phase 12 | Complete |
+| CFG-01 | — | Pending |
+| CFG-02 | — | Pending |
+| CFG-03 | — | Pending |
+| SRC-01 | — | Pending |
+| SRC-02 | — | Pending |
+| TEST-01 | — | Pending |
+| TEST-02 | — | Pending |
+| TEST-03 | — | Pending |
+| TEST-04 | — | Pending |
+| DEMO-01 | — | Pending |
+| DEMO-02 | — | Pending |
+| DEMO-03 | — | Pending |
 
 **Coverage:**
-- v1.3 requirements: 4 total
-- Mapped to phases: 4
-- Unmapped: 0
+- v1.4 requirements: 12 total
+- Mapped to phases: 0
+- Unmapped: 12 (pending roadmap)
 
 ---
-*Requirements defined: 2026-03-19*
-*Last updated: 2026-03-19 — traceability mapped after roadmap creation*
+*Requirements defined: 2026-03-28*
+*Last updated: 2026-03-28 after initial definition*
