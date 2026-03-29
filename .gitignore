@@ -35,6 +35,7 @@ env/
 downloads/
 output/
 clips/
+demo/
 historical_ep/
 assets/*.wav
 

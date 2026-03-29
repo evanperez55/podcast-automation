@@ -94,6 +94,17 @@ def _handle_client_command(cmd, args):
         from client_config import process_all
 
         process_all(args)
+    elif cmd == "package-demo":
+        from demo_packager import DemoPackager
+
+        n = name or (sys.argv[2] if len(sys.argv) > 2 else None)
+        ep = sys.argv[3] if len(sys.argv) > 3 else None
+        if not n or not ep:
+            print("Usage: uv run main.py package-demo <client> <ep_id>")
+            return True
+        _activate_client(n)
+        demo_path = DemoPackager().package_demo(n, ep)
+        print(f"\nDemo packaged: {demo_path}")
     else:
         return False
     return True
