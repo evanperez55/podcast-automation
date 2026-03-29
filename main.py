@@ -113,6 +113,10 @@ def _handle_client_command(cmd, args):
         from pitch_generator import run_gen_pitch_cli
 
         run_gen_pitch_cli(sys.argv)
+    elif cmd == "demo-workflow":
+        from demo_packager import run_demo_workflow_cli
+
+        run_demo_workflow_cli(sys.argv, args)
     elif cmd == "outreach":
         from outreach_tracker import OutreachTracker
 
