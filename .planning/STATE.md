@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Real-World Testing & Sales Readiness
 status: planning
-stopped_at: Completed 17-02-PLAN.md — genre client YAMLs and integration testing
-last_updated: "2026-03-28T23:59:11.253Z"
-last_activity: 2026-03-28 — Roadmap created, 4 phases, 12/12 requirements mapped
+stopped_at: Completed 18-01-PLAN.md — raw audio snapshot for demo package
+last_updated: "2026-03-28T00:18:00Z"
+last_activity: 2026-03-28 — Completed 18-01: raw audio snapshot before censorship
 progress:
   total_phases: 5
   completed_phases: 4
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-03-28)
 
 ## Current Position
 
-Phase: 15 of 18 (v1.4) — Config Hardening
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-03-28 — Roadmap created, 4 phases, 12/12 requirements mapped
+Phase: 18 of 18 (v1.4) — Demo Packaging
+Plan: 1 of TBD in current phase
+Status: In progress
+Last activity: 2026-03-28 — Completed 18-01: raw audio snapshot before censorship
 
-Progress: [░░░░░░░░░░] 0% (v1.4 phases not yet started)
+Progress: [██░░░░░░░░] 20% (18-01 complete)
 
 ## Shipped Milestones
 
@@ -60,6 +60,8 @@ Progress: [░░░░░░░░░░] 0% (v1.4 phases not yet started)
 - [Phase 17-integration-testing-genre-fixes]: True crime client uses Casefile Acast feed URL (original Simplecast returns 403)
 - [Phase 17-integration-testing-genre-fixes]: Non-Dropbox clients skip ALL uploaders in distribute.py to prevent FP credential leakage
 - [Phase 17-integration-testing-genre-fixes]: normalize_audio uses temp file + rename to avoid FFmpeg in-place write crash
+- [Phase 18-01]: Snapshot uses subprocess FFmpeg -ss/-to (not pydub) to avoid loading 1GB+ audio into memory
+- [Phase 18-01]: Snapshot start derived from best_clips[0].start_seconds with 60.0 default; stored in censor checkpoint for resume recovery
 
 ### Blockers/Concerns
 
