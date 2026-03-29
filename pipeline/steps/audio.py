@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import subprocess
 from pathlib import Path
 
 from pipeline.context import PipelineContext
@@ -44,6 +45,47 @@ def run_audio(
     ctx.transcript_data = transcript_data
     ctx.transcript_path = transcript_path
 
+    # Step 3.9: Snapshot raw audio for before/after demo comparison
+    raw_snapshot_path = (
+        episode_output_dir / f"{audio_file.stem}_{timestamp}_raw_snapshot.wav"
+    )
+    if state and state.is_step_completed("censor"):
+        # On resume, raw audio may no longer exist — skip snapshot
+        outputs = state.get_step_outputs("censor")
+        if "raw_snapshot_path" in outputs and outputs["raw_snapshot_path"]:
+            ctx.raw_snapshot_path = Path(outputs["raw_snapshot_path"])
+    else:
+        snapshot_start = (
+            (ctx.analysis or {}).get("best_clips", [{}])[0].get("start_seconds", 60.0)
+        )
+        snapshot_end = snapshot_start + 60.0
+        from config import Config  # noqa: PLC0415
+
+        cmd = [
+            Config.FFMPEG_PATH,
+            "-i",
+            str(audio_file),
+            "-ss",
+            str(snapshot_start),
+            "-to",
+            str(snapshot_end),
+            "-acodec",
+            "pcm_s16le",
+            "-ar",
+            "44100",
+            "-y",
+            str(raw_snapshot_path),
+        ]
+        try:
+            subprocess.run(
+                cmd, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, check=True
+            )
+            ctx.raw_snapshot_path = raw_snapshot_path
+            logger.info("Raw snapshot saved: %s", raw_snapshot_path.name)
+        except Exception as e:
+            logger.warning("Failed to save raw snapshot: %s", e)
+            ctx.raw_snapshot_path = None
+
     # Step 4: Apply censorship
     print("STEP 4: APPLYING CENSORSHIP")
     print("-" * 60)
@@ -60,7 +102,15 @@ def run_audio(
             audio_file, analysis.get("censor_timestamps", []), censored_audio_path
         )
         if state:
-            state.complete_step("censor", {"censored_audio": str(censored_audio)})
+            state.complete_step(
+                "censor",
+                {
+                    "censored_audio": str(censored_audio),
+                    "raw_snapshot_path": str(ctx.raw_snapshot_path)
+                    if ctx.raw_snapshot_path
+                    else None,
+                },
+            )
     print()
 
     ctx.censored_audio = censored_audio
