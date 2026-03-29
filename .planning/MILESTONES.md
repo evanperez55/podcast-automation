@@ -1,5 +1,29 @@
 # Milestones
 
+## v1.4 Real-World Testing & Sales Readiness (Shipped: 2026-03-29)
+
+**Phases:** 4 (15-18) | **Plans:** 8 | **Files changed:** 53 (+12,444/-99)
+**New code:** ~2,500 LOC Python (4 new modules + 4 new test files + extensions)
+**Requirements:** 12/12 satisfied (CFG-01–03, SRC-01–02, TEST-01–04, DEMO-01–03)
+**Timeline:** 2026-03-28 → 2026-03-29 (2 days)
+**Git range:** feat(15-01) → feat(18-02)
+**Tests:** 662 passing (93 new)
+
+**Key accomplishments:**
+1. Config hardening — no Fake Problems defaults leak into non-FP clients (required field validation, conditional voice examples)
+2. RSS episode fetcher via feedparser — pipeline processes any public podcast without Dropbox
+3. Genre-aware clip selection (content vs energy mode) and compliance checking (strict/standard/permissive)
+4. Real-world validation — Casefile True Crime and How I Built This processed end-to-end with genre-appropriate output
+5. Demo packager — `package-demo` command produces self-contained sales demo folder with HTML summary and DEMO.md
+6. Six integration bugs found and fixed during real-world testing (uploader leakage, CUDA, FFmpeg in-place, distribute, RSS URL, User-Agent)
+7. PyTorch CUDA 12.4 configured for RTX 3070 GPU acceleration
+
+**Tech debt accepted:**
+- Before/after audio snapshot only available on future pipeline runs (existing episodes lack raw_snapshot.wav)
+- Business-interview episode partial run (no thumbnail/episode video) — distribute step crashed on missing Dropbox before fix
+
+---
+
 ## v1.2 Engagement & Smart Scheduling (Shipped: 2026-03-19)
 
 **Phases:** 3 | **Plans:** 7 | **Files changed:** 46 (+5721/-167)

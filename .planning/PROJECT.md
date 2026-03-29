@@ -1,12 +1,12 @@
-# Fake Problems Podcast — Automated Production Pipeline
+# Podcast Automation — Multi-Client Production Pipeline
 
 ## What This Is
 
-A multi-client automated podcast production pipeline. One command takes raw audio through transcription, AI content analysis with configurable voice persona, smooth audio ducking censorship, LUFS-normalized mastering, chapter markers, clip generation scored by audio energy, Hormozi-style subtitle clips, SEO-optimized episode webpages, content compliance checking, engagement-optimized scheduling, and multi-platform distribution (YouTube, Spotify, Twitter, Instagram, TikTok). Shipped through v1.3 with multi-client YAML configs, output isolation, and per-client voice/scoring/RSS customization.
+A multi-client automated podcast production pipeline that works across genres. One command takes raw audio (from Dropbox or any public RSS feed) through transcription, AI content analysis with per-client voice persona, genre-aware compliance checking, smooth audio ducking censorship, LUFS-normalized mastering, chapter markers, content-aware clip generation, Hormozi-style subtitle clips, SEO-optimized episode webpages, engagement-optimized scheduling, and multi-platform distribution. Proven with comedy, true crime, and business/interview genres. Includes a `package-demo` command for assembling sales demo folders.
 
 ## Core Value
 
-One command produces professional-quality, platform-ready podcast content that sounds hand-edited and captures the show's edgy comedy voice — without manual intervention.
+One command produces professional-quality, platform-ready podcast content with genre-appropriate voice and tone — without manual intervention.
 
 ## Requirements
 
@@ -69,13 +69,18 @@ One command produces professional-quality, platform-ready podcast content that s
 - ✓ Per-client voice persona, blog voice, topic scoring profiles — post-v1.3
 - ✓ Per-client RSS metadata and video input support — post-v1.3
 - ✓ CLI: init-client, setup-client, validate-client, status, list-clients, process-all — post-v1.3
+- ✓ Config hardening — no FP defaults leak to non-FP clients (required field validation) — v1.4
+- ✓ RSS episode fetcher via feedparser — process any public podcast without Dropbox — v1.4
+- ✓ Genre-aware clip selection (content vs energy mode) — v1.4
+- ✓ Genre-aware compliance checking (strict/standard/permissive) — v1.4
+- ✓ Real-world validation with true crime and business/interview genres — v1.4
+- ✓ Demo packager — package-demo command for self-contained sales demos — v1.4
+- ✓ Raw audio snapshot before censorship for before/after comparison — v1.4
+- ✓ PyTorch CUDA 12.4 configured for GPU acceleration — v1.4
 
-### Active (v1.4 — Real-World Testing & Sales Readiness)
+### Active
 
-- [ ] Identify and configure 2-3 real podcast clients in different genres
-- [ ] Process a full episode from each client through the pipeline end-to-end
-- [ ] Fix integration issues surfaced by non-comedy content
-- [ ] Package pipeline output as a presentable demo/sales pitch per client
+(No active milestone — planning next)
 
 ### Future
 
@@ -97,12 +102,13 @@ One command produces professional-quality, platform-ready podcast content that s
 
 ## Context
 
-- Comedy podcast with edgy/dark humor tone — AI-generated content must match this voice
-- Two hosts, weekly episodes (~70 minutes, ~700MB WAV)
-- v1.2 shipped: ~28,000 LOC Python across 35+ modules, 487 tests, modular pipeline/ architecture
-- Pipeline architecture: main.py (134 lines, CLI shim) → pipeline/runner.py (orchestrator) → pipeline/steps/ (5 step modules)
-- Pipeline step order: 1 Download → 2 Transcribe → 3 Analyze → 3.5 Topic → 3.6 Compliance → 4 Censor → 4.5 Normalize → 5 Clips → 5.1 Approval → 5.4 Subtitles → 5.5 Video → 5.6 Thumbnail → 6 MP3 → 7 Dropbox → 7.5 RSS → 8 Social → 8.5 Blog → 8.6 Webpage → 9 Search
-- 9 checkpoint keys for resume: transcribe, analyze, censor, normalize, create_clips, subtitles, convert_videos, convert_mp3, blog_post
+- Originally built for Fake Problems Podcast (edgy comedy), now multi-client across genres
+- v1.4 shipped: ~36,000 LOC Python across 40+ modules, 662 tests, modular pipeline/ architecture
+- Pipeline architecture: main.py (CLI shim) → pipeline/runner.py (orchestrator) → pipeline/steps/ (5 step modules)
+- Pipeline step order: 1 Download (Dropbox/RSS) → 2 Transcribe → 3 Analyze → 3.5 Topic → 3.6 Compliance → 3.9 Raw Snapshot → 4 Censor → 4.5 Normalize → 5 Clips → 5.1 Approval → 5.4 Subtitles → 5.5 Video → 5.6 Thumbnail → 6 MP3 → 7 Dropbox → 7.5 RSS → 8 Social → 8.5 Blog → 8.6 Webpage → 9 Search
+- Multi-client: YAML configs in clients/<name>.yaml, output isolation in output/<client>/
+- Proven genres: comedy (Fake Problems), true crime (Casefile), business/interview (How I Built This)
+- GPU: NVIDIA RTX 3070 with CUDA 12.4, PyTorch 2.6.0+cu124
 
 ## Constraints
 
@@ -131,16 +137,16 @@ One command produces professional-quality, platform-ready podcast content that s
 | Comedy voice as binary constraint | Edgy content categories (shocking_news, absurd_hypothetical) can never receive negative scores | ✓ Good — optimizer cannot erode the show's identity |
 | 15-episode confidence gate | Below threshold, optimizer returns nothing — pipeline uses fixed delays | ✓ Good — prevents noisy early recommendations |
 | Store video_id at upload time | Avoids 100-unit YouTube search API call per episode during analytics | ✓ Good — quota-safe from day one |
+| feedparser for RSS ingest | Handles all RSS/Atom variants + iTunes extensions; hand-rolling XML would hit namespace edge cases | ✓ Good — one dependency, robust parsing |
+| Skip all uploaders for non-dropbox clients | FP credentials in env vars and credentials/ would leak to new clients | ✓ Good — clean isolation, per-client opt-in later |
+| Genre-aware compliance via COMPLIANCE_STYLE | True crime needs strict flagging; comedy needs permissive; one-size-fits-all was wrong | ✓ Good — Casefile got 12 flags, HIBT got 0 |
+| Content-mode clip selection | RMS energy scoring is flat for non-comedy (measured delivery); content criteria needed | ✓ Good — interview clips selected for insight, not volume |
+| rss_source YAML key (not rss) | Existing `rss` key maps to output feed metadata; collision risk | ✓ Good — clean separation of input vs output config |
+| PyTorch CUDA index in pyproject.toml | uv sync was installing CPU-only build; needed explicit cu124 index | ✓ Good — 7 min transcription vs 30+ on CPU |
 
-## Current Milestone: v1.4 Real-World Testing & Sales Readiness
+## Current Milestone
 
-**Goal:** Prove the multi-client pipeline works with real non-Fake-Problems podcasts in different genres, fix what breaks, and package the output as a sales demo for prospective clients.
-
-**Target features:**
-- Research and select 2-3 target podcasts (different genres: true crime, business, interview, etc.)
-- Set up client configs and process a real public episode per client
-- Fix genre-specific integration issues (voice persona, scoring, censorship tuning)
-- Package output (clips, thumbnails, blog post, social captions) as a presentable demo
+No active milestone. v1.4 shipped 2026-03-29. Use `/gsd:new-milestone` to start next.
 
 ---
-*Last updated: 2026-03-28 after v1.4 milestone start*
+*Last updated: 2026-03-29 after v1.4 milestone*
