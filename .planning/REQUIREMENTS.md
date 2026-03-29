@@ -9,9 +9,9 @@ Requirements for First Paying Client milestone.
 
 ### Prospect Discovery
 
-- [ ] **DISC-01**: User can search for podcasts by genre and filter by episode count range via CLI
-- [ ] **DISC-02**: User can enrich a prospect with contact info extracted from their RSS feed (host email, social links)
-- [ ] **DISC-03**: User can save a prospect as a client YAML config with correct genre settings pre-filled
+- [x] **DISC-01**: User can search for podcasts by genre and filter by episode count range via CLI
+- [x] **DISC-02**: User can enrich a prospect with contact info extracted from their RSS feed (host email, social links)
+- [x] **DISC-03**: User can save a prospect as a client YAML config with correct genre settings pre-filled
 
 ### Outreach Tracking
 
@@ -54,9 +54,9 @@ Requirements for First Paying Client milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DISC-01 | Phase 20 | Pending |
-| DISC-02 | Phase 20 | Pending |
-| DISC-03 | Phase 20 | Pending |
+| DISC-01 | Phase 20 | Complete |
+| DISC-02 | Phase 20 | Complete |
+| DISC-03 | Phase 20 | Complete |
 | TRACK-01 | Phase 19 | Complete |
 | TRACK-02 | Phase 19 | Complete |
 | PITCH-01 | Phase 21 | Pending |

@@ -101,7 +101,7 @@ Plans:
   2. User can enrich a prospect and see host email and social links extracted from their RSS feed
   3. User can save a prospect as a client YAML with genre, voice persona, and compliance style pre-filled based on the selected genre
   4. Saved prospect is automatically registered in the outreach tracker at `identified` status
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 20-01-PLAN.md — ProspectFinder module TDD (search, enrich, save)
@@ -148,6 +148,6 @@ Plans:
 | 17. Integration Testing & Genre Fixes | v1.4 | 2/2 | Complete | 2026-03-28 |
 | 18. Demo Packaging | v1.4 | 2/2 | Complete | 2026-03-29 |
 | 19. Outreach Tracker | v1.5 | 1/1 | Complete | 2026-03-29 |
-| 20. Prospect Finder | v1.5 | 0/2 | Not started | - |
+| 20. Prospect Finder | 1/2 | In Progress|  | - |
 | 21. Pitch Generator | v1.5 | 0/TBD | Not started | - |
 | 22. Outreach Execution | v1.5 | 0/TBD | Not started | - |
