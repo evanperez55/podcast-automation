@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: First Paying Client
 status: executing
-stopped_at: Completed 21-pitch-generator 21-01-PLAN.md
-last_updated: "2026-03-29T02:50:34.585Z"
+stopped_at: Completed 22-outreach-execution 22-01-PLAN.md
+last_updated: "2026-03-29T03:05:27.309Z"
 last_activity: 2026-03-28 — ProspectFinder implemented (DISC-01, DISC-02, DISC-03)
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 6
+  completed_plans: 5
   percent: 25
 ---
 
@@ -57,6 +57,8 @@ Progress: [██░░░░░░░░] 25% (v1.5 phases)
 - [Phase 20-prospect-finder]: CLI logic extracted to prospect_finder.py as run_find_prospects_cli() to keep main.py under 280-line test limit
 - [Phase 21-pitch-generator]: run_gen_pitch_cli extracted to pitch_generator.py to keep main.py under 280-line limit
 - [Phase 21-pitch-generator]: GPT-4o pitch output parsed via ### SUBJECT/EMAIL/DM delimiters — avoids JSON escaping errors with conversational prose
+- [Phase 22-outreach-execution]: consent_fn injection for testability avoids mocking built-in input() — cleaner and more explicit
+- [Phase 22-outreach-execution]: run_demo_workflow is standalone function not DemoPackager method — orchestrates multiple modules
 
 ### Pending Todos
 
@@ -69,6 +71,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-29T02:46:58.285Z
-Stopped at: Completed 21-pitch-generator 21-01-PLAN.md
+Last session: 2026-03-29T03:05:27.306Z
+Stopped at: Completed 22-outreach-execution 22-01-PLAN.md
 Resume file: None

@@ -25,7 +25,7 @@ Requirements for First Paying Client milestone.
 
 ### Demo Production
 
-- [ ] **DEMO-04**: User can process a consented prospect's episode and package the demo in one workflow
+- [x] **DEMO-04**: User can process a consented prospect's episode and package the demo in one workflow
 
 ## Future Requirements
 
@@ -61,7 +61,7 @@ Requirements for First Paying Client milestone.
 | TRACK-02 | Phase 19 | Complete |
 | PITCH-01 | Phase 21 | Complete |
 | PITCH-02 | Phase 21 | Complete |
-| DEMO-04 | Phase 22 | Pending |
+| DEMO-04 | Phase 22 | Complete |
 
 **Coverage:**
 - v1.5 requirements: 8 total
