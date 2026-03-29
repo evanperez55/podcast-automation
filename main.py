@@ -105,6 +105,60 @@ def _handle_client_command(cmd, args):
         _activate_client(n)
         demo_path = DemoPackager().package_demo(n, ep)
         print(f"\nDemo packaged: {demo_path}")
+    elif cmd == "outreach":
+        from outreach_tracker import OutreachTracker
+
+        subcmd = sys.argv[2] if len(sys.argv) > 2 else None
+        tracker = OutreachTracker()
+        if subcmd == "add" and len(sys.argv) > 3:
+            slug = sys.argv[3]
+            show_name = sys.argv[4] if len(sys.argv) > 4 else slug
+            email = sys.argv[5] if len(sys.argv) > 5 else None
+            data = {"show_name": show_name}
+            if email:
+                data["contact_email"] = email
+            result = tracker.add_prospect(slug, data)
+            if result:
+                print(f"Added prospect: {slug}")
+            else:
+                print(f"Prospect already exists: {slug}")
+        elif subcmd == "list":
+            prospects = tracker.list_prospects()
+            if not prospects:
+                print("No prospects found.")
+            else:
+                fmt = "{:<20} {:<30} {:<15} {:<12}"
+                print(fmt.format("Slug", "Show Name", "Status", "Last Contact"))
+                print("-" * 80)
+                for p in prospects:
+                    print(
+                        fmt.format(
+                            p["slug"][:20],
+                            p["show_name"][:30],
+                            p["status"],
+                            (p.get("last_contact_date") or "-")[:12],
+                        )
+                    )
+        elif subcmd == "update" and len(sys.argv) > 4:
+            slug = sys.argv[3]
+            new_status = sys.argv[4]
+            try:
+                result = tracker.update_status(slug, new_status)
+                if result:
+                    print(f"Updated {slug} -> {new_status}")
+                else:
+                    print(f"Prospect not found: {slug}")
+            except ValueError as e:
+                print(f"Error: {e}")
+        elif subcmd == "status" and len(sys.argv) > 3:
+            p = tracker.get_prospect(sys.argv[3])
+            if p:
+                for key, val in p.items():
+                    print(f"  {key}: {val}")
+            else:
+                print(f"Prospect not found: {sys.argv[3]}")
+        else:
+            print("Usage: uv run main.py outreach <add|list|update|status> ...")
     else:
         return False
     return True

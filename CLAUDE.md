@@ -18,6 +18,11 @@ Automated production pipeline: transcription, AI content analysis, auto-censorsh
 - Validate client: `uv run main.py validate-client <name> [--ping]`
 - Setup credentials: `uv run main.py setup-client <name> youtube`
 - Client status: `uv run main.py status <name>`
+- Outreach tracker: `uv run main.py outreach <add|list|update|status> ...`
+  - Add prospect: `uv run main.py outreach add <slug> <show_name> [email]`
+  - List all: `uv run main.py outreach list`
+  - Update status: `uv run main.py outreach update <slug> <status>`
+  - View details: `uv run main.py outreach status <slug>`
 - Flags: `--dry-run`, `--test`, `--auto-approve`, `--client <name>`, `--ping`
 
 ## Pipeline Step Order
