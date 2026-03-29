@@ -19,6 +19,7 @@ Automated production pipeline: transcription, AI content analysis, auto-censorsh
 - Setup credentials: `uv run main.py setup-client <name> youtube`
 - Client status: `uv run main.py status <name>`
 - Find prospects: `uv run main.py find-prospects --genre comedy --min-episodes 20 --max-episodes 500`
+- Gen pitch: `uv run main.py gen-pitch <slug> [ep_id]`
 - Outreach tracker: `uv run main.py outreach <add|list|update|status> ...`
   - Add prospect: `uv run main.py outreach add <slug> <show_name> [email]`
   - List all: `uv run main.py outreach list`
