@@ -115,7 +115,10 @@ Plans:
   1. User can run `gen-pitch <slug>` (pre-demo) and receive a personalized intro message referencing the prospect's show name, genre, and production gaps
   2. User can run `gen-pitch <slug> <ep_id>` (post-demo) and receive a pitch email and DM that reference specific output from the processed episode (LUFS delta, clip count, show note excerpt)
   3. Generated pitch is written to `demo/<slug>/<ep_id>/PITCH.md` alongside the existing demo artifacts
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 21-01-PLAN.md — PitchGenerator module (intro + demo modes), tests, CLI wiring
 
 ### Phase 22: Outreach Execution
 **Goal**: Users can process a consented prospect's episode and package a demo in one workflow, then execute manual outreach with the generated pitch
@@ -149,5 +152,5 @@ Plans:
 | 18. Demo Packaging | v1.4 | 2/2 | Complete | 2026-03-29 |
 | 19. Outreach Tracker | v1.5 | 1/1 | Complete | 2026-03-29 |
 | 20. Prospect Finder | 2/2 | Complete    | 2026-03-29 | - |
-| 21. Pitch Generator | v1.5 | 0/TBD | Not started | - |
+| 21. Pitch Generator | v1.5 | 0/1 | Not started | - |
 | 22. Outreach Execution | v1.5 | 0/TBD | Not started | - |
