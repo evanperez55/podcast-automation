@@ -54,20 +54,20 @@ Requirements for First Paying Client milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DISC-01 | — | Pending |
-| DISC-02 | — | Pending |
-| DISC-03 | — | Pending |
-| TRACK-01 | — | Pending |
-| TRACK-02 | — | Pending |
-| PITCH-01 | — | Pending |
-| PITCH-02 | — | Pending |
-| DEMO-04 | — | Pending |
+| DISC-01 | Phase 20 | Pending |
+| DISC-02 | Phase 20 | Pending |
+| DISC-03 | Phase 20 | Pending |
+| TRACK-01 | Phase 19 | Pending |
+| TRACK-02 | Phase 19 | Pending |
+| PITCH-01 | Phase 21 | Pending |
+| PITCH-02 | Phase 21 | Pending |
+| DEMO-04 | Phase 22 | Pending |
 
 **Coverage:**
 - v1.5 requirements: 8 total
-- Mapped to phases: 0
-- Unmapped: 8 (pending roadmap)
+- Mapped to phases: 8
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-29*
-*Last updated: 2026-03-29 after initial definition*
+*Last updated: 2026-03-29 — traceability updated after roadmap creation*

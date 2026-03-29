@@ -7,6 +7,7 @@
 - ✅ **v1.2 Engagement & Smart Scheduling** — Phases 9-11 (shipped 2026-03-19)
 - ✅ **v1.3 Content Calendar** — Phase 12 (shipped 2026-03-19)
 - ✅ **v1.4 Real-World Testing & Sales Readiness** — Phases 15-18 (shipped 2026-03-29)
+- 🚧 **v1.5 First Paying Client** — Phases 19-22 (in progress)
 
 ## Phases
 
@@ -66,6 +67,59 @@ See: .planning/milestones/v1.4-ROADMAP.md for full details.
 
 </details>
 
+### 🚧 v1.5 First Paying Client (In Progress)
+
+**Milestone Goal:** Find 3-5 real podcast prospects, process a demo episode per prospect, generate personalized outreach copy, and land the first paying client.
+
+- [ ] **Phase 19: Outreach Tracker** - SQLite contact log with CLI lifecycle management for prospect tracking
+- [ ] **Phase 20: Prospect Finder** - iTunes API podcast search, RSS contact extraction, and YAML config scaffolding
+- [ ] **Phase 21: Pitch Generator** - GPT-4o personalized pitch email and DM from demo output and prospect metadata
+- [ ] **Phase 22: Outreach Execution** - Consent-gated demo production workflow and manual outreach execution
+
+## Phase Details
+
+### Phase 19: Outreach Tracker
+**Goal**: Users can track every prospect through a defined lifecycle from identification to conversion or decline, with no lost leads
+**Depends on**: Nothing (first v1.5 phase)
+**Requirements**: TRACK-01, TRACK-02
+**Success Criteria** (what must be TRUE):
+  1. User can add a prospect to the tracker and see it appear in `outreach list`
+  2. User can update a prospect's status through each lifecycle stage (identified → contacted → interested → demo_sent → converted/declined)
+  3. User can view a summary table of all prospects with current status and last-contact date
+  4. Duplicate prospect entries are prevented (add is idempotent on slug)
+**Plans**: TBD
+
+### Phase 20: Prospect Finder
+**Goal**: Users can discover qualified podcast prospects by genre, enrich them with contact info, and create a ready-to-process client YAML in one workflow
+**Depends on**: Phase 19
+**Requirements**: DISC-01, DISC-02, DISC-03
+**Success Criteria** (what must be TRUE):
+  1. User can run `find-prospects --genre comedy --min-episodes 20 --max-episodes 500` and receive a ranked list of matching shows
+  2. User can enrich a prospect and see host email and social links extracted from their RSS feed
+  3. User can save a prospect as a client YAML with genre, voice persona, and compliance style pre-filled based on the selected genre
+  4. Saved prospect is automatically registered in the outreach tracker at `identified` status
+**Plans**: TBD
+
+### Phase 21: Pitch Generator
+**Goal**: Users can generate a personalized, show-specific outreach message (intro and demo pitch) for each prospect without writing it from scratch
+**Depends on**: Phase 20
+**Requirements**: PITCH-01, PITCH-02
+**Success Criteria** (what must be TRUE):
+  1. User can run `gen-pitch <slug>` (pre-demo) and receive a personalized intro message referencing the prospect's show name, genre, and production gaps
+  2. User can run `gen-pitch <slug> <ep_id>` (post-demo) and receive a pitch email and DM that reference specific output from the processed episode (LUFS delta, clip count, show note excerpt)
+  3. Generated pitch is written to `demo/<slug>/<ep_id>/PITCH.md` alongside the existing demo artifacts
+**Plans**: TBD
+
+### Phase 22: Outreach Execution
+**Goal**: Users can process a consented prospect's episode and package a demo in one workflow, then execute manual outreach with the generated pitch
+**Depends on**: Phase 21
+**Requirements**: DEMO-04
+**Success Criteria** (what must be TRUE):
+  1. User can run a single workflow to process a prospect's episode and produce a packaged demo folder (pipeline + `package-demo`) gated on a consent confirmation prompt
+  2. The consent prompt blocks processing unless the user explicitly confirms consent has been obtained from the prospect
+  3. At least one real prospect receives a pitch with their own episode's output attached, and the contact log reflects the interaction
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -86,3 +140,7 @@ See: .planning/milestones/v1.4-ROADMAP.md for full details.
 | 16. RSS Episode Source | v1.4 | 2/2 | Complete | 2026-03-28 |
 | 17. Integration Testing & Genre Fixes | v1.4 | 2/2 | Complete | 2026-03-28 |
 | 18. Demo Packaging | v1.4 | 2/2 | Complete | 2026-03-29 |
+| 19. Outreach Tracker | v1.5 | 0/TBD | Not started | - |
+| 20. Prospect Finder | v1.5 | 0/TBD | Not started | - |
+| 21. Pitch Generator | v1.5 | 0/TBD | Not started | - |
+| 22. Outreach Execution | v1.5 | 0/TBD | Not started | - |

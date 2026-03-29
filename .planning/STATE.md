@@ -4,9 +4,9 @@ milestone: v1.5
 milestone_name: First Paying Client
 status: active
 last_updated: "2026-03-29"
-last_activity: 2026-03-29 — Milestone v1.5 started
+last_activity: 2026-03-29 — v1.5 roadmap created, phases 19-22 defined
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** One command produces professional-quality, platform-ready podcast content with genre-appropriate voice and tone — without manual intervention.
-**Current focus:** v1.5 First Paying Client
+**Current focus:** Phase 19 — Outreach Tracker
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-29 — Milestone v1.5 started
+Phase: 19 of 22 (v1.5 — Outreach Tracker)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-03-29 — Roadmap created for v1.5, phases 19-22 defined
+
+Progress: [░░░░░░░░░░] 0% (v1.5 phases)
 
 ## Shipped Milestones
 
@@ -42,10 +44,22 @@ Last activity: 2026-03-29 — Milestone v1.5 started
 
 ### Decisions
 
-- [v1.5 scope]: Find 3-5 real prospects, process their episodes as demos, build outreach tooling
-- [v1.5 target]: Mix of genres, small independent shows (<50K subs) that need production help
-- [v1.5 outreach]: Both DM and email, with code-supported templates and tracking
+- [v1.5 architecture]: OutreachTracker built first — data store must exist before ProspectFinder can persist discoveries
+- [v1.5 consent]: Process prospect episode only after explicit consent; contact-first workflow required
+- [v1.5 stack]: Zero new packages — requests (iTunes), feedparser (RSS), openai SDK (pitches), sqlite3 (tracker)
+- [v1.5 pricing]: Anchor to value ($300-600/episode entry), not pipeline cost ($1-3/episode)
+
+### Pending Todos
+
+None yet.
 
 ### Blockers/Concerns
 
+- [Active]: iTunes genre IDs (Comedy=1303, True Crime=1488, Business=1321) from community sources, not official Apple docs — validate with live test call before Phase 20 implementation
 - [Active]: `assets/podcast_logo.png` untracked (8.6MB) — needs Git LFS or compression
+
+## Session Continuity
+
+Last session: 2026-03-29
+Stopped at: Roadmap written for v1.5 (phases 19-22), STATE.md initialized
+Resume file: None
