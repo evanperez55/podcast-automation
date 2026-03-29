@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: First Paying Client
 status: executing
-stopped_at: Completed 20-prospect-finder 20-02-PLAN.md
-last_updated: "2026-03-29T02:22:02.720Z"
+stopped_at: Completed 21-pitch-generator 21-01-PLAN.md
+last_updated: "2026-03-29T02:46:58.289Z"
 last_activity: 2026-03-28 — ProspectFinder implemented (DISC-01, DISC-02, DISC-03)
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
+  completed_phases: 3
+  total_plans: 4
+  completed_plans: 4
   percent: 25
 ---
 
@@ -55,6 +55,8 @@ Progress: [██░░░░░░░░] 25% (v1.5 phases)
 - [Phase 20-prospect-finder]: Used getattr not .get() for feedparser entry.published_parsed — feedparser entries are attribute-access objects, not dicts
 - [Phase 20-prospect-finder]: GENRE_NAME_MAP accepts both spaced ("true crime") and hyphenated ("true-crime") variants for robustness against iTunes API variance
 - [Phase 20-prospect-finder]: CLI logic extracted to prospect_finder.py as run_find_prospects_cli() to keep main.py under 280-line test limit
+- [Phase 21-pitch-generator]: run_gen_pitch_cli extracted to pitch_generator.py to keep main.py under 280-line limit
+- [Phase 21-pitch-generator]: GPT-4o pitch output parsed via ### SUBJECT/EMAIL/DM delimiters — avoids JSON escaping errors with conversational prose
 
 ### Pending Todos
 
@@ -67,6 +69,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-29T02:18:21.625Z
-Stopped at: Completed 20-prospect-finder 20-02-PLAN.md
+Last session: 2026-03-29T02:46:58.285Z
+Stopped at: Completed 21-pitch-generator 21-01-PLAN.md
 Resume file: None

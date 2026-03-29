@@ -73,7 +73,7 @@ See: .planning/milestones/v1.4-ROADMAP.md for full details.
 
 - [x] **Phase 19: Outreach Tracker** - SQLite contact log with CLI lifecycle management for prospect tracking (completed 2026-03-29)
 - [x] **Phase 20: Prospect Finder** - iTunes API podcast search, RSS contact extraction, and YAML config scaffolding (completed 2026-03-29)
-- [ ] **Phase 21: Pitch Generator** - GPT-4o personalized pitch email and DM from demo output and prospect metadata
+- [x] **Phase 21: Pitch Generator** - GPT-4o personalized pitch email and DM from demo output and prospect metadata (completed 2026-03-29)
 - [ ] **Phase 22: Outreach Execution** - Consent-gated demo production workflow and manual outreach execution
 
 ## Phase Details
@@ -115,7 +115,7 @@ Plans:
   1. User can run `gen-pitch <slug>` (pre-demo) and receive a personalized intro message referencing the prospect's show name, genre, and production gaps
   2. User can run `gen-pitch <slug> <ep_id>` (post-demo) and receive a pitch email and DM that reference specific output from the processed episode (LUFS delta, clip count, show note excerpt)
   3. Generated pitch is written to `demo/<slug>/<ep_id>/PITCH.md` alongside the existing demo artifacts
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] 21-01-PLAN.md — PitchGenerator module (intro + demo modes), tests, CLI wiring
@@ -152,5 +152,5 @@ Plans:
 | 18. Demo Packaging | v1.4 | 2/2 | Complete | 2026-03-29 |
 | 19. Outreach Tracker | v1.5 | 1/1 | Complete | 2026-03-29 |
 | 20. Prospect Finder | 2/2 | Complete    | 2026-03-29 | - |
-| 21. Pitch Generator | v1.5 | 0/1 | Not started | - |
+| 21. Pitch Generator | 1/1 | Complete   | 2026-03-29 | - |
 | 22. Outreach Execution | v1.5 | 0/TBD | Not started | - |

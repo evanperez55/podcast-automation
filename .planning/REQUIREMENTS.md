@@ -20,8 +20,8 @@ Requirements for First Paying Client milestone.
 
 ### Pitch Generation
 
-- [ ] **PITCH-01**: User can generate a personalized intro message (pre-consent) from prospect metadata via GPT-4o
-- [ ] **PITCH-02**: User can generate a demo pitch (post-consent) that references the processed episode's specific output
+- [x] **PITCH-01**: User can generate a personalized intro message (pre-consent) from prospect metadata via GPT-4o
+- [x] **PITCH-02**: User can generate a demo pitch (post-consent) that references the processed episode's specific output
 
 ### Demo Production
 
@@ -59,8 +59,8 @@ Requirements for First Paying Client milestone.
 | DISC-03 | Phase 20 | Complete |
 | TRACK-01 | Phase 19 | Complete |
 | TRACK-02 | Phase 19 | Complete |
-| PITCH-01 | Phase 21 | Pending |
-| PITCH-02 | Phase 21 | Pending |
+| PITCH-01 | Phase 21 | Complete |
+| PITCH-02 | Phase 21 | Complete |
 | DEMO-04 | Phase 22 | Pending |
 
 **Coverage:**
