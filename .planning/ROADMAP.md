@@ -152,5 +152,5 @@ Plans:
 | 18. Demo Packaging | v1.4 | 2/2 | Complete | 2026-03-29 |
 | 19. Outreach Tracker | v1.5 | 1/1 | Complete | 2026-03-29 |
 | 20. Prospect Finder | 2/2 | Complete    | 2026-03-29 | - |
-| 21. Pitch Generator | 1/1 | Complete   | 2026-03-29 | - |
+| 21. Pitch Generator | 1/1 | Complete    | 2026-03-29 | - |
 | 22. Outreach Execution | v1.5 | 0/TBD | Not started | - |
