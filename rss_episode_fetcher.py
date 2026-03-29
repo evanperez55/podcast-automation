@@ -141,7 +141,14 @@ class RSSEpisodeFetcher:
         feed = feedparser.parse(rss_url)
 
         if feed.bozo:
-            raise ValueError(f"RSS feed parse error (bozo): {feed.bozo_exception}")
+            exc = feed.bozo_exception
+            # Encoding mismatches are harmless — feedparser still parses correctly
+            if isinstance(exc, feedparser.CharacterEncodingOverride):
+                logger.warning("RSS feed encoding mismatch (harmless): %s", exc)
+            elif feed.entries:
+                logger.warning("RSS feed flagged bozo but has entries: %s", exc)
+            else:
+                raise ValueError(f"RSS feed parse error (bozo): {exc}")
 
         if not feed.entries:
             raise ValueError(f"No entries found in RSS feed: {rss_url}")

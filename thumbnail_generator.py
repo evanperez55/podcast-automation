@@ -18,7 +18,10 @@ class ThumbnailGenerator:
         self.badge_color = os.getenv("THUMBNAIL_BADGE_COLOR", "#e94560")
         self.width = 1280
         self.height = 720
-        self.logo_path = Config.ASSETS_DIR / "podcast_logo.png"
+        if Config.CLIENT_LOGO_PATH and Path(Config.CLIENT_LOGO_PATH).exists():
+            self.logo_path = Path(Config.CLIENT_LOGO_PATH)
+        else:
+            self.logo_path = Config.ASSETS_DIR / "podcast_logo.png"
 
     def generate_thumbnail(
         self, episode_title: str, episode_number: int, output_path: str

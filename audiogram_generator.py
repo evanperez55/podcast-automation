@@ -12,6 +12,7 @@ from typing import List, Optional
 
 from config import Config
 from logger import logger
+from video_utils import get_h264_encoder_args
 
 
 class AudiogramGenerator:
@@ -22,7 +23,10 @@ class AudiogramGenerator:
         self.bg_color = os.getenv("AUDIOGRAM_BG_COLOR", "0x1a1a2e")
         self.wave_color = os.getenv("AUDIOGRAM_WAVE_COLOR", "0xe94560")
         self.ffmpeg_path = Config.FFMPEG_PATH
-        self.logo_path = Config.ASSETS_DIR / "podcast_logo.png"
+        if Config.CLIENT_LOGO_PATH and Path(Config.CLIENT_LOGO_PATH).exists():
+            self.logo_path = Path(Config.CLIENT_LOGO_PATH)
+        else:
+            self.logo_path = Config.ASSETS_DIR / "podcast_logo.png"
 
     def create_audiogram(
         self,
@@ -172,6 +176,7 @@ class AudiogramGenerator:
                 f"color=c={self.bg_color}:s={width}x{height}:r=25",
             ]
 
+        encoder_args = get_h264_encoder_args(preset="medium", crf=23, profile="high")
         cmd = [
             self.ffmpeg_path,
             "-y",
@@ -184,12 +189,7 @@ class AudiogramGenerator:
             map_label,
             "-map",
             "1:a",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "medium",
-            "-crf",
-            "23",
+            *encoder_args,
             "-c:a",
             "aac",
             "-b:a",

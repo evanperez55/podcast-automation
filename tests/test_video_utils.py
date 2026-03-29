@@ -5,12 +5,15 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
+from config import Config
+
 from video_utils import (
     is_video_file,
     probe_video,
     extract_audio,
     cut_video_clip,
     mux_audio_to_video,
+    get_h264_encoder_args,
 )
 
 
@@ -245,6 +248,124 @@ class TestMuxAudioToVideo:
 
         result = mux_audio_to_video("/video.mp4", "/censored.wav", "/output.mp4")
         assert result is None
+
+
+class TestGetH264EncoderArgs:
+    """Tests for get_h264_encoder_args()."""
+
+    @patch.object(Config, "USE_NVENC", False)
+    def test_libx264_default(self):
+        """Returns libx264 args when NVENC is disabled."""
+        args = get_h264_encoder_args()
+        assert "-c:v" in args
+        assert "libx264" in args
+        assert "-preset" in args
+        assert "medium" in args
+        assert "-crf" in args
+        assert "18" in args
+        assert "-pix_fmt" in args
+        assert "yuv420p" in args
+        assert "-profile:v" in args
+        assert "high" in args
+
+    @patch.object(Config, "USE_NVENC", False)
+    def test_libx264_no_profile(self):
+        """Omitting profile skips -profile:v flag for libx264."""
+        args = get_h264_encoder_args(profile=None)
+        assert "-profile:v" not in args
+
+    @patch.object(Config, "USE_NVENC", False)
+    def test_libx264_custom_preset(self):
+        """Custom preset is passed through for libx264."""
+        args = get_h264_encoder_args(preset="fast", crf=23)
+        assert "fast" in args
+        assert "23" in args
+
+    @patch.object(Config, "USE_NVENC", True)
+    def test_nvenc_default(self):
+        """Returns NVENC args when USE_NVENC is True."""
+        args = get_h264_encoder_args()
+        assert "-c:v" in args
+        assert "h264_nvenc" in args
+        assert "-preset" in args
+        assert "p4" in args
+        assert "-cq" in args
+        assert "18" in args
+        assert "-profile:v" in args
+        assert "high" in args
+        assert "-pix_fmt" in args
+        assert "yuv420p" in args
+
+    @patch.object(Config, "USE_NVENC", True)
+    def test_nvenc_preset_mapping(self):
+        """NVENC maps libx264 preset names to p-levels."""
+        args_fast = get_h264_encoder_args(preset="fast")
+        assert "p2" in args_fast
+
+        args_slow = get_h264_encoder_args(preset="slow")
+        assert "p6" in args_slow
+
+        args_ultrafast = get_h264_encoder_args(preset="ultrafast")
+        assert "p1" in args_ultrafast
+
+    @patch.object(Config, "USE_NVENC", True)
+    def test_nvenc_unknown_preset_defaults_p4(self):
+        """Unknown preset names fall back to p4 for NVENC."""
+        args = get_h264_encoder_args(preset="veryslow")
+        assert "p4" in args
+
+    @patch.object(Config, "USE_NVENC", True)
+    def test_nvenc_uses_cq_not_crf(self):
+        """NVENC uses -cq instead of -crf."""
+        args = get_h264_encoder_args(crf=23)
+        assert "-cq" in args
+        assert "-crf" not in args
+
+
+class TestDetectNvenc:
+    """Tests for _detect_nvenc()."""
+
+    @patch("config._nvenc_cache", None)
+    @patch("config.subprocess.run")
+    def test_detect_nvenc_available(self, mock_run):
+        """Returns True when h264_nvenc is in FFmpeg encoder list."""
+        mock_run.return_value = MagicMock(
+            stdout=" V..... h264_nvenc           NVIDIA NVENC H.264 encoder (codec h264)\n"
+        )
+        from config import _detect_nvenc
+
+        result = _detect_nvenc("ffmpeg")
+        assert result is True
+
+    @patch("config._nvenc_cache", None)
+    @patch("config.subprocess.run")
+    def test_detect_nvenc_not_available(self, mock_run):
+        """Returns False when h264_nvenc is not in FFmpeg encoder list."""
+        mock_run.return_value = MagicMock(
+            stdout=" V..... libx264              libx264 H.264 / AVC\n"
+        )
+        from config import _detect_nvenc
+
+        result = _detect_nvenc("ffmpeg")
+        assert result is False
+
+    @patch("config._nvenc_cache", None)
+    @patch("config.subprocess.run")
+    def test_detect_nvenc_ffmpeg_error(self, mock_run):
+        """Returns False when FFmpeg fails to run."""
+        mock_run.side_effect = FileNotFoundError("ffmpeg not found")
+        from config import _detect_nvenc
+
+        result = _detect_nvenc("ffmpeg")
+        assert result is False
+
+    @patch("config._nvenc_cache", True)
+    def test_detect_nvenc_uses_cache(self):
+        """Returns cached value without running FFmpeg again."""
+        from config import _detect_nvenc
+
+        result = _detect_nvenc("ffmpeg")
+        assert result is True
 
 
 if __name__ == "__main__":

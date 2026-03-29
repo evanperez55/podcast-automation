@@ -60,6 +60,8 @@ _YAML_TO_CONFIG = {
     "rss.artwork_url": "RSS_ARTWORK_URL",
     "rss.language": "RSS_LANGUAGE",
     "rss.explicit": "RSS_EXPLICIT",
+    # Branding
+    "branding.logo_path": "CLIENT_LOGO_PATH",
     # Output directories (optional — auto-derived from client name if not set)
     "output.dir": "OUTPUT_DIR",
     "output.downloads_dir": "DOWNLOAD_DIR",

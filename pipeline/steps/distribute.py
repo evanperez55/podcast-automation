@@ -732,7 +732,7 @@ def run_distribute_only(
 
     episode_folder = f"ep_{episode_number}"
     episode_output_dir = Config.OUTPUT_DIR / episode_folder
-    clips_dir = Config.CLIPS_DIR / episode_folder
+    clips_dir = episode_output_dir / "clips"
 
     if not episode_output_dir.exists():
         raise FileNotFoundError(

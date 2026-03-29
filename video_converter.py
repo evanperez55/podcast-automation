@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional, List
 from config import Config
 from logger import logger
+from video_utils import get_h264_encoder_args
 
 
 class VideoConverter:
@@ -17,7 +18,12 @@ class VideoConverter:
         Args:
             logo_path: Path to logo/artwork image (defaults to assets/podcast_logo.jpg)
         """
-        self.logo_path = logo_path or str(Config.ASSETS_DIR / "podcast_logo.jpg")
+        if logo_path:
+            self.logo_path = logo_path
+        elif Config.CLIENT_LOGO_PATH and Path(Config.CLIENT_LOGO_PATH).exists():
+            self.logo_path = str(Config.CLIENT_LOGO_PATH)
+        else:
+            self.logo_path = str(Config.ASSETS_DIR / "podcast_logo.jpg")
 
         # Verify logo exists
         if not Path(self.logo_path).exists():
@@ -75,6 +81,7 @@ class VideoConverter:
         logger.debug("Output: %s", output_path.name)
 
         # FFmpeg command to create video from audio + static image
+        encoder_args = get_h264_encoder_args(preset="medium", crf=18, profile="high")
         command = [
             self.ffmpeg_path,
             "-loop",
@@ -83,22 +90,24 @@ class VideoConverter:
             str(self.logo_path),  # Input image
             "-i",
             str(audio_path),  # Input audio
-            "-c:v",
-            "libx264",  # Video codec
-            "-tune",
-            "stillimage",  # Optimize for still image
-            "-c:a",
-            "aac",  # Audio codec
-            "-b:a",
-            "192k",  # Audio bitrate
-            "-pix_fmt",
-            "yuv420p",  # Pixel format (compatible with most players)
-            "-vf",
-            f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2",  # Scale and pad
-            "-shortest",  # End when audio ends
-            "-y",  # Overwrite output file
-            str(output_path),
+            *encoder_args,
         ]
+        # -tune stillimage only works with libx264, not NVENC
+        if not Config.USE_NVENC:
+            command.extend(["-tune", "stillimage"])
+        command.extend(
+            [
+                "-c:a",
+                "aac",  # Audio codec
+                "-b:a",
+                "192k",  # Audio bitrate
+                "-vf",
+                f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2",  # Scale and pad
+                "-shortest",  # End when audio ends
+                "-y",  # Overwrite output file
+                str(output_path),
+            ]
+        )
 
         try:
             # Run ffmpeg (longer timeout for full episodes)
@@ -191,6 +200,7 @@ class VideoConverter:
             f"subtitles='{srt_str}':force_style='{subtitle_style}'"
         )
 
+        encoder_args = get_h264_encoder_args(preset="medium", crf=18, profile="high")
         command = [
             self.ffmpeg_path,
             "-loop",
@@ -199,22 +209,24 @@ class VideoConverter:
             str(self.logo_path),
             "-i",
             str(audio_path),
-            "-c:v",
-            "libx264",
-            "-tune",
-            "stillimage",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "192k",
-            "-pix_fmt",
-            "yuv420p",
-            "-vf",
-            vf_filter,
-            "-shortest",
-            "-y",
-            str(output_path),
+            *encoder_args,
         ]
+        # -tune stillimage only works with libx264, not NVENC
+        if not Config.USE_NVENC:
+            command.extend(["-tune", "stillimage"])
+        command.extend(
+            [
+                "-c:a",
+                "aac",
+                "-b:a",
+                "192k",
+                "-vf",
+                vf_filter,
+                "-shortest",
+                "-y",
+                str(output_path),
+            ]
+        )
 
         try:
             result = subprocess.run(
