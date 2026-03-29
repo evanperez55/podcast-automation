@@ -426,14 +426,15 @@ class TestLoadAnalysis:
         ep_dir = tmp_path / "output" / "ep25"
         ep_dir.mkdir(parents=True)
 
-        old_file = ep_dir / "ep25_analysis_old.json"
+        # Both files match *_analysis.json glob — use real-world naming pattern
+        old_file = ep_dir / "ep25_20260101_120000_analysis.json"
         old_file.write_text(json.dumps({"episode_title": "Old"}), encoding="utf-8")
 
         import time
 
         time.sleep(0.01)  # ensure mtime difference
 
-        new_file = ep_dir / "ep25_analysis_new.json"
+        new_file = ep_dir / "ep25_20260201_120000_analysis.json"
         new_file.write_text(json.dumps({"episode_title": "New"}), encoding="utf-8")
 
         with patch("pitch_generator.Config") as mock_cfg:
