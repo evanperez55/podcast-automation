@@ -78,9 +78,11 @@ One command produces professional-quality, platform-ready podcast content with g
 - ✓ Raw audio snapshot before censorship for before/after comparison — v1.4
 - ✓ PyTorch CUDA 12.4 configured for GPU acceleration — v1.4
 
-### Active
+### Active (v1.5 — First Paying Client)
 
-(No active milestone — planning next)
+- [ ] Research and identify 3-5 small independent podcast prospects across genres
+- [ ] Process a real episode per prospect and package sales demos
+- [ ] Build outreach templates and tracking for email/DM campaigns
 
 ### Future
 
@@ -144,9 +146,14 @@ One command produces professional-quality, platform-ready podcast content with g
 | rss_source YAML key (not rss) | Existing `rss` key maps to output feed metadata; collision risk | ✓ Good — clean separation of input vs output config |
 | PyTorch CUDA index in pyproject.toml | uv sync was installing CPU-only build; needed explicit cu124 index | ✓ Good — 7 min transcription vs 30+ on CPU |
 
-## Current Milestone
+## Current Milestone: v1.5 First Paying Client
 
-No active milestone. v1.4 shipped 2026-03-29. Use `/gsd:new-milestone` to start next.
+**Goal:** Find 3-5 real podcast prospects across genres, process one of their episodes as a sales demo, and build outreach tooling to pitch them. Land the first paying client.
+
+**Target features:**
+- Prospect research: find small independent shows (<50K subs) that need production help
+- Demo production: process a real episode per prospect, package with `package-demo`
+- Outreach tooling: email/DM templates, pitch generator from demo metadata, contact tracking
 
 ---
-*Last updated: 2026-03-29 after v1.4 milestone*
+*Last updated: 2026-03-29 after v1.5 milestone start*
