@@ -123,9 +123,10 @@ Plans:
   1. Running `uv run main.py --client truecrime package-demo ep01` produces a `demo/truecrime/ep01/` folder containing the processed MP3, captioned clips, thumbnail, show notes, social captions, and a self-contained HTML summary page
   2. The demo folder contains a 60-second before/after audio comparison clip (raw vs. normalized + censored) that demonstrates audio quality improvement without requiring technical explanation
   3. A DEMO.md exists per client in the demo folder stating what was automated, estimated time saved, cost per episode in OpenAI tokens, LUFS before/after, and clip selection rationale
-**Plans**: TBD
+**Plans**: 2 plans
 Plans:
-- [ ] TBD
+- [ ] 18-01-PLAN.md — Raw audio snapshot in pipeline audio step (before/after prerequisite)
+- [ ] 18-02-PLAN.md — DemoPackager module, HTML template, DEMO.md, CLI wiring
 
 ## Progress
 
@@ -145,5 +146,5 @@ Plans:
 | 12. ContentCalendar Foundation | v1.3 | 2/2 | Complete | 2026-03-19 |
 | 15. Config Hardening | v1.4 | 2/2 | Complete | 2026-03-28 |
 | 16. RSS Episode Source | v1.4 | 2/2 | Complete | 2026-03-28 |
-| 17. Integration Testing & Genre Fixes | 2/2 | Complete    | 2026-03-28 | - |
-| 18. Demo Packaging | v1.4 | 0/TBD | Not started | - |
+| 17. Integration Testing & Genre Fixes | v1.4 | 2/2 | Complete | 2026-03-28 |
+| 18. Demo Packaging | v1.4 | 0/2 | Not started | - |
