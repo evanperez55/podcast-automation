@@ -87,7 +87,10 @@ See: .planning/milestones/v1.4-ROADMAP.md for full details.
   2. User can update a prospect's status through each lifecycle stage (identified → contacted → interested → demo_sent → converted/declined)
   3. User can view a summary table of all prospects with current status and last-contact date
   4. Duplicate prospect entries are prevented (add is idempotent on slug)
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 19-01-PLAN.md — OutreachTracker module, tests, and CLI wiring
 
 ### Phase 20: Prospect Finder
 **Goal**: Users can discover qualified podcast prospects by genre, enrich them with contact info, and create a ready-to-process client YAML in one workflow
@@ -140,7 +143,7 @@ See: .planning/milestones/v1.4-ROADMAP.md for full details.
 | 16. RSS Episode Source | v1.4 | 2/2 | Complete | 2026-03-28 |
 | 17. Integration Testing & Genre Fixes | v1.4 | 2/2 | Complete | 2026-03-28 |
 | 18. Demo Packaging | v1.4 | 2/2 | Complete | 2026-03-29 |
-| 19. Outreach Tracker | v1.5 | 0/TBD | Not started | - |
+| 19. Outreach Tracker | v1.5 | 0/1 | Not started | - |
 | 20. Prospect Finder | v1.5 | 0/TBD | Not started | - |
 | 21. Pitch Generator | v1.5 | 0/TBD | Not started | - |
 | 22. Outreach Execution | v1.5 | 0/TBD | Not started | - |
