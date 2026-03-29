@@ -105,6 +105,10 @@ def _handle_client_command(cmd, args):
         _activate_client(n)
         demo_path = DemoPackager().package_demo(n, ep)
         print(f"\nDemo packaged: {demo_path}")
+    elif cmd == "find-prospects":
+        from prospect_finder import run_find_prospects_cli
+
+        run_find_prospects_cli(sys.argv)
     elif cmd == "outreach":
         from outreach_tracker import OutreachTracker
 

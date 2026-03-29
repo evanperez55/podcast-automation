@@ -3,6 +3,8 @@
 Provides ProspectFinder to discover podcast prospects via iTunes Search API,
 enrich them with contact info from RSS feeds, and scaffold client YAML configs
 with genre-appropriate content defaults pre-filled.
+
+Also exposes run_find_prospects_cli(argv) for the main.py CLI dispatch.
 """
 
 import re
@@ -291,3 +293,90 @@ class ProspectFinder:
         """
         normalised = genre_name.lower().strip()
         return _GENRE_NAME_MAP.get(normalised)
+
+
+def run_find_prospects_cli(argv: list) -> None:
+    """CLI handler for find-prospects command.
+
+    Parses flags from argv, searches iTunes, prints a ranked table, and
+    optionally prompts the user to save a prospect as a client YAML.
+
+    Args:
+        argv: sys.argv list (index 0 = script, 1 = "find-prospects", 2+ = flags).
+    """
+    genre = None
+    min_ep, max_ep, limit = 20, 500, 20
+    save_flag = False
+    i = 2
+    while i < len(argv):
+        if argv[i] == "--genre" and i + 1 < len(argv):
+            genre = argv[i + 1]
+            i += 2
+        elif argv[i] == "--min-episodes" and i + 1 < len(argv):
+            min_ep = int(argv[i + 1])
+            i += 2
+        elif argv[i] == "--max-episodes" and i + 1 < len(argv):
+            max_ep = int(argv[i + 1])
+            i += 2
+        elif argv[i] == "--limit" and i + 1 < len(argv):
+            limit = int(argv[i + 1])
+            i += 2
+        elif argv[i] == "--save":
+            save_flag = True
+            i += 1
+        else:
+            i += 1
+
+    term = genre or "podcast"
+    genre_id = GENRE_IDS.get(genre) if genre else None
+    finder = ProspectFinder()
+    results = finder.search(
+        term=term,
+        genre_id=genre_id,
+        min_episodes=min_ep,
+        max_episodes=max_ep,
+        limit=limit,
+    )
+    if not results:
+        print("No podcasts found matching criteria.")
+        return
+
+    hdr = "{:<3} {:<40} {:<25} {:<8} {:<15} {:<50}"
+    print(hdr.format("#", "Show Name", "Host", "Episodes", "Genre", "Feed URL"))
+    print("-" * 145)
+    for idx, r in enumerate(results, 1):
+        print(
+            hdr.format(
+                idx,
+                r.get("collectionName", "")[:40],
+                r.get("artistName", "")[:25],
+                r.get("trackCount", 0),
+                r.get("primaryGenreName", "")[:15],
+                r.get("feedUrl", "")[:50],
+            )
+        )
+
+    if save_flag or results:
+        choice = input("\nSave prospect? Enter number (or 'q' to quit): ").strip()
+        if choice.lower() != "q" and choice.isdigit():
+            idx = int(choice) - 1
+            if 0 <= idx < len(results):
+                itunes_data = results[idx]
+                slug = re.sub(
+                    r"[^a-z0-9-]",
+                    "",
+                    itunes_data.get("collectionName", "").lower().replace(" ", "-"),
+                )
+                feed_url = itunes_data.get("feedUrl", "")
+                print(f"Enriching from RSS: {feed_url}")
+                rss_data = finder.enrich_from_rss(feed_url) if feed_url else {}
+                genre_key = finder._genre_key_from_name(
+                    itunes_data.get("primaryGenreName", "")
+                )
+                yaml_path = finder.save_prospect(slug, itunes_data, rss_data, genre_key)
+                email = rss_data.get("contact_email", "")
+                print(f"Saved prospect: {yaml_path}")
+                if email:
+                    print(f"Contact email: {email}")
+            else:
+                print("Invalid selection.")
