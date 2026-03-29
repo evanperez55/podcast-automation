@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ episode_title }} — Demo Package</title>
+  <style>
+    :root {
+      --bg: #0f0f1a;
+      --surface: #1a1a2e;
+      --accent: #e94560;
+      --text: #e0e0e0;
+      --text-muted: #888;
+      --border: #2a2a3e;
+      --success: #2ecc71;
+      --warning: #f39c12;
+      --danger: #e74c3c;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 2rem;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    header {
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
+      display: flex;
+      gap: 2rem;
+      align-items: flex-start;
+    }
+    .thumbnail-wrapper {
+      flex-shrink: 0;
+    }
+    .thumbnail-wrapper img {
+      width: 240px;
+      height: 135px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .thumbnail-placeholder {
+      width: 240px;
+      height: 135px;
+      background: var(--surface);
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+    .header-text h1 {
+      font-size: 1.6rem;
+      color: #fff;
+      margin-bottom: 0.4rem;
+    }
+    .header-text .client-name {
+      color: var(--accent);
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .header-text .episode-id {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-top: 0.25rem;
+    }
+    section {
+      margin-bottom: 2rem;
+    }
+    h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.4rem;
+    }
+    p {
+      margin-bottom: 0.75rem;
+      color: var(--text);
+    }
+    pre, .code-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th {
+      background: var(--surface);
+      color: var(--accent);
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    td {
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:nth-child(even) td { background: #13131f; }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-ok { background: #1a3a2a; color: var(--success); }
+    .badge-warn { background: #3a2a10; color: var(--warning); }
+    .badge-crit { background: #3a1010; color: var(--danger); }
+    .caption-block {
+      margin-bottom: 1rem;
+    }
+    .caption-block .platform-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      margin-bottom: 0.3rem;
+    }
+    .caption-block .caption-text {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+    }
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+    }
+    .metric-card .value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    .metric-card .label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 0.2rem;
+    }
+    .chapter-list { list-style: none; }
+    .chapter-list li {
+      display: flex;
+      gap: 0.75rem;
+      padding: 0.4rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+    .chapter-list .ts {
+      color: var(--accent);
+      font-family: monospace;
+      min-width: 5rem;
+    }
+    footer {
+      margin-top: 3rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="thumbnail-wrapper">
+    {% if thumbnail_b64 %}
+      <img src="data:image/png;base64,{{ thumbnail_b64 }}" alt="Episode Thumbnail" />
+    {% else %}
+      <div class="thumbnail-placeholder">No thumbnail</div>
+    {% endif %}
+  </div>
+  <div class="header-text">
+    <div class="client-name">{{ client_name }}</div>
+    <h1>{{ episode_title }}</h1>
+    <div class="episode-id">Episode: {{ episode_id }}</div>
+  </div>
+</header>
+
+<section>
+  <h2>Episode Summary</h2>
+  <p>{{ episode_summary }}</p>
+</section>
+
+<section>
+  <h2>Audio Metrics</h2>
+  <div class="metric-grid">
+    <div class="metric-card">
+      <div class="value">{{ lufs_input }}</div>
+      <div class="label">Input LUFS</div>
+    </div>
+    <div class="metric-card">
+      <div class="value">{{ lufs_output }}</div>
+      <div class="label">Output LUFS</div>
+    </div>
+    <div class="metric-card">
+      <div class="value">{{ censor_count }}</div>
+      <div class="label">Censored Segments</div>
+    </div>
+    <div class="metric-card">
+      <div class="value">{{ clip_count }}</div>
+      <div class="label">Clips Generated</div>
+    </div>
+  </div>
+</section>
+
+{% if compliance_checked %}
+<section>
+  <h2>Compliance Summary</h2>
+  <p>
+    {% if compliance_critical %}
+      <span class="badge badge-crit">Critical flags detected</span>
+    {% else %}
+      <span class="badge badge-ok">No critical flags</span>
+    {% endif %}
+    &nbsp;
+    {% if compliance_flagged_count > 0 %}
+      <span class="badge badge-warn">{{ compliance_flagged_count }} flagged segment{{ 's' if compliance_flagged_count != 1 }}</span>
+    {% else %}
+      <span class="badge badge-ok">0 flagged segments</span>
+    {% endif %}
+  </p>
+</section>
+{% endif %}
+
+{% if best_clips %}
+<section>
+  <h2>Top Clips ({{ best_clips | length }})</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Clip</th>
+        <th>Timestamp</th>
+        <th>Description</th>
+        <th>Suggested Title</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for clip in best_clips %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ clip.start_seconds | int }}s – {{ clip.end_seconds | int }}s</td>
+        <td>{{ clip.description }}</td>
+        <td>{{ clip.suggested_title }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+<section>
+  <h2>Social Captions</h2>
+  {% for platform, caption in social_captions.items() %}
+  <div class="caption-block">
+    <div class="platform-label">{{ platform }}</div>
+    <div class="caption-text">{{ caption }}</div>
+  </div>
+  {% endfor %}
+</section>
+
+<section>
+  <h2>Show Notes</h2>
+  <pre>{{ show_notes }}</pre>
+</section>
+
+{% if chapters %}
+<section>
+  <h2>Chapter Markers ({{ chapters | length }})</h2>
+  <ul class="chapter-list">
+    {% for ch in chapters %}
+    <li>
+      <span class="ts">{{ ch.start_timestamp }}</span>
+      <span>{{ ch.title }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<footer>
+  Generated by Podcast Automation Pipeline &mdash; {{ generated_at }}
+</footer>
+
+</body>
+</html>
