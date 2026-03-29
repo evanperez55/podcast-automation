@@ -90,7 +90,7 @@ See: .planning/milestones/v1.4-ROADMAP.md for full details.
 **Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 19-01-PLAN.md — OutreachTracker module, tests, and CLI wiring
+- [x] 19-01-PLAN.md — OutreachTracker module, tests, and CLI wiring
 
 ### Phase 20: Prospect Finder
 **Goal**: Users can discover qualified podcast prospects by genre, enrich them with contact info, and create a ready-to-process client YAML in one workflow
@@ -101,7 +101,11 @@ Plans:
   2. User can enrich a prospect and see host email and social links extracted from their RSS feed
   3. User can save a prospect as a client YAML with genre, voice persona, and compliance style pre-filled based on the selected genre
   4. Saved prospect is automatically registered in the outreach tracker at `identified` status
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 20-01-PLAN.md — ProspectFinder module TDD (search, enrich, save)
+- [ ] 20-02-PLAN.md — CLI wiring (find-prospects command in main.py)
 
 ### Phase 21: Pitch Generator
 **Goal**: Users can generate a personalized, show-specific outreach message (intro and demo pitch) for each prospect without writing it from scratch
@@ -143,7 +147,7 @@ Plans:
 | 16. RSS Episode Source | v1.4 | 2/2 | Complete | 2026-03-28 |
 | 17. Integration Testing & Genre Fixes | v1.4 | 2/2 | Complete | 2026-03-28 |
 | 18. Demo Packaging | v1.4 | 2/2 | Complete | 2026-03-29 |
-| 19. Outreach Tracker | 1/1 | Complete    | 2026-03-29 | - |
-| 20. Prospect Finder | v1.5 | 0/TBD | Not started | - |
+| 19. Outreach Tracker | v1.5 | 1/1 | Complete | 2026-03-29 |
+| 20. Prospect Finder | v1.5 | 0/2 | Not started | - |
 | 21. Pitch Generator | v1.5 | 0/TBD | Not started | - |
 | 22. Outreach Execution | v1.5 | 0/TBD | Not started | - |
