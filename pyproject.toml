@@ -8,6 +8,7 @@ dependencies = [
     # AI/ML packages
     "openai>=1.0.0",
     "faster-whisper>=1.0.0",
+    "nvidia-cudnn-cu12>=9.0.0",
     "openai-whisper>=20231117",
     "whisperx>=3.1.6",
     "torch>=2.1.0",
