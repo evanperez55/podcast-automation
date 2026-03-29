@@ -1,4 +1,4 @@
-"""Content editing using OpenAI GPT-4 to identify problematic content and best moments."""
+"""Content editing using OpenAI to identify problematic content and best moments."""
 
 import openai
 import json
@@ -6,6 +6,96 @@ import time
 from audio_clip_scorer import AudioClipScorer
 from config import Config
 from logger import logger
+
+# JSON Schema for OpenAI Structured Outputs (strict mode)
+_ANALYSIS_SCHEMA = {
+    "name": "episode_analysis",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "episode_title": {"type": "string"},
+            "censor_timestamps": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "timestamp": {"type": "string"},
+                        "reason": {"type": "string"},
+                        "context": {"type": "string"},
+                    },
+                    "required": ["timestamp", "reason", "context"],
+                    "additionalProperties": False,
+                },
+            },
+            "best_clips": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "start": {"type": "string"},
+                        "end": {"type": "string"},
+                        "duration_seconds": {"type": "integer"},
+                        "description": {"type": "string"},
+                        "why_interesting": {"type": "string"},
+                        "suggested_title": {"type": "string"},
+                        "hook_caption": {"type": "string"},
+                        "clip_hashtags": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                    },
+                    "required": [
+                        "start",
+                        "end",
+                        "duration_seconds",
+                        "description",
+                        "why_interesting",
+                        "suggested_title",
+                        "hook_caption",
+                        "clip_hashtags",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
+            "episode_summary": {"type": "string"},
+            "social_captions": {
+                "type": "object",
+                "properties": {
+                    "youtube": {"type": "string"},
+                    "instagram": {"type": "string"},
+                    "twitter": {"type": "string"},
+                    "tiktok": {"type": "string"},
+                },
+                "required": ["youtube", "instagram", "twitter", "tiktok"],
+                "additionalProperties": False,
+            },
+            "show_notes": {"type": "string"},
+            "chapters": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "start_timestamp": {"type": "string"},
+                        "title": {"type": "string"},
+                    },
+                    "required": ["start_timestamp", "title"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        "required": [
+            "episode_title",
+            "censor_timestamps",
+            "best_clips",
+            "episode_summary",
+            "social_captions",
+            "show_notes",
+            "chapters",
+        ],
+        "additionalProperties": False,
+    },
+}
 
 VOICE_PERSONA = (
     "You write for the Fake Problems Podcast — an irreverent comedy show "
@@ -18,12 +108,13 @@ VOICE_PERSONA = (
 
 
 class ContentEditor:
-    """Use OpenAI GPT-4 to analyze transcript and identify content to censor and best clips."""
+    """Use OpenAI to analyze transcript and identify content to censor and best clips."""
 
     def __init__(self):
         """Initialize OpenAI client."""
         self.client = openai.OpenAI(api_key=Config.OPENAI_API_KEY)
-        logger.info("OpenAI GPT-4 ready")
+        self.model = getattr(Config, "OPENAI_ANALYSIS_MODEL", "gpt-4.1-mini")
+        logger.info("OpenAI %s ready", self.model)
 
     def analyze_content(
         self,
@@ -47,7 +138,7 @@ class ContentEditor:
             - episode_summary: Summary of the episode
             - social_captions: Suggested captions for social media
         """
-        logger.info("Analyzing content with OpenAI GPT-4...")
+        logger.info("Analyzing content with OpenAI %s...", self.model)
 
         # Prepare transcript text with timestamps for the LLM
         words = transcript_data.get("words", [])
@@ -129,7 +220,10 @@ class ContentEditor:
             raise
 
     def _call_openai_with_retry(self, voice_persona, prompt, max_retries=3):
-        """Call OpenAI API with exponential backoff on transient errors.
+        """Call OpenAI API with structured outputs and exponential backoff.
+
+        Uses JSON Schema response_format for guaranteed valid JSON output,
+        eliminating parsing failures entirely.
 
         Args:
             voice_persona: System message for the LLM.
@@ -146,9 +240,13 @@ class ContentEditor:
         for attempt in range(max_retries + 1):
             try:
                 return self.client.chat.completions.create(
-                    model="gpt-4o",
+                    model=self.model,
                     max_tokens=6000,
                     temperature=0.7,
+                    response_format={
+                        "type": "json_schema",
+                        "json_schema": _ANALYSIS_SCHEMA,
+                    },
                     messages=[
                         {"role": "system", "content": voice_persona},
                         {"role": "user", "content": prompt},
@@ -178,14 +276,22 @@ class ContentEditor:
         raise last_error
 
     def _format_transcript_for_analysis(self, words, segments):
-        """Format transcript with timestamps for Claude to analyze."""
-        # Use segments for better readability
+        """Format transcript with timestamps and speech rate for analysis.
+
+        Includes words-per-minute (WPM) per segment to give the LLM signal
+        about delivery pace — fast segments indicate excitement/emphasis,
+        slow segments indicate deliberate/dramatic delivery.
+        """
         formatted = []
 
-        for i, segment in enumerate(segments):
+        for segment in segments:
             start_time = self._format_timestamp(segment["start"])
             text = segment["text"].strip()
-            formatted.append(f"[{start_time}] {text}")
+            # Calculate speech rate (WPM) for this segment
+            duration = segment.get("end", 0) - segment.get("start", 0)
+            word_count = len(text.split())
+            wpm = int((word_count / duration) * 60) if duration > 0 else 0
+            formatted.append(f"[{start_time}] (WPM:{wpm}) {text}")
 
         return "\n".join(formatted)
 
@@ -335,7 +441,12 @@ GOOD: "turns out immortality is real, it just only applies to lobsters. link in 
    For each REAL instance, provide the timestamp and the exact quote containing the word.
 
 2. **IDENTIFY BEST MOMENTS FOR CLIPS (15-30 seconds):**
-   Find {Config.NUM_CLIPS} compelling moments that would make great social media clips. Look for:
+   Find {Config.NUM_CLIPS} compelling moments that would make great social media clips.
+   Each segment includes a WPM (words-per-minute) indicator — use this to identify delivery changes:
+   - High WPM (180+) = excited/fast speech, high energy moments
+   - Low WPM (80-120) = deliberate/dramatic delivery, emphasis
+   - WPM spikes/drops often mark the best clip boundaries
+   Look for:
 {clip_criteria}
 
    For each clip, provide start/end timestamps and explain why it's interesting.

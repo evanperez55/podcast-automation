@@ -129,7 +129,7 @@ class TestGenerateBlogPost:
         assert result == "# Blog Post\n\nContent here."
         mock_client.chat.completions.create.assert_called_once()
         call_kwargs = mock_client.chat.completions.create.call_args
-        assert call_kwargs.kwargs["model"] == "gpt-4o"
+        assert call_kwargs.kwargs["model"] == "gpt-4.1-mini"
 
     def test_generate_blog_post_fallback_on_error(self):
         """When OpenAI raises an exception, fallback template should be used."""

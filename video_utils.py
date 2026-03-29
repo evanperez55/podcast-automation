@@ -15,6 +15,49 @@ from logger import logger
 
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mov", ".avi", ".webm"}
 
+# NVENC preset mapping: libx264 preset name -> NVENC p-level
+_NVENC_PRESET_MAP = {"ultrafast": "p1", "fast": "p2", "medium": "p4", "slow": "p6"}
+
+
+def get_h264_encoder_args(preset="medium", crf=18, profile="high"):
+    """Return FFmpeg encoder args, using NVENC if available.
+
+    Args:
+        preset: libx264-style preset name (ultrafast/fast/medium/slow).
+        crf: Constant quality value (maps to -cq for NVENC).
+        profile: H.264 profile (e.g., "high", "main").
+
+    Returns:
+        List of FFmpeg command-line arguments for the video encoder.
+    """
+    if Config.USE_NVENC:
+        return [
+            "-c:v",
+            "h264_nvenc",
+            "-preset",
+            _NVENC_PRESET_MAP.get(preset, "p4"),
+            "-cq",
+            str(crf),
+            "-profile:v",
+            profile,
+            "-pix_fmt",
+            "yuv420p",
+        ]
+    else:
+        args = [
+            "-c:v",
+            "libx264",
+            "-preset",
+            preset,
+            "-crf",
+            str(crf),
+            "-pix_fmt",
+            "yuv420p",
+        ]
+        if profile:
+            args.extend(["-profile:v", profile])
+        return args
+
 
 def is_video_file(file_path: Path) -> bool:
     """Check if a file path has a video extension."""
@@ -124,15 +167,27 @@ def cut_video_clip(
     end: float,
     output_path: str,
     crop_vertical: bool = False,
+    ass_path: Optional[str] = None,
 ) -> Optional[str]:
-    """Cut a segment from a video file, optionally cropping to 9:16 vertical.
+    """Cut a segment from a video file, optionally reformatting to 9:16 vertical.
+
+    For horizontal source video (16:9), uses a blurred-background layout:
+    the original video is scaled and overlaid on a blurred, zoomed copy that
+    fills the 720x1280 canvas. This preserves all visual content while
+    eliminating dead black space.
+
+    For already-vertical or square source video, center-crops to 9:16.
+
+    When ass_path is provided, subtitles are burned in the same FFmpeg pass
+    to ensure correct positioning on the composited canvas.
 
     Args:
         video_path: Path to source video.
         start: Start time in seconds.
         end: End time in seconds.
         output_path: Path for output clip.
-        crop_vertical: If True, center-crop to 9:16 aspect ratio.
+        crop_vertical: If True, reformat to 9:16 aspect ratio.
+        ass_path: Optional path to ASS subtitle file to burn in.
 
     Returns:
         Output path on success, None on failure.
@@ -153,18 +208,63 @@ def cut_video_clip(
     ]
 
     if crop_vertical:
-        # Center crop from source aspect ratio to 9:16
-        # crop=oh*9/16:oh:(iw-oh*9/16)/2:0 crops width to maintain 9:16
-        # using input height as the reference
-        vf = "crop=ih*9/16:ih:(iw-ih*9/16)/2:0,scale=720:1280"
-        cmd.extend(["-vf", vf])
+        # Detect source aspect ratio to choose strategy
+        meta = probe_video(video_path)
+        src_w = meta["width"] if meta else 1280
+        src_h = meta["height"] if meta else 720
 
+        if src_w > src_h:
+            # Horizontal source: stacked split layout
+            # Splits source into left/right halves (assumes side-by-side speakers),
+            # scales each to fill 720 wide, crops to 520px tall, stacks vertically
+            # with a 10px gap, and pads to 720x1280 with subtitle space at bottom.
+            fc = (
+                "[0:v]split=2[left_src][right_src];"
+                "[left_src]crop=iw/2:ih:0:0,scale=720:-2,"
+                "crop=720:520:0:(ih-520)/2,pad=720:530:0:0:black[left];"
+                "[right_src]crop=iw/2:ih:iw/2:0,scale=720:-2,"
+                "crop=720:520:0:(ih-520)/2[right];"
+                "[left][right]vstack=inputs=2,pad=720:1280:0:0:black"
+            )
+            if ass_path:
+                from subtitle_clip_generator import SubtitleClipGenerator
+
+                escaped_ass = SubtitleClipGenerator._escape_ffmpeg_filter_path(ass_path)
+                fonts_dir = str(Path(Config.ASSETS_DIR) / "fonts")
+                escaped_fonts = SubtitleClipGenerator._escape_ffmpeg_filter_path(
+                    fonts_dir
+                )
+                fc += (
+                    f"[composed];"
+                    f"[composed]subtitles='{escaped_ass}':"
+                    f"fontsdir='{escaped_fonts}'"
+                )
+            cmd.extend(["-filter_complex", fc, "-map", "0:a"])
+        else:
+            # Vertical or square source: center-crop to 9:16
+            vf = "crop=ih*9/16:ih:(iw-ih*9/16)/2:0,scale=720:1280"
+            if ass_path:
+                from subtitle_clip_generator import SubtitleClipGenerator
+
+                escaped_ass = SubtitleClipGenerator._escape_ffmpeg_filter_path(ass_path)
+                fonts_dir = str(Path(Config.ASSETS_DIR) / "fonts")
+                escaped_fonts = SubtitleClipGenerator._escape_ffmpeg_filter_path(
+                    fonts_dir
+                )
+                vf += f",subtitles='{escaped_ass}':fontsdir='{escaped_fonts}'"
+            cmd.extend(["-vf", vf])
+    elif ass_path:
+        from subtitle_clip_generator import SubtitleClipGenerator
+
+        escaped_ass = SubtitleClipGenerator._escape_ffmpeg_filter_path(ass_path)
+        fonts_dir = str(Path(Config.ASSETS_DIR) / "fonts")
+        escaped_fonts = SubtitleClipGenerator._escape_ffmpeg_filter_path(fonts_dir)
+        cmd.extend(["-vf", f"subtitles='{escaped_ass}':fontsdir='{escaped_fonts}'"])
+
+    encoder_args = get_h264_encoder_args(preset="fast", crf=23, profile="high")
     cmd.extend(
         [
-            "-c:v",
-            "libx264",
-            "-preset",
-            "fast",
+            *encoder_args,
             "-c:a",
             "aac",
             "-b:a",
@@ -246,4 +346,63 @@ def mux_audio_to_video(
         return None
     except Exception as e:
         logger.warning("Audio mux error: %s", e)
+        return None
+
+
+def burn_subtitles_on_video(
+    video_path: str,
+    ass_path: str,
+    output_path: str,
+) -> Optional[str]:
+    """Burn ASS subtitles onto a video clip.
+
+    Args:
+        video_path: Path to source video clip.
+        ass_path: Path to ASS subtitle file.
+        output_path: Path for output video with burned-in subtitles.
+
+    Returns:
+        Output path on success, None on failure.
+    """
+    from subtitle_clip_generator import SubtitleClipGenerator
+
+    escaped_ass = SubtitleClipGenerator._escape_ffmpeg_filter_path(ass_path)
+    fonts_dir = str(Path(Config.ASSETS_DIR) / "fonts")
+    escaped_fonts = SubtitleClipGenerator._escape_ffmpeg_filter_path(fonts_dir)
+
+    vf = f"subtitles='{escaped_ass}':fontsdir='{escaped_fonts}'"
+
+    encoder_args = get_h264_encoder_args(preset="medium", crf=18, profile="high")
+    cmd = [
+        Config.FFMPEG_PATH,
+        "-i",
+        str(video_path),
+        "-vf",
+        vf,
+        *encoder_args,
+        "-c:a",
+        "copy",
+        "-movflags",
+        "+faststart",
+        "-y",
+        str(output_path),
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode != 0:
+            logger.warning("Subtitle burn failed: %s", result.stderr.strip()[:200])
+            return None
+
+        if not Path(output_path).exists():
+            logger.warning("Subtitle burn produced no output file")
+            return None
+
+        logger.info("Burned subtitles onto video: %s", output_path)
+        return output_path
+    except subprocess.TimeoutExpired:
+        logger.warning("Subtitle burn timed out (5 min limit)")
+        return None
+    except Exception as e:
+        logger.warning("Subtitle burn error: %s", e)
         return None

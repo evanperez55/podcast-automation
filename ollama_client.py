@@ -15,7 +15,7 @@ class OllamaClient:
         response = client.chat(messages=[...])
     """
 
-    def __init__(self, model: str = "llama3.2"):
+    def __init__(self, model: str = "qwen2.5:7b"):
         self.model = model
         self.base_url = Config.OLLAMA_BASE_URL
         logger.info(
@@ -102,5 +102,5 @@ class Ollama:
     """Drop-in replacement for Anthropic client."""
 
     def __init__(self, api_key: str = None):
-        self.ollama_client = OllamaClient()
+        self.ollama_client = OllamaClient(model=Config.OLLAMA_MODEL)
         self.messages = Messages(self.ollama_client)

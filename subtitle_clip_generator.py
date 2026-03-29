@@ -15,6 +15,7 @@ import pysubs2
 from config import Config
 from logger import logger
 from subtitle_generator import SubtitleGenerator
+from video_utils import get_h264_encoder_args
 
 
 def normalize_word_timestamps(words: List[Dict]) -> List[Dict]:
@@ -89,7 +90,10 @@ class SubtitleClipGenerator:
     def __init__(self):
         self.enabled = os.getenv("USE_SUBTITLE_CLIPS", "true").lower() == "true"
         self.ffmpeg_path = Config.FFMPEG_PATH
-        self.logo_path = Config.ASSETS_DIR / "podcast_logo.png"
+        if Config.CLIENT_LOGO_PATH and Path(Config.CLIENT_LOGO_PATH).exists():
+            self.logo_path = Path(Config.CLIENT_LOGO_PATH)
+        else:
+            self.logo_path = Config.ASSETS_DIR / "podcast_logo.png"
         self.font_size = int(os.getenv("SUBTITLE_FONT_SIZE", "72"))
         self.font_color = os.getenv("SUBTITLE_FONT_COLOR", "white")
         self.accent_color = os.getenv("SUBTITLE_ACCENT_COLOR", "0x00e0ff")
@@ -145,6 +149,7 @@ class SubtitleClipGenerator:
         output_path: str,
         width: int,
         height: int,
+        video_source: bool = False,
     ) -> str:
         """Generate an ASS subtitle file with per-word accent color highlights.
 
@@ -157,6 +162,8 @@ class SubtitleClipGenerator:
             output_path: Path to write the ASS file
             width: Video width in pixels
             height: Video height in pixels
+            video_source: If True, position subtitles higher for blurred-background
+                layout where video occupies the upper portion of the canvas.
 
         Returns:
             The output_path string
@@ -164,6 +171,10 @@ class SubtitleClipGenerator:
         subs = pysubs2.SSAFile()
         subs.info["PlayResX"] = str(width)
         subs.info["PlayResY"] = str(height)
+
+        # For video-source clips with stacked split layout, subtitles go in
+        # the bottom section below the two speaker panels
+        margin_v = 100 if video_source else 80
 
         # Define base style — large bold white, black outline
         style = pysubs2.SSAStyle(
@@ -176,7 +187,7 @@ class SubtitleClipGenerator:
             outline=3,
             shadow=1,
             alignment=pysubs2.Alignment.BOTTOM_CENTER,
-            marginv=80,  # pixels from bottom edge
+            marginv=margin_v,
         )
         subs.styles["Default"] = style
 
@@ -197,8 +208,11 @@ class SubtitleClipGenerator:
                     # Escape literal braces — ASS uses { } for inline override tags
                     text = text.replace("{", r"\{").replace("}", r"\}")
                     if j == active_idx:
-                        # Accent color for active word, then reset to white
-                        parts.append(f"{{\\c&H{accent_bgr}&}}{text}{{\\c&HFFFFFF&}}")
+                        # Scale up + accent color for active word, then reset
+                        parts.append(
+                            f"{{\\fscx120\\fscy120\\c&H{accent_bgr}&}}{text}"
+                            f"{{\\fscx100\\fscy100\\c&HFFFFFF&}}"
+                        )
                     else:
                         parts.append(text)
 
@@ -260,6 +274,7 @@ class SubtitleClipGenerator:
                 f"color=c={self.bg_color}:s={width}x{height}:r=25",
             ]
 
+        encoder_args = get_h264_encoder_args(preset="medium", crf=18, profile="high")
         return [
             self.ffmpeg_path,
             "-y",
@@ -272,12 +287,7 @@ class SubtitleClipGenerator:
             "[final]",
             "-map",
             "1:a",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "medium",
-            "-crf",
-            "18",
+            *encoder_args,
             "-c:a",
             "copy",
             "-shortest",
@@ -392,22 +402,31 @@ class SubtitleClipGenerator:
         Returns:
             List of successfully created output file paths (None results excluded)
         """
-        results = []
+        from concurrent.futures import ThreadPoolExecutor
 
-        for i, clip_path in enumerate(clip_paths):
-            srt_path = srt_paths[i] if srt_paths and i < len(srt_paths) else None
-            clip_info = best_clips[i] if best_clips and i < len(best_clips) else {}
-
+        def _process_clip(idx):
+            srt_path = srt_paths[idx] if srt_paths and idx < len(srt_paths) else None
+            clip_info = best_clips[idx] if best_clips and idx < len(best_clips) else {}
             output = self.create_subtitle_clip(
-                audio_path=clip_path,
+                audio_path=clip_paths[idx],
                 srt_path=srt_path,
                 transcript_data=transcript_data,
                 clip_info=clip_info,
                 format_type=format_type,
             )
+            logger.info(
+                "Subtitle clip %d/%d %s",
+                idx + 1,
+                len(clip_paths),
+                "succeeded" if output else "failed",
+            )
+            return output
 
-            if output is not None:
-                results.append(output)
+        with ThreadPoolExecutor(max_workers=Config.MAX_NVENC_SESSIONS) as executor:
+            futures = [
+                executor.submit(_process_clip, i) for i in range(len(clip_paths))
+            ]
+            results = [r for r in (f.result() for f in futures) if r is not None]
 
         logger.info(
             f"Subtitle clip batch complete: {len(results)}/{len(clip_paths)} succeeded"

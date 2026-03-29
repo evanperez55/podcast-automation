@@ -2,6 +2,7 @@
 
 import os
 import shutil
+import subprocess
 from dotenv import load_dotenv
 from pathlib import Path
 
@@ -29,6 +30,36 @@ def _detect_ffprobe():
     if found:
         return found
     return "C:\\ffmpeg\\bin\\ffprobe.exe"
+
+
+_nvenc_cache = None
+
+
+def _detect_nvenc(ffmpeg_path: str) -> bool:
+    """Check if h264_nvenc encoder is available in FFmpeg.
+
+    Args:
+        ffmpeg_path: Path to the FFmpeg binary.
+
+    Returns:
+        True if h264_nvenc is listed in FFmpeg encoders, False otherwise.
+    """
+    global _nvenc_cache
+    if _nvenc_cache is not None:
+        return _nvenc_cache
+
+    try:
+        result = subprocess.run(
+            [ffmpeg_path, "-hide_banner", "-encoders"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        _nvenc_cache = "h264_nvenc" in result.stdout
+    except Exception:
+        _nvenc_cache = False
+
+    return _nvenc_cache
 
 
 class Config:
@@ -141,6 +172,13 @@ class Config:
     FFMPEG_PATH = _detect_ffmpeg()
     FFPROBE_PATH = _detect_ffprobe()
 
+    # NVENC hardware encoding (auto-detect GPU, override with NVENC_ENABLED env var)
+    _nvenc_env = os.getenv("NVENC_ENABLED")
+    if _nvenc_env is not None:
+        USE_NVENC = _nvenc_env.lower() == "true"
+    else:
+        USE_NVENC = _detect_nvenc(FFMPEG_PATH)
+
     # Content Filtering Rules
     # First names and full names of hosts to censor
     NAMES_TO_REMOVE = [
@@ -195,7 +233,7 @@ class Config:
 
     # Audio Settings
     MP3_BITRATE = os.getenv("MP3_BITRATE", "192k")
-    WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
+    WHISPER_MODEL = os.getenv("WHISPER_MODEL", "distil-large-v3")
     CLIP_FADE_MS = int(os.getenv("CLIP_FADE_MS", "100"))
     LUFS_TARGET = float(os.getenv("LUFS_TARGET", "-16"))
 
@@ -214,6 +252,14 @@ class Config:
 
     # Ollama Settings
     OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
+
+    # OpenAI Model Settings
+    OPENAI_ANALYSIS_MODEL = os.getenv("OPENAI_ANALYSIS_MODEL", "gpt-4.1-mini")
+    OPENAI_BLOG_MODEL = os.getenv("OPENAI_BLOG_MODEL", "gpt-4.1-mini")
+
+    # NVENC Parallel Encoding Sessions (default 3, newer drivers support 5)
+    MAX_NVENC_SESSIONS = int(os.getenv("MAX_NVENC_SESSIONS", "3"))
 
     # Working Directories
     BASE_DIR = Path(__file__).parent
@@ -221,6 +267,7 @@ class Config:
     OUTPUT_DIR = BASE_DIR / "output"
     CLIPS_DIR = BASE_DIR / "clips"
     ASSETS_DIR = BASE_DIR / "assets"
+    CLIENT_LOGO_PATH = None  # Set by client config; None = use default logo
 
     @classmethod
     def create_directories(cls):

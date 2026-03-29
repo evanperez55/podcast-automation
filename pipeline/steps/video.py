@@ -24,12 +24,11 @@ def run_video(
     transcript_data = ctx.transcript_data
     analysis = ctx.analysis or {}
     episode_number = ctx.episode_number
-    episode_folder = ctx.episode_folder
 
     # Step 5: Create clips
     print("STEP 5: CREATING CLIPS")
     print("-" * 60)
-    clip_dir = Config.CLIPS_DIR / episode_folder
+    clip_dir = episode_output_dir / "clips"
     clip_dir.mkdir(exist_ok=True, parents=True)
 
     if state and state.is_step_completed("create_clips"):
@@ -115,7 +114,9 @@ def run_video(
     audiogram_generator = components.get("audiogram_generator")
     video_converter = components.get("video_converter")
 
-    if subtitle_clip_generator and subtitle_clip_generator.enabled:
+    if ctx.has_video_source:
+        print("STEP 5.5: CUTTING VIDEO CLIPS FROM SOURCE")
+    elif subtitle_clip_generator and subtitle_clip_generator.enabled:
         print("STEP 5.5: CREATING SUBTITLE CLIP VIDEOS")
     elif audiogram_generator and audiogram_generator.enabled:
         print("STEP 5.5: CREATING AUDIOGRAM WAVEFORM VIDEOS")
@@ -130,6 +131,94 @@ def run_video(
         video_clip_paths = [Path(p) for p in outputs.get("video_clip_paths", [])]
         full_episode_video_path = outputs.get("full_episode_video_path")
         logger.info("[RESUME] Skipping video conversion (already completed)")
+    elif ctx.has_video_source and clip_paths:
+        # Video source: cut clips from original video with blurred background
+        # and burned-in subtitles in a single FFmpeg pass
+        from concurrent.futures import ThreadPoolExecutor
+
+        from video_utils import cut_video_clip, mux_audio_to_video
+
+        logger.info("Cutting clips from source video (9:16 vertical crop)...")
+        best_clips = analysis.get("best_clips", [])
+        source_video = str(ctx.source_video_path)
+
+        # Pre-generate ASS subtitle files if subtitle generator is available
+        has_subtitles = subtitle_clip_generator and subtitle_clip_generator.enabled
+        ass_files = {}
+        if has_subtitles:
+            from subtitle_clip_generator import normalize_word_timestamps
+            from subtitle_generator import SubtitleGenerator
+
+            sub_gen = SubtitleGenerator()
+            for i, clip_path in enumerate(clip_paths):
+                if i >= len(best_clips):
+                    break
+                ci = best_clips[i]
+                clip_words = sub_gen.extract_words_for_clip(
+                    transcript_data=transcript_data,
+                    clip_start=ci.get("start_seconds", 0.0),
+                    clip_end=ci.get("end_seconds", 0.0),
+                )
+                clip_words = normalize_word_timestamps(clip_words)
+                ass_path = str(clip_dir / f"clip_{i + 1:02d}_captions.ass")
+                subtitle_clip_generator._generate_ass_file(
+                    clip_words, ass_path, 720, 1280, video_source=True
+                )
+                ass_files[i] = ass_path
+
+        # Single-pass: cut + blur background + overlay + subtitles
+        def _cut_clip(idx, cpath):
+            if idx >= len(best_clips):
+                return None
+            ci = best_clips[idx]
+            start = ci.get("start_seconds", 0)
+            end = ci.get("end_seconds", 30)
+            output = Path(str(cpath).replace(".wav", "_video.mp4"))
+            vpath = cut_video_clip(
+                source_video,
+                start,
+                end,
+                str(output),
+                crop_vertical=True,
+                ass_path=ass_files.get(idx),
+            )
+            if vpath:
+                logger.info("Cut video clip %d/%d", idx + 1, len(clip_paths))
+                return Path(vpath)
+            logger.warning("Failed to cut video clip %d", idx + 1)
+            return None
+
+        with ThreadPoolExecutor(max_workers=Config.MAX_NVENC_SESSIONS) as executor:
+            futures = [
+                executor.submit(_cut_clip, i, cp) for i, cp in enumerate(clip_paths)
+            ]
+            for f in futures:
+                result = f.result()
+                if result:
+                    video_clip_paths.append(result)
+
+        # No separate subtitle burn needed — done in single pass above
+        subtitle_video_paths = video_clip_paths
+        if subtitle_video_paths:
+            video_clip_paths = subtitle_video_paths
+            logger.info("Created %d subtitle video clips", len(video_clip_paths))
+
+        logger.info("Cut %d video clips from source", len(video_clip_paths))
+
+        # Full episode: mux censored audio onto source video
+        if censored_audio and ctx.source_video_path:
+            full_ep_output = str(
+                episode_output_dir / f"{audio_file.stem}_{timestamp}_episode.mp4"
+            )
+            full_episode_video_path = mux_audio_to_video(
+                str(ctx.source_video_path),
+                str(censored_audio),
+                full_ep_output,
+            )
+            if full_episode_video_path:
+                logger.info("Full episode video: %s", full_episode_video_path)
+            else:
+                logger.warning("Failed to create full episode video from source")
     elif subtitle_clip_generator and subtitle_clip_generator.enabled and clip_paths:
         logger.info("Creating word-by-word subtitle clips...")
         srt_list = [str(s) if s else None for s in srt_paths]
@@ -176,68 +265,6 @@ def run_video(
         )
         video_clip_paths = [Path(p) for p in audiogram_results]
         logger.info("Created %d audiogram clips", len(video_clip_paths))
-
-        # Full episode still uses static logo (not audiogram)
-        if video_converter:
-            logger.info("Creating horizontal video (16:9) for YouTube full episode...")
-            full_episode_video_path = video_converter.create_episode_video(
-                audio_path=str(censored_audio),
-                output_path=str(
-                    episode_output_dir / f"{audio_file.stem}_{timestamp}_episode.mp4"
-                ),
-                format_type="horizontal",
-            )
-
-        if state:
-            state.complete_step(
-                "convert_videos",
-                {
-                    "video_clip_paths": [str(p) for p in video_clip_paths],
-                    "full_episode_video_path": str(full_episode_video_path)
-                    if full_episode_video_path
-                    else None,
-                },
-            )
-    elif ctx.has_video_source and clip_paths:
-        # Video source: cut clips from original video instead of static logo
-        from video_utils import cut_video_clip, mux_audio_to_video
-
-        logger.info("Cutting clips from source video (9:16 vertical crop)...")
-        best_clips = analysis.get("best_clips", [])
-        for i, clip_path in enumerate(clip_paths):
-            if i < len(best_clips):
-                clip_info = best_clips[i]
-                start = clip_info.get("start_seconds", 0)
-                end = clip_info.get("end_seconds", 30)
-                output = Path(str(clip_path).replace(".wav", "_video.mp4"))
-                video_path = cut_video_clip(
-                    str(ctx.source_video_path),
-                    start,
-                    end,
-                    str(output),
-                    crop_vertical=True,
-                )
-                if video_path:
-                    video_clip_paths.append(Path(video_path))
-                else:
-                    logger.warning("Failed to cut video clip %d", i + 1)
-
-        logger.info("Cut %d video clips from source", len(video_clip_paths))
-
-        # Full episode: mux censored audio onto source video
-        if censored_audio and ctx.source_video_path:
-            full_ep_output = str(
-                episode_output_dir / f"{audio_file.stem}_{timestamp}_episode.mp4"
-            )
-            full_episode_video_path = mux_audio_to_video(
-                str(ctx.source_video_path),
-                str(censored_audio),
-                full_ep_output,
-            )
-            if full_episode_video_path:
-                logger.info("Full episode video: %s", full_episode_video_path)
-            else:
-                logger.warning("Failed to create full episode video from source")
 
         if state:
             state.complete_step(

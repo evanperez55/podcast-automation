@@ -49,9 +49,10 @@ class BlogPostGenerator:
                 import openai
 
                 client = openai.OpenAI(api_key=Config.OPENAI_API_KEY)
-                logger.info("Generating blog post with OpenAI GPT-4o...")
+                blog_model = getattr(Config, "OPENAI_BLOG_MODEL", "gpt-4.1-mini")
+                logger.info("Generating blog post with OpenAI %s...", blog_model)
                 response = client.chat.completions.create(
-                    model="gpt-4o",
+                    model=blog_model,
                     max_tokens=4000,
                     temperature=0.7,
                     messages=[

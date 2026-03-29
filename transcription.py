@@ -1,50 +1,66 @@
-"""Audio transcription using local Whisper model."""
+"""Audio transcription using faster-whisper (CTranslate2 backend).
 
-import whisper
+Uses faster-whisper for ~4x speed improvement over openai-whisper with
+identical accuracy. Includes Silero VAD pre-filtering to skip silence.
+"""
+
+from faster_whisper import WhisperModel
 from pathlib import Path
 import json
 from config import Config
 from logger import logger
-import torch
 import os
 
 
 class Transcriber:
-    """Handle audio transcription with local Whisper model."""
+    """Handle audio transcription with faster-whisper model."""
 
     def __init__(self, model_size=None):
         """
-        Initialize local Whisper model.
+        Initialize faster-whisper model.
 
         Args:
             model_size: Model size to use (defaults to Config.WHISPER_MODEL). Options:
                 - tiny: Fastest, least accurate (~1GB RAM)
-                - base: Good balance, recommended (~1GB RAM)
+                - base: Good balance (~1GB RAM)
                 - small: Better accuracy (~2GB RAM)
                 - medium: Very good accuracy (~5GB RAM)
-                - large: Best accuracy, slowest (~10GB RAM)
+                - large-v3: Best accuracy (~5GB VRAM fp16)
+                - distil-large-v3: Near-best accuracy, 2x faster (~2.5GB VRAM)
         """
         model_size = model_size or Config.WHISPER_MODEL
 
-        # Ensure FFmpeg is in PATH (Whisper needs it)
+        # Ensure FFmpeg is in PATH (faster-whisper needs it)
         ffmpeg_dir = os.path.dirname(Config.FFMPEG_PATH)
         if ffmpeg_dir and ffmpeg_dir not in os.environ["PATH"]:
             os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ["PATH"]
             logger.debug("Added FFmpeg to PATH: %s", ffmpeg_dir)
 
-        logger.info("Loading Whisper '%s' model...", model_size)
+        logger.info("Loading faster-whisper '%s' model...", model_size)
 
-        # Check if CUDA (GPU) is available
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        logger.info("Using device: %s", self.device)
+        # Auto-detect device and compute type
+        import torch
+
+        if torch.cuda.is_available():
+            self.device = "cuda"
+            self.compute_type = "float16"
+        else:
+            self.device = "cpu"
+            self.compute_type = "int8"
+
+        logger.info("Using device: %s (%s)", self.device, self.compute_type)
 
         # Load the model
-        self.model = whisper.load_model(model_size, device=self.device)
-        logger.info("Whisper model loaded and ready")
+        self.model = WhisperModel(
+            model_size,
+            device=self.device,
+            compute_type=self.compute_type,
+        )
+        logger.info("faster-whisper model loaded and ready")
 
     def transcribe(self, audio_file_path, output_path=None):
         """
-        Transcribe audio file using local Whisper model.
+        Transcribe audio file using faster-whisper.
 
         Args:
             audio_file_path: Path to audio file (WAV, MP3, etc.)
@@ -55,7 +71,7 @@ class Transcriber:
             - text: Full transcript text
             - segments: List of segments with timestamps
             - language: Detected language
-            - words: List of words with timestamps (if available)
+            - words: List of words with timestamps
         """
         audio_file_path = Path(audio_file_path)
 
@@ -66,42 +82,60 @@ class Transcriber:
         logger.info("File size: %.1f MB", audio_file_path.stat().st_size / 1024 / 1024)
 
         try:
-            # Transcribe with Whisper
-            logger.info("Processing with Whisper model...")
+            # Transcribe with faster-whisper
+            logger.info("Processing with faster-whisper...")
             logger.info("(This may take several minutes for long files...)")
 
-            result = self.model.transcribe(
+            segments_iter, info = self.model.transcribe(
                 str(audio_file_path),
-                verbose=False,
-                word_timestamps=True,  # Enable word-level timestamps
+                word_timestamps=True,
+                vad_filter=True,  # Silero VAD pre-filters silence for 10-30% speedup
             )
 
-            # Extract words from segments (Whisper's format)
+            # Collect segments and words from the generator
+            all_segments = []
             words = []
-            for segment in result.get("segments", []):
-                if "words" in segment:
-                    for word_info in segment["words"]:
-                        words.append(
-                            {
-                                "word": word_info.get("word", "").strip(),
-                                "start": word_info.get("start", 0),
-                                "end": word_info.get("end", 0),
-                            }
-                        )
+            full_text_parts = []
+
+            for segment in segments_iter:
+                seg_dict = {
+                    "start": segment.start,
+                    "end": segment.end,
+                    "text": segment.text,
+                }
+
+                if segment.words:
+                    seg_words = []
+                    for w in segment.words:
+                        word_dict = {
+                            "word": w.word.strip(),
+                            "start": w.start,
+                            "end": w.end,
+                        }
+                        words.append(word_dict)
+                        seg_words.append(word_dict)
+                    seg_dict["words"] = seg_words
+
+                all_segments.append(seg_dict)
+                full_text_parts.append(segment.text)
+
+            duration = all_segments[-1]["end"] if all_segments else 0
 
             # Prepare transcript data in our standard format
             transcript_data = {
-                "text": result["text"],
-                "language": result.get("language", "unknown"),
-                "duration": result.get("segments", [{}])[-1].get("end", 0)
-                if result.get("segments")
-                else 0,
-                "segments": result.get("segments", []),
+                "text": " ".join(full_text_parts),
+                "language": info.language,
+                "duration": duration,
+                "segments": all_segments,
                 "words": words,
             }
 
             logger.info("Transcription complete")
-            logger.info("Language: %s", transcript_data["language"])
+            logger.info(
+                "Language: %s (probability: %.2f)",
+                info.language,
+                info.language_probability,
+            )
             logger.info("Duration: %.1fs", transcript_data["duration"])
             logger.info("Words: %d", len(transcript_data["words"]))
             logger.info("Segments: %d", len(transcript_data["segments"]))
