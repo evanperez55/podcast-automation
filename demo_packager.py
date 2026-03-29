@@ -16,9 +16,13 @@ from typing import Optional
 from jinja2 import Environment, FileSystemLoader
 
 from audio_processor import _parse_loudnorm_json
+from client_config import activate_client
 from config import Config
 from logger import logger
+from outreach_tracker import OutreachTracker
+from pipeline import run_with_notification
 from pipeline_state import PipelineState
+from pitch_generator import PitchGenerator
 
 # ---------------------------------------------------------------------------
 # DEMO.md template
@@ -565,3 +569,113 @@ class DemoPackager:
             f"Flagged segments: {flagged_count}\n"
             f"Warnings: {len(compliance_data.get('warnings', []))}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Standalone workflow orchestration
+# ---------------------------------------------------------------------------
+
+
+def run_demo_workflow(
+    slug: str,
+    episode_id: str,
+    args: dict,
+    consent_fn=None,
+) -> Optional[Path]:
+    """Consent-gated demo workflow: process episode, package demo, generate pitch.
+
+    Args:
+        slug: Prospect slug matching the outreach tracker entry.
+        episode_id: Episode identifier (e.g., 'ep01').
+        args: Pipeline args dict (test_mode, dry_run, auto_approve, resume, etc.).
+        consent_fn: Optional callable that receives a prompt string and returns the
+            user's response. When None, ``input()`` is used. Inject for testing.
+
+    Returns:
+        Path to the demo folder if workflow completes successfully, None if aborted.
+
+    Raises:
+        ValueError: If prospect slug is not found in the outreach tracker.
+    """
+    tracker = OutreachTracker()
+    prospect = tracker.get_prospect(slug)
+    if prospect is None:
+        raise ValueError(f"Prospect '{slug}' not found in tracker")
+
+    show_name = prospect.get("show_name", slug)
+    status = prospect.get("status", "unknown")
+    contact_email = prospect.get("contact_email", "")
+
+    print(f"\nProspect: {show_name}")
+    print(f"  Status: {status}")
+    if contact_email:
+        print(f"  Contact: {contact_email}")
+
+    prompt = (
+        f"CONSENT CHECK: Have you obtained explicit permission from the host of "
+        f"'{show_name}' to process their episode? Type 'yes' to confirm: "
+    )
+    if consent_fn is not None:
+        response = consent_fn(prompt)
+    else:
+        response = input(prompt)
+
+    if response.strip().lower() != "yes":
+        print("Aborted — no consent confirmed.")
+        return None
+
+    # Update tracker: prospect has agreed to a demo
+    tracker.update_status(slug, "interested")
+
+    # Activate client config for pipeline context
+    activate_client(slug)
+
+    # Run pipeline
+    ep_number = int(episode_id.replace("ep", ""))
+    run_with_notification(args, episode_number=ep_number)
+
+    # Package demo
+    demo_dir = DemoPackager().package_demo(slug, episode_id)
+
+    # Generate pitch (non-fatal — demo folder is the critical output)
+    pitch_result = None
+    try:
+        pitch_result = PitchGenerator().generate_demo_pitch(slug, episode_id)
+    except Exception as e:
+        logger.warning("Pitch generation failed (non-fatal): %s", e)
+
+    # Update tracker to demo_sent
+    tracker.update_status(slug, "demo_sent")
+
+    # Print summary
+    print(f"\n{'=' * 60}")
+    print("Demo workflow complete!")
+    print(f"  Demo folder: {demo_dir}")
+    if pitch_result:
+        print(f"  Pitch subject: {pitch_result.get('subject', 'N/A')}")
+    else:
+        print("  Pitch: not generated (see log for details)")
+    print("  Next steps: Review the demo output, then send the pitch manually")
+    print(f"{'=' * 60}\n")
+
+    return demo_dir
+
+
+def run_demo_workflow_cli(argv: list, args: dict) -> None:
+    """CLI handler for the demo-workflow command.
+
+    Args:
+        argv: sys.argv list (slug at index 2, ep_id at index 3).
+        args: Parsed flags dict from main.py _parse_flags().
+    """
+    slug = argv[2] if len(argv) > 2 else None
+    ep_id = argv[3] if len(argv) > 3 else None
+    if not slug or not ep_id:
+        print("Usage: uv run main.py demo-workflow <slug> <ep_id>")
+        return
+    try:
+        run_demo_workflow(slug, ep_id, args)
+    except ValueError as e:
+        print(f"Error: {e}")
+    except Exception as e:
+        print(f"Error during demo workflow: {e}")
