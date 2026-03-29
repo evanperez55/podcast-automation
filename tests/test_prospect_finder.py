@@ -537,7 +537,9 @@ class TestSaveProspect:
 
         # init_client should create the YAML when called
         def create_yaml(name):
-            yaml_path = tmp_path / f"{name}.yaml"
+            clients_dir = tmp_path / "clients"
+            clients_dir.mkdir(exist_ok=True)
+            yaml_path = clients_dir / f"{name}.yaml"
             yaml_path.write_text(self._make_minimal_yaml(), encoding="utf-8")
 
         mock_init.side_effect = create_yaml
