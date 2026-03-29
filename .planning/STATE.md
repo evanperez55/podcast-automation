@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Real-World Testing & Sales Readiness
-status: planning
-stopped_at: Completed 18-01-PLAN.md — raw audio snapshot for demo package
-last_updated: "2026-03-28T00:18:00Z"
-last_activity: 2026-03-28 — Completed 18-01: raw audio snapshot before censorship
+status: executing
+stopped_at: Completed 18-02-PLAN.md — DemoPackager module and package-demo CLI command
+last_updated: "2026-03-29T00:30:57.253Z"
+last_activity: "2026-03-28 — Completed 18-01: raw audio snapshot before censorship"
 progress:
   total_phases: 5
-  completed_phases: 4
-  total_plans: 8
-  completed_plans: 8
-  percent: 0
+  completed_phases: 5
+  total_plans: 10
+  completed_plans: 10
+  percent: 20
 ---
 
 # Project State
@@ -62,6 +62,9 @@ Progress: [██░░░░░░░░] 20% (18-01 complete)
 - [Phase 17-integration-testing-genre-fixes]: normalize_audio uses temp file + rename to avoid FFmpeg in-place write crash
 - [Phase 18-01]: Snapshot uses subprocess FFmpeg -ss/-to (not pydub) to avoid loading 1GB+ audio into memory
 - [Phase 18-01]: Snapshot start derived from best_clips[0].start_seconds with 60.0 default; stored in censor checkpoint for resume recovery
+- [Phase 18-demo-packaging]: PipelineState artifact discovery takes priority; glob fallback handles partial runs (business-interview-client has no state file)
+- [Phase 18-demo-packaging]: LUFS measured at package time via FFmpeg loudnorm pass 1 — avoids brittle log parsing
+- [Phase 18-demo-packaging]: main.py line-count limit bumped 210→220 to accommodate package-demo command
 
 ### Blockers/Concerns
 
@@ -72,6 +75,6 @@ Progress: [██░░░░░░░░] 20% (18-01 complete)
 
 ## Session Continuity
 
-Last session: 2026-03-28T23:49:17.981Z
-Stopped at: Completed 17-02-PLAN.md — genre client YAMLs and integration testing
+Last session: 2026-03-29T00:30:57.249Z
+Stopped at: Completed 18-02-PLAN.md — DemoPackager module and package-demo CLI command
 Resume file: None

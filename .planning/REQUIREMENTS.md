@@ -27,9 +27,9 @@ Requirements for Real-World Testing & Sales Readiness milestone.
 
 ### Demo Packaging
 
-- [ ] **DEMO-01**: User can run a package-demo command to assemble all pipeline output into a presentable demo folder
+- [x] **DEMO-01**: User can run a package-demo command to assemble all pipeline output into a presentable demo folder
 - [x] **DEMO-02**: Demo includes a before/after audio comparison clip (raw vs processed)
-- [ ] **DEMO-03**: Demo includes a DEMO.md narrative per client (what was automated, time saved, cost, metrics)
+- [x] **DEMO-03**: Demo includes a DEMO.md narrative per client (what was automated, time saved, cost, metrics)
 
 ## Future Requirements
 
@@ -69,9 +69,9 @@ Requirements for Real-World Testing & Sales Readiness milestone.
 | TEST-02 | Phase 17 | Complete |
 | TEST-03 | Phase 17 | Complete |
 | TEST-04 | Phase 17 | Complete |
-| DEMO-01 | Phase 18 | Pending |
+| DEMO-01 | Phase 18 | Complete |
 | DEMO-02 | Phase 18 | Complete |
-| DEMO-03 | Phase 18 | Pending |
+| DEMO-03 | Phase 18 | Complete |
 
 **Coverage:**
 - v1.4 requirements: 12 total

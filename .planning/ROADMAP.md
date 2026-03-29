@@ -61,7 +61,7 @@ See: Phase 12 details below.
 - [x] **Phase 15: Config Hardening** — Eliminate Fake Problems default leakage; author 2-3 real genre client YAMLs (completed 2026-03-28)
 - [x] **Phase 16: RSS Episode Source** — Add RSS ingest path to unblock non-Dropbox clients (completed 2026-03-28)
 - [x] **Phase 17: Integration Testing & Genre Fixes** — Process real episodes per genre; fix what breaks (completed 2026-03-28)
-- [ ] **Phase 18: Demo Packaging** — Assemble pipeline output into a presentable sales demo per client
+- [x] **Phase 18: Demo Packaging** — Assemble pipeline output into a presentable sales demo per client (completed 2026-03-29)
 
 ## Phase Details
 
@@ -147,4 +147,4 @@ Plans:
 | 15. Config Hardening | v1.4 | 2/2 | Complete | 2026-03-28 |
 | 16. RSS Episode Source | v1.4 | 2/2 | Complete | 2026-03-28 |
 | 17. Integration Testing & Genre Fixes | v1.4 | 2/2 | Complete | 2026-03-28 |
-| 18. Demo Packaging | 1/2 | In Progress|  | - |
+| 18. Demo Packaging | 2/2 | Complete   | 2026-03-29 | - |
