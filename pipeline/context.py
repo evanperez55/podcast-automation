@@ -23,6 +23,7 @@ class PipelineContext:
     transcript_data: Optional[dict] = None
     analysis: Optional[dict] = None
     censored_audio: Optional[Path] = None
+    raw_snapshot_path: Optional[Path] = None
     mp3_path: Optional[Path] = None
 
     # Source video (when input is a video file, not audio-only)

@@ -1,11 +1,14 @@
 """Tests for audio_processor module."""
 
 import pytest
+from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 from pydub import AudioSegment
 
 from audio_processor import AudioProcessor
 from config import Config
+from pipeline.context import PipelineContext
+from pipeline.steps.audio import run_audio
 
 
 @pytest.fixture
@@ -934,3 +937,180 @@ class TestClipDurationValidation:
         sliced_range = call_args[0][0]
         assert sliced_range.start == 10000  # 10s in ms
         assert sliced_range.stop == 35000  # 35s in ms
+
+
+class TestRawSnapshot:
+    """Tests for raw audio snapshot before censorship (DEMO-02).
+
+    Verifies that run_audio() captures a 60-second WAV segment via FFmpeg
+    before the censorship step, stores the path in censor checkpoint outputs,
+    and skips snapshot creation on pipeline resume.
+    """
+
+    def _make_ctx(self, tmp_path, analysis=None):
+        """Build a minimal PipelineContext for run_audio testing."""
+        return PipelineContext(
+            episode_folder="ep01",
+            episode_number=1,
+            episode_output_dir=tmp_path,
+            timestamp="20260328",
+            audio_file=tmp_path / "ep01.wav",
+            analysis=analysis or {},
+        )
+
+    def _make_components(self):
+        """Build a minimal components dict with mocked transcriber and audio_processor."""
+        transcriber = Mock()
+        transcriber.transcribe.return_value = {"segments": [], "words": []}
+        audio_proc = Mock()
+        audio_proc.apply_censorship.return_value = Path("/fake/censored.wav")
+        audio_proc.normalize_audio.return_value = Path("/fake/normalized.wav")
+        audio_proc.convert_to_mp3.return_value = Path("/fake/episode.mp3")
+        return {
+            "transcriber": transcriber,
+            "audio_processor": audio_proc,
+            "chapter_generator": None,
+        }
+
+    @patch("pipeline.steps.audio.subprocess.run")
+    def test_snapshot_calls_ffmpeg_before_censor(self, mock_run, tmp_path):
+        """run_audio calls subprocess.run (FFmpeg) to create 60-second snapshot before censorship."""
+        # Setup
+        mock_run.return_value = Mock(returncode=0)
+        audio_file = tmp_path / "ep01.wav"
+        audio_file.write_bytes(b"fake")
+        ctx = self._make_ctx(tmp_path)
+        ctx.audio_file = audio_file
+        components = self._make_components()
+
+        # Execute
+        run_audio(ctx, components, state=None)
+
+        # Verify FFmpeg was called
+        mock_run.assert_called_once()
+        cmd = mock_run.call_args[0][0]
+        assert str(audio_file) in cmd
+        assert "_raw_snapshot.wav" in cmd[-1]
+
+    @patch("pipeline.steps.audio.subprocess.run")
+    def test_snapshot_start_from_best_clip(self, mock_run, tmp_path):
+        """Snapshot start time uses best_clips[0].start_seconds when available."""
+        mock_run.return_value = Mock(returncode=0)
+        audio_file = tmp_path / "ep01.wav"
+        audio_file.write_bytes(b"fake")
+        analysis = {
+            "best_clips": [
+                {
+                    "start_seconds": 120.0,
+                    "end_seconds": 180.0,
+                    "description": "Good bit",
+                }
+            ]
+        }
+        ctx = self._make_ctx(tmp_path, analysis=analysis)
+        ctx.audio_file = audio_file
+        components = self._make_components()
+
+        run_audio(ctx, components, state=None)
+
+        cmd = mock_run.call_args[0][0]
+        ss_index = cmd.index("-ss")
+        assert cmd[ss_index + 1] == "120.0"
+
+    @patch("pipeline.steps.audio.subprocess.run")
+    def test_snapshot_default_start_when_no_clips(self, mock_run, tmp_path):
+        """Snapshot start defaults to 60.0 when analysis has no best_clips."""
+        mock_run.return_value = Mock(returncode=0)
+        audio_file = tmp_path / "ep01.wav"
+        audio_file.write_bytes(b"fake")
+        ctx = self._make_ctx(tmp_path, analysis={})
+        ctx.audio_file = audio_file
+        components = self._make_components()
+
+        run_audio(ctx, components, state=None)
+
+        cmd = mock_run.call_args[0][0]
+        ss_index = cmd.index("-ss")
+        assert cmd[ss_index + 1] == "60.0"
+
+    @patch("pipeline.steps.audio.subprocess.run")
+    def test_snapshot_path_naming_convention(self, mock_run, tmp_path):
+        """Snapshot path follows {stem}_{timestamp}_raw_snapshot.wav in episode_output_dir."""
+        mock_run.return_value = Mock(returncode=0)
+        audio_file = tmp_path / "ep01.wav"
+        audio_file.write_bytes(b"fake")
+        ctx = self._make_ctx(tmp_path)
+        ctx.audio_file = audio_file
+        components = self._make_components()
+
+        run_audio(ctx, components, state=None)
+
+        cmd = mock_run.call_args[0][0]
+        snapshot_path = Path(cmd[-1])
+        assert snapshot_path.parent == tmp_path
+        assert snapshot_path.name == "ep01_20260328_raw_snapshot.wav"
+
+    @patch("pipeline.steps.audio.subprocess.run")
+    def test_snapshot_skipped_on_resume(self, mock_run, tmp_path):
+        """When censor step is already completed (resume), FFmpeg snapshot is NOT called."""
+        mock_run.return_value = Mock(returncode=0)
+        audio_file = tmp_path / "ep01.wav"
+        audio_file.write_bytes(b"fake")
+        ctx = self._make_ctx(tmp_path)
+        ctx.audio_file = audio_file
+        components = self._make_components()
+
+        # State says censor is already done
+        state = Mock()
+        state.is_step_completed.side_effect = lambda step: step == "censor"
+        state.get_step_outputs.return_value = {
+            "censored_audio": str(tmp_path / "ep01_censored.wav"),
+            "raw_snapshot_path": str(tmp_path / "ep01_20260328_raw_snapshot.wav"),
+        }
+
+        run_audio(ctx, components, state=state)
+
+        # FFmpeg must NOT be called for snapshot on resume
+        mock_run.assert_not_called()
+
+    @patch("pipeline.steps.audio.subprocess.run")
+    def test_snapshot_path_stored_in_censor_checkpoint(self, mock_run, tmp_path):
+        """raw_snapshot_path is stored in the censor checkpoint outputs dict."""
+        mock_run.return_value = Mock(returncode=0)
+        audio_file = tmp_path / "ep01.wav"
+        audio_file.write_bytes(b"fake")
+        ctx = self._make_ctx(tmp_path)
+        ctx.audio_file = audio_file
+        components = self._make_components()
+
+        state = Mock()
+        state.is_step_completed.return_value = False
+
+        run_audio(ctx, components, state=state)
+
+        # Find the complete_step call for "censor"
+        censor_calls = [
+            c for c in state.complete_step.call_args_list if c[0][0] == "censor"
+        ]
+        assert len(censor_calls) == 1
+        outputs = censor_calls[0][0][1]
+        assert "raw_snapshot_path" in outputs
+
+    @patch("pipeline.steps.audio.subprocess.run")
+    def test_ctx_raw_snapshot_path_set_after_creation(self, mock_run, tmp_path):
+        """ctx.raw_snapshot_path is populated with the snapshot Path after FFmpeg runs."""
+        mock_run.return_value = Mock(returncode=0)
+        audio_file = tmp_path / "ep01.wav"
+        audio_file.write_bytes(b"fake")
+        ctx = self._make_ctx(tmp_path)
+        ctx.audio_file = audio_file
+        components = self._make_components()
+
+        run_audio(ctx, components, state=None)
+
+        assert ctx.raw_snapshot_path is not None
+        assert ctx.raw_snapshot_path.name == "ep01_20260328_raw_snapshot.wav"
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
