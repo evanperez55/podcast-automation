@@ -1,209 +1,233 @@
-# Technology Stack
+# Technology Stack — v1.5 New Capabilities Only
 
-**Project:** Podcast Automation — v1.4 Real-World Testing & Sales Readiness
+**Project:** Podcast Automation (v1.5 — First Paying Client)
 **Researched:** 2026-03-28
-**Confidence:** HIGH (feedparser, requests+tqdm), HIGH (stdlib packaging), HIGH (no-new-packages for genre tuning)
+**Scope:** NEW capabilities only — podcast prospect discovery, outreach copy generation, contact tracking.
+         Existing stack is not repeated; see prior milestone STACK for v1.4 and below.
 
 ---
 
-## Existing Stack (Do Not Replace)
+## What Already Covers the New Capabilities
 
-Validated, working dependencies from v1.0–v1.3. Not candidates for replacement or re-research.
+Before adding anything, these existing dependencies already cover all three v1.5 areas:
 
-| Technology | Version (pinned) | Role |
-|------------|-----------------|------|
-| Python | 3.12+ | Language |
-| FFmpeg binary | C:\ffmpeg\bin\ffmpeg.exe | Media processing engine |
-| openai | >=1.0.0 | GPT-4o for content analysis and blog generation |
-| pyyaml | >=6.0.1 | Client YAML config loading (already in use) |
-| requests | >=2.31.0 | HTTP calls (already in use for social APIs) |
-| tqdm | >=4.66.1 | Progress bars (already in use for Dropbox downloads) |
-| jinja2 | >=3.0.0 | HTML template rendering (already in use for webpages) |
-| Pillow | >=10.2.0 | Thumbnail generation (already in use) |
-| pydub | >=0.25.1 | Audio processing (already in use) |
+| Existing Dep | Version | Covers |
+|---|---|---|
+| `requests>=2.31.0` | existing | iTunes Search API calls (no auth required) |
+| `feedparser>=6.0.12` | existing (added v1.4) | RSS feed parsing for prospect show metadata + contact extraction |
+| `openai>=1.0.0` | existing | GPT-4o for personalized pitch copy generation |
+| `jinja2>=3.0.0` | existing | Email/DM template rendering |
+| `pyyaml>=6.0.1` | existing | Prospect config files if needed |
+| `sqlite3` | stdlib | Contact/prospect CRM database — no new dep needed |
 
----
-
-## New Stack Additions (v1.4 Only)
-
-Three new capabilities are required. Two use a single new library each; the third requires no new packages.
+**Result: Zero new packages for v1.5.** All three capability areas build on the existing stack.
 
 ---
 
-### 1. RSS Feed Parsing and Episode Download: `feedparser` + stdlib `urllib` / existing `requests`
+## Podcast Discovery
 
-**New package:** `feedparser>=6.0.12`
+### iTunes Search API — raw `requests`, no wrapper library
 
-**Why feedparser:**
-- Version 6.0.12 (released September 10, 2025) — actively maintained, production/stable.
-- Handles all podcast feed variants: RSS 0.9x, RSS 1.0, RSS 2.0, Atom 0.3, Atom 1.0, CDF, and JSON feeds.
-- Natively parses iTunes extension tags (`itunes_title`, `itunes_duration`, `itunes_explicit`, `itunes_episode`, `itunes_episodetype`) — required for correct podcast metadata extraction.
-- Extracts enclosure URLs from feed entries (the audio file URL) as a list — handles feeds with multiple enclosures gracefully.
-- The `entries[n].enclosures[0].href` pattern gives the direct audio download URL without any custom XML parsing.
-- Alternative `podcastparser` (v0.6.11, Nov 2025) is lighter but has a simpler API and fewer namespace extensions — only matters if feedparser's footprint is a concern, which it is not here.
+**Why this over a wrapper library:**
+The iTunes Search API requires no API key, no registration, and no SDK. A single `requests.get()` call is all that is needed. The archived `podsearch` library (v0.3.1, last commit 2021, archived February 2026) and similar wrappers add nothing over 10 lines of code with `requests`.
 
-**Audio download via existing `requests`:**
-No new package needed. The existing `requests>=2.31.0` already in `pyproject.toml` handles streaming downloads. The existing `tqdm` integration pattern (already used in `dropbox_handler.py`) applies directly.
+**Confidence:** HIGH — Apple official docs confirm: public endpoint, no auth, 200 results per call.
 
-Pattern for streaming audio download with progress:
-```python
-import requests
-from tqdm import tqdm
-
-def download_rss_episode(url: str, dest_path: Path) -> Path:
-    """Download audio enclosure from RSS feed with progress bar."""
-    with requests.get(url, stream=True, timeout=60) as r:
-        r.raise_for_status()
-        total = int(r.headers.get("content-length", 0))
-        with open(dest_path, "wb") as f, tqdm(total=total, unit="B", unit_scale=True) as bar:
-            for chunk in r.iter_content(chunk_size=1024 * 64):
-                f.write(chunk)
-                bar.update(len(chunk))
-    return dest_path
+**Endpoint:**
+```
+GET https://itunes.apple.com/search?term={query}&media=podcast&genreId={id}&limit=200
 ```
 
-**Integration point:** New `rss_downloader.py` module called from `pipeline/steps/ingest.py`. The ingest step already handles a `local_audio_path` bypass; a new `rss_feed_url` + `episode_index` path follows the same pattern. `DropboxHandler` is skipped when RSS source is configured in the client YAML.
+**Genre IDs for target prospect segments (confirmed from community sources, not in official docs):**
 
-**Client YAML addition (no code change to `client_config.py` structure — adds new keys to `_YAML_TO_CONFIG`):**
-```yaml
-source:
-  type: rss           # "dropbox" (default) | "rss" | "local"
-  rss_feed_url: "https://feeds.example.com/podcast.xml"
-  episode_index: 0    # 0 = latest, 1 = second-most-recent, etc.
+| Genre | genreId | Use |
+|---|---|---|
+| Comedy | 1303 | Fake Problems-adjacent prospects |
+| True Crime | 1488 | Casefile-adjacent prospects |
+| Business | 1321 | HIBT-adjacent prospects |
+| Technology | 1318 | Future expansion |
+| Society & Culture | 1324 | Future expansion |
+
+**Response fields that matter:**
+- `collectionName` — show name
+- `artistName` — host name(s)
+- `feedUrl` — RSS feed URL (pass to feedparser for contact extraction)
+- `trackCount` — episode count (proxy for "established but small" show)
+- `primaryGenreName` — genre label
+- `collectionViewUrl` — Apple Podcasts page URL
+- `artworkUrl600` — show artwork
+
+**Size filter heuristic:** No API-level listener count filtering exists. Use `trackCount` between 20–200 to target shows that have traction but are not already at scale. Review count (visible on iTunes show page, not in API response) requires a second lookup or manual check.
+
+**Rate limit:** Apple documents ~20 calls/minute as a soft guideline. Inserting a 2-second sleep between calls is sufficient for a batch of 3-5 genre queries.
+
+### RSS Contact Extraction — existing `feedparser`
+
+**Why feedparser covers this:** Podcast RSS feeds routinely embed host contact info in iTunes extension fields. `feedparser` already normalizes these.
+
+Fields to check in order:
+1. `feed.author_detail.email` — from `<managingEditor>` or `<itunes:email>`
+2. `feed.feed.get('tags', [])` — some feeds encode social links as categories
+3. Regex scan on `feed.feed.description` for `mailto:`, `twitter.com/`, `instagram.com/` patterns
+
+No new library needed. A helper function of ~30 lines covers this completely.
+
+### Why NOT Podcast Index API for v1.5
+
+The Podcast Index API (podcastindex.org) is free but requires HMAC-SHA1 authentication (API key + secret, HMAC header per request). The `python-podcastindex==1.15.0` library wraps this, but:
+
+1. For finding 3-5 prospects, the iTunes API returns the same catalog.
+2. Registration + credential management adds setup friction that is not justified for the v1.5 goal.
+3. The Podcast Index is a better fit for a batch prospecting tool processing hundreds of shows. That is not v1.5.
+
+**Defer `python-podcastindex` to a future "batch prospecting" milestone** if outreach scales beyond manual targeting.
+
+---
+
+## Outreach Copy Generation
+
+### GPT-4o via existing `openai` SDK — no new package
+
+**Pattern:** New `PitchGenerator` class (`pitch_generator.py`) following the project's `self.enabled` convention. Takes a dict of demo metadata (episode title, clip count, highlight topics from analysis, show summary) plus prospect context (show name, host name, genre, episode count). Returns structured dict with `email_subject`, `email_body`, `twitter_dm`, and optionally `instagram_dm`.
+
+**Two-layer approach:**
+1. **Jinja2** (existing) renders the structural skeleton: greeting with host name, sign-off with sender name, CTA linking to demo package, subject line formula.
+2. **GPT-4o at temperature 0.7** generates the personalized hook paragraph that references the specific episode processed. This is the part that cannot be templated — "I ran your episode about [topic] through the pipeline and pulled three clips..." requires reading the actual analysis output.
+
+**Why not pure templates:** The prospect has 3-5 outreach messages. Quality beats volume. A form letter referencing no specific episode content is immediately recognizable as mass email and will not convert. GPT-4o costs ~$0.01-0.02 per pitch at this temperature and length, which is acceptable.
+
+**Why not Ollama/Llama3 locally:** The quality gap between Llama 3.1 and GPT-4o is material for persuasive writing. Local inference is the right choice for bulk analytical tasks (topic scoring); GPT-4o is the right choice for high-stakes one-shot copy.
+
+**Confidence:** HIGH — openai SDK already integrated in pipeline, same calling pattern as `ContentEditor`.
+
+---
+
+## Contact Tracking
+
+### stdlib `sqlite3` — no new package
+
+**Why not a CRM library or framework:** Tracking 3-5 contacts does not justify Django-CRM, creme-crm, or any framework. The project already uses `sqlite3` for `EpisodeSearchIndex` (FTS5). The same pattern works here.
+
+**Module:** `prospect_tracker.py` with a `ProspectTracker` class.
+
+**Schema:**
+
+```sql
+CREATE TABLE IF NOT EXISTS prospects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    show_name TEXT NOT NULL UNIQUE,
+    host_name TEXT,
+    rss_url TEXT,
+    itunes_url TEXT,
+    genre TEXT,
+    episode_count INTEGER,
+    contact_email TEXT,
+    contact_twitter TEXT,
+    contact_instagram TEXT,
+    status TEXT DEFAULT 'identified',
+    demo_path TEXT,
+    notes TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS outreach_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    prospect_id INTEGER REFERENCES prospects(id),
+    channel TEXT,
+    subject TEXT,
+    body TEXT,
+    sent_at TEXT,
+    response_received INTEGER DEFAULT 0,
+    response_notes TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
 ```
 
-**Confidence:** HIGH — feedparser 6.0.12 confirmed on PyPI; enclosure/iTunes tag support confirmed in official docs at feedparser.readthedocs.io.
+**Status lifecycle (stored as TEXT, validated in Python):**
+```
+identified → demo_processed → demo_packaged → contacted → replied → call_scheduled → client | declined
+```
+
+**Storage:** `output/prospects.db` — consistent with `output/` convention for all generated artifacts.
+
+**CLI surface** (new `prospect` subcommand group in `main.py`):
+- `uv run main.py prospect search --genre comedy --limit 20`
+- `uv run main.py prospect list [--status contacted]`
+- `uv run main.py prospect add --show "Show Name" --rss https://...`
+- `uv run main.py prospect demo <show-name>` — triggers `package-demo` for that prospect
+- `uv run main.py prospect pitch <show-name>` — generates email + DM copy
+- `uv run main.py prospect status <show-name> contacted`
+
+**Confidence:** HIGH — exact same sqlite3 pattern as `EpisodeSearchIndex` in `search_index.py`.
 
 ---
 
-### 2. Genre-Specific Pipeline Tuning: No New Package — YAML Config Extension
+## New Modules Summary
 
-**New package:** None.
+Three new modules, zero new packages:
 
-**Why no new package:**
-Genre tuning is entirely about what goes into the GPT-4o prompts and which pipeline parameters are applied — not about new libraries. The multi-client YAML config system (`client_config.py` + `clients/*.yaml`) already provides per-client `voice_persona`, `blog_voice`, `scoring_profile`, `names_to_remove`, and `words_to_censor`. These fields already flow into `ContentEditor.analyze_content()` and `BlogPostGenerator`.
+| Module | Class | Purpose |
+|---|---|---|
+| `prospect_finder.py` | `ProspectFinder` | iTunes Search API queries, RSS contact extraction |
+| `prospect_tracker.py` | `ProspectTracker` | SQLite CRM — status tracking, outreach log |
+| `pitch_generator.py` | `PitchGenerator` | GPT-4o + Jinja2 personalized email/DM generation |
 
-The gap is not missing infrastructure — it is missing YAML content for non-comedy genres. The work is:
+All three follow project conventions: `self.enabled` pattern, `from config import Config`, `from logger import logger`, error handling returns `None` on API failures, raises `ValueError` on missing credentials.
 
-1. **Write client configs** for 2-3 target genres (true crime, business/interview, etc.) with genre-appropriate `voice_persona`, `blog_voice`, and `scoring_profile` values.
-
-2. **Tune censorship defaults per genre.** True crime likely needs zero censorship; business interview may need none either. The `names_to_remove` and `words_to_censor` lists already accept empty arrays.
-
-3. **Validate `content.compliance_check_enabled` per genre.** The compliance checker was tuned for comedy — its prompt needs a genre-aware branch or a per-client `compliance_prompt_override` field in the YAML (another config extension, no new package).
-
-4. **Adjust clip scoring** via `scoring_profile`. Non-comedy genres prioritize informativeness and clarity over energy/humor — the existing `AudioClipScorer` criteria already accept custom weights through the YAML scoring profile.
-
-The `example-client.yaml` already shows the true crime scoring profile pattern. Adapting it for business/interview is authoring work, not engineering work.
-
-**The one code gap:** `ContentEditor` currently reads `Config.VOICE_PERSONA` (a module-level constant) via `VOICE_PERSONA` string in `content_editor.py`. Client YAML `content.voice_persona` must override this at runtime. Verify this override actually flows through `client_config.py` → `Config.VOICE_PERSONA` before building anything new. If the wire is broken, fix it — don't add a new abstraction.
-
-**Confidence:** HIGH — client config system is implemented; existing YAML fields cover the tuning surface. Risk is a missing wire in `ContentEditor`, not missing infrastructure.
+**Test files:** `tests/test_prospect_finder.py`, `tests/test_prospect_tracker.py`, `tests/test_pitch_generator.py`. iTunes API and OpenAI calls mocked; SQLite uses `tmp_path` for real round-trip tests (same pattern as `test_search_index.py`).
 
 ---
 
-### 3. Demo Output Packaging: stdlib `zipfile` + `shutil` + existing `jinja2`
-
-**New package:** None.
-
-**Why no new package:**
-A sales demo package for a prospective client is:
-1. A self-contained HTML summary page (client name, episode processed, key metrics, embedded media)
-2. Sample clips as `.mp4` files
-3. Sample thumbnail as `.png`
-4. Blog post excerpt as `.html` or `.md`
-5. Social captions as `.txt`
-6. Everything in a `.zip` archive named `demo-{client}-{episode}.zip`
-
-All of this is covered by:
-- **`jinja2`** (already in `pyproject.toml`) for generating the HTML summary page — same pattern as `episode_webpage_generator.py`
-- **`shutil.make_archive()`** or **`zipfile.ZipFile`** (Python stdlib) for creating the `.zip` — no external dependency needed
-- **`Pillow`** (already present) for any image resizing/watermarking in the demo package
-
-**Do not use WeasyPrint or pdfkit for PDF generation.** WeasyPrint requires GTK+ (complex Windows install via MSYS2); pdfkit depends on the abandoned wkhtmltopdf binary (archived January 2023). A self-contained HTML file opened in a browser is a better prospect demo than a PDF — it embeds the actual clips and lets the prospect play them. HTML is the right output format.
-
-**Implementation:** New `demo_packager.py` module with a `DemoPackager` class following the existing `self.enabled` pattern. Called as a post-pipeline step, reads from the episode output directory, writes `output/{client}/demo-{episode}.zip`.
-
-**Confidence:** HIGH — stdlib only for zip; jinja2 already in use for webpage generation.
-
----
-
-## Installation (v1.4 diff only)
+## Installation (v1.5 diff)
 
 ```bash
-# Add to pyproject.toml dependencies:
-# "feedparser>=6.0.12",
-
-uv add feedparser
+# No new packages. Verify existing deps are installed:
+uv sync
 ```
-
-No other new packages. `requests`, `tqdm`, `jinja2`, `zipfile` (stdlib), `shutil` (stdlib) are all already present.
-
----
-
-## Alternatives Considered
-
-| Recommended | Alternative | Why Not |
-|-------------|-------------|---------|
-| `feedparser>=6.0.12` | `podcastparser>=0.6.11` | podcastparser is lighter but has fewer namespace extensions and a more limited API; feedparser handles all RSS/Atom variants and iTunes tags in one library |
-| `feedparser>=6.0.12` | Manual `xml.etree.ElementTree` parsing | RSS 2.0 feeds have numerous namespace variations (iTunes, Google, Podcastindex 2.0); feedparser normalizes all of them — hand-rolling this is weeks of edge-case work |
-| `requests` streaming (existing) | `httpx` (async) | No async in the pipeline; requests is already present and sufficient for single-file sequential downloads |
-| YAML config extension for genre tuning | New `GenreAdapter` class or plugin registry | PROJECT.md explicitly rules out "plugin registry / dynamic step discovery"; YAML configs already provide the tuning surface |
-| `jinja2` + stdlib `zipfile` for demo | `WeasyPrint` for PDF | WeasyPrint requires GTK+ on Windows (MSYS2 install) — fragile setup on the project's Windows 11 environment; HTML is a better demo format for media-rich content |
-| `jinja2` + stdlib `zipfile` for demo | `pdfkit` / wkhtmltopdf | wkhtmltopdf was archived January 2023 — frozen CSS support, no active maintenance |
-| `jinja2` + stdlib `zipfile` for demo | `report-creator` / `HTMLArk` | Adds a new dependency for functionality already covered by existing jinja2 patterns in the codebase |
 
 ---
 
 ## What NOT to Add
 
 | Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| `WeasyPrint` | Complex Windows install (GTK+ via MSYS2); no JavaScript support | `jinja2` → self-contained HTML with embedded base64 media |
-| `pdfkit` / `wkhtmltopdf` | Archived Jan 2023; frozen WebKit CSS support | `jinja2` HTML output |
-| `podcast-downloader` (PyPI package) | Full CLI tool, not a library — not importable as a module in the pipeline | `feedparser` + `requests` streaming (5 lines of code) |
-| `httpx` | Async HTTP client — pipeline is synchronous; adds unnecessary complexity | `requests` streaming (already present) |
-| `python-dateutil` / `pendulum` | Overkill for episode date parsing from RSS `published_parsed` | feedparser already normalizes dates to `time.struct_time`; `datetime.fromtimestamp()` converts it |
-| Any new LLM/AI library | Genre tuning is prompt authoring, not model switching | Edit YAML client configs and `voice_persona` fields |
+|---|---|---|
+| `python-podcastindex` | Requires HMAC auth setup; iTunes API covers same corpus for 3-5 prospects | `requests` to iTunes Search API |
+| `podsearch` (nalgeon) | Archived February 2026 — dead library | Direct `requests` call (10 lines) |
+| `smtplib` / `sendgrid` / `mailchimp` | v1.5 generates copy only; sending is intentionally manual to allow review before sending | Copy written to stdout/file |
+| `pandas` or `sqlalchemy` | ORM/DataFrame overhead for a 5-row table | stdlib `sqlite3` directly |
+| Rephonic / Podchaser / ListenNotes API | Paid APIs — explicitly out of scope per PROJECT.md constraints | iTunes API + manual review |
+| `scrapy` / `playwright` | Web scraping is not needed; iTunes API returns RSS URLs directly | `feedparser` on the RSS URL |
+| `aiohttp` | No async needed; pipeline is sequential | `requests` (already present) |
 
 ---
 
-## Integration Points with Existing Code
+## Alternatives Considered
 
-| New Component | Integrates With | What Changes |
-|--------------|----------------|--------------|
-| `feedparser` (new dep) | `rss_downloader.py` (new module) | Added to `pyproject.toml` |
-| `rss_downloader.py` (new) | `pipeline/steps/ingest.py` | Ingest step checks `client_config.source.type == "rss"` and calls `RSSDownloader` instead of `DropboxHandler` |
-| `client_config.py` | `_YAML_TO_CONFIG` mapping | Add `source.type`, `source.rss_feed_url`, `source.episode_index` key mappings |
-| `demo_packager.py` (new) | `pipeline/steps/distribute.py` | Called after blog/webpage steps; reads existing episode output files; no pipeline state changes |
-| `clients/{genre}.yaml` | `client_config.py` (existing) | New config files — no code changes |
-
----
-
-## Version Compatibility
-
-| Package | Version | Python Requirement | Notes |
-|---------|---------|-------------------|-------|
-| feedparser | >=6.0.12 | Python >=3.6 | No conflicts with existing deps; pure Python |
-| requests | >=2.31.0 (existing) | Python >=3.7 | Already pinned; streaming download is stable API |
-| tqdm | >=4.66.1 (existing) | Python >=3.7 | Already pinned; used in dropbox_handler.py |
-| jinja2 | >=3.0.0 (existing) | Python >=3.7 | Already pinned; used in episode_webpage_generator.py |
-| zipfile | stdlib | Python 3.x | No install needed |
-| shutil | stdlib | Python 3.x | No install needed |
+| Category | Recommended | Alternative | Why Not |
+|---|---|---|---|
+| Podcast discovery | `requests` to iTunes Search API | `python-podcastindex` | Requires auth setup; iTunes covers same catalog; overkill for 3-5 prospects |
+| Contact extraction | `feedparser` fields + regex | Scraping Apple Podcasts show page | RSS feed has the same data without scraping; feedparser already in stack |
+| Outreach copy | GPT-4o via `openai` | Pure Jinja2 templates | Templates produce recognizable form emails; GPT-4o generates episode-specific hooks |
+| Outreach copy | GPT-4o via `openai` | Ollama/Llama3 locally | Quality gap matters for persuasive writing; cost is ~$0.02/pitch |
+| Contact tracking | stdlib `sqlite3` | YAML file | Status mutations and log appends are relational; SQLite is the right tool |
+| Contact tracking | stdlib `sqlite3` | Django-CRM / creme-crm | Heavyweight frameworks for a 5-row table |
 
 ---
 
 ## Sources
 
-- [feedparser 6.0.12 on PyPI](https://pypi.org/project/feedparser/) — version 6.0.12, released September 10, 2025 confirmed
-- [feedparser official docs](https://feedparser.readthedocs.io/en/latest/introduction/) — iTunes tags and enclosure parsing confirmed
-- [podcastparser 0.6.11 on PyPI](https://pypi.org/project/podcastparser/) — version and scope confirmed for alternative comparison
-- [Python zipfile stdlib docs](https://docs.python.org/3/library/zipfile.html) — packaging approach confirmed
-- [Python shutil stdlib docs](https://docs.python.org/3/library/shutil.html) — `make_archive()` confirmed
-- [WeasyPrint Windows issues](https://github.com/Kozea/WeasyPrint/issues/1464) — GTK+/MSYS2 complexity on Windows 11 confirmed; rejected
-- [wkhtmltopdf archived](https://github.com/wkhtmltopdf/wkhtmltopdf) — archived January 2023, confirmed abandoned
-- [requests streaming download pattern](https://docs.python-requests.org/en/latest/user/advanced/#streaming-uploads) — `stream=True` + `iter_content()` confirmed
+- [iTunes Search API Official Docs](https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/iTuneSearchAPI/index.html) — no auth required, 200 limit, genreId parameter confirmed (HIGH confidence)
+- [iTunes Search API Examples](https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/iTuneSearchAPI/SearchExamples.html) — parameter structure confirmed (HIGH confidence)
+- [iTunes genre IDs community reference](https://publicapis.io/i-tunes-search-api) — genreId values for Comedy (1303), True Crime (1488), Business (1321) confirmed by multiple community sources (MEDIUM confidence — not in official Apple docs)
+- [python-podcastindex 1.15.0 on PyPI](https://pypi.org/project/python-podcastindex/) — version and maintenance status confirmed (HIGH confidence), deferred
+- [Podcast Index API](https://podcastindex.org/) — free, HMAC auth required, confirmed (HIGH confidence), deferred
+- [podsearch-py archived Feb 2026](https://github.com/nalgeon/podsearch-py) — confirmed abandoned, do not use (HIGH confidence)
+- [feedparser RSS iTunes namespace docs](https://feedparser.readthedocs.io/en/latest/introduction/) — `author_detail.email` and iTunes tag normalization confirmed (HIGH confidence)
+- [Jinja2 email template patterns](https://frankcorso.dev/email-html-templates-jinja-python.html) — existing dep sufficient for template rendering (HIGH confidence)
+- [EpisodeSearchIndex sqlite3 pattern](../codebase/ARCHITECTURE.md) — confirmed as the project's precedent for sqlite3 CRM-style storage (HIGH confidence)
 
 ---
 
-*Stack research for: v1.4 RSS podcast ingestion, genre tuning, and sales demo packaging*
+*Stack research for: v1.5 prospect discovery, outreach generation, contact tracking*
 *Researched: 2026-03-28*

@@ -1,166 +1,174 @@
 # Project Research Summary
 
-**Project:** Podcast Automation — v1.4 Real-World Testing & Sales Readiness
-**Domain:** Podcast production pipeline — multi-genre client testing and sales demo packaging
+**Project:** Podcast Automation — v1.5 First Paying Client
+**Domain:** Go-to-market for a podcast production automation service
 **Researched:** 2026-03-28
-**Confidence:** HIGH
+**Confidence:** MEDIUM-HIGH
 
 ## Executive Summary
 
-The v1.4 milestone is fundamentally about proving the existing pipeline works with real clients across multiple genres, then packaging that proof into a compelling sales demo. This is not a feature-build milestone — it is a validation and sales-readiness milestone. The core pipeline is fully built (570 tests, 5 shipped phases), but it is deeply comedy-tuned with hardcoded Fake Problems defaults that will corrupt output for any other genre if not explicitly overridden. The primary engineering risk is config leakage: host names, voice persona examples, and podcast name are all embedded in the codebase in ways that silently fall back to Fake Problems values if a client YAML fails to override them.
+This is a go-to-market milestone, not a technical one. The pipeline is fully built and battle-tested across multiple clients. The v1.5 work is about finding the right podcast prospects, processing a demo using their actual content (with consent), generating personalized outreach copy, and tracking the conversion to first paying client. The recommended approach is a linear four-step process: discover and qualify prospects via iTunes Search API → process one episode per prospect as a demo → generate a personalized pitch email/DM → execute outreach manually with lightweight contact tracking.
 
-The recommended approach is a four-phase build: (1) fix config leakage and set up real client YAMLs before processing a single episode, (2) add RSS episode sourcing to unblock non-Dropbox clients, (3) run real genre episodes and fix integration issues as they surface, and (4) package demo output for sales. The single most important technical change is decoupling `DropboxHandler` instantiation from ingest — the current architecture raises `ValueError` for any client without Dropbox credentials, which is every real client targeted for v1.4. Only one new dependency is required (`feedparser>=6.0.12`); everything else is YAML config authoring and targeted code fixes.
+The technical implementation requires zero new packages. Three new modules (`prospect_finder.py`, `pitch_generator.py`, `outreach_tracker.py`) plug into the existing architecture using patterns already in the codebase: `requests` to the iTunes Search API, `feedparser` for RSS contact extraction, the existing `openai` SDK for GPT-4o pitch copy, and `sqlite3` for the contact log. All three follow the project's `self.enabled` convention. `OutreachTracker` mirrors `search_index.py` exactly; `PitchGenerator` mirrors `content_editor.py` exactly.
 
-The competitive positioning is strong: the pipeline does more than Swell AI, Castmagic, or Descript in a single command at near-zero ongoing cost (~$1-3 in OpenAI tokens per episode vs. $29-200/episode alternatives). The demo must lead with output quality and cost, not the command-line interface. The before/after audio comparison (raw vs. normalized + censored) is the single most persuasive artifact for a 30-minute sales conversation. Demo quality is entirely dependent on persona quality — authoring genre-appropriate `voice_persona` YAML content before running any episode is the highest-leverage preparation step.
+The highest-leverage risk in this milestone is non-technical: processing a prospect's episode without their explicit consent. Running someone's audio through transcription, AI analysis, and clip generation for a commercial pitch — even from a public RSS feed — creates copyright and GDPR exposure, and risks reputational damage in a tightly connected community. The mitigation is a consent-first workflow: contact the prospect first, ask to run their episode as a free demo, then process only after they agree. This converts a legal risk into a warm lead. Pricing should be anchored to delivered value ($300–600/episode entry), not pipeline cost ($1–3/episode), to avoid commoditizing the service.
+
+---
 
 ## Key Findings
 
 ### Recommended Stack
 
-The v1.4 stack requires only one new package addition. `feedparser>=6.0.12` handles all RSS/Atom feed variants plus iTunes extension tags (`itunes:episode`, `itunes:duration`, enclosure URLs) in a single library. Audio download reuses the existing `requests` streaming pattern already used in `dropbox_handler.py`. Demo packaging uses stdlib `zipfile`/`shutil` plus the existing `jinja2` dependency already in `pyproject.toml`. No PDF libraries — WeasyPrint requires GTK+/MSYS2 on Windows; wkhtmltopdf was archived in January 2023. Self-contained HTML is the correct demo format for media-rich content that embeds actual clips.
+All three new capability areas build entirely on existing dependencies. No new packages are needed. The iTunes Search API requires no auth and is covered by a direct `requests.get()` call; the archived `podsearch` library and `python-podcastindex` (requires HMAC auth) are both deferred. The outreach contact tracker uses `sqlite3` following the exact pattern of `search_index.py`. GPT-4o via the existing `openai` SDK is the right choice for pitch copy over local Ollama — the quality gap matters for persuasive writing, and cost is approximately $0.01–0.02 per pitch.
 
 **Core technologies:**
-- `feedparser>=6.0.12` (new): RSS/Atom feed parsing including iTunes tags — only new dependency needed; confirmed on PyPI September 2025
-- `requests>=2.31.0` (existing): streaming audio download with progress bar, reuses `dropbox_handler.py` pattern with `tqdm`
-- `jinja2>=3.0.0` (existing): demo HTML summary page generation, same pattern as `episode_webpage_generator.py`
-- `zipfile` / `shutil` (stdlib): demo package archive creation — no external dependency
-- No new AI/LLM packages: genre tuning is YAML config authoring and prompt engineering, not model switching
+- `requests` (existing): iTunes Search API calls — free, no auth, 200 results per call
+- `feedparser` (existing since v1.4): RSS contact extraction from `itunes:email` / `managingEditor` fields
+- `openai` SDK (existing): GPT-4o at temperature 0.7 for personalized pitch email and DM copy
+- `sqlite3` (stdlib): Outreach contact log — two tables (prospects, contacts), no ORM
+- `jinja2` (existing): Structural templates for pitch formatting, wrapping GPT-4o output
 
 ### Expected Features
 
-The pipeline already produces every deliverable a prospect expects (clips, show notes, thumbnails, social captions, chapters, RSS). The gap is packaging and narrative — prospects cannot evaluate what they cannot understand. The before/after audio comparison is both a demo table stake and the one feature requiring a pipeline change (the pipeline does not currently snapshot raw audio before Step 4 censor).
+**Must have (table stakes — no client without these):**
+- Prospect list (3-5 qualified shows) — research task, not code
+- Prospect qualification criteria checklist — ICP definition before any demo investment
+- RSS contact extraction — `itunes:email` from feedparser; approximately 15 lines of code
+- Demo run per prospect — existing pipeline + `package-demo`; requires consent before processing
+- Personalized pitch email per prospect — references specific episode, LUFS delta, clip count, show note excerpt
+- Contact tracker — CSV or SQLite, updated after each interaction
 
-**Must have (table stakes for demo):**
-- Before/after audio comparison (raw vs. processed 60-sec segment) — fastest trust-builder; requires pre-censor snapshot addition to pipeline
-- Organized demo folder per client with all deliverables — processed MP3, 2-3 captioned clips, show notes, thumbnail, social captions, chapter list, compliance report
-- Genre-appropriate voice persona in AI output — wrong tone destroys the demo before quality is assessed
-- `DEMO.md` per client explaining what was automated, estimated time saved, cost per episode, LUFS metrics — makes artifacts interpretable to a non-technical prospect
+**Should have (differentiators that increase conversion):**
+- Demo built from prospect's own episode (with consent) — eliminates imagination from prospect's evaluation; most persuasive artifact
+- `gen-pitch` CLI command — reads `_analysis.json` + `DEMO.md`, outputs `PITCH.md` to demo folder
+- Before/after audio segment — already in `demo_packager.py`; verify working per-client before outreach
+- Genre-matched voice persona in YAML before demo run — prevents off-brand output that kills deals
+- Estimated time-saved table and cost-per-episode breakdown — already in `DEMO.md` template; verify accuracy
 
-**Should have (competitive differentiators to surface):**
-- Clip energy scores and selection rationale in demo — shows clips chosen by scoring model, not randomly
-- Compliance report in demo package — no SaaS tool offers this; critical differentiator for brand podcasts
-- LUFS before/after in demo README — demonstrates professional broadcast-standard audio mastering (Spotify requires -14 LUFS)
-- Cost per episode estimate (~$1-3 OpenAI tokens) — primary moat vs. $29-200/episode alternatives
-
-**Defer (post-demo validation or v2+):**
-- White-label output for agency resale
-- Client Dropbox folder handoff automation (useful at 3+ active clients)
-- Demo video walkthrough for async cold outreach (defer until live demo is validated)
-- Dynamic ad insertion (requires CDN, IAB DAAST compliance — architecturally incompatible with zero-cost model)
-- Filler word removal (kills comedy timing; degrades interview cadence; high false-positive rate — off by default per project feedback)
+**Defer until after first client signs:**
+- Automated prospect scraping — not justified until pitch is validated at scale (20+ prospects)
+- Full CRM (HubSpot, Pipedrive, Airtable) — overkill until 3+ active clients
+- Automated email sending / sequences — spam risk at a domain with no sending history
+- Proposal generation tool — write manually after first interested reply
+- Inbound SEO / content marketing — post-v1.5 concern entirely
 
 ### Architecture Approach
 
-The v1.4 additions layer cleanly onto the existing pipeline without touching core logic. Three new/modified patterns drive everything: (1) `Config.EPISODE_SOURCE` flag gates whether ingest calls `RSSEpisodeFetcher` or `DropboxHandler`, fixing the critical blocker where `DropboxHandler.__init__()` raises `ValueError` for clients without Dropbox credentials; (2) `Config.PODCAST_GENRE` injects genre context into the GPT-4o prompt as additive soft guidance alongside the existing `VOICE_PERSONA` field — no ContentEditor subclassing needed; (3) `DemoPackager` is a read-only view of existing pipeline output, never re-generating content, isolating demo packaging failure from pipeline risk.
+Three new standalone modules added to the flat module structure. Zero pipeline changes. All surface as new CLI commands in `main.py`'s existing `_handle_client_command()` dispatch table. Prospect identity is canonical in `clients/<slug>.yaml` (a `prospect:` block ignored by `activate_client()`); the SQLite database tracks events, not identity. Demo output from the existing `demo_packager.py` is the direct input to `pitch_generator.py` — no new pipeline steps or modifications to any existing pipeline component.
 
 **Major components:**
-1. `rss_episode_fetcher.py` (new) — fetches feed metadata and downloads audio enclosure; peer to `dropbox_handler.py` in the `components` dict; conditionally constructed in `runner.py` based on `Config.EPISODE_SOURCE`
-2. `demo_packager.py` (new) — reads `output/<client>/ep_N/` artifacts, assembles `demo/<client>/ep_N/` with summary HTML, clips copy, captions.txt, README.md; invoked via `main.py package-demo` command
-3. `pipeline/steps/ingest.py` (modified) — branches on `Config.EPISODE_SOURCE`; moves `DropboxHandler` construction inside the `dropbox` branch only, eliminating the unconditional `ValueError` for non-Dropbox clients
-4. `pipeline/steps/analysis.py` (modified) — reads `Config.PODCAST_GENRE` and `Config.COMPLIANCE_ENABLED`; injects genre context into `ContentEditor.analyze_content()` call
-5. `client_config.py` / `config.py` (modified) — four new Config fields: `EPISODE_SOURCE`, `RSS_FEED_URL`, `PODCAST_GENRE`, `COMPLIANCE_ENABLED`; all additive with env-var defaults
+1. `prospect_finder.py` (ProspectFinder) — iTunes Search API query + feedparser RSS enrichment + YAML `prospect:` block write; registers prospect in outreach DB via `OutreachTracker`
+2. `pitch_generator.py` (PitchGenerator) — reads `demo/<client>/<ep>/DEMO.md` + `*_analysis.json` + client YAML; GPT-4o generates subject, email, and DM; writes `PITCH.md` to demo folder
+3. `outreach_tracker.py` (OutreachTracker) — SQLite CRM at `output/outreach.db`; two tables (prospects + contacts); CRUD + status lifecycle (`identified → demo_processed → contacted → replied → call_scheduled → client | declined`)
 
 ### Critical Pitfalls
 
-1. **`DropboxHandler` unconditionally constructed in `runner.py`** — raises `ValueError` for every real client without Dropbox credentials; blocks the entire pipeline before ingest starts. Fix: gate `DropboxHandler` construction behind `EPISODE_SOURCE == "dropbox"` check in `_init_components()`. This is the highest-priority architectural fix for v1.4.
+1. **Processing a prospect's episode without consent** — Creates copyright and GDPR exposure even for public RSS content; risks reputational damage in a small, interconnected community. Prevention: contact the prospect first, ask permission, process only after yes. Use Fake Problems as a fallback demo artifact if consent workflow is not yet established.
 
-2. **`Config.NAMES_TO_REMOVE` falls back to Fake Problems host names** — silently censors any client episode featuring a guest named "Evan", "Joey", or mentions of "Gross" as a word. Fix: require `names_to_remove` as an explicit field in every client YAML; treat absence as a `validate-client` error, not a silent fallback to comedy defaults.
+2. **Wrong voice persona in demo output** — Fake Problems comedy framing applied to a true crime or B2B show produces output the prospect immediately dismisses as a mismatch. Prevention: listen to the show, write a genre-specific `voice_persona` in the client YAML before running the pipeline; manually review all AI-generated output before packaging the demo.
 
-3. **Hardcoded Fake Problems voice examples in `_build_analysis_prompt()`** — the BAD/GOOD example block (lobster immortality, etc.) is a string literal that fires for every client regardless of `voice_persona` setting. Corrupts show notes, chapter titles, and social captions for non-comedy genres even when `voice_persona` is correctly configured. Fix: make the example block conditional on client type; omit or replace for non-comedy clients.
+3. **Targeting the wrong prospect size or stage** — Shows too large have production teams; shows too small have no budget. Prevention: filter for 1K–20K estimated monthly downloads, monetization signals (Patreon, sponsors), active release cadence, and visible production pain (no clips, no transcripts, sporadic schedule). Apply the ICP checklist before investing any demo processing time.
 
-4. **Whisper `base` model degrades on real-world audio** — comedy studio WAV files at ~700MB are not representative of client audio quality. Phone recordings, compressed MP3s, and non-native speakers can drop word accuracy from ~95% to 70-80%, cascading into broken censor timestamps and bad clip selection. Fix: add `whisper_model` to client YAML; default to `small` for unknown audio quality; spot-check transcript JSON before proceeding past Step 2.
+4. **Pricing from cost, not value** — Pipeline costs $1–3/episode in API tokens. Pricing at $50–75/episode signals a hobbyist tool and attracts price-sensitive churners. Prevention: anchor price to delivered value ($300–600/episode entry; move to monthly retainers quickly). Market rate for full-service podcast production is $500–2,000/episode or $1,500–5,000/month retainer.
 
-5. **Episode number parsing assumes `ep25` filename convention** — date-based (`2024-03-15-title.mp3`), slug-based, or `S01E03` filenames resolve `episode_number` to `None`, causing checkpoint key collisions and analytics overwrites. Fix: verify with `--dry-run` before first live run per client; pre-rename files to `ep01_original-name.ext` convention if needed.
+5. **Pitching the technology instead of the outcome** — "I built a Python pipeline with Whisper and GPT-4o" produces no emotional response from a podcast host. Prevention: lead with the prospect's production pain and the specific output produced from their episode. The demo is evidence, not the pitch itself.
+
+---
 
 ## Implications for Roadmap
 
-Based on research, suggested phase structure:
+The ARCHITECTURE.md research defines a clear build order based on data dependencies. Each phase is independently testable before the next begins.
 
-### Phase 1: Client Configuration & Config Hardening
-**Rationale:** Config leakage (host names, voice persona, podcast name) is a prerequisite failure mode that corrupts every downstream step. Must be resolved before processing a single real episode. Real client YAML configs and explicit `validate-client` checks must exist before anything else.
-**Delivers:** 2-3 real genre client YAMLs (true crime, business/interview, one more) with correct `voice_persona`, `names_to_remove`, `words_to_censor`, `whisper_model`; enhanced `validate-client` that flags missing content fields and verifies `Config.PODCAST_NAME` matches YAML after activation; `--dry-run` prints active Config values for audit before any live run
-**Addresses:** Genre-appropriate tone (demo table stake); DEMO.md persona accuracy
-**Avoids:** Pitfalls — NAMES_TO_REMOVE leakage (Pitfall 1), voice persona corruption (Pitfall 2), podcast name leakage (Pitfall 7), episode number parse failure (Pitfall 6)
+### Phase 1: OutreachTracker (Contact Log)
 
-### Phase 2: RSS Episode Source (Ingest Decoupling)
-**Rationale:** Every real client target for v1.4 uses RSS, not Dropbox. The `DropboxHandler` construction blocker must be resolved before any real episode can be processed. This is the single architectural change that unblocks all client testing.
-**Delivers:** `rss_episode_fetcher.py` with `feedparser`; `EpisodeMeta` dataclass; conditional component construction in `runner.py`; branched `pipeline/steps/ingest.py`; new Config fields (`EPISODE_SOURCE`, `RSS_FEED_URL`, `PODCAST_GENRE`, `COMPLIANCE_ENABLED`, `CENSOR_ENABLED`); `_YAML_TO_CONFIG` mapping extensions; `tests/test_rss_episode_fetcher.py`
-**Uses:** `feedparser>=6.0.12` (new dep, `uv add feedparser`); existing `requests` streaming + `tqdm` progress bar pattern
-**Implements:** Episode Source Abstraction via Config Flag (Architecture Pattern 1); Conditional Component Initialization in `runner.py` (Architecture Pattern 4)
-**Avoids:** Pitfall — unconditional `DropboxHandler` construction blocking non-Dropbox clients (Pitfall — critical architectural blocker)
+**Rationale:** No external dependencies, no API keys, no file dependencies. Establishes the data store that ProspectFinder writes to, so it must exist first. Verifiable immediately with real SQLite + `tmp_path` tests. Building this first also forces the contact-tracking discipline before any outreach begins.
+**Delivers:** `outreach_tracker.py`, `tests/test_outreach_tracker.py`, CLI subcommands `outreach log / list / update` in `main.py`
+**Addresses:** Contact tracking feature; prevents duplicate outreach and lost warm leads (Pitfall 9 in PITFALLS.md)
+**Avoids:** No-tracking scenario that allows aggressive follow-up damage and missed replies
 
-### Phase 3: Integration Testing & Genre-Aware Pipeline Fixes
-**Rationale:** Processing real episodes will surface genre-specific failures that cannot be predicted without running real audio. Voice examples leaking, energy scoring wrong for interview format, and compliance thresholds miscalibrated are data-driven discoveries. This phase is empirical.
-**Delivers:** Fixed `_build_analysis_prompt()` voice examples block (conditional on client type); genre context injection in `analysis.py`; `COMPLIANCE_ENABLED` flag respected in audio step; `CENSOR_ENABLED` flag; `clip_selection_mode` YAML field for energy vs. content-weighted clip selection; processed first real episode per genre with quality validation; manual transcript spot-check gate documented
-**Addresses:** Differentiators — energy-scored clip selection calibrated per genre; compliance report; genre-appropriate AI output tone
-**Avoids:** Pitfalls — energy scoring wrong for flat-energy interview podcast (Pitfall 3), compliance calibration wrong for genre (Pitfall 4), Whisper model too weak for client audio (Pitfall 5)
+### Phase 2: ProspectFinder (Discovery + Qualification)
 
-### Phase 4: Demo Packaging & Sales Readiness
-**Rationale:** Once real episodes produce quality output across genres, package the output as a persuasive sales leave-behind. Phase 4 depends on Phase 3 producing good artifacts — a demo package of bad output is worse than no demo. Before/after audio snapshot requires a pipeline change independent of the demo packaging module.
-**Delivers:** `demo_packager.py` with `DemoPackager` class; `package-demo` CLI command in `main.py`; `demo/<client>/ep_N/` structure with self-contained summary HTML (base64 thumbnail), clips copy, thumbnail, captions.txt, blog_post.html, README.md; `DEMO.md` per client with automation narrative, time saved estimate, LUFS metrics, clip scores, cost per episode; before/after audio snapshot (pipeline change to capture raw 60-sec segment before Step 4 censor); `tests/test_demo_packager.py`
-**Uses:** `jinja2` (existing) for summary HTML generation; stdlib `zipfile`/`shutil` for archive
-**Implements:** Demo Package as Read-Only View of Existing Output (Architecture Pattern 3)
-**Avoids:** Pitfall — demo output not reviewed before presenting (UX pitfall — manual review gate before packaging)
+**Rationale:** Depends on Phase 1 for persistence. iTunes API requires no auth — no setup friction, runnable immediately. RSS contact extraction uses existing `feedparser`. This is the entry point to the entire outreach funnel; nothing else can start without a qualified prospect list.
+**Delivers:** `prospect_finder.py`, `tests/test_prospect_finder.py`, CLI commands `find-prospects` and `add-prospect` in `main.py`; `prospect:` block written to client YAML for each selected prospect
+**Uses:** `requests` (iTunes Search API), `feedparser` (RSS enrichment), `OutreachTracker` (persistence)
+**Avoids:** Pitfall 2 (wrong target size) via qualification criteria applied during prospect review before any demo investment
+
+### Phase 3: PitchGenerator (Outreach Copy)
+
+**Rationale:** Depends on Phase 2 for prospect YAMLs and depends on an existing demo run having produced output. GPT-4o integration mirrors `content_editor.py` exactly. `PitchGenerator` reads only local files — no live API calls during pitch generation (RSS data cached in YAML from Phase 2).
+**Delivers:** `pitch_generator.py`, `tests/test_pitch_generator.py`, CLI command `gen-pitch <slug> <ep_id>` in `main.py`, `PITCH.md` written to demo folder per prospect
+**Uses:** `openai` SDK (GPT-4o at temperature 0.7), existing `demo_packager.py` output, client YAML `prospect:` block
+**Avoids:** Pitfall 5 (template-blast generic email), Pitfall 7 (pitching the tech), Pitfall 8 (pitch with no show-specific content)
+
+### Phase 4: Manual End-to-End Validation (Outreach Execution)
+
+**Rationale:** This is the actual sales work. Code is done after Phase 3. Find 3-5 real prospects, get consent, run demos, generate pitches, send manually, log in tracker. Validates messaging quality and ICP definition before any further optimization.
+**Delivers:** First client conversation (and ideally, first paying client); validated pitch messaging; contact log with real data
+**Avoids:** Pitfall 1 (consent-first workflow enforced before any processing), Pitfall 3 (value-based pricing introduced before any price is named), Pitfall 4 (voice persona review before demo packaging), Pitfall 6 (accurate expectation framing — "you review and approve" not "fully automated")
+**Note:** No code deliverables in this phase. It is operational execution.
 
 ### Phase Ordering Rationale
 
-- Phase 1 before everything: No point downloading a real episode if Config output will contain Fake Problems host names in the censorship pass. YAML configs must be correct before any real audio is processed.
-- Phase 2 before Phase 3: Cannot process real RSS episodes without the ingest decoupling. The `DropboxHandler` blocker is a hard prerequisite.
-- Phase 3 before Phase 4: Demo packaging of poor-quality output is counterproductive. Quality must be validated per genre before assembling a sales artifact.
-- Phases 1 and 2 have no code dependency between them and can be developed in parallel. Phase 1 YAML authoring should complete first so Phase 3 test runs have correct configs from the start — the two are sequentially ordered by workflow, not by code.
+- **Data store first:** `OutreachTracker` must exist before `ProspectFinder` can persist discoveries. Starting here also validates the SQLite pattern in isolation before it has dependents.
+- **Discovery before generation:** `PitchGenerator` reads prospect YAML written by `ProspectFinder`. That YAML data must exist before pitch generation can run end-to-end.
+- **Demo pipeline is untouched:** The existing `package-demo` command produces the input `PitchGenerator` reads. No pipeline changes means no regression risk to the existing 570-test suite.
+- **Consent workflow reinforced by ordering:** A natural slug-to-YAML-to-demo flow requires the prospect to be registered in the tracker before demo processing begins, which creates a process-level checkpoint against the "process first, ask later" mistake.
 
 ### Research Flags
 
-Phases likely needing deeper research during planning:
-- **Phase 3:** Genre-specific clip quality is empirical — can only be validated by running real audio. The `voice_persona` prompt content for true crime and business genres needs iteration based on actual output review. No pre-research can substitute for running a real episode and reading the show notes output.
-- **Phase 3:** Compliance calibration per genre requires manual review of first-run output. The right thresholds for true crime vs. business vs. comedy cannot be theorized — they must be observed and adjusted based on what the compliance checker actually produces.
+Phases with well-documented patterns (skip deeper research):
+- **Phase 1 (OutreachTracker):** Direct copy of `search_index.py` SQLite pattern. No research needed.
+- **Phase 3 (PitchGenerator):** Direct copy of `content_editor.py` GPT-4o integration pattern. No research needed.
 
-Phases with standard patterns (skip research):
-- **Phase 1:** YAML authoring and `validate-client` enhancement follow established patterns; no research needed
-- **Phase 2:** `feedparser` is well-documented; conditional component construction extends the existing try/except pattern in `runner.py`; `feedparser.readthedocs.io` has confirmed enclosure and iTunes tag support
-- **Phase 4:** `DemoPackager` follows the same read-only-copy pattern as other post-pipeline tools; `jinja2` template generation is established in the codebase (`episode_webpage_generator.py`)
+Phases that benefit from spot validation:
+- **Phase 2 (ProspectFinder):** iTunes genre IDs are documented in community sources but not in official Apple docs. Validate `genreId` values (Comedy=1303, True Crime=1488, Business=1321) with a live test call before committing them to the implementation.
+- **Phase 4 (Outreach Execution):** Pitch messaging quality is empirical. Build in a review loop after the first 1-2 pitches are sent — iterate the `gen-pitch` GPT-4o prompt if output is generic or off-tone.
+
+---
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Only one new library (`feedparser>=6.0.12`); version confirmed on PyPI September 2025; all other technologies are existing deps or stdlib |
-| Features | MEDIUM | Industry competitor feature comparison from MEDIUM-confidence sources; table stakes list is well-grounded. Demo format and persuasion angle recommendations are reasoned inference, not field-tested |
-| Architecture | HIGH | Based on direct code inspection of all relevant modules with line-number citations. The DropboxHandler blocker is confirmed code-level issue. All 4 architectural patterns are grounded in existing codebase patterns |
-| Pitfalls | HIGH | All 7 critical pitfalls confirmed via direct codebase analysis with specific line numbers in `content_editor.py`, `config.py`, `client_config.py`. Not hypothetical — these are actual hardcoded values that produce incorrect output for non-comedy clients |
+| Stack | HIGH | Zero new packages; all technologies already integrated; patterns verified by direct codebase inspection |
+| Features | MEDIUM | Feature list is well-grounded; pricing guidance conflicts between FEATURES.md ($75-150/ep) and PITFALLS.md ($300-600/ep) — use PITFALLS.md value-anchored range |
+| Architecture | HIGH | All integration points verified via direct inspection of `main.py`, `search_index.py`, `content_editor.py`, `demo_packager.py`, `client_config.py` |
+| Pitfalls | MEDIUM-HIGH | Sales/outreach pitfalls from practitioner sources; legal section explicitly not legal advice; consent risk is HIGH confidence and the most critical finding |
 
-**Overall confidence:** HIGH
+**Overall confidence:** HIGH for technical implementation; MEDIUM for go-to-market execution (empirical, will need iteration based on real prospect responses)
 
 ### Gaps to Address
 
-- **Before/after audio snapshot implementation:** The exact extraction approach (which timestamp, how to expose a raw segment to `DemoPackager`) needs design during Phase 4 planning. The pipeline currently normalizes in-place and does not expose a pre-censor copy path. Requires targeted change to `pipeline/steps/audio.py`.
-- **Genre-tuned clip scoring:** The `clip_selection_mode` YAML field (energy vs. content vs. balanced) is specified in architecture research but the `AudioClipScorer` modification to respect this flag is not detailed. Phase 3 may need to address how to suppress or weight the energy candidates block for flat-energy interview audio.
-- **Compliance `compliance_style` field:** PITFALLS.md recommends a `permissive`/`standard`/`strict` flag but this is not mapped to a concrete `ContentComplianceChecker` prompt change. Needs design during Phase 3 once first-run compliance output is reviewed per genre.
-- **RSS `episode_index` boundary behavior:** The `episode_index` field (0 = latest, 1 = second-most-recent) behavior when the feed has fewer entries than expected needs explicit error handling in `RSSEpisodeFetcher` to avoid silent `IndexError` failures.
+- **Genre ID verification:** iTunes `genreId` values (Comedy=1303, True Crime=1488, Business=1321) confirmed from community sources, not official Apple docs. Run a test query per genre before committing these constants to the implementation.
+- **Pricing disconnect:** FEATURES.md suggests $75–150/episode entry pricing (below market, to reduce friction). PITFALLS.md recommends $300–600/episode (value-anchored, prevents commoditization). Resolve before outreach execution — recommend PITFALLS.md guidance. Under-pricing signals hobbyist tool and attracts churners.
+- **Consent workflow formalization:** PITFALLS.md identifies consent as the highest-risk issue but there is no code-level enforcement mechanism. This is a process gap to address in Phase 4 operational documentation — a pre-processing checklist step before any `uv run main.py --client <prospect>` command is issued.
+- **Follow-up cadence reminders:** FEATURES.md defines a 3-touch follow-up cadence (Day 4, Day 10, Day 20). The contact tracker stores dates but nothing reminds the operator of next actions. For 3-5 prospects, calendar reminders are sufficient; flag for a future automation phase if prospect volume grows.
+
+---
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct codebase analysis — `pipeline/steps/ingest.py`, `pipeline/runner.py`, `client_config.py`, `dropbox_handler.py`, `config.py`, `content_editor.py` (lines 263–285, 287), `audio_clip_scorer.py`, `clients/example-client.yaml`
-- [feedparser 6.0.12 on PyPI](https://pypi.org/project/feedparser/) — version confirmed, released September 10, 2025
-- [feedparser official docs](https://feedparser.readthedocs.io/en/latest/introduction/) — enclosure and iTunes extension parsing confirmed
-- [Python zipfile stdlib](https://docs.python.org/3/library/zipfile.html) — packaging approach confirmed
-- [Python shutil stdlib](https://docs.python.org/3/library/shutil.html) — `make_archive()` confirmed
+- Direct codebase inspection: `main.py`, `search_index.py`, `content_editor.py`, `demo_packager.py`, `client_config.py`, `rss_episode_fetcher.py`, `pipeline/context.py` — integration pattern verification
+- [iTunes Search API Official Docs](https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/iTuneSearchAPI/index.html) — endpoint, parameters, no-auth requirement confirmed
+- [iTunes Search API Examples](https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/iTuneSearchAPI/SearchExamples.html) — parameter structure confirmed
+- feedparser project dependency (`rss_episode_fetcher.py`) — `author_detail.email`, `itunes_email`, `feed.entries` fields confirmed
 
 ### Secondary (MEDIUM confidence)
-- [Professional Podcast Production Services — PropodcastSolutions](https://propodcastsolutions.com/podcast-production-services/) — industry feature expectations
-- [Top 17 Podcast Production Companies 2026 — Content Allies](https://contentallies.com/learn/podcast-production-companies-agencies-services-for-b2b-b2c) — competitor feature analysis
-- [Viral Podcast Clips Guide 2025 — Fame](https://www.fame.so/post/ultimate-podcast-clip-guide) — clip content standards per genre
-- [True Crime Podcast Guide — Jellypod](https://jellypod.ai/blog/perfect-guide-true-crime) — genre-specific content and tone expectations
-- [B2B Podcast Production Checklist — Rise25](https://rise25.com/lead-generation/b2b-podcast-production-checklist/) — business podcast deliverable requirements
-- [Pilot Project Structure — Ankord Media](https://www.ankordmedia.com/blog/bay-area-startups-structure-podcast-agency-pilot-project) — trial episode and demo package structure
-- [Science of Viral Podcast Clips — Listeners to Clients](https://listenerstoclients.com/blog/the-science-of-viral-podcast-clips-a-proven-framework-for-high-impact-content) — clip selection criteria
+- [iTunes genre IDs community reference (publicapis.io)](https://publicapis.io/i-tunes-search-api) — Comedy (1303), True Crime (1488), Business (1321); not in official Apple docs
+- [Listen Notes API Documentation](https://www.listennotes.com/api/docs/) — alternative prospect discovery method, free tier confirmed
+- [podseeker.co RSS contact extraction](https://www.podseeker.co/blog/fastest-way-to-get-podcast-contact-information) — `itunes:owner/itunes:email` reliability confirmed
+- [Podcast Production Pricing 2026 — Rise25](https://rise25.com/lead-generation/podcast-production-pricing/) — market rate ranges ($500-2,000/episode full-service)
+- [Podcast Editing Rates — SasPod](https://saspod.com/blog/podcast-editor-costs-and-rates-freelancers) — freelance rates ($50-200/episode)
+- [Cold outreach best practices — Cleverly](https://www.cleverly.co/blog/cold-email-outreach-best-practices) — pitch structure and follow-up cadence
+- [Google Spam Policy changes — Outbound Republic](https://outboundrepublic.com/blog/what-googles-spam-changes-mean-for-b2b-cold-email-in-2025) — deliverability risk for new domains (enforced November 2025)
+- [GDPR voice data rules — IAPP](https://iapp.org/news/a/how-do-the-rules-on-audio-recording-change-under-the-gdpr) — voice recordings as personal data under GDPR
 
 ### Tertiary (LOW confidence)
-- [WeasyPrint Windows issues](https://github.com/Kozea/WeasyPrint/issues/1464) — GTK+/MSYS2 complexity on Windows 11; used to reject PDF output approach
-- [wkhtmltopdf archived](https://github.com/wkhtmltopdf/wkhtmltopdf) — confirmed abandoned January 2023; used to reject pdfkit approach
-- [AI-Powered Podcast Service for Agencies — 51Blocks](https://51blocks.com/ai-podcasts-for-agencies) — marketing page, directional signal only
+- [WaveApps cold pitch templates](https://www.waveapps.com/freelancing/cold-pitch-templates) — general freelance templates; not podcast-specific; used for structural reference only
+- Podcast listener count estimates (Chartable, Rephonic, Podchaser) — download estimates are imprecise; useful directionally
 
 ---
+
 *Research completed: 2026-03-28*
 *Ready for roadmap: yes*

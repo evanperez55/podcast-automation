@@ -1,453 +1,440 @@
-# Architecture Research
+# Architecture Patterns: Prospect Discovery & Outreach Tooling (v1.5)
 
-**Domain:** Real-world podcast client testing and sales demo packaging — v1.4 integration into existing multi-client pipeline
+**Domain:** Prospect research, outreach template generation, contact tracking
 **Researched:** 2026-03-28
-**Confidence:** HIGH — based on direct code inspection of all relevant modules (ingest.py, client_config.py, dropbox_handler.py, runner.py, pipeline/steps/, config.py)
+**Overall confidence:** HIGH (direct codebase inspection + verified external API knowledge)
 
 ---
 
-## Current Architecture (as-built, post-v1.3)
+## Context: Existing Architecture (post-v1.4)
+
+The pipeline as-built provides all the infrastructure these new features can reuse.
+Nothing below changes any existing processing path.
 
 ```
-main.py (134-line CLI shim)
+main.py (CLI shim, 216 lines)
+    _handle_client_command() — dispatch table for all non-episode commands
     |
-    +-- client_config.py:activate_client()   (applied before runner starts)
+    +-- existing commands: package-demo, process-all, init-client, list-clients,
+    |                      validate-client, status, setup-client
     |
-pipeline/runner.py (orchestrator, component factory)
-    |
-    +---> pipeline/steps/ingest.py      (Step 1: download from Dropbox OR local file)
-    +---> pipeline/steps/analysis.py    (Steps 2-3.5: transcribe, analyze, topics)
-    +---> pipeline/steps/audio.py       (Steps 4-4.5: censor, normalize)
-    +---> pipeline/steps/video.py       (Steps 5-5.6: clips, subtitles, video, thumb)
-    +---> pipeline/steps/distribute.py  (Steps 6-9: MP3, Dropbox, RSS, social, blog, search)
-
-Client configs:
-    clients/<name>.yaml          — per-client overrides applied to Config class
-    clients/<name>/              — per-client credential files (YouTube token, etc.)
-    output/<client>/             — per-client output isolation
-    downloads/<client>/          — per-client download isolation
+pipeline/runner.py → pipeline/steps/ (ingest, analysis, audio, video, distribute)
+client_config.py    — activate_client() applies clients/<name>.yaml → Config
+demo_packager.py    — reads pipeline output → demo/<client>/<ep_id>/
+rss_episode_fetcher.py — feedparser-based RSS fetch (already ships)
+search_index.py     — SQLite FTS5 (establishes raw-SQL, no-ORM pattern)
+analytics.py        — JSON file persistence per episode (simpler pattern)
+config.py + logger.py — cross-cutting, all modules import these
 ```
 
-Critical constraint in ingest.py (line 45):
-```python
-# Even when audio_file is pre-set from local path, ingest still calls:
-dropbox = components["dropbox"]
-episode_number = dropbox.extract_episode_number(audio_file.name)
-```
-This means `DropboxHandler` is **always instantiated** even for local-file processing. This is the primary blocker for clients without Dropbox credentials.
+**Key structural facts:**
+- `clients/<name>.yaml` is the canonical identity record for each client/prospect
+- `demo/<client>/<ep_id>/` is the output of `package-demo` — already contains
+  `DEMO.md`, `summary.html`, `clips/`, `captions.txt`, `show_notes.txt`
+- feedparser is already a dependency (`rss_episode_fetcher.py` uses it)
+- OpenAI GPT-4o is already used (`content_editor.py`, `blog_generator.py`)
+- SQLite is already in the project (`search_index.py` — raw SQL, no ORM)
 
 ---
 
-## System Overview: v1.4 Additions
+## Recommended Architecture
+
+Three new standalone modules. Zero pipeline changes. All surface as new CLI
+commands added to `main.py`'s existing dispatch table.
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                  EPISODE SOURCE LAYER (NEW)                           │
-│                                                                       │
-│  rss_episode_fetcher.py                                               │
-│  ┌─────────────────────────────────────────────────────────────────┐ │
-│  │  RSSEpisodeFetcher                                                │ │
-│  │  - fetch_latest(rss_url) → EpisodeMeta                           │ │
-│  │  - fetch_episode(rss_url, n) → EpisodeMeta                       │ │
-│  │  - download_audio(url, dest_path) → Path                         │ │
-│  │  - extract_episode_number(filename_or_url) → Optional[int]       │ │
-│  │                                                                   │ │
-│  │  EpisodeMeta: title, audio_url, pub_date, description,           │ │
-│  │               episode_number, duration_seconds                    │ │
-│  └─────────────────────────────────────────────────────────────────┘ │
-│                                                                       │
-│  client YAML config (new fields):                                     │
-│    episode_source: "rss" | "dropbox" | "local"  (default: dropbox)   │
-│    rss:                                                               │
-│      feed_url: "https://feeds.example.com/podcast.rss"               │
-├──────────────────────────────────────────────────────────────────────┤
-│                  GENRE-AWARE PIPELINE (MODIFIED)                      │
-│                                                                       │
-│  client YAML config (new fields):                                     │
-│    content:                                                           │
-│      genre: "comedy" | "true-crime" | "business" | "interview"       │
-│      compliance_enabled: true/false                                   │
-│      censor_enabled: true/false                                       │
-│      clip_scoring_mode: "energy" | "topic-match" | "balanced"        │
-│                                                                       │
-│  pipeline/steps/analysis.py (MODIFIED):                              │
-│    reads genre from Config; adjusts compliance and clip-scoring       │
-│    passes genre context into ContentEditor prompt                     │
-├──────────────────────────────────────────────────────────────────────┤
-│                  DEMO PACKAGING LAYER (NEW)                           │
-│                                                                       │
-│  demo_packager.py                                                     │
-│  ┌─────────────────────────────────────────────────────────────────┐ │
-│  │  DemoPackager                                                     │ │
-│  │  - package_demo(client_name, episode_folder) → Path              │ │
-│  │  - generates demo/<client>/<episode>/                            │ │
-│  │      summary.html      — single-page visual summary              │ │
-│  │      clips/            — clip mp4s (already exist in output/)    │ │
-│  │      thumbnails/       — thumbnails (already exist)              │ │
-│  │      captions.txt      — platform captions from analysis.json    │ │
-│  │      blog_post.html    — blog post (already exists)              │ │
-│  │      README.md         — what client receives and how to use it  │ │
-│  └─────────────────────────────────────────────────────────────────┘ │
-│                                                                       │
-│  CLI: python main.py package-demo <client> [ep_N]                    │
-├──────────────────────────────────────────────────────────────────────┤
-│                  EXISTING PIPELINE (post-v1.3, unchanged core)        │
-│                                                                       │
-│  pipeline/runner.py → pipeline/steps/                                │
-│  client_config.py:activate_client() applies YAML overrides to Config │
-│  output/<client>/ep_N/ isolation already in place                    │
-└──────────────────────────────────────────────────────────────────────┘
+main.py
+  existing: package-demo, process-all, init-client, …
+  NEW: find-prospects      → prospect_finder.py
+  NEW: add-prospect        → prospect_finder.py (manual add)
+  NEW: gen-pitch           → pitch_generator.py
+  NEW: outreach            → outreach_tracker.py (subcommands: log, list, update)
+
+New top-level modules (flat structure — matches project convention):
+  prospect_finder.py      Discover + persist prospect metadata
+  pitch_generator.py      GPT-4o pitch emails/DMs from demo output
+  outreach_tracker.py     SQLite contact log with status tracking
+
+New test files:
+  tests/test_prospect_finder.py
+  tests/test_pitch_generator.py
+  tests/test_outreach_tracker.py
 ```
 
 ---
 
-## Recommended Project Structure
+## Component Boundaries
 
+### `prospect_finder.py` — ProspectFinder
+
+**Responsibility:** Search the iTunes Search API for podcast shows matching
+genre/term criteria. Enrich results by parsing the show's RSS feed via
+feedparser (already a project dependency) to extract contact signals. Write a
+`prospect:` block into the client's YAML file. Register the prospect in the
+outreach database.
+
+**Communicates with:**
+- iTunes Search API — free, unauthenticated, returns feedUrl + metadata
+- feedparser — parse show RSS for email, website, episode recency
+- `client_config.py:init_client()` — bootstraps the YAML stub if client doesn't exist yet
+- `outreach_tracker.py:OutreachTracker` — inserts prospect row after discovery
+
+**Key method signatures:**
+```python
+class ProspectFinder:
+    def __init__(self):
+        self.enabled = True  # no external credentials needed for search
+
+    def search(self, term: str, genre_id: int = None, limit: int = 20) -> list[dict]
+    # Calls: https://itunes.apple.com/search?term=<term>&media=podcast&limit=<n>
+    # Returns list of raw iTunes result dicts
+
+    def enrich_from_rss(self, feed_url: str) -> dict
+    # feedparser parse of feed_url
+    # Returns: {contact_email, website, last_pub_date, episode_count}
+
+    def save_prospect(self, slug: str, itunes_data: dict, rss_data: dict) -> Path
+    # Appends prospect: block to clients/<slug>.yaml
+    # Returns: path to YAML file
 ```
-podcast-automation/
-├── main.py                              # MODIFIED: add package-demo command
-├── config.py                           # MODIFIED: EPISODE_SOURCE, GENRE, CLIP_SCORING_MODE
-├── client_config.py                    # MODIFIED: map new YAML fields to Config
-├── rss_episode_fetcher.py              # NEW: RSS download + episode metadata
-├── demo_packager.py                    # NEW: demo output packaging
-├── pipeline/
-│   └── steps/
-│       ├── ingest.py                   # MODIFIED: RSS/local source routing, decouple Dropbox
-│       └── analysis.py                 # MODIFIED: genre-aware compliance + clip scoring
-├── clients/
-│   ├── example-client.yaml            # MODIFIED: add episode_source, genre, new fields
-│   ├── fake-problems.yaml             # EXISTING (unchanged behavior)
-│   ├── <new-client-1>.yaml            # NEW (e.g., true-crime-client.yaml)
-│   └── <new-client-2>.yaml            # NEW (e.g., business-podcast.yaml)
-├── demo/
-│   └── <client>/
-│       └── <episode>/                 # Generated demo packages (gitignored)
-└── tests/
-    ├── test_rss_episode_fetcher.py     # NEW
-    └── test_demo_packager.py           # NEW
+
+**Data persisted to YAML** (`prospect:` block — ignored by `_YAML_TO_CONFIG`):
+```yaml
+prospect:
+  itunes_id: "123456789"
+  feed_url: "https://feeds.example.com/show.xml"
+  genre: "True Crime"
+  episode_count: 87
+  last_pub_date: "2026-02-15"
+  contact_email: "host@example.com"   # from itunes:email if present
+  website: "https://exampleshow.com"
+  notes: ""
 ```
 
-### Structure Rationale
+The `prospect:` key is not in `_YAML_TO_CONFIG`, so `activate_client()` silently
+ignores it. No changes to `client_config.py` needed.
 
-- **`rss_episode_fetcher.py` at root** — follows project convention of flat module structure. Peer to `dropbox_handler.py`. Both satisfy the "episode source" role; ingest.py chooses between them.
-- **`demo_packager.py` at root** — standalone post-processing tool, not part of the core pipeline loop. Same level as `analytics.py`, `content_calendar.py`.
-- **`demo/` directory** — separate from `output/` (which is pipeline working state). Demo output is presentation-ready, curated copies.
+**iTunes API facts** (HIGH confidence — official Apple docs):
+- Endpoint: `https://itunes.apple.com/search?term=<q>&media=podcast`
+- Returns: `collectionName`, `artistName`, `feedUrl`, `primaryGenreName`,
+  `trackCount`, `releaseDate`, `artworkUrl600`, `collectionId`
+- Auth: none required
+- Does NOT return subscriber counts or download metrics — not available
+  from any free API
+- Useful proxy for "small indie show": `trackCount` 50–300 + `releaseDate`
+  within 60 days = active, established, independent
+
+**feedparser facts** (HIGH confidence — project dependency since v1.4):
+- `feed.feed.itunes_email` or `feed.feed.author_detail.email` — host email
+- `feed.feed.link` — podcast website
+- `feed.entries[0].published` — most recent episode date
+- `len(feed.entries)` — episode count (capped at feed's window, usually 100–300)
 
 ---
 
-## Architectural Patterns
+### `pitch_generator.py` — PitchGenerator
 
-### Pattern 1: Episode Source Abstraction via Config Flag
+**Responsibility:** Read the packaged demo folder for a prospect
+(`demo/<client>/<ep_id>/`) plus the client YAML's `prospect:` block, and
+produce a personalized outreach email and DM-length pitch using GPT-4o.
+Write output to `demo/<client>/<ep_id>/PITCH.md`.
 
-**What:** `ingest.py` reads `Config.EPISODE_SOURCE` (set from `episode_source` in client YAML) and branches to either `DropboxHandler` or `RSSEpisodeFetcher`. The `DropboxHandler` instantiation is moved inside the `dropbox` branch — it is no longer unconditionally constructed.
+**Communicates with:**
+- `demo/<client>/<ep_id>/DEMO.md` — time-saved metrics, step list
+- `output/<client>/<ep_id>/*_analysis.json` — episode title, summary
+- `clients/<client>.yaml` — podcast name, host info, contact email
+- OpenAI GPT-4o — same client and pattern as `content_editor.py`
 
-**When to use:** Any client whose audio lives in a public RSS feed rather than a shared Dropbox.
-
-**Trade-offs:** No interface/abstract class needed — three branches (dropbox, rss, local) are simple `if/elif`. Adding a fourth source type later is a 10-line addition. The episode number extraction must be handled by each source type — RSS fetchers can parse episode numbers from the `<itunes:episode>` tag or from the audio filename in the enclosure URL.
-
-**Implementation in ingest.py:**
+**Key method signatures:**
 ```python
-episode_source = getattr(Config, "EPISODE_SOURCE", "dropbox")
+class PitchGenerator:
+    def __init__(self):
+        self.enabled = bool(getattr(Config, "OPENAI_API_KEY", None))
 
-if ctx.audio_file and ctx.audio_file.exists():
-    audio_file = ctx.audio_file  # local path provided directly
-elif episode_source == "rss":
-    fetcher = components["rss_fetcher"]
-    meta = fetcher.fetch_latest(Config.RSS_FEED_URL)
-    audio_file = fetcher.download_audio(meta.audio_url, Config.DOWNLOAD_DIR)
-    ctx.episode_meta = meta  # carry forward for RSS field population
-else:  # dropbox (default)
-    dropbox = components["dropbox"]
-    latest = dropbox.get_latest_episode()
-    audio_file = dropbox.download_episode(latest["path"])
+    def generate_pitch(self, client_name: str, episode_id: str) -> dict
+    # Returns: {"subject": str, "email": str, "dm": str}
 
-# Episode number extraction: each source provides its own
+    def save_pitch(self, client_name: str, episode_id: str, pitch: dict) -> Path
+    # Writes demo/<client>/<ep_id>/PITCH.md
+    # Returns: path to written file
 ```
 
-The `components` dict in `runner.py` conditionally includes `"rss_fetcher"` or `"dropbox"` based on `Config.EPISODE_SOURCE`. This prevents `DropboxHandler.__init__()` from raising `ValueError` for clients with no Dropbox credentials.
+**Prompt construction** (same f-string approach as `content_editor.py`):
+The system prompt establishes the role: "You are writing outreach for a podcast
+production service." The user message passes structured context — podcast name,
+episode title, episode summary, metrics from DEMO.md (time saved, cost per
+episode, step count). The model writes the email and DM. Temperature 0.7
+(slightly creative — pitch copy, not analysis).
 
-### Pattern 2: Genre Config as Prompt Context Injection
+**Cost estimate:** ~500–800 output tokens per prospect → ~$0.01–0.02 each
+using GPT-4o pricing. No new API keys needed.
 
-**What:** The `genre` field in the client YAML maps to `Config.PODCAST_GENRE`. The `ContentEditor.analyze_content()` method receives genre as a parameter and injects it into the GPT-4o prompt, adjusting tone expectations, clip selection criteria, and compliance sensitivity.
+---
 
-**When to use:** Any non-comedy podcast. Without this, GPT-4o generates comedy-voiced show notes and over-censors non-profanity content.
+### `outreach_tracker.py` — OutreachTracker
 
-**Trade-offs:** Genre is a soft hint to the AI, not a hard rule switch. The existing `VOICE_PERSONA` field in client YAML already provides the primary tone control. Genre is additive context that helps the AI understand what "good" looks like for this show type. Do not create separate ContentEditor subclasses per genre — that's premature.
+**Responsibility:** Lightweight SQLite contact log. Tracks each prospect
+(identity) and each outreach attempt (events). Follows the `search_index.py`
+pattern exactly: raw SQL, no ORM, single shared DB file.
 
-**Genre effects on pipeline:**
-```
-comedy (default, existing behavior):
-    compliance_enabled: optional (default false for edgy content)
-    clip_scoring: energy-based (AudioClipScorer)
-    censorship: names + words lists
+**Database location:** `output/outreach.db` — single shared file across all
+prospects. Not inside any per-client output folder.
 
-true-crime:
-    compliance_enabled: true (check for identifying victims, legal risk)
-    clip_scoring: balanced (topic relevance + energy)
-    censorship: typically light (no profanity lists needed)
+**Communicates with:** Nothing external. Pure SQLite.
 
-business/interview:
-    compliance_enabled: false (low-risk content)
-    clip_scoring: topic-match weighted (quotable insights > loud moments)
-    censorship: typically empty lists
-```
+**Schema:**
+```sql
+CREATE TABLE IF NOT EXISTS prospects (
+    client_slug   TEXT PRIMARY KEY,
+    podcast_name  TEXT,
+    contact_email TEXT,
+    website       TEXT,
+    itunes_id     TEXT,
+    genre         TEXT,
+    episode_count INTEGER,
+    created_at    TEXT,   -- ISO 8601
+    notes         TEXT
+);
 
-### Pattern 3: Demo Package as a Read-Only View of Existing Output
-
-**What:** `DemoPackager` does NOT re-generate content. It reads what the pipeline already produced in `output/<client>/ep_N/` and assembles a demo-ready copy in `demo/<client>/ep_N/`. The summary HTML is the only new artifact — it wraps existing outputs in a visual layout.
-
-**When to use:** After a full pipeline run completes. Invoked manually via `python main.py package-demo <client> [ep_N]`.
-
-**Trade-offs:** This pattern avoids any risk of demo packaging breaking the core pipeline. Demo packaging can fail without affecting episode output. Copying files (not moving) preserves the original pipeline artifacts. The summary HTML is a static single-file document (no web server needed) so it's shareable as an email attachment or Dropbox link.
-
-**What the demo package contains:**
-```
-demo/<client>/ep_N/
-    README.md               — "Here's what we produced for your episode"
-    summary.html            — visual overview: thumbnail, captions, clips list
-    clips/
-        clip_0.mp4          — copy of subtitled clip video
-        clip_1.mp4
-        clip_2.mp4
-    thumbnail.png           — copy of generated thumbnail
-    blog_post.html          — copy of blog post
-    captions.txt            — extracted social captions (Twitter, YouTube, LinkedIn)
+CREATE TABLE IF NOT EXISTS contacts (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_slug   TEXT NOT NULL REFERENCES prospects(client_slug),
+    channel       TEXT NOT NULL,   -- 'email' | 'twitter_dm' | 'instagram_dm' | 'linkedin'
+    status        TEXT NOT NULL,   -- 'sent' | 'replied' | 'demo_sent' |
+                                   -- 'negotiating' | 'closed_won' | 'closed_lost'
+    contacted_at  TEXT NOT NULL,   -- ISO 8601
+    notes         TEXT
+);
 ```
 
-The `summary.html` is generated with Python's `string.Template` or simple f-string concatenation — no external template engine needed. It embeds the thumbnail as a base64 data URL so the file is self-contained.
-
-### Pattern 4: Conditional Component Initialization in runner.py
-
-**What:** `runner.py:_init_components()` already uses try/except to build the `components` dict, silently omitting unavailable uploaders. The same pattern extends to episode source components: if `EPISODE_SOURCE = "rss"`, only `RSSEpisodeFetcher` is constructed (no Dropbox attempt). If `EPISODE_SOURCE = "dropbox"`, only `DropboxHandler` is constructed.
-
-**Current pattern (runner.py):**
+**Key method signatures:**
 ```python
-# Uploaders already conditional:
-try:
-    uploaders["youtube"] = YouTubeUploader(token_path=youtube_token)
-except (ValueError, FileNotFoundError) as e:
-    logger.info("YouTube uploader not available: %s", ...)
-```
+class OutreachTracker:
+    def __init__(self, db_path: str = None):
+        # db_path defaults to str(Config.OUTPUT_DIR / "outreach.db")
+        self.enabled = True
 
-**Extension for episode sources:**
-```python
-episode_source = getattr(Config, "EPISODE_SOURCE", "dropbox")
-if episode_source == "rss":
-    from rss_episode_fetcher import RSSEpisodeFetcher
-    components["rss_fetcher"] = RSSEpisodeFetcher()
-else:
-    components["dropbox"] = DropboxHandler()  # existing behavior
+    def add_prospect(self, client_slug: str, data: dict) -> None
+    def log_contact(self, client_slug: str, channel: str, status: str,
+                    notes: str = "") -> None
+    def update_status(self, client_slug: str, status: str) -> None
+    def list_prospects(self, status_filter: str = None) -> list[dict]
+    def get_prospect(self, client_slug: str) -> Optional[dict]
 ```
-
-This is the minimal change needed to un-block non-Dropbox clients.
 
 ---
 
 ## Data Flow
 
-### RSS Episode Processing Flow
-
 ```
-python main.py --client true-crime-client latest
-    |
-client_config.py:activate_client("true-crime-client")
-    - applies episode_source: "rss" → Config.EPISODE_SOURCE = "rss"
-    - applies rss.feed_url → Config.RSS_FEED_URL = "https://..."
-    - applies content.genre → Config.PODCAST_GENRE = "true-crime"
-    - applies voice_persona, scoring_profile overrides
-    |
-pipeline/runner.py:_init_components()
-    - sees EPISODE_SOURCE = "rss" → constructs RSSEpisodeFetcher
-    - skips DropboxHandler construction entirely
-    |
-pipeline/steps/ingest.py
-    - calls rss_fetcher.fetch_latest(Config.RSS_FEED_URL)
-    - returns EpisodeMeta(title, audio_url, episode_number, pub_date)
-    - calls rss_fetcher.download_audio(meta.audio_url, DOWNLOAD_DIR / <client>)
-    - sets ctx.audio_file, ctx.episode_number, ctx.episode_meta
-    |
-pipeline/steps/analysis.py (MODIFIED)
-    - reads Config.PODCAST_GENRE, Config.COMPLIANCE_ENABLED
-    - injects genre context into ContentEditor prompt
-    - skips compliance check if Config.COMPLIANCE_ENABLED = False
-    |
-[remaining steps: audio, video, distribute — unchanged]
-    |
-output/true-crime-client/ep_N/
-    {stem}_transcript.json
-    {stem}_analysis.json
-    clip_0.mp4, clip_1.mp4, clip_2.mp4
-    thumbnail.png
-    blog_post.html
-```
+STEP 1 — Discover
+  uv run main.py find-prospects --term "true crime" --limit 20
 
-### Demo Package Flow
+  ProspectFinder.search("true crime", limit=20)
+    → iTunes API: https://itunes.apple.com/search?term=true+crime&media=podcast
+    → returns 20 candidates with feedUrl, trackCount, releaseDate
 
-```
-python main.py package-demo true-crime-client ep_42
-    |
-demo_packager.py:DemoPackager.package_demo("true-crime-client", "ep_42")
-    |
-    +-- reads output/true-crime-client/ep_42/{stem}_analysis.json
-    |   extracts: episode_title, social_captions, show_notes
-    |
-    +-- locates: clip_*_subtitled.mp4, thumbnail.png, blog_post.html
-    |
-    +-- creates demo/true-crime-client/ep_42/
-    |       copies clips/, thumbnail.png, blog_post.html
-    |       writes captions.txt (formatted from analysis.social_captions)
-    |       writes summary.html (template, embeds thumbnail as base64)
-    |       writes README.md
-    |
-    +-- prints: "Demo package ready: demo/true-crime-client/ep_42/"
-```
+  User reviews printed list, selects 3-5 slugs
+  For each selected slug:
+    ProspectFinder.enrich_from_rss(feed_url)   → contact_email, website
+    ProspectFinder.save_prospect(slug, ...)    → clients/<slug>.yaml (with prospect: block)
+    OutreachTracker.add_prospect(slug, ...)    → output/outreach.db
 
-### Client Config Application (existing + new fields)
 
-```
-clients/<name>.yaml
-    episode_source: "rss"           → Config.EPISODE_SOURCE
-    rss.feed_url: "https://..."     → Config.RSS_FEED_URL        (NEW)
-    content.genre: "true-crime"     → Config.PODCAST_GENRE        (NEW)
-    content.compliance_enabled: true → Config.COMPLIANCE_ENABLED  (NEW)
-    content.censor_enabled: false   → Config.CENSOR_ENABLED       (NEW)
-    [all existing fields unchanged]
+STEP 2 — Process episode (EXISTING PIPELINE — no changes)
+  uv run main.py latest --client <slug>           (or rss-based if feed_url set)
+  uv run main.py package-demo <slug> <ep_id>
+
+  Output: demo/<slug>/<ep_id>/DEMO.md
+          demo/<slug>/<ep_id>/summary.html
+          demo/<slug>/<ep_id>/clips/
+          output/<slug>/<ep_id>/*_analysis.json
+
+
+STEP 3 — Generate pitch
+  uv run main.py gen-pitch <slug> <ep_id>
+
+  PitchGenerator.generate_pitch(<slug>, <ep_id>)
+    → reads demo/<slug>/<ep_id>/DEMO.md           (metrics)
+    → reads output/<slug>/<ep_id>/*_analysis.json (episode title + summary)
+    → reads clients/<slug>.yaml (prospect: block) (podcast name, contact)
+    → GPT-4o → {"subject": ..., "email": ..., "dm": ...}
+
+  PitchGenerator.save_pitch(...)
+    → writes demo/<slug>/<ep_id>/PITCH.md
+
+
+STEP 4 — Track outreach (MANUAL, after sending)
+  uv run main.py outreach log <slug> --channel email --status sent --notes "Sent to host@show.com"
+  uv run main.py outreach list
+  uv run main.py outreach list --status replied
+  uv run main.py outreach update <slug> --status negotiating
 ```
 
 ---
 
-## Integration Points
+## Integration Points: New vs Modified
 
-### New Modules
+### New files (create from scratch)
 
-| Module | Integrates With | Direction |
-|--------|-----------------|-----------|
-| `rss_episode_fetcher.py` | `pipeline/runner.py` | runner constructs it; passes via `components["rss_fetcher"]` |
-| `rss_episode_fetcher.py` | `pipeline/steps/ingest.py` | ingest calls `fetch_latest()` + `download_audio()` |
-| `demo_packager.py` | `pipeline/steps/distribute.py` output | reads analysis JSON + copies output files |
-| `demo_packager.py` | `main.py` | new `package-demo` CLI command routes to it |
+| File | What it is |
+|------|-----------|
+| `prospect_finder.py` | ProspectFinder class: iTunes search + feedparser enrichment + YAML write |
+| `pitch_generator.py` | PitchGenerator class: GPT-4o pitch from demo output |
+| `outreach_tracker.py` | OutreachTracker class: SQLite contact log |
+| `tests/test_prospect_finder.py` | Unit tests — mock requests, mock feedparser |
+| `tests/test_pitch_generator.py` | Unit tests — mock OpenAI, mock file reads |
+| `tests/test_outreach_tracker.py` | Unit tests — real SQLite with tmp_path (search_index.py pattern) |
 
-### Modified Existing Modules
+### Modified files (existing, targeted additions only)
 
-| Module | Change | Risk |
-|--------|--------|------|
-| `pipeline/steps/ingest.py` | Branch on `Config.EPISODE_SOURCE`; move Dropbox instantiation inside `else` branch; add RSS fetch path | LOW — additive branching; Dropbox path is behaviorally identical |
-| `pipeline/runner.py` | Conditional component construction (rss_fetcher vs dropbox) based on `EPISODE_SOURCE` | LOW — existing try/except pattern already handles optional components |
-| `pipeline/steps/analysis.py` | Inject genre context into ContentEditor call; respect `COMPLIANCE_ENABLED` flag | LOW — additive prompt context; compliance skip already has `self.enabled` pattern |
-| `client_config.py` | Map new YAML fields (`episode_source`, `rss.feed_url`, `content.genre`, etc.) to Config | MINIMAL — additive to `_YAML_TO_CONFIG` dict |
-| `config.py` | Add `EPISODE_SOURCE`, `RSS_FEED_URL`, `PODCAST_GENRE`, `COMPLIANCE_ENABLED`, `CENSOR_ENABLED` with env-var defaults | MINIMAL — all new, no existing attribute changes |
-| `clients/example-client.yaml` | Add commented-out new fields with documentation | NONE — purely additive, no existing clients affected |
-| `main.py` | Add `package-demo` command routing | LOW — new elif branch in command dispatch |
+| File | What changes |
+|------|-------------|
+| `main.py` | Add `find-prospects`, `add-prospect`, `gen-pitch`, `outreach` (with subcommands) to `_handle_client_command()` |
+| `clients/example-client.yaml` | Add commented `prospect:` block with documented fields |
 
-### Internal Boundaries
+### Files that stay untouched
 
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| `RSSEpisodeFetcher` ↔ `ingest.py` | `EpisodeMeta` dataclass return from `fetch_latest()` | Store on `ctx.episode_meta` for downstream use (RSS distribution step may want pub_date) |
-| `ingest.py` ↔ `runner.py` | `components` dict key: `"rss_fetcher"` vs `"dropbox"` | Only one is present per run; ingest checks which key exists |
-| `DemoPackager` ↔ output files | Read-only access to `output/<client>/ep_N/` | Never modifies pipeline output; only copies |
-| `ContentEditor` ↔ genre config | Genre passed as parameter to `analyze_content()` | Not stored in ContentEditor instance — Config is the source of truth |
-| `Config.CENSOR_ENABLED` ↔ audio step | Audio step skips `apply_censorship()` if False | Must check flag, not rely on empty word lists (empty lists currently still run the duck-fade pass) |
+| File | Why untouched |
+|------|--------------|
+| `pipeline/runner.py` | Prospect tooling is pre-pipeline; no step changes needed |
+| `pipeline/steps/` (all) | Discovery and outreach are outside the processing loop |
+| `client_config.py` | `prospect:` keys in YAML are not in `_YAML_TO_CONFIG`; silently ignored |
+| `demo_packager.py` | Already produces the input that `gen-pitch` reads |
+| `rss_episode_fetcher.py` | ProspectFinder calls feedparser directly (simpler than the full fetcher) |
+| `config.py` | No new env vars needed for these three modules |
 
 ---
 
-## Anti-Patterns
+## Build Order
 
-### Anti-Pattern 1: Subclassing DropboxHandler for RSS
-
-**What people do:** Create `RSSHandler(DropboxHandler)` or add `download_from_rss()` to the existing DropboxHandler class.
-**Why it's wrong:** DropboxHandler owns Dropbox-specific auth, retry logic, and folder path conventions. These are meaningless for RSS. Subclassing adds dead weight and confuses future readers.
-**Do this instead:** Separate `rss_episode_fetcher.py` module. Both DropboxHandler and RSSEpisodeFetcher are peers in the `components` dict. Ingest selects one based on `Config.EPISODE_SOURCE`.
-
-### Anti-Pattern 2: Genre-Specific ContentEditor Subclasses
-
-**What people do:** `TrueCrimeContentEditor(ContentEditor)`, `BusinessContentEditor(ContentEditor)` with overridden prompts.
-**Why it's wrong:** Subclass proliferation for what is really just a config difference. The ContentEditor prompt is already parameterized by `VOICE_PERSONA`. Genre is additive context, not a code branch.
-**Do this instead:** Single ContentEditor with genre injected as prompt context: `"This is a {genre} podcast. Adjust your analysis accordingly."` + the existing `VOICE_PERSONA` per-client config.
-
-### Anti-Pattern 3: Demo Packager Regenerating Content
-
-**What people do:** Make the demo packager re-run GPT-4o to produce "cleaner" or "demo-ready" captions.
-**Why it's wrong:** (a) Costs money. (b) Produces inconsistency between what the demo shows and what the pipeline actually delivered. (c) Adds latency.
-**Do this instead:** The demo is a presentation of what was actually produced. If the output isn't good enough for a demo, fix the pipeline config (voice_persona, genre) and re-run the episode. The demo package is a mirror, not a polish layer.
-
-### Anti-Pattern 4: Unconditional DropboxHandler Construction
-
-**What people do:** Leave `DropboxHandler()` construction in `_init_components()` regardless of `EPISODE_SOURCE`.
-**Why it's wrong:** `DropboxHandler.__init__()` raises `ValueError` if no Dropbox credentials are configured. Real clients won't have Dropbox credentials. This blocks the entire pipeline for any RSS-sourced client.
-**Do this instead:** Gate `DropboxHandler` construction behind `episode_source == "dropbox"` check. This is the primary architectural fix needed for v1.4.
-
-### Anti-Pattern 5: Storing Demo in output/ Directory
-
-**What people do:** Write demo files into `output/<client>/ep_N/demo/` alongside pipeline artifacts.
-**Why it's wrong:** `output/` is ephemeral working state — it may be cleaned, regenerated, or gitignored entirely. Demos are persistent deliverables meant to be shared with clients.
-**Do this instead:** Separate `demo/<client>/<episode>/` tree. Clearly communicates intent. Can be committed to git, zipped and emailed, or hosted on Dropbox independently of pipeline state.
-
----
-
-## Build Order (Dependency-Driven)
+Dependencies drive the order. Each phase can be tested in isolation before the next begins.
 
 ```
-Phase A — RSS episode source (prerequisite for real client testing):
-  1. rss_episode_fetcher.py
-     - fetch_latest(rss_url) → EpisodeMeta
-     - download_audio(url, dest) → Path with progress bar (tqdm, already dep)
-     - extract_episode_number() using itunes:episode tag, then filename fallback
-     - Standalone, no pipeline dependencies
-  2. tests/test_rss_episode_fetcher.py
-     - mock requests.get for RSS XML parsing tests
-     - mock urllib.request for audio download tests
+Phase 1 — OutreachTracker (no external deps, establishes data store)
+  - SQLite schema: prospects + contacts tables
+  - CRUD methods: add_prospect, log_contact, update_status, list_prospects
+  - tests/test_outreach_tracker.py (real SQLite + tmp_path)
+  - CLI: outreach log / list / update in main.py
+  Rationale: no external API, no file dependencies — verifiable immediately
 
-Phase B — Ingest decoupling (unblocks non-Dropbox clients):
-  3. config.py: add EPISODE_SOURCE, RSS_FEED_URL, PODCAST_GENRE,
-                COMPLIANCE_ENABLED, CENSOR_ENABLED
-  4. client_config.py: map new YAML fields in _YAML_TO_CONFIG
-  5. clients/example-client.yaml: add commented new fields
-  6. pipeline/runner.py: conditional component construction
-  7. pipeline/steps/ingest.py: branch on EPISODE_SOURCE
-     - RSS path uses RSSEpisodeFetcher
-     - Dropbox path unchanged (existing behavior preserved)
+Phase 2 — ProspectFinder (depends on Phase 1 for persistence)
+  - iTunes Search API call (requests, already dep)
+  - feedparser RSS enrichment (already dep)
+  - YAML write of prospect: block
+  - Calls OutreachTracker.add_prospect() after save
+  - tests/test_prospect_finder.py (mock requests + mock feedparser)
+  - CLI: find-prospects and add-prospect in main.py
+  Rationale: OutreachTracker must exist first; iTunes API has no auth so no setup needed
 
-Phase C — Genre-aware pipeline (quality for real clients):
-  8. pipeline/steps/analysis.py: inject genre context into ContentEditor
-     - Read Config.PODCAST_GENRE, pass to analyze_content()
-     - Respect Config.COMPLIANCE_ENABLED flag
-     - Respect Config.CENSOR_ENABLED flag in audio step
-  9. Create real client YAML configs (2-3 genres)
-     - Set voice_persona, genre, scoring_profile, censor lists appropriately
-  10. Test run: process one real RSS episode per client, fix breakage
+Phase 3 — PitchGenerator (depends on Phase 2 for demo output to exist)
+  - GPT-4o prompt construction from DEMO.md + analysis JSON + YAML
+  - PITCH.md output into demo folder
+  - tests/test_pitch_generator.py (mock OpenAI, mock Path reads)
+  - CLI: gen-pitch in main.py
+  Rationale: requires a real packaged demo to test end-to-end; do after Phase 2
+             validates that prospect YAMLs and demo output are present
 
-Phase D — Demo packaging (sales readiness):
-  11. demo_packager.py
-      - package_demo(client_name, episode_folder) reads output/ → writes demo/
-      - Generates summary.html (self-contained, base64 thumbnail)
-      - Copies clips, captions, blog post
-  12. tests/test_demo_packager.py
-  13. main.py: add package-demo command
+Phase 4 — Manual end-to-end validation
+  - Run find-prospects, select 2-3 real shows
+  - Process one episode per prospect (existing pipeline)
+  - package-demo per prospect
+  - gen-pitch per prospect
+  - Review PITCH.md quality, iterate prompt if needed
+  - log outreach contacts as they're sent
 ```
-
-Phases A and B must complete before real client testing. Phase C requires B. Phase D requires a successful Phase C test run (needs real output to package).
 
 ---
 
-## Scaling Considerations
+## Anti-Patterns to Avoid
 
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| 2-3 clients (v1.4 target) | Current YAML-per-client approach is adequate; no changes needed |
-| 10+ clients | `process-all` command already exists; add concurrency flag (ProcessPoolExecutor) |
-| 50+ clients (SaaS path) | Client YAML → database; output/ → cloud storage; pipeline as a service |
-| Unsupported audio hosts | Extend `RSSEpisodeFetcher` with host-specific download logic (e.g., Anchor CDN, Spreaker) |
+### Anti-Pattern 1: Prospect identity in a separate DB table independent of YAML
+**What goes wrong:** Two sources of truth for the same entity. YAML controls
+`--client <name>` activation; a separate DB with duplicate identity fields
+diverges over time.
+**Instead:** The `prospect:` block in `clients/<slug>.yaml` is canonical for
+identity. `outreach.db` tracks *events* (contacts), not identity. ProspectFinder
+writes YAML; OutreachTracker reads only the slug as a foreign key.
+
+### Anti-Pattern 2: Putting discovery logic inside pipeline steps
+**What goes wrong:** Discovery is pre-pipeline work. Pipeline steps assume a
+provisioned client. Mixing them violates the invariant that steps run only after
+`activate_client()` has been called and episode audio exists.
+**Instead:** Standalone CLI commands only. The pipeline is untouched.
+
+### Anti-Pattern 3: Jinja2 templates for pitch generation
+**What goes wrong:** Template-with-blanks pitches feel generic. A merge field
+for `{{podcast_name}}` doesn't produce a personalized pitch — it produces a
+mail-merge.
+**Instead:** Pass all demo metrics and episode context as structured input to
+GPT-4o. Let the model write the pitch using real context. Same approach as
+`content_editor.py`. The model produces better copy than any template.
+
+### Anti-Pattern 4: Live RSS fetch inside gen-pitch
+**What goes wrong:** Adds unexpected network latency and a failure point to
+pitch generation. Pitch generation should be purely offline from data already
+collected.
+**Instead:** RSS enrichment happens once during `find-prospects` or
+`add-prospect` and is cached in the `prospect:` YAML block.
+`PitchGenerator.generate_pitch()` reads from YAML and local files only.
+
+### Anti-Pattern 5: Storing outreach.db inside a per-client output directory
+**What goes wrong:** The database tracks relationships across all prospects.
+Putting it inside one client's folder is semantically wrong and makes
+cross-prospect queries awkward.
+**Instead:** `output/outreach.db` at the root output level — shared across all
+prospects, same directory as the existing `podcast_automation.log`.
+
+---
+
+## Scalability Considerations
+
+| Concern | 3-5 prospects (v1.5 target) | 20-50 prospects | 200+ prospects |
+|---------|---------------------------|-----------------|----------------|
+| Prospect storage | YAML per client — fine | YAML per client — fine | Consider DB migration |
+| Contact tracking | SQLite — fine | SQLite — fine | SQLite — still fine |
+| Pitch generation | Manual trigger — fine | Batch script — fine | Queue-based |
+| iTunes API calls | Trivial | Fine | Fine (low volume) |
+
+Current v1.5 target is 3-5 prospects. YAML + SQLite is correct at this scale.
+No abstraction warranted.
+
+---
+
+## External API Notes
+
+**iTunes Search API** (HIGH confidence — official Apple docs verified):
+- Base: `https://itunes.apple.com/search?term=<q>&media=podcast&limit=<n>`
+- Optional: `&genreId=<id>` for genre filtering (1488=True Crime, 1318=Technology,
+  1301=Arts, 1304=Education, 1321=Business, 1316=Comedy)
+- Response fields of interest: `collectionName`, `artistName`, `feedUrl`,
+  `primaryGenreName`, `trackCount`, `releaseDate`, `artworkUrl600`, `collectionId`
+- Auth: none. Rate limits: not published; ~20 req/min is safe in practice.
+- Does not provide subscriber counts, download numbers, or listener metrics.
+  `trackCount` + `releaseDate` recency is the best available proxy.
+
+**feedparser** (HIGH confidence — already project dependency):
+- `feed.feed.author_detail.email` or `feed.feed.itunes_email` — host contact
+- `feed.feed.link` — podcast website
+- `feed.entries[0].published` — most recent episode date
+- `len(feed.entries)` — episode count visible in feed window
+
+**OpenAI GPT-4o** (HIGH confidence — already used in project):
+- Same `OPENAI_API_KEY` env var, same client pattern
+- Cost: ~$0.01–0.02 per pitch (500–800 output tokens)
 
 ---
 
 ## Sources
 
-- Direct code inspection: `pipeline/steps/ingest.py`, `pipeline/runner.py`, `client_config.py`, `dropbox_handler.py`, `config.py`, `clients/example-client.yaml`, `content_compliance_checker.py`, `audio_processor.py`
-- `feedparser` library — standard Python RSS/Atom parsing library, available on PyPI, HIGH confidence for RSS feed parsing
-- Project conventions: flat module structure, `self.enabled` pattern, `components` dict pattern in runner.py, `try/except ValueError` for optional component init
+- Direct code inspection: `main.py`, `demo_packager.py`, `client_config.py`,
+  `clients/example-client.yaml`, `search_index.py`, `rss_episode_fetcher.py`,
+  `pipeline/runner.py`, `pipeline/context.py`, `content_editor.py`
+- iTunes Search API: https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/iTuneSearchAPI/index.html
+- iTunes Search API examples: https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/iTuneSearchAPI/SearchExamples.html
+- feedparser: project dependency, direct inspection of `rss_episode_fetcher.py`
 
 ---
 
-*Architecture research for: v1.4 Real-World Testing & Sales Readiness — Podcast Automation Pipeline*
+*Architecture research for: v1.5 First Paying Client — Prospect Discovery & Outreach Tooling*
 *Researched: 2026-03-28*

@@ -1,268 +1,297 @@
-# Pitfalls Research
+# Domain Pitfalls
 
-**Domain:** Cross-genre podcast pipeline testing — adapting a comedy-tuned pipeline to real-world client content
+**Domain:** Podcast production service — go-to-market, cold outreach, and first paying client acquisition
 **Researched:** 2026-03-28
-**Confidence:** HIGH (based on direct codebase analysis; most pitfalls are confirmed code-level issues, not hypothetical)
+**Confidence:** MEDIUM-HIGH (sales pitfalls from practitioner sources; legal section MEDIUM — not legal advice)
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Config.NAMES_TO_REMOVE Is Loaded at Import Time with Hardcoded Host Names
+### Pitfall 1: Processing Someone's Episode for a Demo Without Permission Creates Legal and Reputational Exposure
 
 **What goes wrong:**
-`config.py` defines `NAMES_TO_REMOVE` as a class-level list with Joey, Evan, Dom, Dominique, and their last names baked in. `content_editor.py` reads `Config.NAMES_TO_REMOVE` in `_build_analysis_prompt()` and `_find_words_to_censor_directly()`. If you process a client episode without explicitly setting `names_to_remove` in the client YAML, the Fake Problems host names are injected into the censorship prompt and the direct-search censor loop runs against the new client's transcript. A client episode that happens to feature a guest named "Evan" or mentions "Gross" as an adjective will trigger incorrect censorship.
+You process a prospect's public podcast episode through the pipeline and send them the output as a sales demo. The prospect feels their content was used without consent. Even though the episode was publicly available via RSS, the act of running it through transcription, AI analysis, content alteration (censorship, clips), and packaging it for commercial solicitation goes beyond the purpose for which it was published.
 
 **Why it happens:**
-`Config` is a class with static attributes — it's evaluated at import time. `client_config.py` patches these via `apply_client_config()`, but that only fires if `--client` is passed AND the YAML has a non-null `names_to_remove` list. An empty list `[]` in the YAML correctly overrides to empty. But if the YAML field is omitted entirely (e.g., a client config copied before v1.3 YAML fields were added), the fallback stays as the Fake Problems list.
+"It's public" feels like permission. It is not. Copyright protects a work regardless of accessibility. The four-factor fair use test weighs heavily against commercial use — you're creating derivative works (clips, subtitles, blog post) from someone else's content to sell a service. Under GDPR, voice recordings are classified as personal data even when published publicly, and processing them for a new commercial purpose requires a separate lawful basis.
 
-**How to avoid:**
-Require `names_to_remove` to be an explicit field in every client YAML — treat absence as a validation error, not a fallback to defaults. Add a `validate-client` check that flags missing content section fields. When `names_to_remove: []` is set, verify the override actually clears `Config.NAMES_TO_REMOVE` to `[]` (it does, per `client_config.py:117`, but test this explicitly with a real episode).
+The spec-work analogy applies here too: the design industry fought this battle for decades. Unsolicited redesigns sent to prospects are widely considered presumptuous and manipulative ("look what I did to your stuff, now pay me"). Podcast hosts who share this reaction publicly can damage your reputation in a small, interconnected community.
 
-**Warning signs:**
-- Demo output for a non-comedy client has audio gaps where no slurs exist
-- GPT-4o prompt contains names like "Joey", "Evan" in the names-to-censor section when processing a true crime or business podcast
-- `logger.info("Items to censor: %d", ...)` shows unexpectedly high count
+**Consequences:**
+- Prospect responds with hostility, shares the pitch in podcasting communities as a cautionary tale
+- Copyright infringement claim (low probability but non-zero, especially if output is redistributed)
+- GDPR exposure if the prospect is EU-based and you processed their voice data without a lawful basis
+- Lost deal and word-of-mouth damage in the exact niche you're targeting
+
+**Prevention:**
+Get permission before processing. A simple DM or email: "I'd love to run your latest episode through my pipeline as a free demo — would you be open to that? I'll send you everything and you can use it or not." This converts a legal risk into a warm lead.
+
+If you want to build demos without prior contact, use your own content (Fake Problems) as the demo artifact, or use shows you've explicitly been given permission to process. Show prospects what the output looks like without using their content.
+
+**Detection:**
+Any prospect response that includes words like "permission," "consent," or "didn't ask" is a signal you've triggered this reaction.
 
 **Phase to address:**
-Phase 1 (Client Configuration) — before any real episode is processed. Add a `--dry-run` path that prints the active `Config.NAMES_TO_REMOVE` and `Config.WORDS_TO_CENSOR` so it's auditable before processing.
+Prospect research phase (before any processing). Establish a consent-first policy before the first episode is processed.
 
 ---
 
-### Pitfall 2: Voice Persona Is Comedy-Specific and Will Corrupt All AI-Generated Output for Non-Comedy Clients
+### Pitfall 2: Targeting the Wrong Size or Stage of Podcast
 
 **What goes wrong:**
-The fallback `VOICE_PERSONA` in `content_editor.py` is hardcoded as Fake Problems voice: "irreverent comedy show," "dark, weird, and absurd topics," "deadpan confidence." This affects the episode title, social captions, show notes, chapter titles, and blog post. For a true crime podcast or a business interview show, this produces unusable output — chapter titles come out deadpan-comic, show notes read as if the hosts are joking about murder cases, and social captions use comedy framing that will alienate the target audience.
-
-The prompt itself also contains voice examples with Fake Problems-branded BAD/GOOD pairs (lines 263–285 of `content_editor.py`) that are embedded directly in the prompt string, not driven by config. Even if `voice_persona` is set in the YAML, these example blocks remain in the prompt.
+You pitch shows that are either too large (don't need you, have production teams) or too small (can't afford you, processing their episodes produces near-zero ROI for them). The sweet spot is independent shows with 1,000–20,000 downloads per episode that are releasing regularly but have no post-production workflow.
 
 **Why it happens:**
-The voice examples block is a string literal inside `_build_analysis_prompt()` and is not conditional on whether the client has set a custom voice. The `VOICE_PERSONA` constant is the fallback but the inline voice-examples block always fires regardless.
+It's tempting to pitch well-known shows for validation, or to cast a wide net. Large shows (100K+ downloads) have established production pipelines and staff — they'll evaluate your pitch against professional agencies, not as a scrappy automation tool. Very small shows (under 500 downloads) may not be generating revenue and cannot justify any production spend, no matter how low.
 
-**How to avoid:**
-Make the voice-examples block conditional — only include Fake Problems-specific examples if the active client is `fake-problems` or no custom persona is set. For new clients, replace the example block with genre-appropriate examples drawn from the client config, or omit it entirely and rely on the `voice_persona` field to provide tone guidance.
+**Consequences:**
+- Wasted demo effort on shows that can't convert
+- Large shows may be dismissive in ways that demoralize outreach momentum
+- Very small shows may love the demo but have no budget, leading to tire-kickers and scope negotiation that goes nowhere
 
-**Warning signs:**
-- Blog post for a true crime client opens with deadpan humor about the subject matter
-- YouTube description for a business podcast reads as ironic/comedic
-- Chapter titles sound like Fake Problems episode beats ("POV: You Don't Know What POV Means" style)
+**Prevention:**
+Screen prospects using public signals before investing in a demo:
+- Listen to Chartable, Rephonic, or Podchaser for download estimates
+- Signs of monetization: sponsor reads, Patreon links, "this show is supported by" language in episodes
+- Signs of growth intent: regular release cadence, improving audio quality over time, active social promotion
+- Signs they need help: no clips on social, no transcripts on site, no chapters in RSS feed, inconsistent release schedule
+
+Target: solo hosts or 2-person shows, releasing bi-weekly or weekly, with some monetization signal, who are not currently using a production service.
+
+**Detection:**
+If prospects consistently respond with "we already have someone" or no response at all, you may be pitching too large. If they respond with enthusiasm but stall on pricing, you may be pitching too small.
 
 **Phase to address:**
-Phase 1 (Client Configuration) — configure `voice_persona` for each test client before processing. Phase 2 (Integration Fix) — make the voice-examples block conditional on client type or omit when custom persona is provided.
+Prospect identification phase. Define an ICP checklist before building the prospect list.
 
 ---
 
-### Pitfall 3: Audio Energy Scoring Favors High-Volume Comedy Delivery, Not Substantive Moments
+### Pitfall 3: Pricing Based on Your Costs, Not the Value You Deliver
 
 **What goes wrong:**
-`AudioClipScorer` ranks segments by RMS energy. Comedy podcasts generate high-energy peaks from shouting, laughter, and fast crosstalk — these map well to "best moments." True crime, business, and interview podcasts often have their most compelling moments during quiet, measured delivery: a revealing confession, a key data point, a moment of tension. RMS scoring will favor segments with the most volume, not the most substance — potentially selecting the wrong clips entirely.
-
-For a solo-host or interview podcast where one person speaks at a consistent volume, energy scores will be nearly flat across all segments, making the energy signal useless as a differentiator. GPT-4o still picks clips, but loses its primary pre-selection signal and will instead pick from whatever the energy_candidates list happens to contain.
+Your marginal cost per episode is near zero (GPU electricity + ~$0.50–0.80 OpenAI API calls). If you price based on cost-plus, you might charge $50–100/episode, which is below market rate and signals low value. Worse, you leave significant money on the table because what you're actually delivering — 3 social clips, subtitles, a blog post, YouTube upload, RSS update — would take a professional editor 4–8 hours at $75–150/hour.
 
 **Why it happens:**
-RMS energy is a reasonable heuristic for high-energy comedy but conflates volume with interest. The `energy_candidates` are passed to GPT-4o as a strong hint with the instruction "prioritize these for clips" — the model will follow this even when energy scores don't correlate with content quality.
+Low-cost automation tempts operators to compete on price. "I can undercut everyone because my costs are low" is a race to the bottom that commoditizes your service and attracts clients who will churn the moment they find something cheaper.
 
-**How to avoid:**
-In the client's `voice_persona` field, explicitly instruct GPT-4o to weight content quality over audio energy for this show type. Alternatively, add a `clip_selection_mode` field to the client YAML (`energy` vs. `content`) that controls whether the energy candidates block is included in the prompt at all.
+**Consequences:**
+- Pricing at $50/episode signals a hobbyist tool, not a professional service
+- Clients who buy on price leave on price — highest churn segment
+- You're leaving 5–10x revenue on the table relative to what the market will bear
 
-**Warning signs:**
-- Selected clips are all loud/overlapping-talk moments, not substantive ones
-- For solo-host podcasts, all energy scores cluster in a narrow range (0.3–0.7 for all segments)
-- GPT-4o picks clips from the energy candidates list even when the transcript content is mundane
+**Prevention:**
+Market rates in 2026 for full-service podcast production:
+- Basic editing only: $200–500/episode
+- Full production (edit + clips + social + SEO): $500–2,000/episode
+- Monthly retainer (4 episodes + distribution): $1,500–5,000/month
+
+Position on outcomes (saved time, professional distribution, consistent publishing) not on the automation that enables it. Prospects don't care that it's AI — they care that their show sounds professional and gets published on time.
+
+Start with a per-episode price in the $300–600 range for small shows. Move to monthly retainers as quickly as possible — retainers create predictable revenue and lower churn.
+
+**Detection:**
+If your first instinct is "what does it cost me" rather than "what is it worth to them," you're pricing from the wrong direction.
 
 **Phase to address:**
-Phase 2 (Integration Fix) — after first-pass processing reveals clip quality issues for non-comedy genres.
+Outreach template phase (before any pricing is communicated to prospects).
 
 ---
 
-### Pitfall 4: Compliance Checker Is Tuned to Not Flag Comedy Content, Which May Miss Real Violations in Other Genres
+### Pitfall 4: The Demo Doesn't Match the Show's Brand or Tone
 
 **What goes wrong:**
-The compliance checker prompt was explicitly calibrated to avoid over-flagging: "Dark humor and profanity are NOT violations; only genuine hate speech and dangerous misinformation." For a true crime podcast discussing sensitive topics (child abuse, racial violence, extremism), the permissive threshold may under-flag content that YouTube's actual moderation would catch. The inverse is also true: if the client runs a family-friendly or educational channel, profanity that the checker ignores is a genuine violation for that client's context.
+The pipeline's AI-generated content — episode title, social captions, blog post, chapter titles — reflects the voice persona in the client YAML config. If you process a prospect's episode using the wrong voice persona (or the Fake Problems fallback), the demo output reads as off-brand. A serious true crime show gets captions with dark comedy framing. A professional B2B interview show gets irreverent chapter titles. The prospect sees output that sounds nothing like their show and concludes the tool doesn't work.
 
 **Why it happens:**
-`ContentComplianceChecker` uses a single hardcoded prompt. There is no per-client compliance profile. The checker was validated against comedy content only and its calibration reflects that.
+The pipeline defaults to the Fake Problems voice. Processing a new show's episode requires explicitly setting up a client YAML with an appropriate voice persona before running. Under time pressure, it's easy to skip this step.
 
-**How to avoid:**
-Add a `compliance_style` field to the client YAML (`permissive` / `standard` / `strict`). For demo purposes, manually review compliance checker output for the first episode per genre before treating it as reliable. Do not include compliance results in the sales demo without manual verification.
+**Consequences:**
+- Prospect dismisses the demo as "not what we'd want" even if the technical quality is excellent
+- You've invested 30–60 minutes of processing time on a demo that can't be used
+- Worse, if you send a demo with comedy framing to a true crime host, it may read as mockery of their serious subject matter
 
-**Warning signs:**
-- True crime episode discussing racial violence gets 0 compliance flags
-- Family-friendly podcast episode with incidental profanity gets 0 compliance flags
-- All clients across all genres produce identical compliance result patterns
+**Prevention:**
+Before processing any demo episode, spend 20–30 minutes listening to the show and writing a voice persona description in the client YAML. Use their actual episode descriptions and social posts as style references. Run the pipeline with this persona set, then manually review AI-generated output before packaging the demo.
+
+Never send a demo without reading the blog post and social captions first. These are the outputs prospects will evaluate most critically.
+
+**Detection:**
+Review the demo output before sending. If the blog post or captions don't sound like the show you listened to, the voice persona is wrong.
 
 **Phase to address:**
-Phase 2 (Integration Fix) — after first processing run surfaces compliance gaps per genre.
+Demo production phase. Add a mandatory pre-send review step in the outreach workflow.
 
 ---
 
-### Pitfall 5: Whisper Base Model Degrades Significantly on Real-World Client Audio Quality
+## Moderate Pitfalls
+
+### Pitfall 5: Over-Automating Outreach Triggers Spam Filters and Kills Deliverability
 
 **What goes wrong:**
-Whisper (`base` model by default) was validated on Fake Problems WAV files: ~700MB, 70-minute studio recordings with two close-mic'd hosts. Real podcast clients may supply heavily compressed MP3s, phone recordings, laptop mic audio, multi-room echo, or non-native English speakers. Transcription accuracy on these inputs can drop from ~95% word accuracy to 70–80%, which cascades into broken censor timestamps (direct word search misses misspelled words), poor clip selection (GPT-4o works from a garbled transcript), and unusable subtitle clips.
+Tempted by the automation capabilities of the pipeline, you build an automated outreach sequence — auto-generated pitch emails, automated follow-ups, bulk sending. Google's spam policies (hard enforcement since November 2025) reject messages from domains without DMARC/DKIM/SPF. Safe sending limits are 50–100 cold emails per day per mailbox. Above this threshold, spam filters engage and domain reputation degrades — which means future legitimate emails also land in spam.
 
-**Why it happens:**
-`Config.WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")` — model is configurable but defaults to `base`, the weakest Whisper variant. No per-client model override exists in the client YAML.
+For a service that sells to a small community (independent podcasters), spam reports are especially damaging. Podcasters are an interconnected community. One host who marks your email as spam and posts about it in a community Slack or Discord can dry up a segment of your prospect pool.
 
-**How to avoid:**
-Add `whisper_model` to the client YAML content section. For new clients with unknown audio quality, use `small` or `medium` for the initial test run. Validate transcript quality by skimming the output JSON before continuing past Step 2. Set a pre-flight minimum quality bar (e.g., no severe clipping, file at least -30 LUFS average).
+**Prevention:**
+Send cold outreach manually or with minimal automation. At 3–5 prospects, no automation is needed. Configure DMARC/DKIM/SPF before sending any cold email from your domain. Personalize each pitch — reference a specific episode, a specific problem visible in their current distribution (no clips, no transcript, sporadic schedule). The goal is 3–5 prospects, not 300.
 
-**Warning signs:**
-- Transcript contains obvious wrong words or garbled proper nouns
-- Episode title generated by GPT-4o doesn't match episode content at all
-- `censor_timestamps` is empty even when host names are known to appear in the episode
+**Detection:**
+Bounce rates above 5% or open rates below 20% on cold outreach suggest deliverability problems. If your email platform flags your domain reputation, stop sending immediately.
 
 **Phase to address:**
-Phase 1 (Client Setup) — confirm audio quality and set appropriate Whisper model before processing. Add a manual transcript spot-check step before proceeding.
+Outreach execution phase. Keep volume at manually manageable levels (under 10 per day).
 
 ---
 
-### Pitfall 6: Episode Numbering Assumption Breaks for Non-Sequential or Non-Numeric Episode IDs
+### Pitfall 6: Overpromising What the Pipeline Can Do
 
 **What goes wrong:**
-The pipeline parses episode numbers from filenames using the `ep25` convention. Many podcasts use date-based filenames (`2024-03-15-episode-title.wav`), descriptive slugs (`cold-case-greenville.mp3`), or season/episode notation (`S01E03`). The `episode_number` field in `PipelineContext` drives checkpoint keys, output directory names, analytics storage, RSS entry creation, and search index entries. If parsing fails and resolves to `None`, all episodes map to the same state key — which silently breaks checkpoint resume (subsequent runs overwrite the first) and analytics (records overwrite each other).
+The pipeline is impressive on paper: transcription, AI analysis, clips, subtitles, blog post, YouTube upload, RSS update. In the pitch, these become "fully automated end-to-end podcast production." The prospect signs up expecting hands-off delivery. Reality: the pipeline requires a working Dropbox setup, proper client YAML configuration, GPU hardware, occasional manual clip approval, and review of AI output before distribution. When the client encounters friction — a file format issue, a voice persona that needs tuning, a compliance flag requiring human judgment — the gap between "fully automated" and "requires your involvement sometimes" creates disappointment and distrust.
 
-**Why it happens:**
-Episode number extraction in `run_ingest` is built around the Fake Problems naming convention. There is no per-client episode number extraction strategy in the current YAML schema.
+**Prevention:**
+Describe what the pipeline does accurately: "I run your raw audio through a production pipeline that handles editing, clips, subtitles, and distribution. You review and approve before anything goes live." The approval step is a feature, not a limitation — it's quality control that protects their brand.
 
-**How to avoid:**
-Before processing a real client's first episode, run `--dry-run` and confirm the resolved `episode_number` is meaningful. For date-based filenames, pre-rename files to the `ep01_original-name` convention before processing, or derive a sequential number from the Dropbox folder listing order.
+Be explicit about what requires their involvement: providing the raw audio file, reviewing the output once per episode, and approving clips before distribution. This is still dramatically less work than manual production.
 
-**Warning signs:**
-- Output directory named `ep_None` or `ep_0`
-- Checkpoint file named with `None` as the episode key
-- Second episode processing overwrites the first episode's checkpoint state
+**Detection:**
+If your pitch uses the phrase "fully automated" or "zero effort," you've probably overpromised.
 
 **Phase to address:**
-Phase 1 (Client Setup) — verify with `--dry-run` before live processing.
+Outreach template phase. Review pitch language for accuracy before sending.
 
 ---
 
-### Pitfall 7: Hardcoded Podcast Name in GPT-4o Prompt Leaks into Client AI Output
+### Pitfall 7: Pitching the Tool Instead of the Outcome
 
 **What goes wrong:**
-`content_editor.py` line 287 embeds `Config.PODCAST_NAME` directly into the analysis prompt: `You are analyzing a podcast transcript for "{Config.PODCAST_NAME}"`. The blog generator also reads `Config.NAMES_TO_REMOVE` for its own prompt. If `activate_client()` is called before components are instantiated, the overrides are applied correctly. But if any component is instantiated before `activate_client()` — or in test/dry-run mode where client config isn't loaded — Fake Problems values bleed through.
+The pitch focuses on the technology: "I built a Python pipeline with Whisper transcription, GPT-4o analysis, and automated YouTube upload." The prospect doesn't care about the implementation. They care about the outcome: consistent publishing, professional clips for social, time saved.
 
-**Why it happens:**
-`Config` class attributes are read at the moment `_build_analysis_prompt()` is called, not at component init time. This is correct behavior. But the risk is that any path through the code that bypasses `activate_client()` (a test, an isolated dry-run, a direct runner invocation) will use Fake Problems defaults.
+**Prevention:**
+Lead with the problem the prospect has, not the solution you built. Example framing: "I noticed your show hasn't released a clip to Instagram in three months. I can produce 3 ready-to-post clips per episode, plus a blog post and YouTube upload, starting this week." Then show the demo as evidence, not as the pitch.
 
-**Warning signs:**
-- Blog post for a client mentions "Fake Problems Podcast"
-- Social captions reference the wrong show name
-- `validate-client` passes but processed output contains wrong podcast name
+**Detection:**
+Read your pitch email. If the first mention of "what you get" comes after a technical description of how it works, restructure it.
 
 **Phase to address:**
-Phase 1 (Client Setup) — add an assertion in `validate-client` that checks `Config.PODCAST_NAME` matches the YAML `podcast_name` after activation.
+Outreach template phase. Write outcome-first templates before any pitching.
 
 ---
 
-## Technical Debt Patterns
+### Pitfall 8: Sending Generic Pitches That Don't Reference the Specific Show
 
-| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
-|----------|-------------------|----------------|-----------------|
-| Hardcoded voice examples in `_build_analysis_prompt` | Works perfectly for Fake Problems | Every new genre requires code changes, not config changes | Never for multi-client use |
-| `Config.NAMES_TO_REMOVE` falls back to Fake Problems list | Safe default for original use case | Incorrect censorship for all new clients unless explicitly cleared in YAML | Never — should default to empty list for new clients |
-| Single compliance prompt for all clients | Simple, no per-client complexity | Under/over-flags content for different genres | Only for single-client deployment |
-| `WHISPER_MODEL = "base"` global default | Fast processing on known good audio | Poor accuracy on real-world client audio | Acceptable for Fake Problems only |
-| Episode number from filename convention | Simple, works for ep25 naming | Breaks for any client using date or slug naming | Acceptable only after explicit pre-flight check |
+**What goes wrong:**
+83% of podcast hosts reject pitches that don't demonstrate familiarity with their show. A pitch email with "Hi [Name]" merged in but no specific show knowledge reads as a template blast. Getting the podcast name wrong, referencing a topic they covered years ago, or sending the same pitch to a comedy show and a true crime show signals you haven't listened.
 
----
+**Prevention:**
+For each prospect: listen to at least one episode, note one specific episode detail you can reference, and customize the first paragraph of the pitch. Reference the specific episode you processed for the demo. The personalization effort also forces the minimum research required to set the voice persona correctly.
 
-## Integration Gotchas
+**Detection:**
+If you can copy-paste your pitch to a different prospect without changing any content detail, it's too generic.
 
-| Integration | Common Mistake | Correct Approach |
-|-------------|----------------|------------------|
-| Dropbox for new client | Assuming episode files are WAV; many clients deliver MP3 | Confirm file format before processing; pydub handles MP3 but some path logic assumes WAV extension |
-| YouTube token per client | Using the global token pickle path without setting `youtube.token_pickle` in the client YAML | Each client needs its own token pickle path — they cannot share a single OAuth token |
-| RSS feed output | All clients write to the same `podcast_feed.xml` unless output dirs are isolated | Confirm `OUTPUT_DIR` is client-specific before the RSS step runs |
-| Compliance checker | Running compliance before reviewing transcription accuracy | Compliance results are only meaningful if the transcript is accurate — spot-check transcript first |
-| Audio energy candidates | Passing energy candidates to GPT-4o for a flat-energy interview podcast | Consider suppressing the energy block for shows where RMS variance is low |
+**Phase to address:**
+Outreach template phase. Templates should have explicit [PERSONALIZATION REQUIRED] placeholders.
 
 ---
 
-## Performance Traps
+## Minor Pitfalls
 
-| Trap | Symptoms | Prevention | When It Breaks |
-|------|----------|------------|----------------|
-| Whisper `base` on CPU | 30–45 min transcription per episode | Confirm CUDA is available; set `WHISPER_MODEL=small` minimum for unknown audio | Immediately on CPU-only or shared machines |
-| pydub loading full 700MB WAV | ~4GB RAM peak during energy scoring | Not a new issue but confirm client files aren't multi-track or unusually large | Files >90 min or files larger than ~800MB |
-| GPT-4o cost for demo run | ~$0.50–0.80 per episode × 3 clients | Budget ~$3 for initial test runs; not a problem at this scale | Non-issue at 2–3 client demo scale |
+### Pitfall 9: No Contact Tracking Leads to Duplicate Outreach
 
----
+**What goes wrong:**
+Without tracking who has been contacted, when, and what response they gave, you risk following up too aggressively (damaging the relationship) or losing warm leads who responded positively but weren't ready to commit.
 
-## Security Mistakes
+**Prevention:**
+Even a simple spreadsheet with: prospect name, show name, contact date, channel (email/DM), response, follow-up date. For 3–5 prospects, this is a 10-minute setup.
 
-| Mistake | Risk | Prevention |
-|---------|------|------------|
-| Committing real client credentials in YAML | Credential exposure in git history | Confirm `clients/*.yaml` is in `.gitignore` except `example-client.yaml`; use `null` values + env vars |
-| Demo using private client episode content | Client content shared without consent | Use publicly available episodes for demos; get explicit permission before processing private audio |
-| Shared Dropbox credentials across clients | One client's revoked token breaks all | Each client config specifies its own Dropbox credentials |
+**Phase to address:**
+Outreach tooling phase.
 
 ---
 
-## UX Pitfalls
+### Pitfall 10: Failing to Get Permission for Demo Use = Demos You Can't Share
 
-| Pitfall | User Impact | Better Approach |
-|---------|-------------|-----------------|
-| `--auto-approve` on first client test run | Bad clips reach the demo package without review | Always run interactively on first episode per client to calibrate expectations |
-| Demo output not reviewed before presenting | Prospective client sees wrong tone, wrong podcast name, or garbled AI output | Establish a manual review gate before packaging any demo artifact |
-| Clip approval UI showing no genre context | Reviewer can't tell if a quiet moment is good for true crime vs. comedy | Add genre note from `voice_persona` to clip approval display, or add reviewer notes in the demo package |
+**What goes wrong:**
+Even if you process a prospect's episode with their permission, you cannot later use that demo as a public portfolio piece or reference without separate permission. Clients may not want their content used in your marketing.
 
----
+**Prevention:**
+When asking for demo consent, ask explicitly: "May I use this as an example in my portfolio?" Keep separate from "may I process your episode." Most will say yes, but don't assume.
 
-## "Looks Done But Isn't" Checklist
-
-- [ ] **Config override active:** After `activate_client()`, print `Config.PODCAST_NAME`, `Config.NAMES_TO_REMOVE`, `Config.WORDS_TO_CENSOR` — confirm they match the client YAML, not Fake Problems defaults
-- [ ] **Voice persona in prompt:** Check debug log of `_call_openai_with_retry` — confirm system prompt is the client voice, not the Fake Problems fallback
-- [ ] **Voice examples block:** Confirm Fake Problems-specific BAD/GOOD examples (lobster immortality, etc.) are absent from the GPT-4o prompt for non-comedy clients
-- [ ] **Output directory isolation:** Confirm `Config.OUTPUT_DIR`, `Config.CLIPS_DIR`, and `Config.DOWNLOAD_DIR` are client-specific paths before ingest starts
-- [ ] **RSS isolation:** Verify RSS generator writes to client-specific output dir, not global `podcast_feed.xml`
-- [ ] **Episode number resolves:** Run `--dry-run` and confirm `episode_number` is a meaningful value for the client's filename convention
-- [ ] **Transcript quality:** Skim first 10 segments of the generated transcript JSON before proceeding past Step 2
-- [ ] **Compliance calibration:** Manually review compliance output for first episode per genre — confirm it's appropriate for that content type and channel
-- [ ] **Demo artifacts reviewed:** All demo output (clips, thumbnail, blog post, social captions) manually reviewed for correct client voice before presenting to prospective client
+**Phase to address:**
+Demo production phase.
 
 ---
 
-## Recovery Strategies
+### Pitfall 11: Pricing Conversation Before Demo Delivery Kills Deals
 
-| Pitfall | Recovery Cost | Recovery Steps |
-|---------|---------------|----------------|
-| Wrong host names censored | LOW | Fix YAML `names_to_remove`, delete `analyze` and `censor` checkpoint keys, re-run from Step 3 (transcription preserved) |
-| Wrong voice persona in output | LOW | Fix YAML `voice_persona`, delete `analyze` checkpoint key, re-run Step 3 and downstream |
-| Poor transcript quality | MEDIUM | Set `WHISPER_MODEL=small` or `medium` in client YAML, delete `transcribe` checkpoint, re-run all steps |
-| Episode number parsed as None | LOW | Rename source file to `ep01_original-name.ext` convention before re-run |
-| Demo presented with wrong tone or podcast name | HIGH | Full re-run with corrected config + manual review of all output before re-presenting |
-| Fake Problems host names censored in client audio | LOW | Fix YAML `names_to_remove: []`, delete `analyze` and `censor` checkpoints, re-run from Step 3 |
+**What goes wrong:**
+Mentioning pricing in the initial cold outreach (or in the same message as the demo offer) frames the demo as a sales attempt rather than a gift. Prospects disengage before seeing the output.
+
+**Prevention:**
+Lead with the free demo offer. No pricing in cold outreach. Pricing conversation happens after the prospect has seen the output and expressed interest.
+
+**Phase to address:**
+Outreach template phase.
 
 ---
 
-## Pitfall-to-Phase Mapping
+## Phase-Specific Warnings
 
-| Pitfall | Prevention Phase | Verification |
-|---------|------------------|--------------|
-| NAMES_TO_REMOVE leakage | Phase 1: Client Config Setup | `--dry-run` prints active `Config.NAMES_TO_REMOVE`; confirm it is empty or matches client hosts |
-| Voice persona not applied | Phase 1: Client Config Setup | Check GPT-4o system prompt in debug log before full run |
-| Fake Problems voice examples in prompt | Phase 2: Integration Fixes | Review analysis output for first client; fix prompt logic if genre mismatch detected |
-| Energy scoring wrong for genre | Phase 2: Integration Fixes | Review clip selection quality after first client run; suppress energy block if needed |
-| Compliance calibration wrong | Phase 2: Integration Fixes | Manual review of compliance output for first episode per genre |
-| Whisper model too weak | Phase 1: Client Config Setup | Add `whisper_model` to client YAML; use `small` minimum for unknown audio quality |
-| Episode number parse failure | Phase 1: Client Config Setup | `--dry-run` confirms `episode_number` resolves to a non-None value |
-| Hardcoded podcast name leaks | Phase 1: Client Config Setup | `validate-client` checks `Config.PODCAST_NAME` matches YAML after activation |
-| Demo output not reviewed | Phase 3: Demo Packaging | Manual review gate before packaging; never use `--auto-approve` on first client run |
+| Phase Topic | Likely Pitfall | Mitigation |
+|-------------|---------------|------------|
+| Prospect identification | Targeting shows too large or too small | Define ICP criteria (1K–20K downloads, monetization signal, no current production service) before building list |
+| Demo production | Processing without permission | DM/email for consent before running pipeline; use Fake Problems as fallback demo |
+| Demo production | Wrong voice persona in output | Listen to show, write persona before processing; review all AI output before packaging |
+| Demo production | Pipeline defaults to Fake Problems config | Always pass `--client <prospect-name>` with a configured YAML; never use default client |
+| Outreach templates | Pitch sounds like a template | Write outcome-first; include specific show reference in paragraph 1 |
+| Outreach execution | Over-automation, spam risk | Manual sending only at 3–5 prospect scale; configure DMARC/DKIM/SPF first |
+| Pricing conversation | Under-pricing based on cost | Price on value delivered ($300–600/episode entry point); lead with retainer framing |
+| Expectation setting | Overpromising automation | Use "I handle production, you review and approve" framing — never "fully automated" |
+| Follow-up | No tracking, duplicate contact | Build simple contact log before first outreach |
+
+---
+
+## Legal Considerations Summary
+
+The following are practical risk assessments, not legal advice.
+
+| Action | Risk Level | Notes |
+|--------|------------|-------|
+| Processing public episode without consent for private demo use | MEDIUM | Fair use likely does not apply for commercial derivative works; voice is personal data under GDPR |
+| Processing public episode with explicit prospect consent | LOW | Consent resolves both copyright and GDPR concerns |
+| Using Fake Problems episodes as demo of capabilities | LOW | You own the content |
+| Distributing processed output publicly without permission | HIGH | Do not do this |
+| Transcribing and processing an episode, then deleting all outputs | LOW | Transient processing with no distribution has minimal exposure |
+| Using processed demo as portfolio without permission | MEDIUM | Requires separate explicit permission from the prospect |
 
 ---
 
 ## Sources
 
-- Direct codebase analysis: `content_editor.py` lines 11–17, 85, 209, 263–285, 287, 465–570
-- Direct codebase analysis: `config.py` lines 132, 141–186
-- Direct codebase analysis: `client_config.py` lines 77–182
-- Direct codebase analysis: `audio_clip_scorer.py` full file
-- Direct codebase analysis: `pipeline/steps/analysis.py`, `pipeline/steps/audio.py`
-- Project history: `PROJECT.md` lines 129–130 (compliance calibration decisions and rationale)
-- Client config templates: `clients/example-client.yaml`, `clients/fake-problems.yaml`
+- [Podcasting Copyright Laws - async.com](https://async.com/blog/podcasting-copyright-laws/)
+- [Podcasting Legal Guide - Creative Commons](https://wiki.creativecommons.org/wiki/Podcasting_Legal_Guide)
+- [How to Avoid Copyright Infringement on a Podcast - Copyright Alliance](https://copyrightalliance.org/how-to-avoid-copyright-infringement-on-podcasts/)
+- [How do the rules on audio recording change under GDPR? - IAPP](https://iapp.org/news/a/how-do-the-rules-on-audio-recording-change-under-the-gdpr)
+- [GDPR Compliance for Voice-to-Text Services - GDPR Advisor](https://www.gdpr-advisor.com/gdpr-compliance-for-voice-to-text-services-and-transcription-platforms/)
+- [Podcast Production Pricing Guide 2026 - Rise25](https://rise25.com/lead-generation/podcast-production-pricing/)
+- [Podcast Editing Pricing Models - PricingLink](https://pricinglink.com/knowledge-base/podcast-production-marketing-services/podcast-editing-pricing-models/)
+- [6 cold outreach mistakes to avoid in 2026 - Outsource Accelerator](https://www.outsourceaccelerator.com/articles/cold-outreach/)
+- [Cold Email Outreach Best Practices 2025-26 - Cleverly](https://www.cleverly.co/blog/cold-email-outreach-best-practices)
+- [Common mistakes choosing the right podcast to pitch - PR Daily](https://www.prdaily.com/common-mistakes-in-choosing-the-right-podcast-for-your-media-relations-pitch/)
+- [What Google's Spam Changes Mean for B2B Cold Email - Outbound Republic](https://outboundrepublic.com/blog/what-googles-spam-changes-mean-for-b2b-cold-email-in-2025/)
+- [Cold Email Sending Limits 2025 - Topo](https://www.topo.io/blog/safe-sending-limits-cold-email)
+- [Setting Realistic Expectations for AI Projects - PMI](https://www.pmi.org/blog/setting-realistic-expectations-ai-projects)
+- [ALP 279: Setting client expectations in the AI era - FIR Podcast Network](https://www.firpodcastnetwork.com/alp-279-setting-client-expectations-in-the-ai-era/)
+- [Are Your Reps Pitch Slapping Their Prospects? - LinkedIn](https://www.linkedin.com/pulse/pitch-slapping-linkedin-why-bad-news-sellers-buyers-peter)
+- Existing codebase pitfalls (technical): `.planning/research/PITFALLS.md` prior version (2026-03-28)
 
 ---
-*Pitfalls research for: Cross-genre podcast pipeline testing (v1.4 real-world client testing)*
+
+## Note on Prior Pitfalls File
+
+This file replaces the previous `PITFALLS.md` which covered **technical/pipeline pitfalls** for v1.4 (cross-genre testing). Those findings remain valid and are documented in the git history. The v1.5 milestone is a go-to-market milestone — the primary risks are no longer in the code.
+
+---
+
+*Pitfalls research for: v1.5 First Paying Client — sales, outreach, and demo delivery*
 *Researched: 2026-03-28*

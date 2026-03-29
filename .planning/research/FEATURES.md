@@ -1,242 +1,402 @@
-# Feature Research
+# Feature Landscape: Client Acquisition & Outreach Tooling
 
-**Domain:** Podcast production service — real-world client testing and sales demo packaging
+**Domain:** Podcast production service — prospect discovery, pitch, and contact tracking
 **Researched:** 2026-03-28
-**Milestone:** v1.4 — Real-World Testing & Sales Readiness
+**Milestone:** v1.5 — First Paying Client
 **Confidence:** MEDIUM
 
 ---
 
 ## Context
 
-The pipeline is fully built (570 tests, all features shipped through v1.3 + multi-client YAML).
-This research answers: what does a compelling sales demo look like, what genre-specific tuning
-is needed for non-comedy podcasts, and how do production services win clients.
+The pipeline is fully built and the demo packager (`package-demo` command) is shipped. The gap is
+entirely go-to-market: finding the right podcast prospects, qualifying them, processing a demo with
+their real audio, and converting them with a credible cold outreach pitch.
 
-The pipeline already produces: cleaned audio, clips with burned-in captions, show notes, thumbnails,
-social captions, compliance reports, chapters, RSS, and YouTube upload. The gap is packaging and
-positioning that output as a persuasive demo for prospects.
+This research answers:
+1. Where do you find small independent podcast prospects worth pitching?
+2. What criteria disqualify or qualify a show as a good target?
+3. What does a cold outreach pitch need to include to convert?
+4. What does lightweight contact tracking look like for a solo outreach campaign?
+
+Existing artifacts that feed into this:
+- `demo_packager.py` + `package-demo` command — produces self-contained demo folder with HTML
+  summary and DEMO.md narrative
+- `templates/demo_summary.html.j2` — HTML summary template
+- Per-client YAML configs already support genre-specific voice personas
 
 ---
 
-## Feature Landscape
+## Table Stakes
 
-### Table Stakes (Prospects Expect These)
-
-Features a prospective client assumes exist when evaluating any production service.
-Missing these = demo feels incomplete before quality is even assessed.
+Features without which the outreach effort cannot begin or will fail.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Before/after audio clip | Strongest single proof point. Prospects want to hear the transformation in 60 seconds | MEDIUM | Not currently packaged. Need to snapshot raw audio before censor/normalize steps, then extract matching timestamp segment from both raw and processed for side-by-side |
-| 2-3 social clips with captions per genre | Every production service delivers this. Swell AI, Castmagic, Descript all lead with clips | LOW | Already built. Demo folder must include 2-3 `.mp4` clip files with burned-in subtitles per client genre |
-| Show notes / blog post sample | Every agency includes show notes as a deliverable. Absence signals incomplete service | LOW | Already built: BlogPostGenerator. Demo package must include the generated `.md` or `.html` output |
-| Platform-specific social captions | Ready-to-post copy per platform is baseline expectation from any content service | LOW | Already built: analysis dict contains `social_captions` per platform. Must be included in demo folder as a readable `.txt` |
-| Episode thumbnail | Visual identity is table stakes for YouTube. First thing a prospect looks at | LOW | Already built: ThumbnailGenerator. Include the `.png` in demo package |
-| Chapter list / timestamps | Podcast apps show chapters. Prospects who listen on Overcast/Pocket Casts notice immediately | LOW | Already built: chapter_generator + RSS Podcasting 2.0. Format as a readable list in demo |
-| Genre-appropriate tone in AI-generated content | Show notes and captions must sound like the show, not a generic template | MEDIUM | Current per-client YAML `voice_persona` and `blog_voice` fields support this. Requires prompt engineering per genre before demo runs |
-| One-page explanation of what was automated | Prospects cannot evaluate what they cannot understand. The demo output means nothing without a narrative | LOW | New deliverable: `DEMO.md` per client explaining each artifact, what was automated, and estimated time saved |
+| Prospect list (3-5 shows) | You cannot pitch zero people. Every other feature depends on this | LOW (research, not code) | Use Listen Notes API (free tier: 30 results/query, genre + episode count filters). Also: manual search on Apple Podcasts, Spotify by genre + scroll for small shows with 50-500 reviews |
+| Prospect qualification criteria | Not every small podcast is a good target. Need filters to avoid wasting demo cycles on shows that will never pay | LOW (criteria doc, not code) | See qualification filter list below |
+| Contact extraction from RSS | The `<itunes:email>` tag in the show's RSS feed is the most reliable contact point — more reliable than website forms | LOW (Python feedparser, already in deps) | Parse RSS, extract `itunes:owner/itunes:email` or `managingEditor`. Fall back to website scrape. Already have feedparser. |
+| Email pitch template | Generic outreach fails. Template must lead with their show, open with value to them, and attach a tangible demo artifact | LOW (copywriting, not code) | See pitch template section. Personalization beats volume. |
+| Demo folder per prospect | Prospects cannot evaluate abstract claims. They need to hear and see the output from THEIR episode | MEDIUM (one pipeline run per prospect) | Already supported by `package-demo`. Run pipeline on a public episode of their show. Include before/after audio — this is the single fastest trust-builder. |
+| Contact tracker | Even 5 prospects need a log: who was contacted, when, which email variant, reply status, follow-up due date | LOW (CSV or flat JSON, not a CRM) | See contact tracking section. Do not build software for this — use a spreadsheet or plain JSON file. |
 
-### Differentiators (Competitive Advantage)
+---
 
-Features that separate this pipeline from Swell AI, Castmagic, Descript, and one-person editors.
-These are where the demo wins or loses.
+## Differentiators
+
+Features that make this outreach stand out from generic freelancer cold outreach.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| One command → full pipeline output | Prospect sees everything produced from a single run, not 12 tools stitched together. No SaaS subscriptions. | LOW | Demo README must open with: `uv run main.py --client <name> ep1` → all deliverables appear in `output/<client>/<ep>/` |
-| Per-client voice persona in AI content | Generated content sounds like the show, not a generic template. True crime narrative vs. business insight vs. comedy edge — each demo artifact should be unmistakably genre-matched | MEDIUM | YAML persona config exists and works. Demo must show genre-distinct show notes side-by-side to make this tangible |
-| Compliance-gated upload safety | Catches content that would trigger YouTube/Spotify guideline violations before they happen. Critical for brand podcasts with reputational stakes | LOW | Already built. Include a compliance report `.txt` in demo package. This is a differentiator no SaaS tool offers |
-| Audio ducking censorship (not a beep) | Professional duck-fade sounds hand-edited. Prospects have heard beep censorship on bad tools. The before/after comparison makes this immediately audible | LOW | Demo must include explicit before/after audio for this one feature alone. It's the fastest trust builder |
-| Energy-scored clip selection | Clips are selected by a scoring model, not random timestamps. Prospect can see why each clip was chosen | MEDIUM | AudioClipScorer already runs and writes scores. Expose the top-3 scores and reasoning in the demo package |
-| EBU R128 / LUFS audio mastering | Real broadcast-standard loudness normalization. Podcasts submitted to Spotify require -14 LUFS. Most one-person editors do not do this correctly | LOW | Include the measured LUFS value before/after normalization in the demo README |
-| Full pipeline cost: near-zero per episode | OpenAI tokens + local Whisper. No per-seat SaaS. Scales from 1 to 100 clients without per-unit pricing | LOW | Include cost estimate in demo README. This is a competitive moat vs. Swell AI ($29-99/mo) and editor time ($50-200/ep) |
+| Demo built from prospect's own episode | Every other editor says "here's our portfolio." This pipeline says "here's YOUR episode, processed." Personal demos convert at higher rates because they eliminate imagination from the prospect's evaluation | MEDIUM (one pipeline run per prospect; ~40 min per episode) | Process one episode per prospect before outreach. Package with `package-demo`. Send demo link or zip in initial email. |
+| Estimated time-saved table in DEMO.md | Hosts understand their own time cost better than abstract quality claims. "6-11 hours saved per episode" is a number they can act on | LOW (already in DEMO.md template) | DEMO.md already has time-saved table. Verify accuracy of manual-edit time estimates against industry data (confirmed: transcription 2-3h, show notes 1-2h, clips 2-4h). |
+| Cost-per-episode breakdown | "~$1-2 per episode in AI costs" is a differentiator vs. freelance editors ($50-200/ep) and SaaS tools ($29-99/mo). Positions this as something that pays for itself in two episodes | LOW (already in DEMO.md template) | Include this number in both the email and the DEMO.md. It is a competitive moat. |
+| Before/after audio segment | 60 seconds of raw vs. processed audio is more persuasive than any written claim about audio quality. Duck-fade censorship, LUFS normalization, and noise reduction all show up in the listening test | MEDIUM (pipeline snapshot already shipped in v1.4) | Raw audio snapshot before censor step is already implemented. `demo_packager.py` already surfaces before/after. Confirm it is working per-client before outreach. |
+| Pitch generated from demo metadata | Instead of a generic email, a pitch that names the specific episode processed, the LUFS improvement, the number of clips extracted, and one specific show note line — demonstrates that the system ran on their show | LOW (post-processing, no new infra) | See pitch generator feature below. Reads from `_analysis.json` and DEMO.md to populate a personalized email template. |
+| Genre-matched content tone | Show notes and social captions that sound like the show — not a generic template — prove the system understands context, not just structure | MEDIUM (persona tuning required per show before pipeline run) | Write a genre-appropriate voice_persona in the prospect's YAML before running the pipeline. This is the highest-leverage 10-minute task before each demo run. |
 
-### Anti-Features (Commonly Requested, Often Problematic)
+---
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| Live upload demo to prospect's platforms | Feels real. Shows the full pipeline | Requires their OAuth credentials. Security risk. Quota concerns. Cannot do in a meeting. Brand risk if something goes wrong | Demo the upload step logs + screenshots of a test account's YouTube/Spotify output. Describe the capability in README |
-| Fully automated publishing without human review | "Set it and forget it" appeals to busy hosts | Prospects — especially brand/business podcasts — correctly want editorial control. Removing them from the loop creates liability for content errors | Demo `--auto-approve` mode but lead with interactive clip approval workflow. Frame automation as time-saving, not human-eliminating |
-| Real-time processing during a demo meeting | Shows transparency and power | 70-minute episode: 20-40 min Whisper on GPU, another 5-10 min for analysis. No prospect sits through that | Pre-process all demo episodes. Present output artifacts, not progress bars |
-| Generic AI persona for all clients | Simpler to configure one template | Destroys the core value proposition. A true crime podcast's show notes written in comedy voice is an anti-demo | Per-client YAML persona is the correct approach. Demo must show genre-distinct outputs explicitly |
-| Filler word removal | Commonly asked about. Sounds professional | Kills comedy timing. Degrades interview cadence where verbal pauses signal thinking. High false-positive rate. Per feedback from Fake Problems hosts, this is a known bad default | Demonstrate silence trimming between segments instead. Flag filler removal as configurable but off by default. Include a note in DEMO.md |
-| Dynamic ad insertion | Monetization pitch is appealing | Requires CDN hosting, mid-roll insertion logic, IAB DAAST compliance. Fundamentally incompatible with zero-cost constraint | Explain that chapter markers are ad markers that a separate DAI system (Spotify, Acast) can hook into without pipeline changes |
+## Anti-Features
+
+Features that seem useful for outreach but are not worth building for a 3-5 prospect campaign.
+
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| Automated email sending (mail merge, sequences) | Campaign scale is 3-5 prospects. No automation needed at this volume. Risk of spam classification with a new sender domain. | Send manually from personal email. Use Gmail or FastMail. Personalize each one. |
+| Full CRM (HubSpot, Pipedrive, Airtable) | Overkill for a 5-contact list. Setup time exceeds value at this stage. | Use a flat CSV or a JSON file in `.planning/outreach/contacts.json`. 6 fields: name, show, email, sent_date, reply_status, next_action. |
+| Podcast discovery API integration in the pipeline | Finding prospects is a one-time manual task, not a recurring automated workflow (at this stage) | Research manually. Use Listen Notes free web search (no API key needed for web UI) or Apple Podcasts category pages. |
+| Video outreach (Loom demo walkthrough) | High production overhead. Only worthwhile after at least one live demo validates messaging | Send the demo folder first. If no reply after 2 follow-ups, then consider a 3-minute Loom. |
+| LinkedIn scraping or automated DM outreach | Podcast hosts are more reachable via email (from RSS feed) or Twitter/X DM. LinkedIn is for corporate podcasters, not indie shows | Prioritize RSS-extracted email. Fall back to Twitter/X DM or Instagram DM for indie hosts. |
+| SEO / content marketing to attract inbound | Weeks to months to see results. The v1.5 milestone goal is a first client within the milestone, not a marketing funnel | Do outbound until first client. Revisit inbound at v2+. |
+| Proposal generation tool | At 3-5 prospects, write proposals manually. A template doc is sufficient. | Create a single `PROPOSAL_TEMPLATE.md` in `.planning/outreach/`. Personalize per prospect. No automation. |
+
+---
+
+## Prospect Qualification Criteria
+
+What makes a podcast a good target for this service. Apply these as filters before investing a
+full pipeline run on a prospect's episode.
+
+### Must-Have Qualifiers (fail any of these = skip)
+
+| Criterion | Rationale | How to Check |
+|-----------|-----------|--------------|
+| Active show: published within 30 days | Inactive shows will not respond, and hosts who paused likely paused because of production burden — they need money or motivation, not a vendor | Check RSS feed for most recent publish date |
+| Public RSS feed | Pipeline ingests via `rss_source` YAML key. No RSS = no demo, no pipeline run | Try to fetch `https://[show].com/feed` or look up on Apple Podcasts |
+| 10-200 episodes | Too few (< 10): may be a new show that quits. Too many (> 200): likely already has a production workflow | Check episode count on ListenNotes or Apple Podcasts show page |
+| Independent / self-produced (not a network show) | Network shows have in-house production teams. Indies are the target market | Hosting platform (Buzzsprout, Anchor/Spotify, Transistor, Libsyn) in RSS feed `<generator>` tag usually signals indie. NPR/iHeart/Wondery in branding = skip |
+| Signs of production debt | Inconsistent audio quality, no show notes or very brief ones, missing chapters, no social clips, irregular publish schedule | Listen to 5 minutes of a recent episode. Check their Twitter/Instagram for clip posting. |
+| Host handles own production | If they tweet about editing their own episodes, mention "I spent the weekend editing" — high pain, low sophistication, perfect target | Check Twitter/X for complaints about production time |
+
+### Nice-to-Have Qualifiers (increase priority ranking)
+
+| Criterion | Rationale |
+|-----------|-----------|
+| 500-5,000 estimated monthly listeners | Large enough to care about quality. Small enough that they have not yet hired an editor. ListenNotes and Rephonic both estimate reach. |
+| Genre matches proven pipeline (comedy, true crime, business/interview) | Pipeline has been validated on these genres. Voice personas already exist or can be adapted quickly. |
+| Guest-heavy interview format OR solo host with strong opinion content | Interview format produces consistent structure that clips and transcribes well. Monologue/opinion shows also work well. Multi-host banter without structure is harder to clip. |
+| Twitter/X or Instagram account with < 5K followers | Signals they are trying to grow but have not yet broken through — production quality improvements have clear upside |
+| Monetization signals (Patreon, merchandise, sponsorship mentions) | Already has some revenue. More willing to pay for services that improve production value which directly supports their monetization. |
+| Positive show reviews mentioning content, not production | Listeners love the HOST but production is holding growth back. This is the most common indie podcast situation. |
+
+### Disqualifiers (hard no)
+
+| Criterion | Reason |
+|-----------|--------|
+| Network-produced (NPR, iHeart, Wondery, Audacy) | Have in-house teams. Not reachable via cold outreach. |
+| No contact information findable in RSS feed, website, or social | Cannot pitch someone you cannot reach |
+| Video-first show (primarily YouTube with podcast as audio export) | Production workflow is video-editing-first. Different toolchain, different pain points, not what this pipeline solves |
+| Older than 12 months since last episode | Inactive shows will not convert |
+| Already using a production agency (mentioned in show notes or website) | Will not switch without a compelling proof point and active dissatisfaction |
+
+---
+
+## Outreach Pitch Requirements
+
+What a converting cold pitch for a podcast production service needs. Based on research across
+podcast booking, B2B service, and freelancer outreach patterns.
+
+### Email Anatomy
+
+A cold outreach email to a podcast host must follow this structure to convert:
+
+1. **Subject line** — Show-specific, not generic. Reference their show name or a recent episode.
+   - Works: "I processed [Show Name] ep47 — here's what 6 hours of editing looks like in 38 minutes"
+   - Fails: "Podcast production services for you", "Save time on your podcast"
+   - Target: < 60 characters. Question format or curiosity gap works.
+
+2. **Opening line** — About them, not you. Never start with "I". Reference their show specifically.
+   - Works: "Your recent episode on [topic] had a great insight around [specific quote or moment]"
+   - Fails: "I'm a podcast automation specialist with 3 years experience..."
+
+3. **One-line value proposition** — Concrete time and cost claim, not abstract quality language.
+   - Works: "I ran your episode through an automated production pipeline — saved ~8 hours of editing, costs $1-2 in AI."
+   - Fails: "We offer premium podcast editing and production services"
+
+4. **Social proof or proof point** — A tangible artifact, not a claim. Link the demo folder or HTML summary.
+   - Works: "Here's what it produced from ep47: [link to demo folder or summary page]"
+   - Fails: "Our clients love us and we have a great track record"
+
+5. **Single clear ask** — One specific next step, not multiple options.
+   - Works: "Worth a 20-minute call this week to walk through it?"
+   - Fails: "Let me know if you'd like to learn more, or check out our website, or..."
+
+6. **Length** — 150-200 words maximum. Prospects scan, they do not read. If it takes longer than
+   30 seconds to read, it will not be read.
+
+### Follow-Up Cadence
+
+Research confirms: most conversions happen on follow-up, not the initial email.
+
+| Follow-Up | Timing | Content |
+|-----------|--------|---------|
+| Follow-up 1 | Day 4 after no reply | One-line check-in. Add a new piece of information — one specific metric from their demo (e.g., "Your ep47 was at -24 LUFS; broadcast standard is -14. The pipeline fixed it automatically.") |
+| Follow-up 2 | Day 10 after no reply | Short and graceful. Offer a different format — "Happy to send a 3-minute Loom walkthrough instead of a demo folder if that's easier." |
+| Follow-up 3 | Day 20 | Final contact. Acknowledge it may not be the right time. Leave the door open: "If you ever want to run an episode through the pipeline, just say the word." |
+
+After 3 follow-ups with no reply: mark as "dead" in tracker. Do not contact again for 90 days.
+
+### Pitch Personalization Requirements Per Prospect
+
+For each prospect, before sending the email, extract these from the demo run:
+
+| Field | Source | Where Used in Email |
+|-------|--------|---------------------|
+| Episode number or title processed | Demo run | Subject line and opening |
+| LUFS before/after values | `_analysis.json` or normalization log | Follow-up 1 metric |
+| Number of clips extracted | `_analysis.json` `best_clips` length | Body of email |
+| Compliance flag count | `_analysis.json` compliance section | Optional — useful if they had flags |
+| Estimated time saved | DEMO.md time-saved table | Body of email (use the 6-11 hour figure) |
+| One specific show note excerpt | `_analysis.json` `show_notes` field | Shows the AI matched their show's voice |
+
+---
+
+## Pitch Generator Feature
+
+A lightweight script that reads an existing demo output and generates a personalized email draft.
+Not a full feature — a utility script run once per prospect.
+
+**Input:** `output/<client>/<ep>/[ep_id]_analysis.json` + `demo/<client>/<ep>/DEMO.md`
+**Output:** Populated email text printed to stdout or written to `demo/<client>/<ep>/PITCH_EMAIL.txt`
+
+**Populate:**
+- Subject line variant A (statement format) and B (question format)
+- Opening line using episode title
+- Time saved estimate
+- LUFS before/after
+- Clip count
+- Demo folder link placeholder
+- Follow-up 1 with a specific metric
+
+**Complexity:** LOW. 50-100 lines of Python. Reads JSON, applies a string template, writes text.
+Does not require a new module — can live as `generate_pitch.py` at top level or as a CLI
+subcommand `uv run main.py generate-pitch --client <name> --ep <id>`.
+
+---
+
+## Contact Tracking System
+
+For 3-5 prospects, the contact tracker must take under 5 minutes to set up and zero ongoing
+maintenance beyond updating a row after each interaction.
+
+**Recommendation:** A JSON file at `.planning/outreach/contacts.json` or a CSV at
+`.planning/outreach/contacts.csv`. CSV is easier to edit by hand and open in Excel/Numbers.
+
+### Schema
+
+| Field | Type | Example |
+|-------|------|---------|
+| `prospect_id` | string | `"true-crime-weekly"` |
+| `show_name` | string | `"True Crime Weekly"` |
+| `host_name` | string | `"Sarah Jenkins"` |
+| `contact_email` | string | `"sarah@truecrimepod.com"` |
+| `contact_source` | string | `"rss_itunes_email"` / `"twitter_dm"` / `"website_form"` |
+| `demo_processed` | boolean | `true` |
+| `demo_path` | string | `"demo/true-crime-weekly/ep47/"` |
+| `email_sent_date` | date | `"2026-04-02"` |
+| `email_variant` | string | `"A"` (subject line A vs B for A/B test) |
+| `reply_status` | enum | `"no_reply"` / `"replied_positive"` / `"replied_negative"` / `"call_scheduled"` / `"closed_won"` / `"closed_lost"` |
+| `follow_up_1_date` | date | `"2026-04-06"` |
+| `follow_up_2_date` | date | `"2026-04-12"` |
+| `follow_up_3_date` | date | `"2026-04-22"` |
+| `next_action` | string | `"Send follow-up 1 on Apr 6"` |
+| `notes` | string | `"Host mentioned on ep47 they edit themselves on weekends"` |
+
+**Usage pattern:** Open the CSV, update the row after each interaction. Set a calendar reminder for
+each next_action date. This is a 30-second-per-week maintenance task.
+
+**Do not build a web interface or database for this.** At 3-5 prospects, that is over-engineering.
+The schema above in a plain CSV file is sufficient through v1.5 and likely v2.0.
+
+---
+
+## Prospect Discovery Methods
+
+Ranked by reliability and ease of extraction for this specific use case.
+
+### Method 1: Listen Notes API — Best for Programmatic Search
+
+Listen Notes API supports:
+- `GET /search` with `type=podcast`, `genre_ids` (genre filter), `episode_count_min`, `episode_count_max`
+- Free tier: 30 results per query, no rate limit specified for free plan
+- Response includes estimated `total_episodes`, `listen_score` (popularity proxy), and `rss` URL
+
+**Genre IDs to use:** Business (93), True Crime (132), Comedy (133), Society & Culture (122),
+Health & Fitness (88), Education (111). Get current IDs from `GET /genres`.
+
+**Search query approach:** Use broad genre terms ("interview" in business, "case" in true crime)
+plus `episode_count_min=10&episode_count_max=200` to target active mid-stage shows.
+
+**Confidence:** HIGH — API documentation confirms these parameters exist and the free tier supports them.
+
+### Method 2: Apple Podcasts / Spotify Category Browse — Best for Manual Inspection
+
+Browse category pages on Apple Podcasts (podcasts.apple.com/us/genre/podcasts-business/id1321)
+and scroll past the top-ranked shows into page 3-5 territory. Shows in that range:
+- Have enough listeners to care about quality
+- Have not yet broken out enough to have a team
+
+This is manual, takes 20-30 minutes per genre, but produces high-quality leads because you can
+listen to 3 minutes of audio before adding to the list.
+
+### Method 3: RSS-Extracted Contact — Best for Email Accuracy
+
+Once a show is identified, extract contact email programmatically:
+
+```python
+import feedparser
+
+feed = feedparser.parse(rss_url)
+owner = feed.feed.get("itunes_owner", {})
+email = owner.get("email") or feed.feed.get("author_detail", {}).get("email")
+```
+
+`<itunes:email>` inside `<itunes:owner>` is the most reliable contact point. Fall back to
+`<managingEditor>` or the show website's contact page.
+
+**Note:** Apple deprecated the `<itunes:owner>` tag recommendation in 2024, but most hosting
+platforms (Buzzsprout, Transistor, Libsyn, Anchor) still include it. Check before assuming it
+exists.
+
+**Confidence:** HIGH — confirmed via RSS spec and podseeker.co documentation.
+
+### Method 4: Social Media Direct Search
+
+Search Twitter/X for `"editing my podcast" OR "spent hours editing" OR "podcast editing takes"` to
+find hosts explicitly expressing the pain point in real time. These are warm leads.
+
+Similarly, Reddit r/podcasting has posts like "How long does editing take you?" — names there are
+often indie hosts who are prospects.
+
+**Confidence:** MEDIUM — this works but requires manual effort and the signal is noisy.
 
 ---
 
 ## Feature Dependencies
 
 ```
-Demo Package Output
-    └──requires──> Per-client pipeline run (fully processed episode)
-                       └──requires──> Client config (YAML: voice_persona, blog_voice, rss_metadata)
-                                          └──requires──> Public episode download or local audio file
+First paying client
+    └──requires──> Closed pitch (reply_status: closed_won)
+                       └──requires──> Compelling demo + credible email pitch
+                                          └──requires──> Demo run on prospect's episode
+                                                             └──requires──> Prospect identified + qualified
+                                                                                └──requires──> Prospect list (3-5 shows)
 
-Genre Persona Tuning (per-client YAML)
-    └──enhances──> Show notes tone
-    └──enhances──> Social caption voice
-    └──enhances──> Clip hook language in subtitle clips
-    └──must run before──> pipeline analysis step (Step 3)
+Pitch generator script
+    └──reads──> _analysis.json (from pipeline run)
+    └──reads──> DEMO.md (from demo_packager)
+    └──outputs──> PITCH_EMAIL.txt (personalized draft)
+    └──requires──> Demo has already been run per prospect
 
-Before/After Audio Comparison
-    └──requires──> Raw audio snapshot (before Step 4 censor)
-    └──requires──> Processed audio (after Step 4.5 normalize)
-    └──requires──> Matching timestamp segment extraction via FFmpeg
-    └──note──> Pipeline currently does not snapshot raw audio. Must add snapshot logic.
+Contact tracker (CSV)
+    └──no code dependencies — just a CSV file
+    └──used by──> Human (manual updates)
+    └──populated by──> pipeline run completion + email send event
 
-DEMO.md per client
-    └──requires──> Processed episode (all artifacts)
-    └──reads──> LUFS values from normalization log
-    └──reads──> Clip energy scores from analysis JSON
-    └──reads──> Compliance report from analysis step
-    └──written manually or templated──> One per genre client
-
-Compliance Report in Demo Package
-    └──requires──> Analyze step (GPT-4o compliance pass)
-    └──already generated──> Surfaces as field in analysis JSON; needs extraction to readable format
+RSS email extraction
+    └──uses──> feedparser (already in deps)
+    └──input──> RSS URL (from Listen Notes API search result or manual discovery)
+    └──output──> contact email for each prospect
 ```
 
-### Dependency Notes
+---
 
-- **Genre persona tuning must happen before running the pipeline, not after.** YAML voice_persona feeds into the GPT-4o analysis prompt. Running first, then tuning, requires re-running the analysis step.
-- **Before/after audio requires a pipeline change.** The pipeline normalizes audio in-place. A raw segment must be captured before Step 4 (censor) to enable comparison. This is medium-complexity: save a 60-second clip at a selected timestamp before the censor step runs.
-- **Demo quality multiplies with persona quality.** A generic voice_persona produces generic show notes. The whole demo looks weak. Persona tuning is the highest-leverage P1 task before running any demo episode.
-- **Real podcast sourcing unblocks everything.** Without a real public episode to run, genre tuning cannot be validated and demo artifacts cannot be generated. Client sourcing is the first dependency in the chain.
+## MVP for v1.5
+
+Minimum viable outreach that could close a first client.
+
+### Must Ship (no client without these)
+
+1. **Prospect list: 3-5 qualified shows** — Research, qualify against criteria above, record in CSV
+   (no code required, just structured research)
+
+2. **Demo run per prospect** — Process one episode per show using public RSS fetch. Takes ~40 min
+   per episode on GPU. Run `uv run main.py --client <name> ep1` + `uv run main.py --client <name> package-demo ep1`
+
+3. **Contact emails extracted** — Parse RSS for `itunes:email` or `managingEditor` for each
+   prospect. 15 lines of feedparser code or manual inspection.
+
+4. **Personalized pitch email per prospect** — Use template structure above. Personalize with
+   episode title, LUFS delta, clip count, and one specific show note excerpt. Send manually.
+
+5. **Contact tracker CSV** — Create `.planning/outreach/contacts.csv` with schema above. Update
+   after each send and reply.
+
+### Ship After First Reply
+
+6. **Pitch generator script** (`generate_pitch.py` or `generate-pitch` CLI subcommand) — Reads
+   demo JSON + DEMO.md, outputs personalized email draft. Worth building once the manual
+   approach validates messaging.
+
+7. **Proposal template** — A standard `.planning/outreach/PROPOSAL_TEMPLATE.md` with
+   scope, pricing, and onboarding steps. Write once after first interested reply.
+
+### Defer Until After First Client Signs
+
+8. **Automated prospect scraping** — Not needed until you have validated the pitch and want to
+   scale to 20+ prospects
+9. **Full CRM** — Overkill until pipeline is serving 3+ active paying clients
+10. **Inbound marketing / SEO** — Post-v1.5 concern entirely
 
 ---
 
-## MVP Definition
+## Pricing Guidance
 
-v1.4 scope. MVP here means: minimum demo that would convince a real podcast host to
-pay for production services after a 30-minute conversation or async review.
+Informed by 2025 market rates for podcast editing and production services:
 
-### Launch With (Demo v1)
+| Tier | Market Rate | Notes |
+|------|-------------|-------|
+| Freelance editor (per episode) | $50-200/episode | Manual editing. This is the primary competition for indie hosts. |
+| Mid-tier production agency (monthly) | $500-2,000/month | Full production including strategy. Too expensive for indie shows. |
+| SaaS tools (Swell AI, Castmagic) | $29-99/month | Clips + show notes only. No audio mastering, no upload. |
+| This pipeline (suggested entry price) | $75-150/episode OR $200-400/month | Cost: ~$1-3/episode in AI tokens. Margin is high. Entry price should be below freelance editor rates to remove friction from first client. |
 
-- [ ] 2-3 real genre clients configured in YAML (true crime, business/interview, one more) — no demo without this
-- [ ] Processed episode per genre with full pipeline run — no artifacts without this
-- [ ] Demo folder per client: processed MP3, 2-3 captioned clips, show notes, thumbnail, social captions `.txt`, chapter list, compliance report — the "leave-behind" a prospect reviews after the call
-- [ ] Before/after audio segment (same 60-second timestamp: raw vs processed) — fastest trust-builder; requires pipeline snapshot change
-- [ ] `DEMO.md` per client: what was automated, estimated time saved per episode, cost per episode, LUFS before/after, clip scores — the narrative that makes the artifacts make sense
+**Positioning:** "Less than you pay a freelance editor, with 10x the deliverables."
 
-### Add After Validation (Post-demo)
-
-- [ ] Genre-tuned clip scoring criteria (true crime: narrative tension; business: insight quotability) — add when real clients surface the need after seeing initial clip selection
-- [ ] Compliance report as formatted `.pdf` or standalone `.txt` deliverable — add if brand-podcast prospects specifically ask for it
-- [ ] Demo video walkthrough (screen recording + narration, 3-5 min) — useful for async cold outreach; defer until live demo is validated with at least one real prospect
-
-### Future Consideration (v2+)
-
-- [ ] White-label output (remove pipeline branding from generated content headers) — needed if reselling to agencies, not direct clients
-- [ ] Client Dropbox folder handoff automation (write all demo deliverables to a named Dropbox folder) — useful at 3+ active clients; today manual folder share is fine
-- [ ] Proposal email generator (uses episode metadata + client name to draft a pitch) — clever but premature
-
----
-
-## Feature Prioritization Matrix
-
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Genre-matched voice persona per client YAML | HIGH | LOW (YAML already supported; needs prompt text) | P1 |
-| Real public podcast sourced per genre (2-3) | HIGH | LOW (research + download) | P1 |
-| Demo output folder with all deliverables organized | HIGH | LOW (pipeline already produces files; needs folder copy logic) | P1 |
-| `DEMO.md` per client explaining artifacts | HIGH | LOW (write once, template it) | P1 |
-| True crime voice persona tuning | HIGH | LOW (prompt engineering in YAML) | P1 |
-| Business/interview voice persona tuning | HIGH | LOW (prompt engineering in YAML) | P1 |
-| Before/after audio segment comparison | HIGH | MEDIUM (requires pipeline snapshot before censor step) | P1 |
-| Clip energy scores surfaced in demo | MEDIUM | LOW (already in analysis JSON; just needs extraction) | P2 |
-| Compliance report in demo package | MEDIUM | LOW (already generated; needs extraction to readable file) | P2 |
-| Chapter list formatted for demo | MEDIUM | LOW (already generated) | P2 |
-| Genre-tuned clip scoring profiles | MEDIUM | MEDIUM (new scoring criteria in YAML per genre) | P2 |
-| Demo video walkthrough (async outreach) | MEDIUM | MEDIUM (screen recording + narration) | P3 |
-
-**Priority key:**
-- P1: Demo is incomplete without it — blocks showing anything to a prospect
-- P2: Materially improves demo quality and conversion probability
-- P3: Adds polish; defer until live demo is validated
-
----
-
-## Genre-Specific Tuning Requirements
-
-What needs to change per genre in the existing per-client YAML configuration.
-All of these map to existing `voice_persona`, `blog_voice`, and `topic_scoring` fields.
-
-### True Crime
-
-**Tone:** Narrative, investigative, empathetic. Avoids dark comedy. Avoids casual irreverence.
-**`voice_persona`:** "You are a true crime podcast producer with a background in investigative journalism. Write in a gripping, narrative voice. Use active voice. Build tension. Treat victims and families with dignity. Never make light of violence or trauma."
-**`blog_voice`:** Chronological case summary. Include trigger warnings for violence/trauma content. Avoid speculating on guilt.
-**Clip selection:** Favor moments of revelation, tension, interview testimony, case-breaking details. Avoid crosstalk, tangents, host banter.
-**Censorship word list:** Minimize. True crime rarely has profanity censorship needs. May need victim/minor name protection depending on case. No comedy-specific words.
-**Social captions:** Teaser hooks ("The one detail investigators missed for 10 years"). Avoid humor entirely. Platform: Reddit/Instagram/TikTok over Twitter.
-**Compliance:** Extra scrutiny on misinformation about active cases. Real names of minors must be flagged as compliance risk.
-**Thumbnail:** Dark palette, true crime aesthetic. May need a different Pillow template than the current comedy layout.
-
-### Business / Interview
-
-**Tone:** Authoritative, professional, insight-driven. Warm but not edgy. Guest expertise is central.
-**`voice_persona`:** "You are a business podcast producer. Write in a confident, professional voice. Lead with actionable insights. Highlight guest credentials and specific expertise. Use precise language. Avoid jargon."
-**`blog_voice`:** Key insights as numbered bullet points. Guest bio paragraph at top. Timestamp links to key moments. Resource links if mentioned in episode.
-**Clip selection:** Favor quotable insights, counterintuitive takes, concrete frameworks or numbers. Avoid long preamble, filler-heavy setup, crosstalk.
-**Censorship word list:** Minimal. Company names and competitor mentions require care. Standard light profanity list.
-**Social captions:** Insight hook on LinkedIn ("How [guest] built $X with one counterintuitive rule"), shorter for Twitter. LinkedIn is the primary platform for business podcasts.
-**Compliance:** Low inherent risk. Watch for investment advice, medical advice, or legal claims that could trigger platform financial/health content policies.
-**Thumbnail:** Guest headshot + show logo. Clean, professional layout. Corporate-friendly.
-
-### Comedy (existing Fake Problems config — baseline)
-
-**Tone:** Edgy, irreverent, dark humor. Censorship is for genuine slurs/doxxing, not punchlines.
-**Clip selection:** High-energy laugh moments, outrageous premises, unexpected punchlines, escalating bits.
-**Compliance:** Comedy-aware — profanity and dark humor are NOT violations. Genuine hate speech and dangerous misinformation are. (This is already implemented correctly.)
-
----
-
-## Competitor Feature Analysis
-
-Services prospects are already aware of or comparing against:
-
-| Feature | Swell AI / Castmagic | Descript | Manual editor ($50-200/ep) | Our Pipeline |
-|---------|----------------------|----------|---------------------------|--------------|
-| Auto clip extraction | Yes — AI highlights | Yes — manual + AI suggestions | Manual judgment | Yes — energy-scored AudioClipScorer |
-| Burned-in captions on clips | Yes — auto | Yes — manual styling | Varies | Yes — Hormozi-style word-by-word |
-| Show notes generation | Yes — voice-matched | No | Sometimes | Yes — persona-matched per client YAML |
-| Platform-specific social captions | Yes | No | Sometimes | Yes — per-platform in analysis dict |
-| Full audio mastering (EBU R128 -14 LUFS) | No | No | Depends on editor | Yes — ffmpeg-loudnorm |
-| Censorship with duck-fade | No | No | Manual edit | Yes — smooth duck-fade, not beep |
-| Content compliance check | No | No | No | Yes — GPT-4o compliance gate |
-| RSS with Podcasting 2.0 chapters | No | No | No | Yes — chapter markers in RSS + ID3 |
-| YouTube upload + Shorts | No | No | No | Yes — full episode + Shorts clips |
-| One-command full pipeline | No (multiple tools) | No (manual steps) | No | Yes |
-| Per-client genre persona tuning | No | No | Human judgment | Yes — YAML voice_persona |
-| Cost per episode (ongoing) | $29-99/mo SaaS | $24/mo + editor time | $50-200/episode | ~$1-3 OpenAI tokens only |
-
-**Positioning summary:** The pipeline wins on depth of integration (one command, real audio mastering,
-compliance, full distribution) and near-zero cost at scale. It loses on UX polish — Descript has a
-GUI, Swell has a web app. The demo must lead with output quality and cost, not the interface.
-The "no SaaS subscription" and "works for any genre with a config change" angles are the strongest
-competitive differentiators for a sales conversation.
+The near-zero cost per episode (~$1-3 OpenAI tokens, local Whisper) means any paying client is
+highly profitable. First client pricing should prioritize closing over margin optimization.
 
 ---
 
 ## Sources
 
-- [Professional Podcast Production Services — PropodcastSolutions](https://propodcastsolutions.com/podcast-production-services/) — MEDIUM confidence
-- [Top 17 Podcast Production Companies 2026 — Content Allies](https://contentallies.com/learn/podcast-production-companies-agencies-services-for-b2b-b2c) — MEDIUM confidence
-- [7 AI Podcast Production Systems — GodOfPrompt](https://www.godofprompt.ai/blog/7-ai-podcast-production-systems-that-automated-the-entire-workflow) — MEDIUM confidence
-- [Viral Podcast Clips Guide 2025 — Fame](https://www.fame.so/post/ultimate-podcast-clip-guide) — MEDIUM confidence
-- [Shareable Podcast Clips Guide 2026 — Riverside](https://riverside.com/blog/podcast-clips) — MEDIUM confidence
-- [Trial Episode Strategy — We Edit Podcasts](https://weeditpodcasts.com/trial/) — MEDIUM confidence
-- [True Crime Podcast Guide 2025/2026 — Jellypod](https://jellypod.ai/blog/perfect-guide-true-crime) — MEDIUM confidence
-- [True Crime Podcast Business Growth 2026 — Variety](https://variety.com/2026/digital/podcasts/true-crime-podcasts-business-growth-1236679547/) — MEDIUM confidence
-- [Most Popular Podcast Genres 2025 — Command Your Brand](https://commandyourbrand.com/the-most-popular-podcast-genres-in-2025-ranked-by-audience-growth/) — MEDIUM confidence
-- [B2B Podcast Production Checklist — Rise25](https://rise25.com/lead-generation/b2b-podcast-production-checklist/) — MEDIUM confidence
-- [Podcast Demo Reel Guide — Promo.ly](https://promo.ly/podcast-demo-reel/) — MEDIUM confidence
-- [Pilot Project Structure for Podcast Agencies — Ankord Media](https://www.ankordmedia.com/blog/bay-area-startups-structure-podcast-agency-pilot-project) — MEDIUM confidence
-- [Science of Viral Podcast Clips — Listeners to Clients](https://listenerstoclients.com/blog/the-science-of-viral-podcast-clips-a-proven-framework-for-high-impact-content) — MEDIUM confidence
-- [AI-Powered Podcast Service for Agencies — 51Blocks](https://51blocks.com/ai-podcasts-for-agencies) — LOW confidence (marketing page)
+- [Listen Notes API Documentation](https://www.listennotes.com/api/docs/) — HIGH confidence (official docs)
+- [Listen Notes API genre/episode count filters](https://www.listennotes.com/api/announcements/) — HIGH confidence
+- [Podchaser Podcast Discovery API](https://features.podchaser.com/api/) — MEDIUM confidence
+- [Rephonic Podcast Database](https://rephonic.com/podcast-database) — MEDIUM confidence (25+ filters, $99-299/mo for API access)
+- [Finding Podcast Contact Information via RSS](https://www.podseeker.co/blog/fastest-way-to-get-podcast-contact-information) — HIGH confidence
+- [How to Pitch a Podcast: Lessons from 1,000+ Emails](https://respona.com/blog/how-to-pitch-a-podcast/) — MEDIUM confidence
+- [Cold Email Conversion Rates for Podcast Outreach](https://www.smartlead.ai/blog/how-to-write-a-cold-email-podcast-template) — MEDIUM confidence (10-20% reply rate when personalized)
+- [Podcast Production Pricing 2025](https://www.trevorohare.com/blog/how-much-does-professional-podcast-editing-cost-in-2025) — MEDIUM confidence
+- [Podcast Production Pricing Guide 2026 — Rise25](https://rise25.com/lead-generation/podcast-production-pricing/) — MEDIUM confidence ($500-20K/month for B2B)
+- [Podcast Editing Rates — SasPod](https://saspod.com/blog/post/podcast-editor-costs-and-rates-freelancers) — MEDIUM confidence ($50-200/episode for freelancers)
+- [B2B Podcast Client Acquisition — Rise25](https://rise25.com/) — MEDIUM confidence
+- [Top B2B Podcast Production Agencies — Content Allies](https://contentallies.com/learn/top-b2b-podcast-production-agencies) — MEDIUM confidence
+- [Podcast Host Pain Points — Podium](https://hello.podium.page/blog/overcoming-common-podcasting-challenges-and-roadblocks) — MEDIUM confidence
+- [Podcast Cold Email Template — WaveApps](https://www.waveapps.com/freelancing/cold-pitch-templates) — LOW confidence (general freelance templates, not podcast-specific)
 
 ---
 
-*Feature research for: podcast production service — real-world client testing and sales demo packaging (v1.4 milestone)*
+*Feature research for: podcast production service — client acquisition and outreach tooling (v1.5 milestone)*
 *Researched: 2026-03-28*
