@@ -2,14 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: First Paying Client
-status: active
-last_updated: "2026-03-29"
-last_activity: 2026-03-29 — v1.5 roadmap created, phases 19-22 defined
+status: planning
+stopped_at: Completed 19-outreach-tracker 19-01-PLAN.md
+last_updated: "2026-03-29T01:49:06.372Z"
+last_activity: 2026-03-29 — Roadmap created for v1.5, phases 19-22 defined
 progress:
   total_phases: 4
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
   percent: 0
 ---
 
@@ -48,6 +49,9 @@ Progress: [░░░░░░░░░░] 0% (v1.5 phases)
 - [v1.5 consent]: Process prospect episode only after explicit consent; contact-first workflow required
 - [v1.5 stack]: Zero new packages — requests (iTunes), feedparser (RSS), openai SDK (pitches), sqlite3 (tracker)
 - [v1.5 pricing]: Anchor to value ($300-600/episode entry), not pipeline cost ($1-3/episode)
+- [Phase 19-outreach-tracker]: Single prospects table (no contacts log) — contacts table is Phase 21 scope
+- [Phase 19-outreach-tracker]: Python-level status validation with VALID_STATUSES tuple, not DB CHECK constraint
+- [Phase 19-outreach-tracker]: Positional CLI args for outreach add: slug show_name [email] — simpler than --flag kwargs
 
 ### Pending Todos
 
@@ -60,6 +64,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-29
-Stopped at: Roadmap written for v1.5 (phases 19-22), STATE.md initialized
+Last session: 2026-03-29T01:49:06.369Z
+Stopped at: Completed 19-outreach-tracker 19-01-PLAN.md
 Resume file: None
