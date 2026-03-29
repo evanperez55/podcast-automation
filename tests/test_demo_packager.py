@@ -648,5 +648,220 @@ class TestLufsMeasurement:
         assert result == {}
 
 
+# ---------------------------------------------------------------------------
+# TestDemoWorkflow — run_demo_workflow() orchestration tests
+# ---------------------------------------------------------------------------
+
+
+class TestDemoWorkflow:
+    """Tests for run_demo_workflow() consent-gated orchestration function."""
+
+    def _make_mock_tracker(self, found=True):
+        """Create a mock OutreachTracker with a canned prospect."""
+        mock_tracker = MagicMock()
+        if found:
+            mock_tracker.get_prospect.return_value = {
+                "slug": "test-podcast",
+                "show_name": "Test Podcast Show",
+                "status": "contacted",
+                "contact_email": "host@example.com",
+            }
+        else:
+            mock_tracker.get_prospect.return_value = None
+        mock_tracker.update_status.return_value = True
+        return mock_tracker
+
+    def test_no_consent_returns_none_no_pipeline(self):
+        """run_demo_workflow returns None without calling pipeline when consent is denied."""
+        from demo_packager import run_demo_workflow
+
+        mock_tracker = self._make_mock_tracker()
+
+        with (
+            patch("demo_packager.OutreachTracker", return_value=mock_tracker),
+            patch("demo_packager.activate_client") as mock_activate,
+            patch("demo_packager.run_with_notification") as mock_pipeline,
+            patch("demo_packager.DemoPackager") as mock_packager_cls,
+            patch("demo_packager.PitchGenerator") as mock_pitch_cls,
+        ):
+            result = run_demo_workflow(
+                "test-podcast",
+                "ep01",
+                {},
+                consent_fn=lambda _: "no",
+            )
+
+        assert result is None
+        mock_pipeline.assert_not_called()
+        mock_activate.assert_not_called()
+        mock_packager_cls.assert_not_called()
+        mock_pitch_cls.assert_not_called()
+
+    def test_empty_consent_returns_none_no_pipeline(self):
+        """run_demo_workflow returns None without calling pipeline when consent is empty string."""
+        from demo_packager import run_demo_workflow
+
+        mock_tracker = self._make_mock_tracker()
+
+        with (
+            patch("demo_packager.OutreachTracker", return_value=mock_tracker),
+            patch("demo_packager.activate_client"),
+            patch("demo_packager.run_with_notification") as mock_pipeline,
+            patch("demo_packager.DemoPackager"),
+            patch("demo_packager.PitchGenerator"),
+        ):
+            result = run_demo_workflow(
+                "test-podcast",
+                "ep01",
+                {},
+                consent_fn=lambda _: "",
+            )
+
+        assert result is None
+        mock_pipeline.assert_not_called()
+
+    def test_yes_consent_runs_full_chain(self):
+        """run_demo_workflow calls pipeline, package_demo, gen-pitch, and updates tracker when consent given."""
+        from demo_packager import run_demo_workflow
+        from pathlib import Path
+
+        mock_tracker = self._make_mock_tracker()
+        mock_demo_path = Path("/tmp/demo/test-podcast/ep01")
+        mock_packager = MagicMock()
+        mock_packager.package_demo.return_value = mock_demo_path
+        mock_pitch = MagicMock()
+        mock_pitch.generate_demo_pitch.return_value = {
+            "subject": "Test Subject",
+            "email": "Test email body",
+        }
+
+        with (
+            patch("demo_packager.OutreachTracker", return_value=mock_tracker),
+            patch("demo_packager.activate_client") as mock_activate,
+            patch("demo_packager.run_with_notification") as mock_pipeline,
+            patch("demo_packager.DemoPackager", return_value=mock_packager),
+            patch("demo_packager.PitchGenerator", return_value=mock_pitch),
+        ):
+            result = run_demo_workflow(
+                "test-podcast",
+                "ep01",
+                {},
+                consent_fn=lambda _: "yes",
+            )
+
+        assert result == mock_demo_path
+        mock_activate.assert_called_once_with("test-podcast")
+        mock_pipeline.assert_called_once()
+        mock_packager.package_demo.assert_called_once_with("test-podcast", "ep01")
+        mock_pitch.generate_demo_pitch.assert_called_once_with("test-podcast", "ep01")
+        # Tracker should be updated to demo_sent
+        update_calls = [str(c) for c in mock_tracker.update_status.call_args_list]
+        assert any("demo_sent" in c for c in update_calls)
+
+    def test_prospect_not_found_raises_value_error(self):
+        """run_demo_workflow raises ValueError if prospect not found in tracker."""
+        from demo_packager import run_demo_workflow
+
+        mock_tracker = self._make_mock_tracker(found=False)
+
+        with (
+            patch("demo_packager.OutreachTracker", return_value=mock_tracker),
+        ):
+            with pytest.raises(ValueError, match="not found in tracker"):
+                run_demo_workflow(
+                    "unknown-slug",
+                    "ep01",
+                    {},
+                    consent_fn=lambda _: "yes",
+                )
+
+    def test_tracker_updated_to_interested_before_processing(self):
+        """run_demo_workflow updates tracker to 'interested' before pipeline runs."""
+        from demo_packager import run_demo_workflow
+        from pathlib import Path
+
+        mock_tracker = self._make_mock_tracker()
+        call_order = []
+
+        def track_status_call(slug, status):
+            call_order.append(("update_status", status))
+            return True
+
+        def track_pipeline_call(*args, **kwargs):
+            call_order.append(("pipeline",))
+
+        mock_tracker.update_status.side_effect = track_status_call
+        mock_packager = MagicMock()
+        mock_packager.package_demo.return_value = Path("/tmp/demo/test-podcast/ep01")
+        mock_pitch = MagicMock()
+        mock_pitch.generate_demo_pitch.return_value = None
+
+        with (
+            patch("demo_packager.OutreachTracker", return_value=mock_tracker),
+            patch("demo_packager.activate_client"),
+            patch(
+                "demo_packager.run_with_notification", side_effect=track_pipeline_call
+            ),
+            patch("demo_packager.DemoPackager", return_value=mock_packager),
+            patch("demo_packager.PitchGenerator", return_value=mock_pitch),
+        ):
+            run_demo_workflow(
+                "test-podcast",
+                "ep01",
+                {},
+                consent_fn=lambda _: "yes",
+            )
+
+        # interested must come before pipeline
+        interested_idx = next(
+            (
+                i
+                for i, x in enumerate(call_order)
+                if x == ("update_status", "interested")
+            ),
+            None,
+        )
+        pipeline_idx = next(
+            (i for i, x in enumerate(call_order) if x == ("pipeline",)),
+            None,
+        )
+        assert interested_idx is not None, (
+            "update_status('interested') was never called"
+        )
+        assert pipeline_idx is not None, "pipeline was never called"
+        assert interested_idx < pipeline_idx, (
+            "interested must be set before pipeline runs"
+        )
+
+    def test_pitch_failure_does_not_abort(self):
+        """run_demo_workflow returns demo path even if gen-pitch raises an exception."""
+        from demo_packager import run_demo_workflow
+        from pathlib import Path
+
+        mock_tracker = self._make_mock_tracker()
+        mock_demo_path = Path("/tmp/demo/test-podcast/ep01")
+        mock_packager = MagicMock()
+        mock_packager.package_demo.return_value = mock_demo_path
+        mock_pitch = MagicMock()
+        mock_pitch.generate_demo_pitch.side_effect = Exception("OpenAI error")
+
+        with (
+            patch("demo_packager.OutreachTracker", return_value=mock_tracker),
+            patch("demo_packager.activate_client"),
+            patch("demo_packager.run_with_notification"),
+            patch("demo_packager.DemoPackager", return_value=mock_packager),
+            patch("demo_packager.PitchGenerator", return_value=mock_pitch),
+        ):
+            # Should not raise
+            result = run_demo_workflow(
+                "test-podcast",
+                "ep01",
+                {},
+                consent_fn=lambda _: "yes",
+            )
+
+        assert result == mock_demo_path
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
