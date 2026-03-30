@@ -46,15 +46,21 @@ def pil_mocks():
     ``sys.modules["PIL"].Image``.  We temporarily replace those
     attributes with fresh MagicMock objects so that each test gets
     isolated mocks.
+
+    When the full suite runs with --cov, the real PIL may already be in
+    sys.modules without ImageDraw/ImageFont as direct attributes.  We
+    use getattr with a sentinel so we can safely restore the original
+    state afterward.
     """
     mock_image_mod = MagicMock()
     mock_draw_mod = MagicMock()
     mock_font_mod = MagicMock()
 
     pil = sys.modules["PIL"]
-    orig_image = pil.Image
-    orig_draw = pil.ImageDraw
-    orig_font = pil.ImageFont
+    _sentinel = object()
+    orig_image = getattr(pil, "Image", _sentinel)
+    orig_draw = getattr(pil, "ImageDraw", _sentinel)
+    orig_font = getattr(pil, "ImageFont", _sentinel)
 
     pil.Image = mock_image_mod
     pil.ImageDraw = mock_draw_mod
@@ -66,9 +72,15 @@ def pil_mocks():
         "ImageFont": mock_font_mod,
     }
 
-    pil.Image = orig_image
-    pil.ImageDraw = orig_draw
-    pil.ImageFont = orig_font
+    for attr, orig in [
+        ("Image", orig_image),
+        ("ImageDraw", orig_draw),
+        ("ImageFont", orig_font),
+    ]:
+        if orig is _sentinel:
+            delattr(pil, attr)
+        else:
+            setattr(pil, attr, orig)
 
 
 # ---------------------------------------------------------------------------
