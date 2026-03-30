@@ -421,5 +421,477 @@ class TestHashtagInjection:
             assert "\n\n#" not in tweets[0]
 
 
+class TestPostTweetEdgeCases:
+    """Test edge cases in post_tweet method."""
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_post_tweet_unicode_encode_error_in_logging(
+        self, mock_client_class, mock_api_class
+    ):
+        """UnicodeEncodeError in text logging falls back to ascii-replaced text."""
+        import uploaders.twitter_uploader as mod
+
+        uploader = TwitterUploader()
+
+        mock_client = Mock()
+        mock_response = Mock()
+        mock_response.data = {"id": "999"}
+        mock_client.create_tweet.return_value = mock_response
+        uploader.client = mock_client
+
+        original_info = mod.logger.info
+        call_count = [0]
+
+        def info_side_effect(msg, *args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 2:
+                raise UnicodeEncodeError("ascii", "", 0, 1, "mock")
+            return original_info(msg, *args, **kwargs)
+
+        with patch.object(mod.logger, "info", side_effect=info_side_effect):
+            result = uploader.post_tweet(text="Test \u2603 tweet")
+
+        assert result is not None
+        assert result["tweet_id"] == "999"
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_post_tweet_media_upload_returns_empty(
+        self, mock_client_class, mock_api_class
+    ):
+        """When _upload_media returns empty list, post_tweet returns None."""
+        uploader = TwitterUploader()
+
+        with patch.object(uploader, "_upload_media", return_value=[]):
+            result = uploader.post_tweet(
+                text="Test tweet", media_paths=["/fake/path.jpg"]
+            )
+
+        assert result is None
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_post_tweet_tweepy_exception_returns_none(
+        self, mock_client_class, mock_api_class
+    ):
+        """TweepyException in create_tweet returns None."""
+        import tweepy
+
+        uploader = TwitterUploader()
+
+        mock_client = Mock()
+        mock_client.create_tweet.side_effect = tweepy.TweepyException("Rate limited")
+        uploader.client = mock_client
+
+        result = uploader.post_tweet(text="Test tweet")
+
+        assert result is None
+
+
+class TestUploadMedia:
+    """Test edge cases in _upload_media method."""
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_upload_media_file_not_found(self, mock_client_class, mock_api_class):
+        """Non-existent media file is skipped with warning."""
+        uploader = TwitterUploader()
+
+        result = uploader._upload_media(["/nonexistent/file.jpg"])
+
+        assert result == []
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_upload_media_video_category(
+        self, mock_client_class, mock_api_class, tmp_path
+    ):
+        """Video files use tweet_video media category."""
+        uploader = TwitterUploader()
+
+        video_file = tmp_path / "clip.mp4"
+        video_file.write_text("fake video")
+
+        mock_api = Mock()
+        mock_media = Mock()
+        mock_media.media_id_string = "vid_123"
+        mock_api.media_upload.return_value = mock_media
+        uploader.api_v1 = mock_api
+
+        result = uploader._upload_media([str(video_file)])
+
+        assert result == ["vid_123"]
+        mock_api.media_upload.assert_called_once_with(
+            filename=str(video_file), media_category="tweet_video"
+        )
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_upload_media_tweepy_exception(
+        self, mock_client_class, mock_api_class, tmp_path
+    ):
+        """TweepyException during upload is caught and file is skipped."""
+        import tweepy
+
+        uploader = TwitterUploader()
+
+        img_file = tmp_path / "photo.jpg"
+        img_file.write_text("fake image")
+
+        mock_api = Mock()
+        mock_api.media_upload.side_effect = tweepy.TweepyException("Upload failed")
+        uploader.api_v1 = mock_api
+
+        result = uploader._upload_media([str(img_file)])
+
+        assert result == []
+
+
+class TestPostThreadEdgeCases:
+    """Test edge cases in post_thread method."""
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_post_thread_with_media_paths(self, mock_client_class, mock_api_class):
+        """Thread with media_paths passes media to individual tweets."""
+        uploader = TwitterUploader()
+
+        with patch.object(uploader, "post_tweet") as mock_post:
+            mock_post.return_value = {"tweet_id": "1"}
+
+            result = uploader.post_thread(
+                ["Tweet 1", "Tweet 2"],
+                media_paths=[["/img1.jpg"], None],
+            )
+
+            assert result is not None
+            assert len(result) == 2
+            first_call = mock_post.call_args_list[0]
+            assert first_call.kwargs["media_paths"] == ["/img1.jpg"]
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_post_thread_failure_returns_none(self, mock_client_class, mock_api_class):
+        """Thread returns None when a tweet in the thread fails."""
+        uploader = TwitterUploader()
+
+        with patch.object(uploader, "post_tweet") as mock_post:
+            mock_post.return_value = None
+
+            result = uploader.post_thread(["Tweet 1", "Tweet 2"])
+
+            assert result is None
+
+
+class TestPostEpisodeAnnouncementEdgeCases:
+    """Test edge cases in post_episode_announcement."""
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch.object(Config, "PODCAST_NAME", "Test Podcast")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_caption_trimmed_with_url(self, mock_client_class, mock_api_class):
+        """Long AI caption is trimmed to fit YouTube URL within 280 chars."""
+        uploader = TwitterUploader()
+
+        long_caption = "A" * 270
+
+        with patch.object(uploader, "post_thread") as mock_post_thread:
+            mock_post_thread.return_value = [{"tweet_id": "1"}]
+
+            uploader.post_episode_announcement(
+                episode_number=25,
+                episode_summary="Summary",
+                youtube_url="https://youtube.com/watch?v=123",
+                twitter_caption=long_caption,
+            )
+
+            call_args = mock_post_thread.call_args
+            tweets = call_args[0][0]
+            assert "https://youtube.com/watch?v=123" in tweets[0]
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch.object(Config, "PODCAST_NAME", "Test Podcast")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_hashtag_truncation_when_too_long(self, mock_client_class, mock_api_class):
+        """Hashtags truncate main tweet text when combined length exceeds 280."""
+        uploader = TwitterUploader()
+
+        long_caption = "B" * 270
+
+        with patch.object(uploader, "post_thread") as mock_post_thread:
+            mock_post_thread.return_value = [{"tweet_id": "1"}]
+
+            uploader.post_episode_announcement(
+                episode_number=25,
+                episode_summary="Summary",
+                twitter_caption=long_caption,
+                hashtags=["comedy", "podcast"],
+            )
+
+            call_args = mock_post_thread.call_args
+            tweets = call_args[0][0]
+            assert tweets[0].endswith("\n\n#comedy #podcast")
+            assert len(tweets[0]) <= 280
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch.object(Config, "PODCAST_NAME", "Test Podcast")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_clip_youtube_urls_in_thread(self, mock_client_class, mock_api_class):
+        """Clip YouTube URLs are added as thread tweets."""
+        uploader = TwitterUploader()
+
+        with patch.object(uploader, "post_thread") as mock_post_thread:
+            mock_post_thread.return_value = [
+                {"tweet_id": "1"},
+                {"tweet_id": "2"},
+                {"tweet_id": "3"},
+            ]
+
+            uploader.post_episode_announcement(
+                episode_number=25,
+                episode_summary="Summary",
+                twitter_caption="Main tweet",
+                clip_youtube_urls=[
+                    {"title": "Best Moment", "url": "https://youtube.com/shorts/abc"},
+                    {"title": "Funny Part", "url": "https://youtube.com/shorts/def"},
+                ],
+            )
+
+            call_args = mock_post_thread.call_args
+            tweets = call_args[0][0]
+            assert len(tweets) == 3
+            assert "Best Moment" in tweets[1]
+            assert "https://youtube.com/shorts/abc" in tweets[1]
+            assert "Funny Part" in tweets[2]
+
+
+class TestPostClip:
+    """Test cases for post_clip method."""
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch.object(Config, "PODCAST_NAME", "Test Podcast")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_post_clip_with_youtube_url(self, mock_client_class, mock_api_class):
+        """Post clip with YouTube URL includes URL in tweet and no media."""
+        uploader = TwitterUploader()
+
+        with patch.object(uploader, "post_tweet") as mock_post:
+            mock_post.return_value = {"tweet_id": "42", "status": "success"}
+
+            result = uploader.post_clip(
+                caption="Hilarious moment",
+                episode_number=10,
+                youtube_url="https://youtube.com/shorts/xyz",
+            )
+
+            assert result is not None
+            call_kwargs = mock_post.call_args.kwargs
+            assert "https://youtube.com/shorts/xyz" in call_kwargs["text"]
+            assert "Episode 10" in call_kwargs["text"]
+            assert "Test Podcast" in call_kwargs["text"]
+            assert call_kwargs["media_paths"] is None
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch.object(Config, "PODCAST_NAME", "Test Podcast")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_post_clip_with_video_path_no_youtube(
+        self, mock_client_class, mock_api_class
+    ):
+        """Post clip with video_path but no youtube_url uploads video as media."""
+        uploader = TwitterUploader()
+
+        with patch.object(uploader, "post_tweet") as mock_post:
+            mock_post.return_value = {"tweet_id": "43", "status": "success"}
+
+            result = uploader.post_clip(
+                caption="Great clip",
+                episode_number=5,
+                video_path="/path/to/clip.mp4",
+            )
+
+            assert result is not None
+            call_kwargs = mock_post.call_args.kwargs
+            assert call_kwargs["media_paths"] == ["/path/to/clip.mp4"]
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch.object(Config, "PODCAST_NAME", "Test Podcast")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_post_clip_no_url_no_video(self, mock_client_class, mock_api_class):
+        """Post clip with neither youtube_url nor video_path sends text only."""
+        uploader = TwitterUploader()
+
+        with patch.object(uploader, "post_tweet") as mock_post:
+            mock_post.return_value = {"tweet_id": "44", "status": "success"}
+
+            result = uploader.post_clip(
+                caption="Just text",
+                episode_number=3,
+            )
+
+            assert result is not None
+            call_kwargs = mock_post.call_args.kwargs
+            assert call_kwargs["media_paths"] is None
+
+
+class TestGetUserInfoEdgeCases:
+    """Test edge cases in get_user_info method."""
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_get_user_info_no_data(self, mock_client_class, mock_api_class):
+        """Returns None when get_me response has no data."""
+        uploader = TwitterUploader()
+
+        mock_client = Mock()
+        mock_response = Mock()
+        mock_response.data = None
+        mock_client.get_me.return_value = mock_response
+        uploader.client = mock_client
+
+        result = uploader.get_user_info()
+
+        assert result is None
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_get_user_info_tweepy_exception(self, mock_client_class, mock_api_class):
+        """TweepyException in get_me returns None."""
+        import tweepy
+
+        uploader = TwitterUploader()
+
+        mock_client = Mock()
+        mock_client.get_me.side_effect = tweepy.TweepyException("Auth failed")
+        uploader.client = mock_client
+
+        result = uploader.get_user_info()
+
+        assert result is None
+
+
+class TestDeleteTweet:
+    """Test cases for delete_tweet method."""
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_delete_tweet_success(self, mock_client_class, mock_api_class):
+        """Successful delete returns True."""
+        uploader = TwitterUploader()
+
+        mock_client = Mock()
+        uploader.client = mock_client
+
+        result = uploader.delete_tweet("12345")
+
+        assert result is True
+        mock_client.delete_tweet.assert_called_once_with("12345")
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_delete_tweet_tweepy_exception(self, mock_client_class, mock_api_class):
+        """TweepyException in delete returns False."""
+        import tweepy
+
+        uploader = TwitterUploader()
+
+        mock_client = Mock()
+        mock_client.delete_tweet.side_effect = tweepy.TweepyException("Not found")
+        uploader.client = mock_client
+
+        result = uploader.delete_tweet("99999")
+
+        assert result is False
+
+
+class TestCreateTwitterCaptionEdgeCases:
+    """Test edge cases for create_twitter_caption function."""
+
+    def test_caption_without_hashtags_when_only_caption_fits(self):
+        """Returns caption without hashtags when caption alone fits but with hashtags does not."""
+        clip_title = "Title"
+        social_caption = "X" * 260
+        caption = create_twitter_caption(
+            clip_title=clip_title,
+            social_caption=social_caption,
+            hashtags=["verylonghashtag", "anotherlongone"],
+        )
+
+        assert "#" not in caption
+        assert len(caption) <= 280
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
