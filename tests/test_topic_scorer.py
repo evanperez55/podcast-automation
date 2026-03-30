@@ -201,6 +201,127 @@ class TestScoringProfile:
         assert score["total"] == 8.0
 
 
+class TestFilterAndSort:
+    """Tests for filter, sort, and group methods."""
+
+    def _make_scorer(self):
+        mock_ollama = MagicMock()
+        with patch("topic_scorer.Ollama", return_value=mock_ollama):
+            from topic_scorer import TopicScorer
+
+            return TopicScorer()
+
+    def test_filter_recommended(self):
+        """Filters to only recommended topics."""
+        scorer = self._make_scorer()
+        topics = [
+            {"title": "A", "score": {"recommended": True, "total": 8}},
+            {"title": "B", "score": {"recommended": False, "total": 3}},
+            {"title": "C", "score": {"recommended": True, "total": 7}},
+        ]
+        result = scorer.filter_recommended(topics)
+        assert len(result) == 2
+        assert all(t["score"]["recommended"] for t in result)
+
+    def test_sort_by_score(self):
+        """Sorts topics by total score descending."""
+        scorer = self._make_scorer()
+        topics = [
+            {"title": "Low", "score": {"total": 3}},
+            {"title": "High", "score": {"total": 9}},
+            {"title": "Mid", "score": {"total": 6}},
+        ]
+        result = scorer.sort_by_score(topics)
+        assert [t["title"] for t in result] == ["High", "Mid", "Low"]
+
+    def test_group_by_category(self):
+        """Groups topics by category."""
+        scorer = self._make_scorer()
+        topics = [
+            {"title": "A", "score": {"category": "news"}},
+            {"title": "B", "score": {"category": "comedy"}},
+            {"title": "C", "score": {"category": "news"}},
+        ]
+        result = scorer.group_by_category(topics)
+        assert len(result["news"]) == 2
+        assert len(result["comedy"]) == 1
+
+
+class TestSaveScoredTopics:
+    """Tests for save_scored_topics."""
+
+    def test_save_creates_json(self, tmp_path):
+        """Saves scored topics to JSON file."""
+        import json
+
+        mock_ollama = MagicMock()
+        with patch("topic_scorer.Ollama", return_value=mock_ollama):
+            from topic_scorer import TopicScorer
+
+            scorer = TopicScorer()
+
+        topics = [
+            {
+                "title": "A",
+                "score": {"total": 8, "recommended": True, "category": "news"},
+            },
+            {
+                "title": "B",
+                "score": {"total": 3, "recommended": False, "category": "comedy"},
+            },
+        ]
+
+        with patch("topic_scorer.Path", return_value=tmp_path):
+            # Override the output dir to use tmp_path
+            import topic_scorer
+
+            original_path = topic_scorer.Path
+            topic_scorer.Path = lambda x: (
+                tmp_path if x == "topic_data" else original_path(x)
+            )
+            try:
+                output = scorer.save_scored_topics(topics, filename="test_scored.json")
+            finally:
+                topic_scorer.Path = original_path
+
+        assert output.exists()
+        data = json.loads(output.read_text())
+        assert data["statistics"]["total_topics"] == 2
+        assert data["statistics"]["recommended"] == 1
+
+
+class TestScoreTopics:
+    """Tests for score_topics batching."""
+
+    def test_score_topics_batches(self):
+        """score_topics processes topics in batches."""
+        mock_ollama = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = [
+            MagicMock(
+                text=(
+                    '[{"topic_number": 1, "total_score": 7.0, "shock_value": 2,'
+                    ' "relatability": 2, "absurdity": 2, "title_hook": 1,'
+                    ' "visual_imagery": 0, "reason": "test",'
+                    ' "category": "news", "recommended": true}]'
+                )
+            )
+        ]
+        mock_ollama.messages.create.return_value = mock_response
+
+        with patch("topic_scorer.Ollama", return_value=mock_ollama):
+            from topic_scorer import TopicScorer
+
+            scorer = TopicScorer()
+
+        topics = [{"title": f"Topic {i}"} for i in range(3)]
+        result = scorer.score_topics(topics, batch_size=2)
+
+        # Should have called _score_batch twice (batch of 2 + batch of 1)
+        assert mock_ollama.messages.create.call_count == 2
+        assert len(result) == 3
+
+
 if __name__ == "__main__":
     import pytest
 
