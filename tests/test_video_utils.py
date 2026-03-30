@@ -375,5 +375,147 @@ class TestDetectNvenc:
         assert result is True
 
 
+class TestExtractAudioErrors:
+    """Tests for extract_audio error paths."""
+
+    @patch("video_utils.Path.exists", return_value=False)
+    @patch("video_utils.subprocess.run")
+    def test_no_output_file_returns_none(self, mock_run, mock_exists):
+        """Returns None when output file not created."""
+        mock_run.return_value = MagicMock(returncode=0)
+
+        result = extract_audio("/video.mp4", "/audio.wav")
+        assert result is None
+
+    @patch("video_utils.subprocess.run")
+    def test_timeout_returns_none(self, mock_run):
+        """Returns None on timeout."""
+        import subprocess
+
+        mock_run.side_effect = subprocess.TimeoutExpired("ffmpeg", 600)
+
+        result = extract_audio("/video.mp4", "/audio.wav")
+        assert result is None
+
+    @patch("video_utils.subprocess.run")
+    def test_generic_error_returns_none(self, mock_run):
+        """Returns None on generic exception."""
+        mock_run.side_effect = OSError("disk full")
+
+        result = extract_audio("/video.mp4", "/audio.wav")
+        assert result is None
+
+
+class TestMuxAudioErrors:
+    """Tests for mux_audio_to_video error paths."""
+
+    @patch("video_utils.Path.exists", return_value=False)
+    @patch("video_utils.subprocess.run")
+    def test_no_output_returns_none(self, mock_run, mock_exists):
+        """Returns None when output file not created."""
+        mock_run.return_value = MagicMock(returncode=0)
+
+        result = mux_audio_to_video("/video.mp4", "/audio.wav", "/out.mp4")
+        assert result is None
+
+    @patch("video_utils.subprocess.run")
+    def test_timeout_returns_none(self, mock_run):
+        """Returns None on timeout."""
+        import subprocess
+
+        mock_run.side_effect = subprocess.TimeoutExpired("ffmpeg", 600)
+
+        result = mux_audio_to_video("/video.mp4", "/audio.wav", "/out.mp4")
+        assert result is None
+
+    @patch("video_utils.subprocess.run")
+    def test_generic_error_returns_none(self, mock_run):
+        """Returns None on generic exception."""
+        mock_run.side_effect = RuntimeError("broken")
+
+        result = mux_audio_to_video("/video.mp4", "/audio.wav", "/out.mp4")
+        assert result is None
+
+
+class TestCutVideoClipErrors:
+    """Tests for cut_video_clip error paths."""
+
+    @patch("video_utils.Path.exists", return_value=False)
+    @patch("video_utils.subprocess.run")
+    def test_no_output_returns_none(self, mock_run, mock_exists):
+        """Returns None when output file not created."""
+        mock_run.return_value = MagicMock(returncode=0)
+
+        result = cut_video_clip("/video.mp4", 0.0, 10.0, "/clip.mp4")
+        assert result is None
+
+    @patch("video_utils.subprocess.run")
+    def test_timeout_returns_none(self, mock_run):
+        """Returns None on timeout."""
+        import subprocess
+
+        mock_run.side_effect = subprocess.TimeoutExpired("ffmpeg", 300)
+
+        result = cut_video_clip("/video.mp4", 0.0, 10.0, "/clip.mp4")
+        assert result is None
+
+    @patch("video_utils.subprocess.run")
+    def test_generic_error_returns_none(self, mock_run):
+        """Returns None on generic exception."""
+        mock_run.side_effect = OSError("disk error")
+
+        result = cut_video_clip("/video.mp4", 0.0, 10.0, "/clip.mp4")
+        assert result is None
+
+
+class TestBurnSubtitlesOnVideo:
+    """Tests for burn_subtitles_on_video."""
+
+    @patch("video_utils.Path.exists", return_value=True)
+    @patch("video_utils.subprocess.run")
+    @patch(
+        "subtitle_clip_generator.SubtitleClipGenerator._escape_ffmpeg_filter_path",
+        side_effect=lambda p: p,
+    )
+    def test_success(self, mock_escape, mock_run, mock_exists):
+        """Returns output path on success."""
+        mock_run.return_value = MagicMock(returncode=0)
+
+        from video_utils import burn_subtitles_on_video
+
+        result = burn_subtitles_on_video("/clip.mp4", "/clip.ass", "/output.mp4")
+        assert result == "/output.mp4"
+
+    @patch("video_utils.subprocess.run")
+    @patch(
+        "subtitle_clip_generator.SubtitleClipGenerator._escape_ffmpeg_filter_path",
+        side_effect=lambda p: p,
+    )
+    def test_failure_returns_none(self, mock_escape, mock_run):
+        """Returns None on FFmpeg failure."""
+        mock_run.return_value = MagicMock(returncode=1, stderr="burn error")
+
+        from video_utils import burn_subtitles_on_video
+
+        result = burn_subtitles_on_video("/clip.mp4", "/clip.ass", "/output.mp4")
+        assert result is None
+
+    @patch("video_utils.subprocess.run")
+    @patch(
+        "subtitle_clip_generator.SubtitleClipGenerator._escape_ffmpeg_filter_path",
+        side_effect=lambda p: p,
+    )
+    def test_timeout_returns_none(self, mock_escape, mock_run):
+        """Returns None on timeout."""
+        import subprocess
+
+        mock_run.side_effect = subprocess.TimeoutExpired("ffmpeg", 300)
+
+        from video_utils import burn_subtitles_on_video
+
+        result = burn_subtitles_on_video("/clip.mp4", "/clip.ass", "/output.mp4")
+        assert result is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
