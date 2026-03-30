@@ -272,5 +272,134 @@ class TestTikTokFunctionalFlag:
         assert uploader.functional is True
 
 
+class TestTikTokErrorPaths:
+    """Tests for error handling paths."""
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", "valid_key")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
+    def test_upload_video_not_functional(self):
+        """upload_video returns None when not functional."""
+        with patch.object(Config, "TIKTOK_CLIENT_KEY", None):
+            uploader = TikTokUploader()
+        result = uploader.upload_video("/fake.mp4", "Test")
+        assert result is None
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", "valid_key")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
+    def test_get_user_info_not_functional(self):
+        """get_user_info returns None when not functional."""
+        with patch.object(Config, "TIKTOK_CLIENT_KEY", None):
+            uploader = TikTokUploader()
+        result = uploader.get_user_info()
+        assert result is None
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", "valid_key")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
+    @patch("requests.post")
+    def test_initialize_upload_api_error(self, mock_post):
+        """Returns None on API error response."""
+        import requests as req
+
+        mock_post.side_effect = req.exceptions.RequestException("timeout")
+        uploader = TikTokUploader()
+
+        with patch.object(Path, "stat", return_value=Mock(st_size=1024)):
+            url, pid = uploader._initialize_upload(Path("/fake.mp4"))
+        assert url is None
+        assert pid is None
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", "valid_key")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
+    @patch("requests.put")
+    def test_upload_video_file_failure(self, mock_put):
+        """Returns False on upload failure."""
+        import requests as req
+
+        mock_put.side_effect = req.exceptions.RequestException("fail")
+        uploader = TikTokUploader()
+
+        result = uploader._upload_video_file(
+            "https://upload.example.com", Path(__file__)
+        )
+        assert result is False
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", "valid_key")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
+    @patch("requests.post")
+    @patch("time.sleep", return_value=None)
+    def test_wait_for_publish_failed(self, mock_sleep, mock_post):
+        """Returns None when publish status is FAILED."""
+        mock_post.return_value = Mock(
+            json=lambda: {"data": {"status": "FAILED", "fail_reason": "copyright"}},
+            raise_for_status=lambda: None,
+        )
+        uploader = TikTokUploader()
+        result = uploader._wait_for_publish("pub123")
+        assert result is None
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", "valid_key")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
+    @patch("requests.post")
+    @patch("time.sleep", return_value=None)
+    def test_wait_for_publish_api_error_response(self, mock_sleep, mock_post):
+        """Returns None when API returns error."""
+        mock_post.return_value = Mock(
+            json=lambda: {"error": {"code": "invalid_token", "message": "expired"}},
+            raise_for_status=lambda: None,
+        )
+        uploader = TikTokUploader()
+        result = uploader._wait_for_publish("pub123")
+        assert result is None
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", "valid_key")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
+    @patch("requests.post")
+    def test_get_user_info_api_error(self, mock_post):
+        """Returns None on API error."""
+        mock_post.return_value = Mock(
+            json=lambda: {"error": {"code": "invalid", "message": "err"}},
+            raise_for_status=lambda: None,
+        )
+        uploader = TikTokUploader()
+        result = uploader.get_user_info()
+        assert result is None
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", "valid_key")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
+    @patch("requests.post")
+    def test_get_user_info_request_exception(self, mock_post):
+        """Returns None on request exception."""
+        import requests as req
+
+        mock_post.side_effect = req.exceptions.RequestException("network error")
+        uploader = TikTokUploader()
+        result = uploader.get_user_info()
+        assert result is None
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", "valid_key")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
+    def test_initialize_upload_api_error_response(self):
+        """Returns None when init response has error field."""
+        with patch("requests.post") as mock_post:
+            mock_post.return_value = Mock(
+                json=lambda: {"error": {"code": "rate_limit", "message": "slow down"}},
+                raise_for_status=lambda: None,
+            )
+            uploader = TikTokUploader()
+            with patch.object(Path, "stat", return_value=Mock(st_size=1024)):
+                url, pid = uploader._initialize_upload(Path("/fake.mp4"))
+        assert url is None
+        assert pid is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
