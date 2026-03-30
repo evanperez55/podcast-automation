@@ -322,6 +322,293 @@ class TestScoreTopics:
         assert len(result) == 3
 
 
+class TestSelftextContext:
+    """Tests for selftext context inclusion in topic list."""
+
+    def test_selftext_included_in_prompt(self):
+        """Topics with selftext include context in the prompt sent to LLM."""
+        from topic_scorer import TopicScorer
+
+        mock_ollama = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = [
+            MagicMock(
+                text=(
+                    '[{"topic_number": 1, "total_score": 5.0, "shock_value": 1,'
+                    ' "relatability": 1, "absurdity": 1, "title_hook": 1,'
+                    ' "visual_imagery": 1, "reason": "test",'
+                    ' "category": "news", "recommended": false}]'
+                )
+            )
+        ]
+        mock_ollama.messages.create.return_value = mock_response
+
+        with patch("topic_scorer.Ollama", return_value=mock_ollama):
+            scorer = TopicScorer()
+
+        topic = {"title": "Test Topic", "selftext": "Some extra context here"}
+        scorer._score_batch([topic])
+
+        # Check that the prompt sent to Ollama includes the selftext context
+        call_args = mock_ollama.messages.create.call_args
+        prompt = call_args.kwargs["messages"][0]["content"]
+        assert "Context: Some extra context here" in prompt
+
+
+class TestJsonExtractionFallback:
+    """Tests for JSON extraction fallback when response has wrapping text."""
+
+    def _make_scorer(self):
+        mock_ollama = MagicMock()
+        with patch("topic_scorer.Ollama", return_value=mock_ollama):
+            from topic_scorer import TopicScorer
+
+            return TopicScorer(), mock_ollama
+
+    def test_regex_fallback_extracts_json(self):
+        """JSON is extracted via regex when response has surrounding text."""
+        scorer, mock_ollama = self._make_scorer()
+
+        mock_response = MagicMock()
+        mock_response.content = [
+            MagicMock(
+                text=(
+                    "Here are the scores:\n"
+                    '[{"topic_number": 1, "total_score": 7.0, "shock_value": 2,'
+                    ' "relatability": 2, "absurdity": 2, "title_hook": 1,'
+                    ' "visual_imagery": 0, "reason": "test",'
+                    ' "category": "news", "recommended": true}]\n'
+                    "Hope this helps!"
+                )
+            )
+        ]
+        mock_ollama.messages.create.return_value = mock_response
+
+        result = scorer._score_batch([{"title": "Test"}])
+        assert result[0]["score"]["total"] == 7.0
+
+    def test_unparseable_response_returns_original_topics(self):
+        """Returns original topics when response has no valid JSON."""
+        scorer, mock_ollama = self._make_scorer()
+
+        mock_response = MagicMock()
+        mock_response.content = [MagicMock(text="I cannot score these topics, sorry.")]
+        mock_ollama.messages.create.return_value = mock_response
+
+        topics = [{"title": "Test Topic"}]
+        result = scorer._score_batch(topics)
+        # Should return original topics unchanged
+        assert result == topics
+        assert "score" not in result[0]
+
+
+class TestScoreBatchExceptionHandling:
+    """Tests for exception handling in _score_batch."""
+
+    def _make_scorer(self):
+        mock_ollama = MagicMock()
+        with patch("topic_scorer.Ollama", return_value=mock_ollama):
+            from topic_scorer import TopicScorer
+
+            return TopicScorer(), mock_ollama
+
+    def test_analytics_exception_swallowed(self):
+        """Analytics import failure doesn't break scoring."""
+        scorer, mock_ollama = self._make_scorer()
+
+        mock_response = MagicMock()
+        mock_response.content = [
+            MagicMock(
+                text=(
+                    '[{"topic_number": 1, "total_score": 8.0, "shock_value": 2,'
+                    ' "relatability": 2, "absurdity": 2, "title_hook": 1,'
+                    ' "visual_imagery": 1, "reason": "test",'
+                    ' "category": "news", "recommended": true}]'
+                )
+            )
+        ]
+        mock_ollama.messages.create.return_value = mock_response
+
+        topic = {"title": "Test", "episode_number": 5}
+
+        # Make TopicEngagementScorer raise an exception
+        with patch(
+            "analytics.TopicEngagementScorer", side_effect=RuntimeError("broken")
+        ):
+            result = scorer._score_batch([topic])
+
+        # Score should still be present despite analytics failure
+        assert result[0]["score"]["total"] == 8.0
+        assert result[0]["score"]["engagement_bonus"] is None
+
+    def test_general_exception_returns_original_topics(self):
+        """General exception in LLM call returns original topics."""
+        scorer, mock_ollama = self._make_scorer()
+
+        mock_ollama.messages.create.side_effect = RuntimeError("LLM down")
+
+        topics = [{"title": "Test Topic"}]
+        result = scorer._score_batch(topics)
+        assert result == topics
+
+
+class TestSaveScoredTopicsAutoFilename:
+    """Tests for auto-generated filename in save_scored_topics."""
+
+    def test_auto_filename_uses_timestamp(self, tmp_path):
+        """save_scored_topics generates timestamped filename when none provided."""
+        mock_ollama = MagicMock()
+        with patch("topic_scorer.Ollama", return_value=mock_ollama):
+            from topic_scorer import TopicScorer
+
+            scorer = TopicScorer()
+
+        topics = [
+            {
+                "title": "A",
+                "score": {"total": 7, "recommended": True, "category": "news"},
+            },
+        ]
+
+        import topic_scorer
+
+        original_path = topic_scorer.Path
+
+        topic_scorer.Path = lambda x: (
+            tmp_path if x == "topic_data" else original_path(x)
+        )
+        try:
+            output = scorer.save_scored_topics(topics)
+        finally:
+            topic_scorer.Path = original_path
+
+        assert output.exists()
+        assert output.name.startswith("scored_topics_")
+        assert output.suffix == ".json"
+
+
+class TestScoreScrapedTopics:
+    """Tests for the score_scraped_topics standalone function."""
+
+    def test_score_scraped_topics_with_input_file(self, tmp_path):
+        """score_scraped_topics loads and scores topics from a file."""
+        import json
+        from topic_scorer import score_scraped_topics
+
+        # Create input file
+        input_file = tmp_path / "scraped_topics_test.json"
+        input_file.write_text(
+            json.dumps({"topics": [{"title": "Topic 1"}, {"title": "Topic 2"}]})
+        )
+
+        mock_ollama = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = [
+            MagicMock(
+                text=(
+                    '[{"topic_number": 1, "total_score": 7.0, "shock_value": 2,'
+                    ' "relatability": 2, "absurdity": 2, "title_hook": 1,'
+                    ' "visual_imagery": 0, "reason": "test",'
+                    ' "category": "news", "recommended": true}]'
+                )
+            )
+        ]
+        mock_ollama.messages.create.return_value = mock_response
+
+        import topic_scorer
+
+        original_path = topic_scorer.Path
+
+        topic_scorer.Path = lambda x: (
+            tmp_path if x == "topic_data" else original_path(x)
+        )
+        try:
+            with patch("topic_scorer.Ollama", return_value=mock_ollama):
+                result = score_scraped_topics(input_file=str(input_file))
+        finally:
+            topic_scorer.Path = original_path
+
+        assert result is not None
+        assert result.exists()
+
+    def test_score_scraped_topics_no_topic_data_dir(self, tmp_path):
+        """score_scraped_topics returns None when no topic_data dir exists."""
+        from topic_scorer import score_scraped_topics
+
+        with patch("topic_scorer.Path") as mock_path:
+            mock_dir = MagicMock()
+            mock_dir.exists.return_value = False
+            mock_path.return_value = mock_dir
+
+            result = score_scraped_topics(input_file=None)
+
+        assert result is None
+
+    def test_score_scraped_topics_no_scraped_files(self, tmp_path):
+        """score_scraped_topics returns None when no scraped files found."""
+        from topic_scorer import score_scraped_topics
+
+        with patch("topic_scorer.Path") as mock_path:
+            mock_dir = MagicMock()
+            mock_dir.exists.return_value = True
+            mock_dir.glob.return_value = []
+            mock_path.return_value = mock_dir
+
+            result = score_scraped_topics(input_file=None)
+
+        assert result is None
+
+    def test_score_scraped_topics_finds_most_recent(self, tmp_path):
+        """score_scraped_topics picks the most recent scraped file."""
+        import json
+        from topic_scorer import score_scraped_topics
+
+        # Create two scraped files with different mtimes
+        old_file = tmp_path / "scraped_topics_old.json"
+        old_file.write_text(json.dumps({"topics": [{"title": "Old"}]}))
+
+        new_file = tmp_path / "scraped_topics_new.json"
+        new_file.write_text(json.dumps({"topics": [{"title": "New"}]}))
+
+        mock_ollama = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = [
+            MagicMock(
+                text=(
+                    '[{"topic_number": 1, "total_score": 6.0, "shock_value": 1,'
+                    ' "relatability": 1, "absurdity": 1, "title_hook": 1,'
+                    ' "visual_imagery": 1, "reason": "test",'
+                    ' "category": "news", "recommended": true}]'
+                )
+            )
+        ]
+        mock_ollama.messages.create.return_value = mock_response
+
+        import topic_scorer
+
+        original_path = topic_scorer.Path
+
+        # Mock Path("topic_data") to return tmp_path contents
+        def mock_path_factory(x):
+            if x == "topic_data":
+                mock_dir = MagicMock()
+                mock_dir.exists.return_value = True
+                mock_dir.glob.return_value = [old_file, new_file]
+                return mock_dir
+            return original_path(x)
+
+        topic_scorer.Path = mock_path_factory
+        try:
+            with patch("topic_scorer.Ollama", return_value=mock_ollama):
+                with patch(
+                    "topic_scorer.TopicScorer.save_scored_topics",
+                    return_value=tmp_path / "output.json",
+                ):
+                    score_scraped_topics(input_file=None)
+        finally:
+            topic_scorer.Path = original_path
+
+
 if __name__ == "__main__":
     import pytest
 
