@@ -8,6 +8,7 @@ from uploaders.youtube_uploader import (
     create_episode_metadata,
     _format_chapters_for_youtube,
 )
+from googleapiclient.errors import HttpError
 
 
 class TestYouTubeUploader:
@@ -329,6 +330,356 @@ class TestCreateEpisodeMetadataShowNotes:
             clip_info=clip_info,
         )
         assert "A funny clip" in metadata["description"]
+
+
+class TestYouTubeUploaderAuth:
+    """Tests for authentication edge cases."""
+
+    @patch("uploaders.youtube_uploader.build")
+    @patch("builtins.open", new_callable=mock_open)
+    def test_custom_token_path(self, mock_file, mock_build):
+        """Test that custom token_path overrides default."""
+        mock_creds = Mock()
+        mock_creds.valid = True
+
+        with patch("uploaders.youtube_uploader.Path.exists", return_value=True):
+            with patch("pickle.load", return_value=mock_creds):
+                uploader = YouTubeUploader(token_path="/custom/token.pickle")
+
+        from pathlib import Path
+
+        assert uploader.TOKEN_PATH == Path("/custom/token.pickle")
+
+    @patch("uploaders.youtube_uploader.build")
+    @patch("builtins.open", new_callable=mock_open)
+    def test_token_refresh_success(self, mock_file, mock_build):
+        """Test successful token refresh for expired credentials."""
+        mock_creds = Mock()
+        mock_creds.expired = True
+        mock_creds.refresh_token = "refresh_token"
+
+        # valid is False initially, then True after refresh is called
+        valid_values = iter([False, True])
+        type(mock_creds).valid = property(lambda self: next(valid_values))
+
+        with patch("uploaders.youtube_uploader.Path.exists", return_value=True):
+            with patch("pickle.load", return_value=mock_creds):
+                with patch("pickle.dump"):
+                    uploader = YouTubeUploader()
+
+        mock_creds.refresh.assert_called_once()
+        assert uploader.youtube is not None
+
+    @patch("uploaders.youtube_uploader.build")
+    @patch("uploaders.youtube_uploader.InstalledAppFlow")
+    @patch("builtins.open", new_callable=mock_open)
+    def test_token_refresh_failure_triggers_reauth(
+        self, mock_file, mock_flow_class, mock_build
+    ):
+        """Test that failed token refresh triggers full OAuth flow."""
+        mock_creds = Mock()
+        mock_creds.valid = False
+        mock_creds.expired = True
+        mock_creds.refresh_token = "refresh_token"
+        mock_creds.refresh.side_effect = Exception("Refresh failed")
+
+        mock_new_creds = Mock()
+        mock_new_creds.valid = True
+        mock_flow = Mock()
+        mock_flow.run_local_server.return_value = mock_new_creds
+        mock_flow_class.from_client_secrets_file.return_value = mock_flow
+
+        def exists_side_effect(*args, **kwargs):
+            return True
+
+        with patch(
+            "uploaders.youtube_uploader.Path.exists", side_effect=exists_side_effect
+        ):
+            with patch("pickle.load", return_value=mock_creds):
+                with patch("pickle.dump"):
+                    uploader = YouTubeUploader()
+
+        mock_flow_class.from_client_secrets_file.assert_called_once()
+        assert uploader.youtube is not None
+
+    @patch("uploaders.youtube_uploader.build")
+    @patch("uploaders.youtube_uploader.InstalledAppFlow")
+    @patch("builtins.open", new_callable=mock_open)
+    def test_full_oauth_flow_no_token(self, mock_file, mock_flow_class, mock_build):
+        """Test full OAuth flow when no token file exists."""
+        mock_new_creds = Mock()
+        mock_new_creds.valid = True
+        mock_flow = Mock()
+        mock_flow.run_local_server.return_value = mock_new_creds
+        mock_flow_class.from_client_secrets_file.return_value = mock_flow
+
+        # Token doesn't exist, but credentials file does
+        def exists_side_effect(*args, **kwargs):
+            return True
+
+        with patch("uploaders.youtube_uploader.Path.exists", side_effect=[False, True]):
+            with patch("pickle.dump"):
+                uploader = YouTubeUploader()
+
+        mock_flow.run_local_server.assert_called_once()
+        assert uploader.youtube is not None
+
+
+class TestUploadEpisodeEdgeCases:
+    """Tests for upload_episode edge cases."""
+
+    @patch("uploaders.youtube_uploader.YouTubeUploader._authenticate")
+    def test_upload_returns_none_when_youtube_is_none(self, mock_auth):
+        """upload_episode returns None when YouTube API is not authenticated."""
+        uploader = YouTubeUploader()
+        uploader.youtube = None
+
+        result = uploader.upload_episode(
+            video_path=__file__, title="Test", description="Test"
+        )
+        assert result is None
+
+    @patch("uploaders.youtube_uploader.YouTubeUploader._authenticate")
+    @patch("uploaders.youtube_uploader.Path.exists")
+    @patch("uploaders.youtube_uploader.MediaFileUpload")
+    def test_upload_with_publish_at(self, mock_media, mock_exists, mock_auth):
+        """upload_episode includes publishAt when publish_at is set."""
+        mock_exists.return_value = True
+        uploader = YouTubeUploader()
+
+        mock_youtube = Mock()
+        mock_request = Mock()
+        mock_request.next_chunk.return_value = (None, {"id": "vid123"})
+        mock_youtube.videos().insert.return_value = mock_request
+        uploader.youtube = mock_youtube
+
+        result = uploader.upload_episode(
+            video_path=__file__,
+            title="Test",
+            description="Test",
+            publish_at="2026-04-01T12:00:00Z",
+        )
+
+        assert result is not None
+        # Verify publishAt was in the body
+        call_args = mock_youtube.videos().insert.call_args
+        body = call_args.kwargs.get("body") or call_args[1].get("body")
+        assert body["status"]["publishAt"] == "2026-04-01T12:00:00Z"
+
+    @patch("uploaders.youtube_uploader.YouTubeUploader._authenticate")
+    @patch("uploaders.youtube_uploader.Path.exists")
+    @patch("uploaders.youtube_uploader.MediaFileUpload")
+    @patch("time.sleep")
+    def test_upload_ssl_error_retry(
+        self, mock_sleep, mock_media, mock_exists, mock_auth
+    ):
+        """upload_episode retries on SSL errors."""
+        import ssl
+
+        mock_exists.return_value = True
+        uploader = YouTubeUploader()
+
+        mock_youtube = Mock()
+        mock_request = Mock()
+        # First call raises SSL, second succeeds
+        mock_request.next_chunk.side_effect = [
+            ssl.SSLError("SSL handshake failed"),
+            (None, {"id": "vid123"}),
+        ]
+        mock_youtube.videos().insert.return_value = mock_request
+        uploader.youtube = mock_youtube
+
+        result = uploader.upload_episode(
+            video_path=__file__, title="Test", description="Test"
+        )
+
+        assert result is not None
+        assert result["video_id"] == "vid123"
+        mock_sleep.assert_called_once()
+
+    @patch("uploaders.youtube_uploader.YouTubeUploader._authenticate")
+    @patch("uploaders.youtube_uploader.Path.exists")
+    @patch("uploaders.youtube_uploader.MediaFileUpload")
+    @patch("time.sleep")
+    def test_upload_connection_error_retry(
+        self, mock_sleep, mock_media, mock_exists, mock_auth
+    ):
+        """upload_episode retries on EOF/connection errors."""
+        mock_exists.return_value = True
+        uploader = YouTubeUploader()
+
+        mock_youtube = Mock()
+        mock_request = Mock()
+        mock_request.next_chunk.side_effect = [
+            Exception("EOF occurred in violation of protocol"),
+            (None, {"id": "vid123"}),
+        ]
+        mock_youtube.videos().insert.return_value = mock_request
+        uploader.youtube = mock_youtube
+
+        result = uploader.upload_episode(
+            video_path=__file__, title="Test", description="Test"
+        )
+
+        assert result is not None
+        assert result["video_id"] == "vid123"
+
+    @patch("uploaders.youtube_uploader.YouTubeUploader._authenticate")
+    @patch("uploaders.youtube_uploader.Path.exists")
+    @patch("uploaders.youtube_uploader.MediaFileUpload")
+    def test_upload_calls_thumbnail_on_success(
+        self, mock_media, mock_exists, mock_auth
+    ):
+        """upload_episode calls _upload_thumbnail when thumbnail_path is provided."""
+        mock_exists.return_value = True
+        uploader = YouTubeUploader()
+
+        mock_youtube = Mock()
+        mock_request = Mock()
+        mock_request.next_chunk.return_value = (None, {"id": "vid123"})
+        mock_youtube.videos().insert.return_value = mock_request
+        uploader.youtube = mock_youtube
+
+        with patch.object(uploader, "_upload_thumbnail") as mock_thumb:
+            uploader.upload_episode(
+                video_path=__file__,
+                title="Test",
+                description="Test",
+                thumbnail_path=__file__,
+            )
+            mock_thumb.assert_called_once_with("vid123", __file__)
+
+    @patch("uploaders.youtube_uploader.YouTubeUploader._authenticate")
+    @patch("uploaders.youtube_uploader.Path.exists")
+    @patch("uploaders.youtube_uploader.MediaFileUpload")
+    def test_upload_http_error_returns_none(self, mock_media, mock_exists, mock_auth):
+        """upload_episode returns None on HttpError."""
+        mock_exists.return_value = True
+        uploader = YouTubeUploader()
+
+        mock_youtube = Mock()
+        mock_request = Mock()
+        mock_request.next_chunk.side_effect = HttpError(
+            resp=Mock(status=403), content=b"Forbidden"
+        )
+        mock_youtube.videos().insert.return_value = mock_request
+        uploader.youtube = mock_youtube
+
+        result = uploader.upload_episode(
+            video_path=__file__, title="Test", description="Test"
+        )
+        assert result is None
+
+    @patch("uploaders.youtube_uploader.YouTubeUploader._authenticate")
+    @patch("uploaders.youtube_uploader.Path.exists")
+    @patch("uploaders.youtube_uploader.MediaFileUpload")
+    def test_upload_generic_exception_returns_none(
+        self, mock_media, mock_exists, mock_auth
+    ):
+        """upload_episode returns None on unexpected exception."""
+        mock_exists.return_value = True
+        uploader = YouTubeUploader()
+
+        mock_youtube = Mock()
+        mock_request = Mock()
+        mock_request.next_chunk.side_effect = RuntimeError("Something broke")
+        mock_youtube.videos().insert.return_value = mock_request
+        uploader.youtube = mock_youtube
+
+        result = uploader.upload_episode(
+            video_path=__file__, title="Test", description="Test"
+        )
+        assert result is None
+
+
+class TestUploadThumbnailEdgeCases:
+    """Tests for _upload_thumbnail edge cases."""
+
+    @patch("uploaders.youtube_uploader.YouTubeUploader._authenticate")
+    def test_thumbnail_file_not_found(self, mock_auth):
+        """_upload_thumbnail returns False when file doesn't exist."""
+        uploader = YouTubeUploader()
+        uploader.youtube = Mock()
+
+        result = uploader._upload_thumbnail("vid123", "/nonexistent/thumb.jpg")
+        assert result is False
+
+    @patch("uploaders.youtube_uploader.YouTubeUploader._authenticate")
+    @patch("uploaders.youtube_uploader.Path.exists")
+    @patch("uploaders.youtube_uploader.MediaFileUpload")
+    def test_thumbnail_http_error(self, mock_media, mock_exists, mock_auth):
+        """_upload_thumbnail returns False on HttpError."""
+        mock_exists.return_value = True
+        uploader = YouTubeUploader()
+
+        mock_youtube = Mock()
+        mock_youtube.thumbnails().set().execute.side_effect = HttpError(
+            resp=Mock(status=400), content=b"Bad Request"
+        )
+        uploader.youtube = mock_youtube
+
+        result = uploader._upload_thumbnail("vid123", __file__)
+        assert result is False
+
+
+class TestUpdateVideoMetadataEdgeCases:
+    """Tests for update_video_metadata edge cases."""
+
+    @patch("uploaders.youtube_uploader.YouTubeUploader._authenticate")
+    def test_video_not_found(self, mock_auth):
+        """update_video_metadata returns False when video not found."""
+        uploader = YouTubeUploader()
+
+        mock_youtube = Mock()
+        mock_youtube.videos().list().execute.return_value = {"items": []}
+        uploader.youtube = mock_youtube
+
+        result = uploader.update_video_metadata(video_id="nonexistent")
+        assert result is False
+
+    @patch("uploaders.youtube_uploader.YouTubeUploader._authenticate")
+    def test_update_tags(self, mock_auth):
+        """update_video_metadata updates tags when provided."""
+        uploader = YouTubeUploader()
+
+        mock_youtube = Mock()
+        mock_youtube.videos().list().execute.return_value = {
+            "items": [{"snippet": {"title": "Old", "description": "Desc", "tags": []}}]
+        }
+        mock_youtube.videos().update().execute.return_value = {}
+        uploader.youtube = mock_youtube
+
+        result = uploader.update_video_metadata(video_id="vid123", tags=["new", "tags"])
+        assert result is True
+
+    @patch("uploaders.youtube_uploader.YouTubeUploader._authenticate")
+    def test_update_metadata_http_error(self, mock_auth):
+        """update_video_metadata returns False on HttpError."""
+        uploader = YouTubeUploader()
+
+        mock_youtube = Mock()
+        mock_youtube.videos().list().execute.side_effect = HttpError(
+            resp=Mock(status=404), content=b"Not Found"
+        )
+        uploader.youtube = mock_youtube
+
+        result = uploader.update_video_metadata(video_id="vid123", title="New Title")
+        assert result is False
+
+
+class TestFormatChaptersNonStandard:
+    """Test for non-standard timestamp format in chapters."""
+
+    def test_non_standard_timestamp_format(self):
+        """Chapters with non-HH:MM:SS format use raw timestamp."""
+        chapters = [
+            {"start_timestamp": "0:00", "title": "Intro", "start_seconds": 0},
+            {"start_timestamp": "5:30", "title": "Topic 1", "start_seconds": 330},
+            {"start_timestamp": "15:00", "title": "Topic 2", "start_seconds": 900},
+        ]
+        result = _format_chapters_for_youtube(chapters)
+        assert "0:00 Intro" in result
+        assert "5:30 Topic 1" in result
 
 
 if __name__ == "__main__":
