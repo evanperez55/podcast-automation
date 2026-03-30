@@ -944,3 +944,82 @@ class TestVoiceExamplesConditional:
         assert "VOICE EXAMPLES" in prompt, (
             "Explicit None persona must still include FP voice examples"
         )
+
+
+from config import Config  # noqa: E402
+
+
+class TestFindWordsToCensorDirectly:
+    """Tests for _find_words_to_censor_directly."""
+
+    def test_empty_words_returns_empty(self, content_editor):
+        """Empty word list returns empty censor list."""
+        result = content_editor._find_words_to_censor_directly([])
+        assert result == []
+
+    def test_no_names_configured_returns_empty(self, content_editor, monkeypatch):
+        """No names to remove or censor words returns empty list."""
+        monkeypatch.setattr(Config, "NAMES_TO_REMOVE", [])
+        if hasattr(Config, "WORDS_TO_CENSOR"):
+            monkeypatch.setattr(Config, "WORDS_TO_CENSOR", [])
+        result = content_editor._find_words_to_censor_directly(
+            [{"word": "hello", "start": 0.0, "end": 0.5}]
+        )
+        assert result == []
+
+    def test_finds_single_word_name(self, content_editor, monkeypatch):
+        """Finds a single-word name in the transcript."""
+        monkeypatch.setattr(Config, "NAMES_TO_REMOVE", ["John"])
+        words = [
+            {"word": "Hello", "start": 0.0, "end": 0.5},
+            {"word": "John", "start": 0.5, "end": 1.0},
+            {"word": "said", "start": 1.0, "end": 1.5},
+        ]
+        result = content_editor._find_words_to_censor_directly(words)
+        assert len(result) >= 1
+        assert any("John" in str(ts) for ts in result)
+
+    def test_finds_multi_word_name(self, content_editor, monkeypatch):
+        """Finds a multi-word name in the transcript."""
+        monkeypatch.setattr(Config, "NAMES_TO_REMOVE", ["John Smith"])
+        words = [
+            {"word": "Hello", "start": 0.0, "end": 0.5},
+            {"word": "John", "start": 0.5, "end": 1.0},
+            {"word": "Smith", "start": 1.0, "end": 1.5},
+            {"word": "said", "start": 1.5, "end": 2.0},
+        ]
+        result = content_editor._find_words_to_censor_directly(words)
+        assert len(result) >= 1
+
+
+class TestCallOpenaiWithRetry:
+    """Tests for _call_openai_with_retry error handling."""
+
+    def test_retry_on_api_error(self, content_editor):
+        """Retries on OpenAI API errors and eventually raises."""
+        import openai
+
+        error = openai.APIConnectionError(request=Mock())
+        content_editor.client.chat.completions.create = Mock(side_effect=error)
+        with pytest.raises(openai.APIConnectionError):
+            content_editor._call_openai_with_retry("system", "prompt", max_retries=0)
+
+    def test_success_on_first_try(self, content_editor):
+        """Returns response on successful first attempt."""
+        mock_response = Mock()
+        content_editor.client.chat.completions.create = Mock(return_value=mock_response)
+
+        result = content_editor._call_openai_with_retry("system", "prompt")
+        assert result == mock_response
+
+
+class TestFormatTranscript:
+    """Tests for _format_transcript_for_analysis."""
+
+    def test_formats_segments_with_timestamps(self, content_editor):
+        """Formats segments with timestamps and text."""
+        words = [{"word": "hello", "start": 0.0, "end": 0.5}]
+        segments = [{"start": 0.0, "end": 5.0, "text": "hello world"}]
+        result = content_editor._format_transcript_for_analysis(words, segments)
+        assert "hello world" in result
+        assert "00:00" in result
