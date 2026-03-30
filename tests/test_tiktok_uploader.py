@@ -401,5 +401,184 @@ class TestTikTokErrorPaths:
         assert pid is None
 
 
+class TestUploadVideoHappyPath:
+    """Tests for upload_video full flow through _initialize, _upload_file, _wait_for_publish."""
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", "valid_key")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
+    @patch("pathlib.Path.exists", return_value=True)
+    def test_upload_video_success(self, mock_exists):
+        """Full success path returns result dict with publish_id and share_url."""
+        uploader = TikTokUploader()
+        publish_result = {
+            "publish_id": "pub456",
+            "status": "PUBLISH_COMPLETE",
+            "share_url": "https://tiktok.com/@user/video/456",
+            "video_id": "vid456",
+        }
+        with (
+            patch.object(
+                uploader,
+                "_initialize_upload",
+                return_value=("https://upload.tiktok.com/456", "pub456"),
+            ),
+            patch.object(uploader, "_upload_video_file", return_value=True),
+            patch.object(uploader, "_wait_for_publish", return_value=publish_result),
+        ):
+            result = uploader.upload_video("/fake/video.mp4", "Test Title")
+
+        assert result is not None
+        assert result["publish_id"] == "pub456"
+        assert result["share_url"] == "https://tiktok.com/@user/video/456"
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", "valid_key")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
+    @patch("pathlib.Path.exists", return_value=True)
+    def test_upload_video_init_failure_returns_none(self, mock_exists):
+        """upload_video returns None when _initialize_upload fails."""
+        uploader = TikTokUploader()
+        with patch.object(uploader, "_initialize_upload", return_value=(None, None)):
+            result = uploader.upload_video("/fake/video.mp4", "Test Title")
+
+        assert result is None
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", "valid_key")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
+    @patch("pathlib.Path.exists", return_value=True)
+    def test_upload_video_file_upload_failure_returns_none(self, mock_exists):
+        """upload_video returns None when _upload_video_file fails."""
+        uploader = TikTokUploader()
+        with (
+            patch.object(
+                uploader,
+                "_initialize_upload",
+                return_value=("https://upload.tiktok.com/789", "pub789"),
+            ),
+            patch.object(uploader, "_upload_video_file", return_value=False),
+        ):
+            result = uploader.upload_video("/fake/video.mp4", "Test Title")
+
+        assert result is None
+
+
+class TestInitializeUploadResponseLogging:
+    """Tests for _initialize_upload response text logging on exception."""
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", "valid_key")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
+    @patch("requests.post")
+    def test_initialize_upload_logs_response_text_on_exception(self, mock_post):
+        """Logs e.response.text when RequestException has a response attached."""
+        import requests as req
+
+        mock_response = Mock()
+        mock_response.text = "server error details"
+        exc = req.exceptions.RequestException("fail")
+        exc.response = mock_response
+        mock_post.side_effect = exc
+
+        uploader = TikTokUploader()
+        with patch.object(Path, "stat", return_value=Mock(st_size=1024)):
+            url, pid = uploader._initialize_upload(Path("/fake.mp4"))
+
+        assert url is None
+        assert pid is None
+
+
+class TestWaitForPublishEdgeCases:
+    """Tests for _wait_for_publish polling, timeout, and exception paths."""
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", "valid_key")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
+    @patch("requests.post")
+    @patch("time.sleep", return_value=None)
+    def test_wait_for_publish_polling_then_success(self, mock_sleep, mock_post):
+        """Polls through IN_PROGRESS statuses then returns on PUBLISH_COMPLETE."""
+        in_progress_resp = Mock(
+            json=lambda: {"data": {"status": "PROCESSING"}},
+            raise_for_status=lambda: None,
+        )
+        complete_resp = Mock(
+            json=lambda: {
+                "data": {
+                    "status": "PUBLISH_COMPLETE",
+                    "share_url": "https://tiktok.com/@user/video/999",
+                    "video_id": "vid999",
+                }
+            },
+            raise_for_status=lambda: None,
+        )
+        mock_post.side_effect = [in_progress_resp, in_progress_resp, complete_resp]
+
+        uploader = TikTokUploader()
+        result = uploader._wait_for_publish("pub999")
+
+        assert result is not None
+        assert result["status"] == "PUBLISH_COMPLETE"
+        assert result["video_id"] == "vid999"
+        # Should have slept for initial wait + 2 polling waits
+        assert mock_sleep.call_count == 3
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", "valid_key")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
+    @patch("requests.post")
+    @patch("time.sleep", return_value=None)
+    def test_wait_for_publish_request_exception_returns_none(
+        self, mock_sleep, mock_post
+    ):
+        """Returns None when a RequestException occurs during polling."""
+        import requests as req
+
+        mock_post.side_effect = req.exceptions.RequestException("network error")
+
+        uploader = TikTokUploader()
+        result = uploader._wait_for_publish("pub123")
+
+        assert result is None
+
+    @patch.object(Config, "TIKTOK_CLIENT_KEY", "valid_key")
+    @patch.object(Config, "TIKTOK_CLIENT_SECRET", "valid_secret")
+    @patch.object(Config, "TIKTOK_ACCESS_TOKEN", "valid_token")
+    @patch("requests.post")
+    @patch("time.sleep", return_value=None)
+    def test_wait_for_publish_timeout_returns_none(self, mock_sleep, mock_post):
+        """Returns None after max_attempts when status never reaches PUBLISH_COMPLETE."""
+        mock_post.return_value = Mock(
+            json=lambda: {"data": {"status": "PROCESSING"}},
+            raise_for_status=lambda: None,
+        )
+
+        uploader = TikTokUploader()
+        result = uploader._wait_for_publish("pub123")
+
+        assert result is None
+        # 30 polling attempts + 1 initial sleep
+        assert mock_sleep.call_count == 31
+
+
+class TestCreateTikTokCaptionLastResort:
+    """Test for create_tiktok_caption last resort truncation path."""
+
+    def test_caption_last_resort_truncation(self):
+        """Falls back to primary_text[:150] when hashtags leave no room."""
+        # Use many long hashtags so hashtag_str is very long (max_title_len <= 10)
+        long_hashtags = [f"verylonghashtag{i:03d}" for i in range(20)]
+        long_title = "A" * 200
+
+        caption = create_tiktok_caption(
+            clip_title=long_title,
+            hashtags=long_hashtags,
+        )
+
+        assert len(caption) == 150
+        assert caption == "A" * 150
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
