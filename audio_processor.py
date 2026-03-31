@@ -295,7 +295,9 @@ class AudioProcessor:
         logger.info("Censored audio saved to: %s", output_path)
         return output_path
 
-    def extract_clip(self, audio_file_path, start_seconds, end_seconds, output_path):
+    def extract_clip(
+        self, audio_file_path, start_seconds, end_seconds, output_path, _audio=None
+    ):
         """
         Extract a clip from the audio file.
 
@@ -304,6 +306,7 @@ class AudioProcessor:
             start_seconds: Start time in seconds
             end_seconds: End time in seconds
             output_path: Output path for clip
+            _audio: Pre-loaded AudioSegment to avoid redundant disk reads
 
         Returns:
             Path to extracted clip
@@ -313,8 +316,12 @@ class AudioProcessor:
         if not audio_file_path.exists():
             raise FileNotFoundError(f"Audio file not found: {audio_file_path}")
 
-        # Load audio (supports any format FFmpeg can handle)
-        audio = AudioSegment.from_file(str(audio_file_path))
+        # Use pre-loaded audio if provided, otherwise load from disk
+        audio = (
+            _audio
+            if _audio is not None
+            else AudioSegment.from_file(str(audio_file_path))
+        )
 
         # Extract clip
         start_ms = int(start_seconds * 1000)
@@ -352,6 +359,9 @@ class AudioProcessor:
         file_base = base_name if base_name else audio_file_path.stem
 
         logger.info("Creating %d clips from: %s", len(best_clips), audio_file_path.name)
+
+        # Load audio once — avoids redundant disk reads in extract_clip loop
+        audio = AudioSegment.from_file(str(audio_file_path))
 
         clip_paths = []
 
@@ -392,8 +402,10 @@ class AudioProcessor:
             )
             logger.debug("  %s", description)
 
-            # Extract clip
-            clip_path = self.extract_clip(audio_file_path, start, end, output_path)
+            # Extract clip (pass cached audio to avoid reloading from disk)
+            clip_path = self.extract_clip(
+                audio_file_path, start, end, output_path, _audio=audio
+            )
             clip_paths.append(clip_path)
 
         logger.info("Created %d clips in: %s", len(clip_paths), output_dir)
