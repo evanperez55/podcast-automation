@@ -39,8 +39,21 @@ class AudioProcessor:
         """Initialize audio processor."""
         logger.info("Audio processor ready")
 
-        # TODO: beep_sound kept for backward compat; no longer used by apply_censorship (Phase 2)
-        self.beep_sound = self._get_beep_sound()
+        # Lazy-loaded: no longer used by apply_censorship (Phase 2, now uses ducking)
+        # Kept for backward compat — only loads on first access via property
+        self._beep_sound = None
+
+    @property
+    def beep_sound(self):
+        """Lazy-load beep sound on first access."""
+        if self._beep_sound is None:
+            self._beep_sound = self._get_beep_sound()
+        return self._beep_sound
+
+    @beep_sound.setter
+    def beep_sound(self, value):
+        """Allow setting beep sound (used in tests)."""
+        self._beep_sound = value
 
     def _get_beep_sound(self):
         """Get or generate the beep sound for censoring."""
