@@ -939,6 +939,82 @@ class TestClipDurationValidation:
         assert sliced_range.stop == 35000  # 35s in ms
 
 
+class TestAudioCaching:
+    """Tests for audio caching optimizations — load once, reuse across operations."""
+
+    @patch("audio_processor.AudioSegment.from_file")
+    def test_create_clips_loads_audio_once(
+        self, mock_from_file, audio_processor, tmp_path
+    ):
+        """create_clips loads audio once and passes to extract_clip, not N times."""
+        mock_audio = Mock(spec=AudioSegment)
+        mock_audio.__len__ = Mock(return_value=300000)
+        mock_clip = Mock(spec=AudioSegment)
+        mock_clip.fade_in = Mock(return_value=mock_clip)
+        mock_clip.fade_out = Mock(return_value=mock_clip)
+        mock_clip.export = Mock()
+        mock_audio.__getitem__ = Mock(return_value=mock_clip)
+        mock_from_file.return_value = mock_audio
+
+        audio_file = tmp_path / "test.wav"
+        audio_file.write_text("fake")
+        clip_dir = tmp_path / "clips"
+        clip_dir.mkdir()
+
+        best_clips = [
+            {"start_seconds": 10.0, "end_seconds": 40.0, "description": "Clip 1"},
+            {"start_seconds": 50.0, "end_seconds": 80.0, "description": "Clip 2"},
+            {"start_seconds": 90.0, "end_seconds": 120.0, "description": "Clip 3"},
+        ]
+
+        result = audio_processor.create_clips(audio_file, best_clips, clip_dir)
+
+        assert len(result) == 3
+        # Audio loaded exactly once (in create_clips), not 3 times (once per clip)
+        mock_from_file.assert_called_once()
+
+    @patch("audio_processor.AudioSegment.from_file")
+    def test_extract_clip_with_preloaded_audio_skips_load(
+        self, mock_from_file, audio_processor, tmp_path
+    ):
+        """extract_clip with _audio param skips AudioSegment.from_file."""
+        pre_loaded = Mock(spec=AudioSegment)
+        mock_clip = Mock(spec=AudioSegment)
+        mock_clip.fade_in = Mock(return_value=mock_clip)
+        mock_clip.fade_out = Mock(return_value=mock_clip)
+        mock_clip.export = Mock()
+        pre_loaded.__getitem__ = Mock(return_value=mock_clip)
+
+        audio_file = tmp_path / "test.wav"
+        audio_file.write_text("fake")
+        output_path = tmp_path / "clip.wav"
+
+        audio_processor.extract_clip(
+            audio_file, 10.0, 40.0, output_path, _audio=pre_loaded
+        )
+
+        # from_file should NOT be called since pre-loaded audio was provided
+        mock_from_file.assert_not_called()
+        # But the clip should still be extracted from the pre-loaded audio
+        pre_loaded.__getitem__.assert_called_once()
+
+    @patch("audio_processor.AudioSegment.from_file")
+    def test_convert_to_mp3_with_preloaded_audio_skips_load(
+        self, mock_from_file, audio_processor, tmp_path
+    ):
+        """convert_to_mp3 with _audio param skips AudioSegment.from_file."""
+        pre_loaded = Mock(spec=AudioSegment)
+        pre_loaded.export = Mock()
+
+        audio_file = tmp_path / "test.wav"
+        audio_file.write_text("fake")
+
+        audio_processor.convert_to_mp3(audio_file, _audio=pre_loaded)
+
+        mock_from_file.assert_not_called()
+        pre_loaded.export.assert_called_once()
+
+
 class TestRawSnapshot:
     """Tests for raw audio snapshot before censorship (DEMO-02).
 
