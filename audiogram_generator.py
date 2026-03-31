@@ -219,19 +219,27 @@ class AudiogramGenerator:
         Returns:
             List of successfully created output file paths.
         """
-        results = []
+        from concurrent.futures import ThreadPoolExecutor
 
-        for i, clip_path in enumerate(clip_paths):
+        def _create_one(i, clip_path):
             srt_path = srt_paths[i] if srt_paths and i < len(srt_paths) else None
-
-            output = self.create_audiogram(
+            return self.create_audiogram(
                 audio_path=clip_path,
                 format_type=format_type,
                 srt_path=srt_path,
             )
 
-            if output is not None:
-                results.append(output)
+        max_workers = min(len(clip_paths), Config.MAX_NVENC_SESSIONS)
+        results = []
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [
+                executor.submit(_create_one, i, cp) for i, cp in enumerate(clip_paths)
+            ]
+            for f in futures:
+                output = f.result()
+                if output is not None:
+                    results.append(output)
 
         logger.info(
             f"Audiogram batch complete: {len(results)}/{len(clip_paths)} succeeded"
