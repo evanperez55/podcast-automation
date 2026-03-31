@@ -140,6 +140,38 @@ class TestVideoConverterInit:
             VideoConverter(logo_path="/nonexistent/logo.jpg")
 
 
+class TestFaststartFlag:
+    """Tests that -movflags +faststart is included in FFmpeg commands."""
+
+    @patch("video_converter.subprocess.run")
+    def test_audio_to_video_has_faststart(self, mock_run, converter, tmp_path):
+        """audio_to_video includes -movflags +faststart for progressive playback."""
+        audio = tmp_path / "test.wav"
+        audio.write_text("fake")
+        mock_run.return_value = MagicMock(returncode=0)
+
+        converter.audio_to_video(str(audio))
+
+        cmd = mock_run.call_args[0][0]
+        assert "-movflags" in cmd
+        assert "+faststart" in cmd
+
+    @patch("video_converter.subprocess.run")
+    def test_subtitle_video_has_faststart(self, mock_run, converter, tmp_path):
+        """audio_to_video_with_subtitles includes -movflags +faststart."""
+        audio = tmp_path / "test.wav"
+        audio.write_text("fake")
+        srt = tmp_path / "test.srt"
+        srt.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n")
+        mock_run.return_value = MagicMock(returncode=0)
+
+        converter.audio_to_video_with_subtitles(str(audio), str(srt))
+
+        cmd = mock_run.call_args[0][0]
+        assert "-movflags" in cmd
+        assert "+faststart" in cmd
+
+
 class TestAudioToVideoFormats:
     """Tests for different format types."""
 

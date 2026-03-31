@@ -104,6 +104,8 @@ class VideoConverter:
                 "-vf",
                 f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2",  # Scale and pad
                 "-shortest",  # End when audio ends
+                "-movflags",
+                "+faststart",  # Moov atom at front — enables progressive playback
                 "-y",  # Overwrite output file
                 str(output_path),
             ]
@@ -223,6 +225,8 @@ class VideoConverter:
                 "-vf",
                 vf_filter,
                 "-shortest",
+                "-movflags",
+                "+faststart",
                 "-y",
                 str(output_path),
             ]

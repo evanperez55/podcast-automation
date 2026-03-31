@@ -269,6 +269,8 @@ def cut_video_clip(
             "aac",
             "-b:a",
             "192k",
+            "-movflags",
+            "+faststart",
             "-y",
             str(output_path),
         ]
