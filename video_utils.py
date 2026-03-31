@@ -18,6 +18,9 @@ VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mov", ".avi", ".webm"}
 # NVENC preset mapping: libx264 preset name -> NVENC p-level
 _NVENC_PRESET_MAP = {"ultrafast": "p1", "fast": "p2", "medium": "p4", "slow": "p6"}
 
+# Cache probe results — avoids redundant ffprobe calls when cutting N clips from same video
+_probe_cache: dict = {}
+
 
 def get_h264_encoder_args(preset="medium", crf=18, profile="high"):
     """Return FFmpeg encoder args, using NVENC if available.
@@ -67,12 +70,19 @@ def is_video_file(file_path: Path) -> bool:
 def probe_video(video_path: str) -> Optional[dict]:
     """Get video metadata using ffprobe.
 
+    Results are cached per path to avoid redundant ffprobe subprocess calls
+    when cutting multiple clips from the same source video.
+
     Args:
         video_path: Path to video file.
 
     Returns:
         Dict with width, height, duration, fps, codec, or None on failure.
     """
+    cache_key = str(video_path)
+    if cache_key in _probe_cache:
+        return _probe_cache[cache_key]
+
     cmd = [
         Config.FFPROBE_PATH,
         "-v",
@@ -104,13 +114,15 @@ def probe_video(video_path: str) -> Optional[dict]:
         else:
             fps = float(fps_str)
 
-        return {
+        meta = {
             "width": stream.get("width", 0),
             "height": stream.get("height", 0),
             "fps": round(fps, 2),
             "codec": stream.get("codec_name", "unknown"),
             "duration": float(fmt.get("duration", 0)),
         }
+        _probe_cache[cache_key] = meta
+        return meta
     except (subprocess.TimeoutExpired, json.JSONDecodeError, Exception) as e:
         logger.warning("Failed to probe video: %s", e)
         return None

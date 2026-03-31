@@ -7,6 +7,7 @@ from unittest.mock import patch, MagicMock
 
 from config import Config
 
+import video_utils
 from video_utils import (
     is_video_file,
     probe_video,
@@ -15,6 +16,14 @@ from video_utils import (
     mux_audio_to_video,
     get_h264_encoder_args,
 )
+
+
+@pytest.fixture(autouse=True)
+def _clear_probe_cache():
+    """Clear probe cache between tests to prevent state leakage."""
+    video_utils._probe_cache.clear()
+    yield
+    video_utils._probe_cache.clear()
 
 
 class TestIsVideoFile:
@@ -129,6 +138,61 @@ class TestProbeVideo:
 
         result = probe_video("/path/to/video.mp4")
         assert result is None
+
+
+class TestProbeVideoCache:
+    """Tests for probe_video() result caching."""
+
+    @patch("video_utils.subprocess.run")
+    def test_probe_cache_avoids_repeated_subprocess(self, mock_run):
+        """Second probe_video call for same path uses cache, skips subprocess."""
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "streams": [
+                        {
+                            "width": 1920,
+                            "height": 1080,
+                            "r_frame_rate": "30/1",
+                            "codec_name": "h264",
+                        }
+                    ],
+                    "format": {"duration": "100"},
+                }
+            ),
+        )
+
+        result1 = probe_video("/same/video.mp4")
+        result2 = probe_video("/same/video.mp4")
+
+        assert result1 == result2
+        mock_run.assert_called_once()  # Only one subprocess call, second was cached
+
+    @patch("video_utils.subprocess.run")
+    def test_different_paths_not_cached(self, mock_run):
+        """Different paths are probed independently."""
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "streams": [
+                        {
+                            "width": 1920,
+                            "height": 1080,
+                            "r_frame_rate": "30/1",
+                            "codec_name": "h264",
+                        }
+                    ],
+                    "format": {"duration": "100"},
+                }
+            ),
+        )
+
+        probe_video("/video_a.mp4")
+        probe_video("/video_b.mp4")
+
+        assert mock_run.call_count == 2
 
 
 class TestExtractAudio:
