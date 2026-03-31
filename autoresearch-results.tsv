@@ -1,0 +1,15 @@
+# metric_direction: higher_is_better
+# goal: pipeline efficiency — eliminate redundant audio loads, add parallelism, optimize FFmpeg
+iteration	commit	metric	delta	guard	status	description
+0	84d16df	92.30	0.0	pass	baseline	initial state — 965 passed, 89% coverage
+1	3c2f7f3	92.30	+0.00	pass	keep	cache audio in create_clips — load once instead of N per clip (eliminates N-1 redundant loads)
+2	2c41a17	92.30	+0.00	pass	keep	accept pre-loaded audio in convert_to_mp3 to avoid redundant disk read
+3	e8d1870	92.30	+0.00	pass	keep	add 3 tests validating audio caching (load-once, skip-load with _audio)
+4	5e2842a	92.30	+0.00	pass	keep	parallelize convert_clips_to_videos with ThreadPoolExecutor (MAX_NVENC_SESSIONS workers)
+5	9e54e3f	89.00	+0.00	pass	keep	fix test fixture for lazy import (patch faster_whisper.WhisperModel instead of transcription.WhisperModel)
+6	4ec1c48	89.00	+0.00	pass	keep	add -movflags +faststart to all FFmpeg video outputs — progressive playback optimization
+7	db54634	89.00	+0.00	pass	keep	use FFmpeg directly for MP3 conversion — skip pydub decode/re-encode overhead
+8	138cc8b	89.00	+0.00	pass	keep	cache probe_video results — avoid N redundant ffprobe subprocess calls per source video
+9	79b7842	89.00	+0.00	pass	keep	parallelize create_audiogram_clips with ThreadPoolExecutor (MAX_NVENC_SESSIONS workers)
+10	902b134	89.00	+0.00	pass	keep	lazy-load beep sound — skip WAV I/O on AudioProcessor init (ducking replaced beeping)
+11	348ef1c	89.00	+0.00	pass	keep	lazy import openai in ContentEditor — defer heavy module load to __init__
