@@ -2,6 +2,7 @@
 
 import pytest
 from pathlib import Path
+from unittest.mock import patch
 
 from config import Config
 
@@ -945,6 +946,464 @@ class TestPingRSSFeed:
             validate_client("rss-ping", ping=True)
 
         mock_ping.assert_called_once()
+
+
+class TestGetClientNames:
+    """Tests for get_client_names()."""
+
+    def test_returns_list_of_client_names(self, tmp_path, monkeypatch):
+        """Returns client names from clients/ directory."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        (clients_dir / "alpha.yaml").write_text("client_name: alpha\n")
+        (clients_dir / "beta.yaml").write_text("client_name: beta\n")
+        (clients_dir / "example-client.yaml").write_text("client_name: example\n")
+
+        from client_config import get_client_names
+
+        names = get_client_names()
+        assert "alpha" in names
+        assert "beta" in names
+        assert "example-client" not in names
+
+    def test_no_clients_dir_returns_empty(self, tmp_path, monkeypatch):
+        """Returns empty list when clients/ dir does not exist."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+
+        from client_config import get_client_names
+
+        assert get_client_names() == []
+
+
+class TestProcessAll:
+    """Tests for process_all()."""
+
+    def test_no_clients_prints_message(self, tmp_path, monkeypatch, capsys):
+        """Prints help message when no clients configured."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+
+        from client_config import process_all
+
+        process_all({})
+        output = capsys.readouterr().out
+        assert "No clients configured" in output
+
+    def test_processes_each_client(self, tmp_path, monkeypatch, capsys):
+        """Iterates over each configured client."""
+        from unittest.mock import patch
+
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        (clients_dir / "test-show.yaml").write_text(
+            'client_name: "test-show"\npodcast_name: "Test"\n'
+            "content:\n  names_to_remove: []\n"
+        )
+
+        with patch("pipeline.run_with_notification") as mock_run:
+            from client_config import process_all
+
+            process_all({"test_mode": True})
+
+        mock_run.assert_called_once()
+        output = capsys.readouterr().out
+        assert "test-show" in output
+
+    def test_handles_client_failure(self, tmp_path, monkeypatch, capsys):
+        """Records failure status when client processing raises."""
+        from unittest.mock import patch
+
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        (clients_dir / "broken.yaml").write_text(
+            'client_name: "broken"\npodcast_name: "Broken"\n'
+            "content:\n  names_to_remove: []\n"
+        )
+
+        with patch("pipeline.run_with_notification", side_effect=RuntimeError("boom")):
+            from client_config import process_all
+
+            process_all({})
+
+        output = capsys.readouterr().out
+        assert "FAILED" in output
+
+
+class TestListClientsNoDir:
+    """Tests for list_clients edge cases."""
+
+    def test_no_clients_dir(self, tmp_path, monkeypatch, capsys):
+        """Prints message when clients/ dir doesn't exist."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+
+        from client_config import list_clients
+
+        list_clients()
+        output = capsys.readouterr().out
+        assert "No clients/ directory" in output
+
+
+class TestClientStatusEdgeCases:
+    """Tests for client_status edge cases."""
+
+    def test_no_episodes_processed(self, tmp_path, monkeypatch, capsys):
+        """Shows message when no episode dirs exist."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "PODCAST_NAME", "Test Pod")
+        monkeypatch.setattr(Config, "OUTPUT_DIR", tmp_path / "output")
+        (tmp_path / "output").mkdir()
+
+        from client_config import client_status
+
+        with patch("client_config.activate_client"):
+            client_status("test")
+        output = capsys.readouterr().out
+        assert "No episodes processed" in output
+
+    def test_with_pipeline_state(self, tmp_path, monkeypatch, capsys):
+        """Shows step count and timestamp from pipeline state."""
+        import json
+        from unittest.mock import patch
+
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "PODCAST_NAME", "Test Pod")
+        output_dir = tmp_path / "output"
+        monkeypatch.setattr(Config, "OUTPUT_DIR", output_dir)
+        monkeypatch.setattr(Config, "TOPIC_DATA_DIR", tmp_path / "topics")
+
+        # Create episode dir with state
+        ep_dir = output_dir / "ep_01"
+        ep_dir.mkdir(parents=True)
+        state_dir = output_dir / ".pipeline_state"
+        state_dir.mkdir()
+        state = {
+            "completed_steps": {"transcribe": {}, "censor": {}, "normalize": {}},
+            "updated_at": "2026-03-30T12:00:00",
+        }
+        (state_dir / "ep_01.json").write_text(json.dumps(state))
+
+        with patch("client_config.activate_client"):
+            from client_config import client_status
+
+            client_status("test")
+        output = capsys.readouterr().out
+        assert "steps:" in output
+        assert "ep_01" in output
+
+    def test_with_platform_ids(self, tmp_path, monkeypatch, capsys):
+        """Shows uploaded platforms from platform_ids.json."""
+        import json
+        from unittest.mock import patch
+
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "PODCAST_NAME", "Test Pod")
+        output_dir = tmp_path / "output"
+        monkeypatch.setattr(Config, "OUTPUT_DIR", output_dir)
+        monkeypatch.setattr(Config, "TOPIC_DATA_DIR", tmp_path / "topics")
+
+        ep_dir = output_dir / "ep_01"
+        ep_dir.mkdir(parents=True)
+        (ep_dir / "platform_ids.json").write_text(json.dumps({"youtube": "abc123"}))
+
+        with patch("client_config.activate_client"):
+            from client_config import client_status
+
+            client_status("test")
+        output = capsys.readouterr().out
+        assert "youtube" in output
+
+    def test_with_pending_schedule(self, tmp_path, monkeypatch, capsys):
+        """Shows pending upload count from schedule file."""
+        import json
+        from unittest.mock import patch
+
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "PODCAST_NAME", "Test Pod")
+        output_dir = tmp_path / "output"
+        monkeypatch.setattr(Config, "OUTPUT_DIR", output_dir)
+        monkeypatch.setattr(Config, "TOPIC_DATA_DIR", tmp_path / "topics")
+
+        ep_dir = output_dir / "ep_01"
+        ep_dir.mkdir(parents=True)
+        sched = {"platforms": {"instagram": {"status": "pending"}}}
+        (ep_dir / "upload_schedule.json").write_text(json.dumps(sched))
+
+        with patch("client_config.activate_client"):
+            from client_config import client_status
+
+            client_status("test")
+        output = capsys.readouterr().out
+        assert "pending" in output
+
+    def test_content_calendar_pending(self, tmp_path, monkeypatch, capsys):
+        """Shows pending content calendar slots."""
+        import json
+        from unittest.mock import patch
+
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "PODCAST_NAME", "Test Pod")
+        output_dir = tmp_path / "output"
+        monkeypatch.setattr(Config, "OUTPUT_DIR", output_dir)
+        topics_dir = tmp_path / "topics"
+        topics_dir.mkdir(parents=True)
+        monkeypatch.setattr(Config, "TOPIC_DATA_DIR", topics_dir)
+
+        # Need at least one ep dir
+        (output_dir / "ep_01").mkdir(parents=True)
+
+        cal = {"ep_01": {"slots": {"twitter": {"status": "pending"}}}}
+        (topics_dir / "content_calendar.json").write_text(json.dumps(cal))
+
+        with patch("client_config.activate_client"):
+            from client_config import client_status
+
+            client_status("test")
+        output = capsys.readouterr().out
+        assert "pending slot" in output
+
+
+class TestListAvailableClients:
+    """Tests for _list_available_clients()."""
+
+    def test_no_clients_dir(self, tmp_path, monkeypatch):
+        """Returns message when no clients directory exists."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+
+        from client_config import _list_available_clients
+
+        result = _list_available_clients()
+        assert "no clients/ directory" in result
+
+    def test_no_yaml_files(self, tmp_path, monkeypatch):
+        """Returns message when no YAML files in clients/."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        (tmp_path / "clients").mkdir()
+
+        from client_config import _list_available_clients
+
+        result = _list_available_clients()
+        assert "no .yaml files" in result
+
+    def test_lists_client_names(self, tmp_path, monkeypatch):
+        """Returns comma-separated list of client names."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        (clients_dir / "alpha.yaml").write_text("x: y\n")
+        (clients_dir / "beta.yaml").write_text("x: y\n")
+
+        from client_config import _list_available_clients
+
+        result = _list_available_clients()
+        assert "alpha" in result
+        assert "beta" in result
+
+
+class TestPingFunction:
+    """Tests for _ping helper."""
+
+    def test_ping_success(self, capsys):
+        """Successful ping prints OK."""
+        from client_config import _ping
+
+        results = []
+        _ping(results, "TestService", lambda: None)
+        output = capsys.readouterr().out
+        assert "ping OK" in output
+
+    def test_ping_failure(self, capsys):
+        """Failed ping records error."""
+        from client_config import _ping
+
+        results = []
+
+        def _fail():
+            raise ConnectionError("refused")
+
+        _ping(results, "TestService", _fail)
+        output = capsys.readouterr().out
+        assert "ping FAILED" in output
+        assert any("ping" in r[0] for r in results)
+
+
+class TestYAMLSpecialHandling:
+    """Tests for YAML special handling branches in _build_overrides."""
+
+    @pytest.fixture(autouse=True)
+    def _save_restore_config(self):
+        """Save Config state before test and restore after."""
+        # Save all current Config class attributes
+        saved = {k: v for k, v in vars(Config).items() if not k.startswith("_")}
+        yield
+        # Remove any new attrs added by activate_client
+        current = {k for k in vars(Config) if not k.startswith("_")}
+        for attr in current - set(saved):
+            delattr(Config, attr)
+        # Restore original values
+        for k, v in saved.items():
+            setattr(Config, k, v)
+
+    def _activate(self, tmp_path, client_name, yaml_content):
+        """Activate a client config."""
+        setattr(Config, "BASE_DIR", tmp_path)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir(exist_ok=True)
+        (clients_dir / f"{client_name}.yaml").write_text(yaml_content)
+
+        from client_config import activate_client
+
+        return activate_client(client_name)
+
+    def test_rss_categories(self, tmp_path):
+        """RSS categories list from YAML is mapped to Config."""
+        self._activate(
+            tmp_path,
+            "cats",
+            'client_name: "cats"\npodcast_name: "Cats"\n'
+            "content:\n  names_to_remove: []\n"
+            "rss:\n  categories:\n    - Comedy\n    - Society\n",
+        )
+        assert Config.RSS_CATEGORIES == ["Comedy", "Society"]
+
+    def test_blog_voice(self, tmp_path):
+        """Blog voice from YAML is mapped to Config."""
+        self._activate(
+            tmp_path,
+            "bv",
+            'client_name: "bv"\npodcast_name: "BV"\n'
+            "content:\n  names_to_remove: []\n"
+            '  blog_voice: "Write like Hemingway"\n',
+        )
+        assert Config.BLOG_VOICE == "Write like Hemingway"
+
+    def test_scoring_profile(self, tmp_path):
+        """Scoring profile dict from YAML is mapped to Config."""
+        self._activate(
+            tmp_path,
+            "sp",
+            'client_name: "sp"\npodcast_name: "SP"\n'
+            "content:\n  names_to_remove: []\n"
+            "  scoring_profile:\n    humor_weight: 0.8\n    debate_weight: 0.5\n",
+        )
+        assert Config.SCORING_PROFILE == {"humor_weight": 0.8, "debate_weight": 0.5}
+
+
+class TestValidateConfigDisplay:
+    """Tests for validate_client config display branches."""
+
+    @pytest.fixture(autouse=True)
+    def _save_restore_config(self):
+        """Save Config state before test and restore after."""
+        saved = {k: v for k, v in vars(Config).items() if not k.startswith("_")}
+        yield
+        current = {k for k in vars(Config) if not k.startswith("_")}
+        for attr in current - set(saved):
+            delattr(Config, attr)
+        for k, v in saved.items():
+            setattr(Config, k, v)
+
+    def _setup_client(self, tmp_path, yaml_extra=""):
+        """Create a minimal client config."""
+        setattr(Config, "BASE_DIR", tmp_path)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir()
+        yaml_content = (
+            'client_name: "disp"\npodcast_name: "Display Test"\n'
+            "content:\n  names_to_remove: []\n" + yaml_extra
+        )
+        (clients_dir / "disp.yaml").write_text(yaml_content)
+
+    def test_shows_empty_words_to_censor(self, tmp_path, capsys):
+        """Shows (empty) when words_to_censor is empty."""
+        self._setup_client(tmp_path)
+
+        from client_config import validate_client
+
+        validate_client("disp")
+        output = capsys.readouterr().out
+        assert "words_to_censor" in output
+
+    def test_shows_blog_voice_configured(self, tmp_path, capsys):
+        """Shows blog_voice when configured."""
+        self._setup_client(tmp_path, '  blog_voice: "Write casually"\n')
+
+        from client_config import validate_client
+
+        validate_client("disp")
+        output = capsys.readouterr().out
+        assert "blog_voice" in output
+
+    def test_shows_scoring_profile(self, tmp_path, capsys):
+        """Shows scoring_profile when configured."""
+        self._setup_client(
+            tmp_path,
+            "  scoring_profile:\n    weight: 0.5\n",
+        )
+
+        from client_config import validate_client
+
+        validate_client("disp")
+        output = capsys.readouterr().out
+        assert "scoring_profile" in output
+
+
+class TestSetupYouTubeEdgeCases:
+    """Tests for _setup_youtube edge cases."""
+
+    def test_deletes_existing_token(self, tmp_path, monkeypatch, capsys):
+        """Deletes existing token file before re-auth."""
+        from unittest.mock import patch
+
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "_YOUTUBE_TOKEN_PICKLE", None)
+
+        # Create credentials file
+        creds_dir = tmp_path / "credentials"
+        creds_dir.mkdir()
+        (creds_dir / "youtube_credentials.json").write_text("{}")
+
+        # Create existing token
+        token_dir = tmp_path / "clients" / "test"
+        token_dir.mkdir(parents=True)
+        token_file = token_dir / "youtube_token.pickle"
+        token_file.write_text("old token")
+
+        with (
+            patch("builtins.input", return_value=""),
+            patch("uploaders.YouTubeUploader"),
+        ):
+            from client_config import _setup_youtube
+
+            _setup_youtube("test")
+
+        assert not token_file.exists()
+        output = capsys.readouterr().out
+        assert "Deleting existing token" in output
+
+    def test_auth_failure(self, tmp_path, monkeypatch, capsys):
+        """Prints error on authentication failure."""
+        from unittest.mock import patch
+
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        monkeypatch.setattr(Config, "_YOUTUBE_TOKEN_PICKLE", None)
+
+        creds_dir = tmp_path / "credentials"
+        creds_dir.mkdir()
+        (creds_dir / "youtube_credentials.json").write_text("{}")
+
+        with (
+            patch("builtins.input", return_value=""),
+            patch("uploaders.YouTubeUploader", side_effect=RuntimeError("auth failed")),
+        ):
+            from client_config import _setup_youtube
+
+            _setup_youtube("test")
+
+        output = capsys.readouterr().out
+        assert "ERROR" in output
+        assert "auth failed" in output
 
 
 if __name__ == "__main__":
