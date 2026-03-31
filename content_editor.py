@@ -1,6 +1,5 @@
 """Content editing using OpenAI to identify problematic content and best moments."""
 
-import openai
 import json
 import time
 from audio_clip_scorer import AudioClipScorer
@@ -111,7 +110,10 @@ class ContentEditor:
     """Use OpenAI to analyze transcript and identify content to censor and best clips."""
 
     def __init__(self):
-        """Initialize OpenAI client."""
+        """Initialize OpenAI client (lazy import — openai is heavy)."""
+        import openai
+
+        self._openai = openai
         self.client = openai.OpenAI(api_key=Config.OPENAI_API_KEY)
         self.model = getattr(Config, "OPENAI_ANALYSIS_MODEL", "gpt-4.1-mini")
         logger.info("OpenAI %s ready", self.model)
@@ -253,10 +255,10 @@ class ContentEditor:
                     ],
                 )
             except (
-                openai.RateLimitError,
-                openai.APIError,
-                openai.APIConnectionError,
-                openai.APITimeoutError,
+                self._openai.RateLimitError,
+                self._openai.APIError,
+                self._openai.APIConnectionError,
+                self._openai.APITimeoutError,
             ) as e:
                 last_error = e
                 if attempt < max_retries:

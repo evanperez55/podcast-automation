@@ -9,7 +9,7 @@ from content_editor import ContentEditor
 @pytest.fixture
 def content_editor():
     """Create a ContentEditor instance with mocked OpenAI client."""
-    with patch("content_editor.openai.OpenAI"):
+    with patch("openai.OpenAI"):
         editor = ContentEditor()
         return editor
 
