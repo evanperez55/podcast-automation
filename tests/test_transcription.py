@@ -13,7 +13,7 @@ from transcription import Transcriber
 class TestTranscriberInit:
     """Tests for Transcriber initialization."""
 
-    @patch("transcription.WhisperModel")
+    @patch("faster_whisper.WhisperModel")
     def test_init_cuda(self, mock_model_cls):
         """Uses CUDA when available."""
         mock_torch = MagicMock()
@@ -28,7 +28,7 @@ class TestTranscriberInit:
             "base", device="cuda", compute_type="float16"
         )
 
-    @patch("transcription.WhisperModel")
+    @patch("faster_whisper.WhisperModel")
     def test_init_cpu_fallback(self, mock_model_cls):
         """Falls back to CPU int8 when no CUDA."""
         mock_torch = MagicMock()
@@ -40,7 +40,7 @@ class TestTranscriberInit:
         assert t.device == "cpu"
         assert t.compute_type == "int8"
 
-    @patch("transcription.WhisperModel")
+    @patch("faster_whisper.WhisperModel")
     def test_init_default_model_size(self, mock_model_cls):
         """Uses Config.WHISPER_MODEL as default."""
         mock_torch = MagicMock()

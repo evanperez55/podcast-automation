@@ -4,7 +4,6 @@ Uses faster-whisper for ~4x speed improvement over openai-whisper with
 identical accuracy. Includes Silero VAD pre-filtering to skip silence.
 """
 
-from faster_whisper import WhisperModel
 from pathlib import Path
 import json
 from config import Config
@@ -38,7 +37,9 @@ class Transcriber:
 
         logger.info("Loading faster-whisper '%s' model...", model_size)
 
-        # Auto-detect device and compute type
+        # Lazy import: faster-whisper + torch are heavy (~2s import time)
+        # Deferring to __init__ avoids paying this cost when transcription is unused
+        from faster_whisper import WhisperModel
         import torch
 
         if torch.cuda.is_available():
