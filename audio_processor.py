@@ -439,11 +439,28 @@ class AudioProcessor:
 
         logger.info("Converting to MP3: %s", wav_file_path.name)
 
-        # Use pre-loaded audio if provided, otherwise load from disk
-        audio = (
-            _audio if _audio is not None else AudioSegment.from_file(str(wav_file_path))
-        )
-        audio.export(str(output_path), format="mp3", bitrate=bitrate)
+        if _audio is not None:
+            # Pre-loaded audio — use pydub export (data already in memory)
+            _audio.export(str(output_path), format="mp3", bitrate=bitrate)
+        else:
+            # No pre-loaded audio — use FFmpeg directly (skip pydub decode overhead)
+            cmd = [
+                Config.FFMPEG_PATH,
+                "-i",
+                str(wav_file_path),
+                "-codec:a",
+                "libmp3lame",
+                "-b:a",
+                bitrate,
+                "-y",
+                str(output_path),
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"FFmpeg MP3 conversion failed (rc={result.returncode}): "
+                    f"{result.stderr[-300:]}"
+                )
 
         logger.info("MP3 saved to: %s", output_path)
         return output_path

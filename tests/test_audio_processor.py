@@ -194,12 +194,10 @@ class TestAudioProcessor:
         assert len(result) == 2
         assert all(path.parent == clip_dir for path in result)
 
-    @patch("audio_processor.AudioSegment.from_file")
-    def test_convert_to_mp3(
-        self, mock_from_file, audio_processor, mock_audio_segment, tmp_path
-    ):
-        """Test converting audio to MP3."""
-        mock_from_file.return_value = mock_audio_segment
+    @patch("audio_processor.subprocess.run")
+    def test_convert_to_mp3(self, mock_run, audio_processor, tmp_path):
+        """Test converting audio to MP3 via direct FFmpeg call."""
+        mock_run.return_value = MagicMock(returncode=0)
         audio_file = tmp_path / "test.wav"
         audio_file.write_text("fake")
 
@@ -207,8 +205,9 @@ class TestAudioProcessor:
 
         assert result.suffix == ".mp3"
         assert result.parent == audio_file.parent
-        # Verify export was called with mp3 format
-        mock_audio_segment.export.assert_called()
+        # Verify FFmpeg was called with libmp3lame
+        cmd = mock_run.call_args[0][0]
+        assert "libmp3lame" in cmd
 
     def test_beep_sound_loaded(self):
         """Test that AudioProcessor loads beep sound."""
