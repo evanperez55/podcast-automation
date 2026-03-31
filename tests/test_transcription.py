@@ -64,7 +64,7 @@ def transcriber():
     mock_torch.cuda.is_available.return_value = False
 
     with (
-        patch("transcription.WhisperModel"),
+        patch("faster_whisper.WhisperModel"),
         patch.dict(sys.modules, {"torch": mock_torch}),
     ):
         t = Transcriber("tiny")
