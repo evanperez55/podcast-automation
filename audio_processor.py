@@ -411,7 +411,9 @@ class AudioProcessor:
         logger.info("Created %d clips in: %s", len(clip_paths), output_dir)
         return clip_paths
 
-    def convert_to_mp3(self, wav_file_path, output_path=None, bitrate=None):
+    def convert_to_mp3(
+        self, wav_file_path, output_path=None, bitrate=None, _audio=None
+    ):
         """
         Convert WAV to MP3 for uploading to platforms.
 
@@ -419,6 +421,7 @@ class AudioProcessor:
             wav_file_path: Path to WAV file
             output_path: Output path for MP3
             bitrate: Audio bitrate (default from Config.MP3_BITRATE)
+            _audio: Pre-loaded AudioSegment to avoid redundant disk reads
 
         Returns:
             Path to MP3 file
@@ -436,8 +439,10 @@ class AudioProcessor:
 
         logger.info("Converting to MP3: %s", wav_file_path.name)
 
-        # Load and export as MP3 (supports any format FFmpeg can handle)
-        audio = AudioSegment.from_file(str(wav_file_path))
+        # Use pre-loaded audio if provided, otherwise load from disk
+        audio = (
+            _audio if _audio is not None else AudioSegment.from_file(str(wav_file_path))
+        )
         audio.export(str(output_path), format="mp3", bitrate=bitrate)
 
         logger.info("MP3 saved to: %s", output_path)
