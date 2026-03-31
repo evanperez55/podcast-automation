@@ -262,7 +262,7 @@ class VideoConverter:
         srt_paths: Optional[List[Optional[str]]] = None,
     ) -> List[str]:
         """
-        Convert multiple audio clips to videos.
+        Convert multiple audio clips to videos in parallel.
 
         Args:
             clip_paths: List of paths to audio clips
@@ -271,41 +271,45 @@ class VideoConverter:
             srt_paths: Optional list of SRT file paths (one per clip, None for no subtitles)
 
         Returns:
-            List of paths to created video files
+            List of paths to created video files (preserves input order)
         """
-        video_paths = []
+        from concurrent.futures import ThreadPoolExecutor
 
-        for i, clip_path in enumerate(clip_paths):
+        def _convert_one(i, clip_path):
             clip_path = Path(clip_path)
-
-            # Determine output path
             if output_dir:
-                output_path = Path(output_dir) / clip_path.with_suffix(".mp4").name
+                out = Path(output_dir) / clip_path.with_suffix(".mp4").name
             else:
-                output_path = clip_path.with_suffix(".mp4")
+                out = clip_path.with_suffix(".mp4")
 
-            # Check if we have subtitles for this clip
             srt_path = None
             if srt_paths and i < len(srt_paths):
                 srt_path = srt_paths[i]
 
-            # Convert to video (with or without subtitles)
             if srt_path:
-                video_path = self.audio_to_video_with_subtitles(
+                return self.audio_to_video_with_subtitles(
                     audio_path=str(clip_path),
                     srt_path=srt_path,
-                    output_path=str(output_path),
+                    output_path=str(out),
                     format_type=format_type,
                 )
-            else:
-                video_path = self.audio_to_video(
-                    audio_path=str(clip_path),
-                    output_path=str(output_path),
-                    format_type=format_type,
-                )
+            return self.audio_to_video(
+                audio_path=str(clip_path),
+                output_path=str(out),
+                format_type=format_type,
+            )
 
-            if video_path:
-                video_paths.append(video_path)
+        max_workers = min(len(clip_paths), Config.MAX_NVENC_SESSIONS)
+        video_paths = []
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [
+                executor.submit(_convert_one, i, cp) for i, cp in enumerate(clip_paths)
+            ]
+            for f in futures:
+                result = f.result()
+                if result:
+                    video_paths.append(result)
 
         logger.info("Created %d/%d videos", len(video_paths), len(clip_paths))
         return video_paths
