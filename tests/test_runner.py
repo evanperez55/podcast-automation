@@ -72,7 +72,7 @@ class TestInitUploaders:
     @patch("pipeline.runner.TwitterUploader", side_effect=ValueError("no creds"))
     @patch("pipeline.runner.YouTubeUploader", side_effect=ValueError("no creds"))
     def test_uploaders_with_missing_credentials(
-        self, mock_yt, mock_tw, mock_ig, mock_tt, mock_sp
+        self, mock_yt, mock_tw, mock_ig, mock_tt, mock_sp, monkeypatch
     ):
         """Uploaders that raise ValueError are excluded gracefully."""
         mock_ig_instance = Mock()
@@ -83,15 +83,13 @@ class TestInitUploaders:
         mock_tt_instance.functional = False
         mock_tt.return_value = mock_tt_instance
 
+        monkeypatch.setattr(
+            "pipeline.runner.Config.EPISODE_SOURCE", "dropbox", raising=False
+        )
+
         from pipeline.runner import _init_uploaders
 
-        with patch(
-            "pipeline.runner.getattr",
-            side_effect=lambda o, a, d=None: (
-                d if a == "EPISODE_SOURCE" else getattr(o, a, d)
-            ),
-        ):
-            uploaders = _init_uploaders()
+        uploaders = _init_uploaders()
 
         # YouTube, Twitter, Spotify raised ValueError → not in dict (or handled)
         assert "youtube" not in uploaders or uploaders.get("youtube") is not None
@@ -113,11 +111,14 @@ class TestInitUploaders:
     @patch("pipeline.runner.TwitterUploader")
     @patch("pipeline.runner.YouTubeUploader")
     def test_all_uploaders_initialize_successfully(
-        self, mock_yt, mock_tw, mock_ig, mock_tt, mock_sp
+        self, mock_yt, mock_tw, mock_ig, mock_tt, mock_sp, monkeypatch
     ):
         """When all credentials are available, all uploaders are initialized."""
         mock_ig.return_value.functional = True
         mock_tt.return_value.functional = True
+        monkeypatch.setattr(
+            "pipeline.runner.Config.EPISODE_SOURCE", "dropbox", raising=False
+        )
 
         from pipeline.runner import _init_uploaders
 
@@ -1028,8 +1029,12 @@ class TestInitComponents:
         mock_subtitle,
         mock_webpage,
         mock_compliance,
+        monkeypatch,
     ):
         """Full init creates all components."""
+        monkeypatch.setattr(
+            "pipeline.runner.Config.EPISODE_SOURCE", "dropbox", raising=False
+        )
         from pipeline.runner import _init_components
 
         components = _init_components(test_mode=True)
@@ -1080,8 +1085,12 @@ class TestInitComponents:
         mock_subtitle,
         mock_webpage,
         mock_compliance,
+        monkeypatch,
     ):
         """VideoConverter failure is handled gracefully."""
+        monkeypatch.setattr(
+            "pipeline.runner.Config.EPISODE_SOURCE", "dropbox", raising=False
+        )
         from pipeline.runner import _init_components
 
         components = _init_components()
