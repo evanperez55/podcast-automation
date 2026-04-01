@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
 
 from config import Config
@@ -250,7 +250,9 @@ class UploadScheduler:
 
         # Fall back to fixed-delay config
         if delay > 0:
-            publish_at = (datetime.now() + timedelta(hours=delay)).isoformat()
+            publish_at = (
+                datetime.now(timezone.utc) + timedelta(hours=delay)
+            ).isoformat()
             logger.debug(
                 "Fixed-delay scheduling for %s: publish at %s", platform, publish_at
             )
@@ -266,7 +268,7 @@ class UploadScheduler:
         """
         if self.youtube_delay > 0:
             publish_at = (
-                datetime.now() + timedelta(hours=self.youtube_delay)
+                datetime.now(timezone.utc) + timedelta(hours=self.youtube_delay)
             ).isoformat()
             logger.debug(f"YouTube publishAt: {publish_at}")
             return publish_at

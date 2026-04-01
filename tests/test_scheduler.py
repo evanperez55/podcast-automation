@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import patch
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from scheduler import UploadScheduler
 from config import Config
@@ -240,7 +240,7 @@ class TestGetYoutubePublishAt:
         assert result is not None
         publish_at = datetime.fromisoformat(result)
         # Should be roughly 3 hours from now (allow 10s tolerance)
-        expected = datetime.now() + timedelta(hours=3)
+        expected = datetime.now(timezone.utc) + timedelta(hours=3)
         assert abs((publish_at - expected).total_seconds()) < 10
 
     @patch.dict("os.environ", {}, clear=True)
@@ -475,7 +475,7 @@ class TestGetOptimalPublishAt:
 
         assert result is not None
         publish_at = datetime.fromisoformat(result)
-        expected = datetime.now() + timedelta(hours=3)
+        expected = datetime.now(timezone.utc) + timedelta(hours=3)
         assert abs((publish_at - expected).total_seconds()) < 10
 
     @patch.object(Config, "SCHEDULE_YOUTUBE_DELAY_HOURS", 0)
@@ -504,7 +504,7 @@ class TestGetOptimalPublishAt:
         assert result is not None
         publish_at = datetime.fromisoformat(result)
         # Should be ~5 hours (twitter_delay), not 2 hours (youtube_delay)
-        expected = datetime.now() + timedelta(hours=5)
+        expected = datetime.now(timezone.utc) + timedelta(hours=5)
         assert abs((publish_at - expected).total_seconds()) < 10
 
     @patch.object(Config, "SCHEDULE_YOUTUBE_DELAY_HOURS", 2)
@@ -520,7 +520,7 @@ class TestGetOptimalPublishAt:
 
         assert result is not None
         publish_at = datetime.fromisoformat(result)
-        expected = datetime.now() + timedelta(hours=2)
+        expected = datetime.now(timezone.utc) + timedelta(hours=2)
         assert abs((publish_at - expected).total_seconds()) < 10
 
 
