@@ -1,6 +1,7 @@
 """Pipeline state management for checkpointing and resume support."""
 
 import json
+import os
 from datetime import datetime
 from logger import logger
 from config import Config
@@ -50,10 +51,14 @@ class PipelineState:
         }
 
     def _save(self):
-        """Persist state to disk."""
+        """Persist state to disk atomically (write-to-tmp + rename)."""
         self.state["updated_at"] = datetime.now().isoformat()
-        with open(self.state_file, "w", encoding="utf-8") as f:
+        tmp_path = self.state_file.with_suffix(".tmp")
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(self.state, f, indent=2, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(str(tmp_path), str(self.state_file))
 
     def is_step_completed(self, step_name: str) -> bool:
         """Check if a step has been completed."""
