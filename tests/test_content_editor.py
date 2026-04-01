@@ -1023,3 +1023,113 @@ class TestFormatTranscript:
         result = content_editor._format_transcript_for_analysis(words, segments)
         assert "hello world" in result
         assert "00:00" in result
+
+
+class TestMergeCensorTimestamps:
+    """Tests for _merge_censor_timestamps — deduplication of direct + GPT timestamps."""
+
+    def test_empty_gpt_returns_direct(self, content_editor):
+        """When gpt_timestamps is empty, returns direct_timestamps."""
+        direct = [{"start_seconds": 10.0, "reason": "Name: Joey"}]
+        result = content_editor._merge_censor_timestamps(direct, [])
+        assert result == direct
+
+    def test_empty_direct_returns_gpt(self, content_editor):
+        """When direct_timestamps is empty, returns gpt_timestamps."""
+        gpt = [{"seconds": 20.0, "reason": "Name: Joey"}]
+        result = content_editor._merge_censor_timestamps([], gpt)
+        assert result == gpt
+
+    def test_merges_non_overlapping(self, content_editor):
+        """GPT timestamps not near direct ones are added."""
+        direct = [{"start_seconds": 10.0, "reason": "Name: Joey"}]
+        gpt = [{"seconds": 30.0, "reason": "Name: Mike"}]
+        result = content_editor._merge_censor_timestamps(direct, gpt)
+        assert len(result) == 2
+
+    def test_deduplicates_overlapping(self, content_editor):
+        """GPT timestamps within 2s of direct ones are dropped."""
+        direct = [{"start_seconds": 10.0, "reason": "Name: Joey"}]
+        gpt = [{"seconds": 11.0, "reason": "Name: Joey"}]  # within 2s
+        result = content_editor._merge_censor_timestamps(direct, gpt)
+        assert len(result) == 1  # only direct
+
+    def test_uses_seconds_key_fallback(self, content_editor):
+        """Falls back to 'seconds' key when 'start_seconds' missing."""
+        direct = [{"seconds": 10.0, "reason": "Name: Joey"}]
+        gpt = [{"seconds": 10.5, "reason": "Name: Joey"}]  # within 2s
+        result = content_editor._merge_censor_timestamps(direct, gpt)
+        assert len(result) == 1
+
+
+class TestValidateCensorTimestamps:
+    """Tests for _validate_censor_timestamps — filters GPT hallucinations."""
+
+    def test_empty_list_returns_empty(self, content_editor):
+        """Empty input returns empty list."""
+        assert content_editor._validate_censor_timestamps([]) == []
+
+    def test_valid_item_kept(self, content_editor):
+        """Items where target word appears in context are kept."""
+        items = [
+            {"reason": "Name: Joey", "context": "Joey said something funny"},
+        ]
+        result = content_editor._validate_censor_timestamps(items)
+        assert len(result) == 1
+
+    def test_hallucinated_item_removed(self, content_editor):
+        """Items where target word does NOT appear in context are removed."""
+        items = [
+            {"reason": "Name: Joey", "context": "Mike said something funny"},
+        ]
+        result = content_editor._validate_censor_timestamps(items)
+        assert len(result) == 0
+
+    def test_mixed_valid_and_invalid(self, content_editor):
+        """Mix of valid and hallucinated items."""
+        items = [
+            {"reason": "Name: Joey", "context": "Joey laughed"},
+            {"reason": "Name: Mike", "context": "someone else talked"},
+            {"reason": "Name: Alex", "context": "Alex was there"},
+        ]
+        result = content_editor._validate_censor_timestamps(items)
+        assert len(result) == 2  # Joey and Alex
+
+    def test_case_insensitive_match(self, content_editor):
+        """Target word matching is case-insensitive."""
+        items = [
+            {"reason": "Name: joey", "context": "JOEY said something"},
+        ]
+        result = content_editor._validate_censor_timestamps(items)
+        assert len(result) == 1
+
+    def test_unextractable_reason_skipped(self, content_editor):
+        """Items where target word can't be extracted from reason are skipped."""
+        items = [
+            {"reason": "", "context": "something"},
+        ]
+        result = content_editor._validate_censor_timestamps(items)
+        assert len(result) == 0
+
+
+class TestRefineCensorTimestampsFallback:
+    """Tests for _refine_censor_timestamps — no-target-word fallback path."""
+
+    def test_no_target_word_uses_segment_timestamp(self, content_editor):
+        """When target word can't be extracted, uses segment timestamp."""
+        censor_items = [
+            {
+                "reason": "",
+                "context": "something",
+                "seconds": 60.0,
+                "start_seconds": 60.0,
+                "end_seconds": 60.5,
+            },
+        ]
+        words = [
+            {"word": "something", "start": 59.0, "end": 59.5},
+        ]
+        result = content_editor._refine_censor_timestamps(censor_items, words)
+        assert len(result) == 1
+        assert result[0]["start_seconds"] == 60.0
+        assert result[0]["end_seconds"] == 60.5
