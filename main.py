@@ -202,6 +202,30 @@ def main():
             _activate_client(client_name)
             run_search(" ".join(sys.argv[2:]))
             return
+        if cmd == "best-of":
+            from compilation_generator import CompilationGenerator
+
+            gen = CompilationGenerator()
+            max_clips = int(sys.argv[2]) if len(sys.argv) > 2 else 10
+            result = gen.generate_best_of(max_clips=max_clips)
+            if result:
+                print(f"Best-of compilation created: {result}")
+            else:
+                print("Failed to create compilation")
+            return
+        if cmd == "daily-content":
+            from daily_content_generator import DailyContentGenerator
+
+            gen = DailyContentGenerator()
+            topic = " ".join(sys.argv[2:]) if len(sys.argv) > 2 else None
+            result = gen.generate_fake_problem(topic_hint=topic)
+            if result:
+                print("\n--- Fake Problem of the Day ---")
+                for platform, text in result.items():
+                    print(f"\n{platform.upper()}:\n  {text}")
+            else:
+                print("Failed to generate content")
+            return
 
     if args["dry_run"]:
         _activate_client(client_name)
