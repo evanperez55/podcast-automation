@@ -87,11 +87,35 @@ class Transcriber:
             logger.info("Processing with faster-whisper...")
             logger.info("(This may take several minutes for long files...)")
 
-            segments_iter, info = self.model.transcribe(
-                str(audio_file_path),
-                word_timestamps=True,
-                vad_filter=True,  # Silero VAD pre-filters silence for 10-30% speedup
-            )
+            try:
+                segments_iter, info = self.model.transcribe(
+                    str(audio_file_path),
+                    word_timestamps=True,
+                    vad_filter=True,  # Silero VAD pre-filters silence for 10-30% speedup
+                )
+            except RuntimeError as e:
+                if "out of memory" in str(e).lower() and self.device == "cuda":
+                    logger.warning(
+                        "GPU out of memory — retrying transcription on CPU (this will be slower)"
+                    )
+                    import torch
+
+                    torch.cuda.empty_cache()
+                    from faster_whisper import WhisperModel
+
+                    self.model = WhisperModel(
+                        Config.WHISPER_MODEL,
+                        device="cpu",
+                        compute_type="int8",
+                    )
+                    self.device = "cpu"
+                    segments_iter, info = self.model.transcribe(
+                        str(audio_file_path),
+                        word_timestamps=True,
+                        vad_filter=True,
+                    )
+                else:
+                    raise
 
             # Collect segments and words from the generator
             all_segments = []
