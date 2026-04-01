@@ -394,7 +394,6 @@ def run_distribute(
     clip_paths = ctx.clip_paths or []
     video_clip_paths = ctx.video_clip_paths or []
     full_episode_video_path = ctx.full_episode_video_path
-    transcript_path = ctx.transcript_path
     transcript_data = ctx.transcript_data
     chapters_list = analysis.get("chapters", [])
     uploaders = components.get("uploaders", {})
@@ -479,10 +478,8 @@ def run_distribute(
                 # Get MP3 file info
                 mp3_file_size = os.path.getsize(mp3_path)
 
-                # Get duration from transcript
-                with open(transcript_path, "r", encoding="utf-8") as f:
-                    transcript_data = json.load(f)
-                    episode_duration = int(transcript_data.get("duration", 3600))
+                # Get duration from transcript (use ctx data, not file)
+                episode_duration = int((transcript_data or {}).get("duration", 3600))
 
                 # Generate chapters JSON for podcast apps
                 chapters_json_url = None
