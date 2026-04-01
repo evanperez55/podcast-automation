@@ -123,6 +123,13 @@ class SubtitleClipGenerator:
         return path
 
     @staticmethod
+    @staticmethod
+    def _parse_hex_color(rgb_hex: str) -> tuple:
+        """Parse hex color string to (R, G, B) ints for pysubs2.Color."""
+        hex_val = rgb_hex.lstrip("0x").lstrip("#").zfill(6)
+        return int(hex_val[0:2], 16), int(hex_val[2:4], 16), int(hex_val[4:6], 16)
+
+    @staticmethod
     def _to_bgr_hex(rgb_hex: str) -> str:
         """Convert RGB hex color to BGR hex string for ASS color tags.
 
@@ -150,6 +157,7 @@ class SubtitleClipGenerator:
         width: int,
         height: int,
         video_source: bool = False,
+        hook_text: str = None,
     ) -> str:
         """Generate an ASS subtitle file with per-word accent color highlights.
 
@@ -164,6 +172,8 @@ class SubtitleClipGenerator:
             height: Video height in pixels
             video_source: If True, position subtitles higher for blurred-background
                 layout where video occupies the upper portion of the canvas.
+            hook_text: Optional hook text to display in the first 2 seconds as a
+                scroll-stopping overlay (e.g., "Why can't lobsters die?").
 
         Returns:
             The output_path string
@@ -190,6 +200,31 @@ class SubtitleClipGenerator:
             marginv=margin_v,
         )
         subs.styles["Default"] = style
+
+        # Hook text style — centered, larger, accent color, appears first 2 seconds
+        if hook_text:
+            hook_style = pysubs2.SSAStyle(
+                fontname="Anton",
+                fontsize=int(self.font_size * 1.2),
+                bold=True,
+                primarycolor=pysubs2.Color(
+                    *self._parse_hex_color(self.accent_color), 0
+                ),
+                outlinecolor=pysubs2.Color(0, 0, 0, 0),
+                backcolor=pysubs2.Color(0, 0, 0, 160),
+                outline=4,
+                shadow=2,
+                alignment=pysubs2.Alignment.MIDDLE_CENTER,
+                marginv=0,
+            )
+            subs.styles["Hook"] = hook_style
+            hook_event = pysubs2.SSAEvent(
+                start=0,
+                end=2000,  # 2 seconds
+                text=hook_text.upper(),
+                style="Hook",
+            )
+            subs.events.append(hook_event)
 
         accent_bgr = self._to_bgr_hex(self.accent_color)
 
@@ -347,8 +382,11 @@ class SubtitleClipGenerator:
         clip_words = normalize_word_timestamps(clip_words)
 
         # Generate ASS subtitle file alongside the audio clip
+        hook_text = clip_info.get("hook_caption")
         ass_path = str(audio_path_obj.parent / f"{audio_path_obj.stem}_captions.ass")
-        self._generate_ass_file(clip_words, ass_path, width, height)
+        self._generate_ass_file(
+            clip_words, ass_path, width, height, hook_text=hook_text
+        )
 
         # Build and run FFmpeg
         cmd = self._build_ffmpeg_command(

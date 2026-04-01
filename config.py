@@ -156,6 +156,9 @@ class Config:
     # Analytics Feedback Loop
     ANALYTICS_ENABLED = os.getenv("ANALYTICS_ENABLED", "true").lower() == "true"
 
+    # Daily Content Generator
+    DAILY_CONTENT_ENABLED = os.getenv("DAILY_CONTENT_ENABLED", "true").lower() == "true"
+
     # Audiogram Waveforms
     USE_AUDIOGRAM = os.getenv("USE_AUDIOGRAM", "true").lower() == "true"
     AUDIOGRAM_BG_COLOR = os.getenv("AUDIOGRAM_BG_COLOR", "0x1a1a2e")
@@ -239,8 +242,12 @@ class Config:
 
     # Clip Settings
     CLIP_MIN_DURATION = 15  # seconds
-    CLIP_MAX_DURATION = 30  # seconds
-    NUM_CLIPS = 3  # Number of clips to generate per episode
+    CLIP_MAX_DURATION = int(
+        os.getenv("CLIP_MAX_DURATION", "60")
+    )  # seconds (longer clips perform better on TikTok/Reels)
+    NUM_CLIPS = int(
+        os.getenv("NUM_CLIPS", "5")
+    )  # clips per episode (volume > perfection for discovery)
     CLIP_AUDIO_TOP_N = int(
         os.getenv("CLIP_AUDIO_TOP_N", "10")
     )  # Top-N high-energy segments to pass to GPT-4o

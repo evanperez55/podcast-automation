@@ -442,8 +442,9 @@ GOOD: "turns out immortality is real, it just only applies to lobsters. link in 
 
    For each REAL instance, provide the timestamp and the exact quote containing the word.
 
-2. **IDENTIFY BEST MOMENTS FOR CLIPS (15-30 seconds):**
+2. **IDENTIFY BEST MOMENTS FOR CLIPS (15-60 seconds):**
    Find {Config.NUM_CLIPS} compelling moments that would make great social media clips.
+   PREFER LONGER CLIPS (30-60s) over short ones — TikTok/Reels algorithms favor 45-90s content.
    Each segment includes a WPM (words-per-minute) indicator — use this to identify delivery changes:
    - High WPM (180+) = excited/fast speech, high energy moments
    - Low WPM (80-120) = deliberate/dramatic delivery, emphasis
@@ -452,14 +453,25 @@ GOOD: "turns out immortality is real, it just only applies to lobsters. link in 
 {clip_criteria}
 
    For each clip, provide start/end timestamps and explain why it's interesting.
+   The hook_caption should be a SHORT HOOK QUESTION or BOLD CLAIM that appears as text overlay
+   in the first 2 seconds of the clip (before the audio starts). This is critical for stopping
+   the scroll. Examples: "Why can't lobsters die?", "This changes everything about healthcare",
+   "Nobody talks about this". Make it curiosity-driven, not a summary.
 
-3. **CREATE A FUNNY EPISODE TITLE:**
-   Generate a catchy, humorous episode title that:
-   - Is derived from the funniest or most memorable quote/moment in the episode
-   - Should be something one of the hosts actually said (or close to it)
+3. **CREATE A DUAL-PURPOSE EPISODE TITLE:**
+   Generate a title that is BOTH searchable AND funny:
+   - Format: a catchy hook that includes a searchable topic keyword
+   - Must make someone who doesn't know the show curious enough to click
+   - Should contain a real topic/concept people might search for
    - Can be absurd, out-of-context, or ironically serious
-   - Should make people curious to listen
-   - Examples of good titles: "I'm Basically a Godfather Now", "Healthcare is a Scam and I Can Prove It", "POV: You Don't Know What POV Means"
+   - Examples of GOOD titles (searchable + funny):
+     "The Animal That Literally Cannot Die" (topic: immortality)
+     "Why Your Brain Lies to You Every Day" (topic: cognitive bias)
+     "POV: You Don't Know What POV Means" (topic: internet slang)
+     "The Invention Designed Purely to Waste Your Time" (topic: inventions)
+   - Examples of BAD titles (funny but unsearchable):
+     "We Need to Talk About Thursday" (too vague for discovery)
+     "That One Thing From Last Week" (no topic keyword at all)
 
 4. **WRITE EPISODE SUMMARY:**
    Write a 2-3 sentence summary of the episode's main topics and themes.
@@ -467,10 +479,10 @@ GOOD: "turns out immortality is real, it just only applies to lobsters. link in 
 ## SOCIAL CAPTIONS (same irreverent voice — no corporate language, no filler phrases):
 5. **CREATE SOCIAL MEDIA CAPTIONS:**
    Write engaging captions for:
-   - YouTube (description format, 2-3 paragraphs — slightly moderated but still dry and authentic, algorithm-safe)
-   - Instagram (short, punchy, with emojis)
-   - Twitter/X (concise, under 280 chars — punchy and dry, show voice)
-   - TikTok (short, punchy, under 150 chars, with emojis)
+   - YouTube (description format, 2-3 paragraphs — slightly moderated but still dry and authentic, algorithm-safe. End with "New episode every week — subscribe so you don't miss the next one.")
+   - Instagram (short, punchy, with emojis. End with "link in bio" and include 5-8 hashtags including #comedy #podcast and topic-specific tags)
+   - Twitter/X (concise, under 280 chars — punchy and dry, show voice. Make it quotable/retweetable — imagine someone sharing this without context)
+   - TikTok (short, punchy, under 150 chars, with emojis. Start with a hook question or bold claim)
 
 6. **WRITE DETAILED SHOW NOTES:**
    Write show notes for the episode page/description:
