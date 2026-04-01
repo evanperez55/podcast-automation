@@ -399,3 +399,259 @@ class TestHistoricalEpisodeProcessor:
 
         # Should have continued to episode 2 after SSL error on episode 1
         assert call_count[0] == 2
+
+
+class TestProcessHistoricalEpisodeUploadFailures:
+    """Tests for Dropbox upload failure warnings (lines 133, 145, 158)."""
+
+    def test_transcription_upload_failure_warns(
+        self, processor, mock_components, tmp_path
+    ):
+        """When transcription upload returns None, a warning is printed."""
+        audio_file = tmp_path / "Episode #1 - Test.mp4"
+        audio_file.write_text("fake")
+
+        mock_components["dropbox"].upload_transcription.return_value = None
+
+        printed = []
+        with (
+            patch("builtins.open", mock_open()),
+            patch(
+                "builtins.print", side_effect=lambda *a, **kw: printed.append(str(a))
+            ),
+            patch("json.dump"),
+        ):
+            result = processor.process_historical_episode(audio_file)
+
+        assert result is not None
+        assert any("Failed to upload transcription" in line for line in printed)
+
+    def test_finished_episode_upload_failure_warns(
+        self, processor, mock_components, tmp_path
+    ):
+        """When finished episode upload returns None, a warning is printed."""
+        audio_file = tmp_path / "Episode #1 - Test.mp4"
+        audio_file.write_text("fake")
+
+        mock_components["dropbox"].upload_finished_episode.return_value = None
+
+        printed = []
+        with (
+            patch("builtins.open", mock_open()),
+            patch(
+                "builtins.print", side_effect=lambda *a, **kw: printed.append(str(a))
+            ),
+            patch("json.dump"),
+        ):
+            result = processor.process_historical_episode(audio_file)
+
+        assert result is not None
+        assert any("Failed to upload censored audio" in line for line in printed)
+
+    def test_clips_upload_failure_warns(self, processor, mock_components, tmp_path):
+        """When clips upload returns empty list, a warning is printed."""
+        audio_file = tmp_path / "Episode #1 - Test.mp4"
+        audio_file.write_text("fake")
+
+        mock_components["dropbox"].upload_clips.return_value = []
+
+        printed = []
+        with (
+            patch("builtins.open", mock_open()),
+            patch(
+                "builtins.print", side_effect=lambda *a, **kw: printed.append(str(a))
+            ),
+            patch("json.dump"),
+        ):
+            result = processor.process_historical_episode(audio_file)
+
+        assert result is not None
+        assert any("Failed to upload clips" in line for line in printed)
+
+
+class TestProcessAllHistoricalEpisodesReturnNone:
+    """Tests for process_historical_episode returning None in batch (line 252)."""
+
+    def test_process_returns_none_prints_error(
+        self, processor, mock_components, tmp_path
+    ):
+        """When process_historical_episode returns None, an error is printed."""
+        folder = tmp_path / "episodes"
+        folder.mkdir()
+        (folder / "Episode #1.mp4").write_text("fake")
+
+        mock_components["dropbox"].extract_episode_number.return_value = 1
+
+        printed = []
+        with (
+            patch.object(processor, "process_historical_episode", return_value=None),
+            patch(
+                "builtins.print", side_effect=lambda *a, **kw: printed.append(str(a))
+            ),
+        ):
+            processor.process_all_historical_episodes(str(folder))
+
+        assert any("Failed to process" in line for line in printed)
+
+
+class TestMainFunction:
+    """Tests for the main() entry point (lines 285-326)."""
+
+    def test_main_with_all_arg(self):
+        """Test main() with 'all' argument processes all episodes."""
+        with (
+            patch("process_historical_episodes.HistoricalEpisodeProcessor") as mock_cls,
+            patch("sys.argv", ["script", "all"]),
+            patch("builtins.print"),
+        ):
+            mock_inst = Mock()
+            mock_cls.return_value = mock_inst
+
+            from process_historical_episodes import main
+
+            main()
+
+            mock_inst.process_all_historical_episodes.assert_called_once_with(
+                "historical_ep", start_episode=None
+            )
+
+    def test_main_with_all_and_start_episode(self):
+        """Test main() with 'all 5' starts from episode 5."""
+        with (
+            patch("process_historical_episodes.HistoricalEpisodeProcessor") as mock_cls,
+            patch("sys.argv", ["script", "all", "5"]),
+            patch("builtins.print"),
+        ):
+            mock_inst = Mock()
+            mock_cls.return_value = mock_inst
+
+            from process_historical_episodes import main
+
+            main()
+
+            mock_inst.process_all_historical_episodes.assert_called_once_with(
+                "historical_ep", start_episode=5
+            )
+
+    def test_main_with_all_and_folder_arg(self):
+        """Test main() with 'all <folder>' uses folder as path."""
+        with (
+            patch("process_historical_episodes.HistoricalEpisodeProcessor") as mock_cls,
+            patch("sys.argv", ["script", "all", "my_folder"]),
+            patch("builtins.print"),
+        ):
+            mock_inst = Mock()
+            mock_cls.return_value = mock_inst
+
+            from process_historical_episodes import main
+
+            main()
+
+            mock_inst.process_all_historical_episodes.assert_called_once_with(
+                "my_folder", start_episode=None
+            )
+
+    def test_main_with_single_file_arg(self):
+        """Test main() with a file path processes single episode."""
+        with (
+            patch("process_historical_episodes.HistoricalEpisodeProcessor") as mock_cls,
+            patch("sys.argv", ["script", "/path/to/episode.mp4"]),
+            patch("builtins.print"),
+        ):
+            mock_inst = Mock()
+            mock_cls.return_value = mock_inst
+
+            from process_historical_episodes import main
+
+            main()
+
+            mock_inst.process_historical_episode.assert_called_once_with(
+                "/path/to/episode.mp4"
+            )
+
+    def test_main_interactive_mode_process_all(self):
+        """Test main() interactive mode choice 1 processes all."""
+        with (
+            patch("process_historical_episodes.HistoricalEpisodeProcessor") as mock_cls,
+            patch("sys.argv", ["script"]),
+            patch("builtins.print"),
+            patch("builtins.input", side_effect=["1"]),
+        ):
+            mock_inst = Mock()
+            mock_cls.return_value = mock_inst
+
+            from process_historical_episodes import main
+
+            main()
+
+            mock_inst.process_all_historical_episodes.assert_called_once()
+
+    def test_main_interactive_mode_process_single(self):
+        """Test main() interactive mode choice 2 processes single file."""
+        with (
+            patch("process_historical_episodes.HistoricalEpisodeProcessor") as mock_cls,
+            patch("sys.argv", ["script"]),
+            patch("builtins.print"),
+            patch("builtins.input", side_effect=["2", "/path/to/file.mp4"]),
+        ):
+            mock_inst = Mock()
+            mock_cls.return_value = mock_inst
+
+            from process_historical_episodes import main
+
+            main()
+
+            mock_inst.process_historical_episode.assert_called_once_with(
+                "/path/to/file.mp4"
+            )
+
+    def test_main_interactive_mode_invalid_choice(self):
+        """Test main() interactive mode with invalid choice prints error."""
+        printed = []
+        with (
+            patch("process_historical_episodes.HistoricalEpisodeProcessor") as mock_cls,
+            patch("sys.argv", ["script"]),
+            patch(
+                "builtins.print", side_effect=lambda *a, **kw: printed.append(str(a))
+            ),
+            patch("builtins.input", side_effect=["9"]),
+        ):
+            mock_cls.return_value = Mock()
+
+            from process_historical_episodes import main
+
+            main()
+
+        assert any("Invalid choice" in line for line in printed)
+
+
+class TestMainBlock:
+    """Tests for the __main__ block (lines 330-340)."""
+
+    def test_keyboard_interrupt_exits_with_code_1(self):
+        """KeyboardInterrupt during main() exits with code 1."""
+        with (
+            patch(
+                "process_historical_episodes.main",
+                side_effect=KeyboardInterrupt,
+            ),
+            patch("builtins.print"),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            exec(
+                compile(
+                    "try:\n"
+                    "    main()\n"
+                    "except KeyboardInterrupt:\n"
+                    '    print("\\n\\n[WARNING] Interrupted by user")\n'
+                    "    import sys; sys.exit(1)\n",
+                    "<test>",
+                    "exec",
+                ),
+                {
+                    "main": Mock(side_effect=KeyboardInterrupt),
+                    "print": lambda *a, **kw: None,
+                },
+            )
+
+        assert exc_info.value.code == 1

@@ -581,5 +581,155 @@ class TestBurnSubtitlesOnVideo:
         assert result is None
 
 
+class TestProbeVideoPlainFps:
+    """Tests for probe_video() with non-fractional fps string."""
+
+    @patch("video_utils.subprocess.run")
+    def test_probe_plain_fps_no_slash(self, mock_run):
+        """Plain fps string (no '/') is parsed as a float directly."""
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "streams": [
+                        {
+                            "width": 1280,
+                            "height": 720,
+                            "r_frame_rate": "25",
+                            "codec_name": "h264",
+                        }
+                    ],
+                    "format": {"duration": "60"},
+                }
+            ),
+        )
+
+        result = probe_video("/path/to/plain_fps.mp4")
+
+        assert result is not None
+        assert result["fps"] == 25.0
+
+
+class TestCutVideoClipWithSubtitles:
+    """Tests for cut_video_clip() subtitle burn-in paths."""
+
+    @patch("video_utils.Path.exists", return_value=True)
+    @patch("video_utils.subprocess.run")
+    @patch(
+        "subtitle_clip_generator.SubtitleClipGenerator._escape_ffmpeg_filter_path",
+        side_effect=lambda p: p,
+    )
+    @patch("video_utils.probe_video", return_value={"width": 1920, "height": 1080})
+    def test_cut_vertical_horizontal_source_with_subtitles(
+        self, mock_probe, mock_escape, mock_run, mock_exists
+    ):
+        """Horizontal source with crop_vertical=True and ass_path uses filter_complex with subtitles."""
+        mock_run.return_value = MagicMock(returncode=0)
+
+        result = cut_video_clip(
+            "/video.mp4",
+            5.0,
+            15.0,
+            "/clip.mp4",
+            crop_vertical=True,
+            ass_path="/subs.ass",
+        )
+
+        assert result == "/clip.mp4"
+        cmd = mock_run.call_args[0][0]
+        fc_idx = cmd.index("-filter_complex")
+        fc_value = cmd[fc_idx + 1]
+        assert "subtitles=" in fc_value
+        assert "[composed]" in fc_value
+
+    @patch("video_utils.Path.exists", return_value=True)
+    @patch("video_utils.subprocess.run")
+    @patch(
+        "subtitle_clip_generator.SubtitleClipGenerator._escape_ffmpeg_filter_path",
+        side_effect=lambda p: p,
+    )
+    @patch("video_utils.probe_video", return_value={"width": 720, "height": 1280})
+    def test_cut_vertical_square_source_with_subtitles(
+        self, mock_probe, mock_escape, mock_run, mock_exists
+    ):
+        """Vertical/square source with crop_vertical=True and ass_path uses -vf with subtitles."""
+        mock_run.return_value = MagicMock(returncode=0)
+
+        result = cut_video_clip(
+            "/video.mp4",
+            5.0,
+            15.0,
+            "/clip.mp4",
+            crop_vertical=True,
+            ass_path="/subs.ass",
+        )
+
+        assert result == "/clip.mp4"
+        cmd = mock_run.call_args[0][0]
+        vf_idx = cmd.index("-vf")
+        vf_value = cmd[vf_idx + 1]
+        assert "subtitles=" in vf_value
+        assert "scale=720:1280" in vf_value
+
+    @patch("video_utils.Path.exists", return_value=True)
+    @patch("video_utils.subprocess.run")
+    @patch(
+        "subtitle_clip_generator.SubtitleClipGenerator._escape_ffmpeg_filter_path",
+        side_effect=lambda p: p,
+    )
+    def test_cut_no_crop_with_subtitles(self, mock_escape, mock_run, mock_exists):
+        """Non-cropped clip with ass_path burns subtitles via -vf filter."""
+        mock_run.return_value = MagicMock(returncode=0)
+
+        result = cut_video_clip(
+            "/video.mp4",
+            0.0,
+            10.0,
+            "/clip.mp4",
+            crop_vertical=False,
+            ass_path="/subs.ass",
+        )
+
+        assert result == "/clip.mp4"
+        cmd = mock_run.call_args[0][0]
+        vf_idx = cmd.index("-vf")
+        vf_value = cmd[vf_idx + 1]
+        assert "subtitles=" in vf_value
+        assert "fontsdir=" in vf_value
+
+
+class TestBurnSubtitlesErrors:
+    """Tests for burn_subtitles_on_video additional error paths."""
+
+    @patch("video_utils.Path.exists", return_value=False)
+    @patch("video_utils.subprocess.run")
+    @patch(
+        "subtitle_clip_generator.SubtitleClipGenerator._escape_ffmpeg_filter_path",
+        side_effect=lambda p: p,
+    )
+    def test_no_output_file_returns_none(self, mock_escape, mock_run, mock_exists):
+        """Returns None when output file is not created after success returncode."""
+        mock_run.return_value = MagicMock(returncode=0)
+
+        from video_utils import burn_subtitles_on_video
+
+        result = burn_subtitles_on_video("/clip.mp4", "/clip.ass", "/output.mp4")
+        assert result is None
+
+    @patch("video_utils.subprocess.run")
+    @patch(
+        "subtitle_clip_generator.SubtitleClipGenerator._escape_ffmpeg_filter_path",
+        side_effect=lambda p: p,
+    )
+    def test_generic_exception_returns_none(self, mock_escape, mock_run):
+        """Returns None on generic exception during subtitle burn."""
+        mock_run.side_effect = OSError("disk full")
+
+        from video_utils import burn_subtitles_on_video
+
+        result = burn_subtitles_on_video("/clip.mp4", "/clip.ass", "/output.mp4")
+        assert result is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

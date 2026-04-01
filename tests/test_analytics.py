@@ -856,5 +856,205 @@ class TestRunAnalyticsWiring:
         assert call_kwargs[1]["episode_number"] == 1 or call_kwargs[0][0] == 1
 
 
+class TestBuildYoutubeClient:
+    """Tests for _build_youtube_client edge cases."""
+
+    @patch("analytics.Path.mkdir")
+    def test_build_youtube_client_token_not_found(self, mock_mkdir):
+        """Returns None when youtube_token.pickle does not exist."""
+        collector = AnalyticsCollector()
+
+        with patch("analytics.Path.exists", return_value=False):
+            result = collector._build_youtube_client()
+
+        assert result is None
+
+    @patch("analytics.Path.mkdir")
+    def test_build_youtube_client_refreshes_expired_creds(self, mock_mkdir):
+        """Refreshes credentials when they are expired."""
+        collector = AnalyticsCollector()
+
+        mock_creds = Mock()
+        mock_creds.expired = True
+        mock_creds.refresh_token = "refresh_token_value"
+
+        mock_youtube = MagicMock()
+
+        with (
+            patch("builtins.open", mock_open()),
+            patch("analytics.Path.exists", return_value=True),
+            patch("pickle.load", return_value=mock_creds),
+            patch(
+                "google.auth.transport.requests.Request", return_value=Mock()
+            ) as mock_request_cls,
+            patch("googleapiclient.discovery.build", return_value=mock_youtube),
+        ):
+            result = collector._build_youtube_client()
+
+        mock_creds.refresh.assert_called_once_with(mock_request_cls.return_value)
+        assert result is mock_youtube
+
+
+class TestFetchYouTubeAnalyticsEdgeCases:
+    """Tests for fetch_youtube_analytics edge cases."""
+
+    @patch("analytics.Path.mkdir")
+    def test_fetch_youtube_no_search_items(self, mock_mkdir):
+        """Returns None when YouTube search returns no items."""
+        collector = AnalyticsCollector()
+
+        mock_creds = Mock()
+        mock_creds.expired = False
+        mock_creds.refresh_token = "token"
+
+        mock_youtube = MagicMock()
+        mock_youtube.search().list().execute.return_value = {"items": []}
+
+        with (
+            patch("builtins.open", mock_open()),
+            patch("analytics.Path.exists", return_value=True),
+            patch("pickle.load", return_value=mock_creds),
+            patch("googleapiclient.discovery.build", return_value=mock_youtube),
+        ):
+            result = collector.fetch_youtube_analytics(99)
+
+        assert result is None
+
+    @patch("analytics.Path.mkdir")
+    def test_fetch_youtube_no_stats_items(self, mock_mkdir):
+        """Returns None when video stats response has no items."""
+        collector = AnalyticsCollector()
+
+        mock_creds = Mock()
+        mock_creds.expired = False
+        mock_creds.refresh_token = "token"
+
+        mock_youtube = MagicMock()
+        mock_youtube.search().list().execute.return_value = {
+            "items": [{"id": {"videoId": "vid123"}}]
+        }
+        mock_youtube.videos().list().execute.return_value = {"items": []}
+
+        with (
+            patch("builtins.open", mock_open()),
+            patch("analytics.Path.exists", return_value=True),
+            patch("pickle.load", return_value=mock_creds),
+            patch("googleapiclient.discovery.build", return_value=mock_youtube),
+        ):
+            result = collector.fetch_youtube_analytics(25)
+
+        assert result is None
+
+    @patch("analytics.Path.mkdir")
+    def test_fetch_youtube_exception_in_stats(self, mock_mkdir):
+        """Returns None when videos().list() raises an exception."""
+        collector = AnalyticsCollector()
+
+        mock_creds = Mock()
+        mock_creds.expired = False
+        mock_creds.refresh_token = "token"
+
+        mock_youtube = MagicMock()
+        mock_youtube.search().list().execute.return_value = {
+            "items": [{"id": {"videoId": "vid123"}}]
+        }
+        mock_youtube.videos().list().execute.side_effect = Exception("Stats API error")
+
+        with (
+            patch("builtins.open", mock_open()),
+            patch("analytics.Path.exists", return_value=True),
+            patch("pickle.load", return_value=mock_creds),
+            patch("googleapiclient.discovery.build", return_value=mock_youtube),
+        ):
+            result = collector.fetch_youtube_analytics(25)
+
+        assert result is None
+
+
+class TestFetchTwitterAnalyticsEdgeCases:
+    """Tests for fetch_twitter_analytics edge cases."""
+
+    @patch("analytics.Path.mkdir")
+    def test_fetch_twitter_missing_credentials(self, mock_mkdir):
+        """Returns None when Twitter credentials are not configured."""
+        collector = AnalyticsCollector()
+
+        with (
+            patch.object(Config, "TWITTER_API_KEY", None),
+            patch.object(Config, "TWITTER_API_SECRET", None),
+            patch.object(Config, "TWITTER_ACCESS_TOKEN", None),
+            patch.object(Config, "TWITTER_ACCESS_SECRET", None),
+        ):
+            result = collector.fetch_twitter_analytics(25)
+
+        assert result is None
+
+    @patch("analytics.Path.mkdir")
+    def test_fetch_twitter_no_tweets_found(self, mock_mkdir):
+        """Returns None when no tweets match the search query."""
+        collector = AnalyticsCollector()
+
+        mock_response = Mock()
+        mock_response.data = None
+
+        mock_client = Mock()
+        mock_client.search_recent_tweets.return_value = mock_response
+
+        with (
+            patch.object(Config, "TWITTER_API_KEY", "key"),
+            patch.object(Config, "TWITTER_API_SECRET", "secret"),
+            patch.object(Config, "TWITTER_ACCESS_TOKEN", "token"),
+            patch.object(Config, "TWITTER_ACCESS_SECRET", "token_secret"),
+            patch("tweepy.Client", return_value=mock_client),
+        ):
+            result = collector.fetch_twitter_analytics(42)
+
+        assert result is None
+
+
+class TestEngagementHistoryPath:
+    """Tests for _engagement_history_path."""
+
+    @patch("analytics.Path.mkdir")
+    def test_engagement_history_path(self, mock_mkdir):
+        """Returns the correct path for engagement_history.json."""
+        collector = AnalyticsCollector()
+
+        result = collector._engagement_history_path()
+
+        assert result == Config.BASE_DIR / "topic_data" / "engagement_history.json"
+
+
+class TestLoadPlatformIds:
+    """Tests for _load_platform_ids."""
+
+    def test_load_platform_ids_file_exists(self, tmp_path):
+        """Loads and returns platform IDs when the file exists."""
+        # Create ep dir and platform_ids.json before mocking Path.mkdir
+        ep_dir = tmp_path / "ep_10"
+        ep_dir.mkdir()
+        platform_ids = {"youtube": "vid_abc", "twitter": "tw_123"}
+        ids_file = ep_dir / "platform_ids.json"
+        ids_file.write_text(json.dumps(platform_ids), encoding="utf-8")
+
+        with patch("analytics.Path.mkdir"):
+            collector = AnalyticsCollector()
+
+        with patch.object(Config, "OUTPUT_DIR", tmp_path):
+            result = collector._load_platform_ids(10)
+
+        assert result == platform_ids
+
+    @patch("analytics.Path.mkdir")
+    def test_load_platform_ids_file_missing(self, mock_mkdir, tmp_path):
+        """Returns empty dict when platform_ids.json does not exist."""
+        collector = AnalyticsCollector()
+
+        with patch.object(Config, "OUTPUT_DIR", tmp_path):
+            result = collector._load_platform_ids(999)
+
+        assert result == {}
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
