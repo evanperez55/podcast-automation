@@ -146,6 +146,7 @@ class AudioProcessor:
             stdin=subprocess.DEVNULL,
             text=True,
             check=False,
+            timeout=600,
         )
         if result1.returncode != 0:
             raise RuntimeError(
@@ -188,6 +189,7 @@ class AudioProcessor:
             stdin=subprocess.DEVNULL,
             text=True,
             check=False,
+            timeout=600,
         )
         if result2.returncode != 0:
             raise RuntimeError(

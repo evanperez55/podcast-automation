@@ -78,7 +78,11 @@ def run_audio(
         ]
         try:
             subprocess.run(
-                cmd, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, check=True
+                cmd,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                check=True,
+                timeout=120,
             )
             ctx.raw_snapshot_path = raw_snapshot_path
             logger.info("Raw snapshot saved: %s", raw_snapshot_path.name)

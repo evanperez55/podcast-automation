@@ -347,6 +347,7 @@ class DemoPackager:
                 text=True,
                 check=False,
                 stdin=subprocess.DEVNULL,
+                timeout=120,
             )
             return _parse_loudnorm_json(result.stderr)
         except Exception as e:
@@ -536,6 +537,7 @@ class DemoPackager:
                 stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,
                 check=True,
+                timeout=600,
             )
             logger.info("Extracted processed segment: %s", dest.name)
         except Exception as e:
