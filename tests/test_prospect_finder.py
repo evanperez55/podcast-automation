@@ -4,7 +4,12 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch, Mock
 
-from prospect_finder import ProspectFinder, GENRE_IDS, GENRE_DEFAULTS
+from prospect_finder import (
+    ProspectFinder,
+    GENRE_IDS,
+    GENRE_DEFAULTS,
+    run_find_prospects_cli,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -782,6 +787,254 @@ class TestSaveProspect:
             result = finder.save_prospect("test-comedy", itunes_data, rss_data)
 
         assert result is not None
+
+
+# ---------------------------------------------------------------------------
+# run_find_prospects_cli()
+# ---------------------------------------------------------------------------
+
+
+class TestRunFindProspectsCli:
+    """Tests for run_find_prospects_cli() CLI entry point."""
+
+    @patch("prospect_finder.ProspectFinder")
+    @patch("builtins.input", return_value="q")
+    def test_no_results_prints_message(self, mock_input, mock_finder_cls, capsys):
+        """When search returns empty list, should print 'No podcasts found' and return."""
+        mock_finder = Mock()
+        mock_finder.search.return_value = []
+        mock_finder_cls.return_value = mock_finder
+
+        run_find_prospects_cli(["main.py", "find-prospects", "--genre", "comedy"])
+
+        output = capsys.readouterr().out
+        assert "No podcasts found matching criteria." in output
+        mock_input.assert_not_called()
+
+    @patch("prospect_finder.ProspectFinder")
+    @patch("builtins.input", return_value="q")
+    def test_results_printed_as_table(self, mock_input, mock_finder_cls, capsys):
+        """When search returns results, should print a formatted table."""
+        mock_finder = Mock()
+        mock_finder.search.return_value = [SAMPLE_ITUNES_RESULT]
+        mock_finder_cls.return_value = mock_finder
+
+        run_find_prospects_cli(["main.py", "find-prospects"])
+
+        output = capsys.readouterr().out
+        assert "Show Name" in output
+        assert "Test Comedy Podcast" in output
+        assert "Test Host" in output
+
+    @patch("prospect_finder.ProspectFinder")
+    @patch("builtins.input", return_value="q")
+    def test_quit_does_not_save(self, mock_input, mock_finder_cls):
+        """Entering 'q' at the prompt should not call save_prospect."""
+        mock_finder = Mock()
+        mock_finder.search.return_value = [SAMPLE_ITUNES_RESULT]
+        mock_finder_cls.return_value = mock_finder
+
+        run_find_prospects_cli(["main.py", "find-prospects"])
+
+        mock_finder.save_prospect.assert_not_called()
+
+    @patch("prospect_finder.ProspectFinder")
+    @patch("builtins.input", return_value="1")
+    def test_valid_selection_saves_prospect(self, mock_input, mock_finder_cls, capsys):
+        """Entering a valid number should enrich from RSS and save the prospect."""
+        mock_finder = Mock()
+        mock_finder.search.return_value = [SAMPLE_ITUNES_RESULT]
+        mock_finder.enrich_from_rss.return_value = SAMPLE_RSS_DATA
+        mock_finder._genre_key_from_name.return_value = "comedy"
+        mock_finder.save_prospect.return_value = Path(
+            "clients/test-comedy-podcast.yaml"
+        )
+        mock_finder_cls.return_value = mock_finder
+
+        run_find_prospects_cli(["main.py", "find-prospects"])
+
+        mock_finder.enrich_from_rss.assert_called_once_with(
+            SAMPLE_ITUNES_RESULT["feedUrl"]
+        )
+        mock_finder.save_prospect.assert_called_once()
+        output = capsys.readouterr().out
+        assert "Saved prospect" in output
+
+    @patch("prospect_finder.ProspectFinder")
+    @patch("builtins.input", return_value="1")
+    def test_save_prints_contact_email_when_present(
+        self, mock_input, mock_finder_cls, capsys
+    ):
+        """When RSS data contains a contact email, it should be printed."""
+        mock_finder = Mock()
+        mock_finder.search.return_value = [SAMPLE_ITUNES_RESULT]
+        mock_finder.enrich_from_rss.return_value = SAMPLE_RSS_DATA
+        mock_finder._genre_key_from_name.return_value = "comedy"
+        mock_finder.save_prospect.return_value = Path("clients/test.yaml")
+        mock_finder_cls.return_value = mock_finder
+
+        run_find_prospects_cli(["main.py", "find-prospects"])
+
+        output = capsys.readouterr().out
+        assert "Contact email: host@example.com" in output
+
+    @patch("prospect_finder.ProspectFinder")
+    @patch("builtins.input", return_value="1")
+    def test_save_no_email_line_when_empty(self, mock_input, mock_finder_cls, capsys):
+        """When RSS data has no contact email, 'Contact email' line should not appear."""
+        mock_finder = Mock()
+        mock_finder.search.return_value = [SAMPLE_ITUNES_RESULT]
+        mock_finder.enrich_from_rss.return_value = {"contact_email": ""}
+        mock_finder._genre_key_from_name.return_value = "comedy"
+        mock_finder.save_prospect.return_value = Path("clients/test.yaml")
+        mock_finder_cls.return_value = mock_finder
+
+        run_find_prospects_cli(["main.py", "find-prospects"])
+
+        output = capsys.readouterr().out
+        assert "Contact email" not in output
+
+    @patch("prospect_finder.ProspectFinder")
+    @patch("builtins.input", return_value="99")
+    def test_invalid_selection_prints_error(self, mock_input, mock_finder_cls, capsys):
+        """Entering an out-of-range number should print 'Invalid selection.'."""
+        mock_finder = Mock()
+        mock_finder.search.return_value = [SAMPLE_ITUNES_RESULT]
+        mock_finder_cls.return_value = mock_finder
+
+        run_find_prospects_cli(["main.py", "find-prospects"])
+
+        output = capsys.readouterr().out
+        assert "Invalid selection." in output
+        mock_finder.save_prospect.assert_not_called()
+
+    @patch("prospect_finder.ProspectFinder")
+    @patch("builtins.input", return_value="q")
+    def test_genre_flag_parsed(self, mock_input, mock_finder_cls):
+        """--genre flag should be parsed and passed to search."""
+        mock_finder = Mock()
+        mock_finder.search.return_value = []
+        mock_finder_cls.return_value = mock_finder
+
+        run_find_prospects_cli(["main.py", "find-prospects", "--genre", "comedy"])
+
+        call_kwargs = mock_finder.search.call_args[1]
+        assert call_kwargs["genre_id"] == GENRE_IDS["comedy"]
+
+    @patch("prospect_finder.ProspectFinder")
+    @patch("builtins.input", return_value="q")
+    def test_min_max_limit_flags_parsed(self, mock_input, mock_finder_cls):
+        """--min-episodes, --max-episodes, --limit flags should be parsed."""
+        mock_finder = Mock()
+        mock_finder.search.return_value = []
+        mock_finder_cls.return_value = mock_finder
+
+        run_find_prospects_cli(
+            [
+                "main.py",
+                "find-prospects",
+                "--min-episodes",
+                "50",
+                "--max-episodes",
+                "300",
+                "--limit",
+                "10",
+            ]
+        )
+
+        call_kwargs = mock_finder.search.call_args[1]
+        assert call_kwargs["min_episodes"] == 50
+        assert call_kwargs["max_episodes"] == 300
+        assert call_kwargs["limit"] == 10
+
+    @patch("prospect_finder.ProspectFinder")
+    @patch("builtins.input", return_value="q")
+    def test_defaults_without_flags(self, mock_input, mock_finder_cls):
+        """Without flags, defaults should be min=20, max=500, limit=20, term='podcast'."""
+        mock_finder = Mock()
+        mock_finder.search.return_value = []
+        mock_finder_cls.return_value = mock_finder
+
+        run_find_prospects_cli(["main.py", "find-prospects"])
+
+        call_kwargs = mock_finder.search.call_args[1]
+        assert call_kwargs["term"] == "podcast"
+        assert call_kwargs["min_episodes"] == 20
+        assert call_kwargs["max_episodes"] == 500
+        assert call_kwargs["limit"] == 20
+        assert call_kwargs["genre_id"] is None
+
+    @patch("prospect_finder.ProspectFinder")
+    @patch("builtins.input", return_value="1")
+    def test_no_feed_url_skips_rss_enrichment(self, mock_input, mock_finder_cls):
+        """When feedUrl is empty, enrich_from_rss should not be called."""
+        result_no_feed = {**SAMPLE_ITUNES_RESULT, "feedUrl": ""}
+        mock_finder = Mock()
+        mock_finder.search.return_value = [result_no_feed]
+        mock_finder._genre_key_from_name.return_value = None
+        mock_finder.save_prospect.return_value = Path("clients/test.yaml")
+        mock_finder_cls.return_value = mock_finder
+
+        run_find_prospects_cli(["main.py", "find-prospects"])
+
+        mock_finder.enrich_from_rss.assert_not_called()
+
+    @patch("prospect_finder.ProspectFinder")
+    @patch("builtins.input", return_value="abc")
+    def test_non_numeric_input_does_not_save(self, mock_input, mock_finder_cls):
+        """Non-numeric, non-'q' input should not save or crash."""
+        mock_finder = Mock()
+        mock_finder.search.return_value = [SAMPLE_ITUNES_RESULT]
+        mock_finder_cls.return_value = mock_finder
+
+        run_find_prospects_cli(["main.py", "find-prospects"])
+
+        mock_finder.save_prospect.assert_not_called()
+
+    @patch("prospect_finder.ProspectFinder")
+    @patch("builtins.input", return_value="q")
+    def test_unknown_flags_ignored(self, mock_input, mock_finder_cls):
+        """Unknown flags should be silently skipped."""
+        mock_finder = Mock()
+        mock_finder.search.return_value = []
+        mock_finder_cls.return_value = mock_finder
+
+        run_find_prospects_cli(
+            [
+                "main.py",
+                "find-prospects",
+                "--unknown-flag",
+                "--genre",
+                "comedy",
+            ]
+        )
+
+        # Should still parse --genre correctly
+        call_kwargs = mock_finder.search.call_args[1]
+        assert call_kwargs["genre_id"] == GENRE_IDS["comedy"]
+
+    @patch("prospect_finder.ProspectFinder")
+    @patch("builtins.input", return_value="1")
+    def test_slug_generation_from_collection_name(
+        self, mock_input, mock_finder_cls, capsys
+    ):
+        """Slug should be generated from collectionName: lowercase, spaces to dashes, special chars removed."""
+        result_special = {
+            **SAMPLE_ITUNES_RESULT,
+            "collectionName": "My Podcast! (2024)",
+        }
+        mock_finder = Mock()
+        mock_finder.search.return_value = [result_special]
+        mock_finder.enrich_from_rss.return_value = {"contact_email": ""}
+        mock_finder._genre_key_from_name.return_value = None
+        mock_finder.save_prospect.return_value = Path("clients/my-podcast-2024.yaml")
+        mock_finder_cls.return_value = mock_finder
+
+        run_find_prospects_cli(["main.py", "find-prospects"])
+
+        save_call = mock_finder.save_prospect.call_args
+        slug = save_call[0][0]
+        assert slug == "my-podcast-2024"
 
 
 if __name__ == "__main__":

@@ -1187,5 +1187,214 @@ class TestRawSnapshot:
         assert ctx.raw_snapshot_path.name == "ep01_20260328_raw_snapshot.wav"
 
 
+class TestGetBeepSoundGeneration:
+    """Tests for _get_beep_sound when beep file does not exist on disk."""
+
+    @patch("audio_processor.Sine")
+    @patch("audio_processor.Path")
+    def test_get_beep_sound_generates_when_file_missing(self, mock_path_cls, mock_sine):
+        """When beep file does not exist, a 1000Hz tone is generated and saved."""
+        # Setup: beep path says file doesn't exist
+        mock_beep_path = MagicMock()
+        mock_beep_path.exists.return_value = False
+        mock_path_cls.return_value = mock_beep_path
+
+        mock_tone = MagicMock()
+        mock_reduced = MagicMock()
+        mock_sine.return_value.to_audio_segment.return_value = mock_tone
+        mock_tone.__sub__ = Mock(return_value=mock_reduced)
+        mock_reduced.export = Mock()
+
+        processor = AudioProcessor()
+        processor._beep_sound = None  # Force lazy load
+
+        result = processor._get_beep_sound()
+
+        # Verify tone was generated at 1000Hz
+        mock_sine.assert_called_once_with(1000)
+        mock_sine.return_value.to_audio_segment.assert_called_once_with(duration=1000)
+        # Volume reduced by 10dB
+        mock_tone.__sub__.assert_called_once_with(10)
+        # Saved to disk
+        mock_reduced.export.assert_called_once()
+        assert result is mock_reduced
+
+
+class TestNormalizeAudioEdgeCases:
+    """Tests for normalize_audio edge cases: in-place mode, pass failures."""
+
+    FIRST_PASS_JSON = """{
+        "input_i" : "-23.45",
+        "input_tp" : "-6.23",
+        "input_lra" : "8.10",
+        "input_thresh" : "-33.90",
+        "target_offset" : "0.39",
+        "normalization_type" : "linear",
+        "output_i" : "-16.00",
+        "output_tp" : "-1.10",
+        "output_lra" : "8.10",
+        "output_thresh" : "-26.45"
+    }"""
+
+    SECOND_PASS_JSON = FIRST_PASS_JSON
+
+    @patch("audio_processor.subprocess.run")
+    def test_normalize_in_place_replaces_original(
+        self, mock_run, audio_processor, tmp_path
+    ):
+        """When output_path is None, normalized file replaces original in-place."""
+        first_stderr = f"FFmpeg output\n{self.FIRST_PASS_JSON}\n"
+        second_stderr = f"FFmpeg output\n{self.SECOND_PASS_JSON}\n"
+        mock_run.side_effect = [
+            Mock(returncode=0, stderr=first_stderr),
+            Mock(returncode=0, stderr=second_stderr),
+        ]
+
+        audio_file = tmp_path / "test.wav"
+        audio_file.write_bytes(b"fake wav content")
+
+        # Create the .norm file that FFmpeg would produce
+        norm_file = tmp_path / "test.norm.wav"
+        norm_file.write_bytes(b"normalized content")
+
+        result = audio_processor.normalize_audio(audio_file, output_path=None)
+
+        # Should return the original path (in-place replacement)
+        assert result == audio_file
+
+    @patch("audio_processor.subprocess.run")
+    def test_normalize_pass1_failure_raises_runtime_error(
+        self, mock_run, audio_processor, tmp_path
+    ):
+        """RuntimeError raised when FFmpeg pass 1 returns non-zero exit code."""
+        mock_run.return_value = Mock(returncode=1, stderr="Error: codec not found")
+
+        audio_file = tmp_path / "test.wav"
+        audio_file.write_bytes(b"fake wav content")
+
+        with pytest.raises(RuntimeError, match="pass 1 failed"):
+            audio_processor.normalize_audio(
+                audio_file, output_path=tmp_path / "out.wav"
+            )
+
+    @patch("audio_processor.subprocess.run")
+    def test_normalize_pass2_failure_raises_runtime_error(
+        self, mock_run, audio_processor, tmp_path
+    ):
+        """RuntimeError raised when FFmpeg pass 2 returns non-zero exit code."""
+        first_stderr = f"FFmpeg output\n{self.FIRST_PASS_JSON}\n"
+        mock_run.side_effect = [
+            Mock(returncode=0, stderr=first_stderr),
+            Mock(returncode=1, stderr="Error: output write failed"),
+        ]
+
+        audio_file = tmp_path / "test.wav"
+        audio_file.write_bytes(b"fake wav content")
+
+        with pytest.raises(RuntimeError, match="pass 2 failed"):
+            audio_processor.normalize_audio(
+                audio_file, output_path=tmp_path / "out.wav"
+            )
+
+
+class TestApplyCensorshipEdgeCases:
+    """Tests for apply_censorship edge cases: missing file, default output path."""
+
+    def test_apply_censorship_raises_on_missing_file(self, audio_processor, tmp_path):
+        """FileNotFoundError raised when audio file does not exist."""
+        missing = tmp_path / "nonexistent.wav"
+
+        with pytest.raises(FileNotFoundError, match="Audio file not found"):
+            audio_processor.apply_censorship(missing, [])
+
+    @patch("audio_processor.AudioSegment.from_file")
+    def test_apply_censorship_default_output_path(
+        self, mock_from_file, audio_processor, mock_audio_segment, tmp_path, monkeypatch
+    ):
+        """When output_path is None, censored file goes to OUTPUT_DIR/{stem}_censored.wav."""
+        mock_from_file.return_value = mock_audio_segment
+        monkeypatch.setattr(Config, "OUTPUT_DIR", tmp_path)
+
+        audio_file = tmp_path / "episode.wav"
+        audio_file.write_text("fake")
+
+        result = audio_processor.apply_censorship(audio_file, [], output_path=None)
+
+        assert result == tmp_path / "episode_censored.wav"
+
+
+class TestExtractClipEdgeCases:
+    """Tests for extract_clip edge cases."""
+
+    def test_extract_clip_raises_on_missing_file(self, audio_processor, tmp_path):
+        """FileNotFoundError raised when audio file does not exist."""
+        missing = tmp_path / "nonexistent.wav"
+
+        with pytest.raises(FileNotFoundError, match="Audio file not found"):
+            audio_processor.extract_clip(missing, 0, 10, tmp_path / "clip.wav")
+
+
+class TestConvertToMp3EdgeCases:
+    """Tests for convert_to_mp3 edge cases: missing file, explicit output, FFmpeg failure."""
+
+    def test_convert_to_mp3_raises_on_missing_file(self, audio_processor, tmp_path):
+        """FileNotFoundError raised when WAV file does not exist."""
+        missing = tmp_path / "nonexistent.wav"
+
+        with pytest.raises(FileNotFoundError, match="WAV file not found"):
+            audio_processor.convert_to_mp3(missing)
+
+    @patch("audio_processor.subprocess.run")
+    def test_convert_to_mp3_explicit_output_path(
+        self, mock_run, audio_processor, tmp_path
+    ):
+        """When output_path is provided, MP3 is written to that path."""
+        mock_run.return_value = MagicMock(returncode=0)
+
+        wav_file = tmp_path / "test.wav"
+        wav_file.write_text("fake")
+        explicit_output = tmp_path / "custom" / "output.mp3"
+
+        result = audio_processor.convert_to_mp3(wav_file, output_path=explicit_output)
+
+        assert result == explicit_output
+
+    @patch("audio_processor.subprocess.run")
+    def test_convert_to_mp3_ffmpeg_failure_raises_runtime_error(
+        self, mock_run, audio_processor, tmp_path
+    ):
+        """RuntimeError raised when FFmpeg MP3 conversion returns non-zero exit code."""
+        mock_run.return_value = MagicMock(
+            returncode=1, stderr="Error: encoder not found"
+        )
+
+        wav_file = tmp_path / "test.wav"
+        wav_file.write_text("fake")
+
+        with pytest.raises(RuntimeError, match="FFmpeg MP3 conversion failed"):
+            audio_processor.convert_to_mp3(wav_file)
+
+
+class TestParseLoudnormJson:
+    """Tests for module-level _parse_loudnorm_json function."""
+
+    def test_parse_valid_json_from_stderr(self):
+        """Extracts loudnorm JSON block from mixed FFmpeg stderr output."""
+        from audio_processor import _parse_loudnorm_json
+
+        stderr = 'frame=0 fps=0\n{"input_i": "-23.0", "input_tp": "-6.0"}\nmore output'
+        result = _parse_loudnorm_json(stderr)
+
+        assert result["input_i"] == "-23.0"
+        assert result["input_tp"] == "-6.0"
+
+    def test_parse_raises_on_missing_json(self):
+        """ValueError raised when no JSON block found in stderr."""
+        from audio_processor import _parse_loudnorm_json
+
+        with pytest.raises(ValueError, match="Could not find loudnorm JSON"):
+            _parse_loudnorm_json("no json here at all")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

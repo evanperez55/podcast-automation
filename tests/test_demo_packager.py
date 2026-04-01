@@ -863,5 +863,469 @@ class TestDemoWorkflow:
         assert result == mock_demo_path
 
 
+# ---------------------------------------------------------------------------
+# TestFindAnalysis — _find_analysis() artifact discovery
+# ---------------------------------------------------------------------------
+
+
+class TestFindAnalysis:
+    """Tests for DemoPackager._find_analysis() helper."""
+
+    def test_find_analysis_via_pipeline_state(self, tmp_path):
+        """_find_analysis returns analysis from pipeline state path when step is completed."""
+        from demo_packager import DemoPackager
+
+        ep_dir = tmp_path / "output" / "ep01"
+        ep_dir.mkdir(parents=True)
+        analysis_path = ep_dir / "state_analysis.json"
+        analysis_path.write_text(json.dumps(SAMPLE_ANALYSIS), encoding="utf-8")
+
+        mock_state = MagicMock()
+        mock_state.is_step_completed.return_value = True
+        mock_state.get_step_outputs.return_value = {"analysis_path": str(analysis_path)}
+
+        packager = DemoPackager()
+        result, path = packager._find_analysis(ep_dir, mock_state)
+
+        assert result is not None
+        assert result["episode_title"] == "Test Crime Episode"
+        assert path == analysis_path
+
+    def test_find_analysis_state_path_missing_falls_back_to_glob(self, tmp_path):
+        """_find_analysis falls back to glob when state path does not exist on disk."""
+        from demo_packager import DemoPackager
+
+        ep_dir = tmp_path / "output" / "ep01"
+        ep_dir.mkdir(parents=True)
+        # State points to nonexistent file
+        mock_state = MagicMock()
+        mock_state.is_step_completed.return_value = True
+        mock_state.get_step_outputs.return_value = {
+            "analysis_path": str(ep_dir / "gone.json")
+        }
+
+        # But glob file exists
+        glob_path = ep_dir / "audio_analysis.json"
+        glob_path.write_text(json.dumps(SAMPLE_ANALYSIS), encoding="utf-8")
+
+        packager = DemoPackager()
+        result, path = packager._find_analysis(ep_dir, mock_state)
+
+        assert result is not None
+        assert path == glob_path
+
+    def test_find_analysis_returns_none_when_nothing_found(self, tmp_path):
+        """_find_analysis returns (None, None) when no analysis JSON exists anywhere."""
+        from demo_packager import DemoPackager
+
+        ep_dir = tmp_path / "output" / "ep01"
+        ep_dir.mkdir(parents=True)
+
+        mock_state = MagicMock()
+        mock_state.is_step_completed.return_value = False
+
+        packager = DemoPackager()
+        result, path = packager._find_analysis(ep_dir, mock_state)
+
+        assert result is None
+        assert path is None
+
+    def test_find_analysis_returns_none_on_json_parse_error(self, tmp_path):
+        """_find_analysis returns (None, None) when analysis file contains invalid JSON."""
+        from demo_packager import DemoPackager
+
+        ep_dir = tmp_path / "output" / "ep01"
+        ep_dir.mkdir(parents=True)
+        bad_json = ep_dir / "audio_analysis.json"
+        bad_json.write_text("{invalid json!!!", encoding="utf-8")
+
+        mock_state = MagicMock()
+        mock_state.is_step_completed.return_value = False
+
+        packager = DemoPackager()
+        result, path = packager._find_analysis(ep_dir, mock_state)
+
+        assert result is None
+        assert path is None
+
+
+# ---------------------------------------------------------------------------
+# TestFindWav — _find_wav() / _find_mp3() artifact discovery
+# ---------------------------------------------------------------------------
+
+
+class TestFindWavAndMp3:
+    """Tests for _find_wav() and _find_mp3() pipeline state paths."""
+
+    def test_find_wav_via_normalize_state(self, tmp_path):
+        """_find_wav returns path from normalize step outputs when completed."""
+        from demo_packager import DemoPackager
+
+        ep_dir = tmp_path / "output" / "ep01"
+        ep_dir.mkdir(parents=True)
+        wav_path = ep_dir / "normalized.wav"
+        wav_path.write_bytes(b"FAKE")
+
+        mock_state = MagicMock()
+        mock_state.is_step_completed.side_effect = lambda s: s == "normalize"
+        mock_state.get_step_outputs.return_value = {"normalized_audio": str(wav_path)}
+
+        packager = DemoPackager()
+        result = packager._find_wav(ep_dir, mock_state)
+
+        assert result == wav_path
+
+    def test_find_mp3_via_convert_mp3_state(self, tmp_path):
+        """_find_mp3 returns path from convert_mp3 step outputs when completed."""
+        from demo_packager import DemoPackager
+
+        ep_dir = tmp_path / "output" / "ep01"
+        ep_dir.mkdir(parents=True)
+        mp3_path = ep_dir / "final.mp3"
+        mp3_path.write_bytes(b"FAKE")
+
+        mock_state = MagicMock()
+        mock_state.is_step_completed.side_effect = lambda s: s == "convert_mp3"
+        mock_state.get_step_outputs.return_value = {"mp3_path": str(mp3_path)}
+
+        packager = DemoPackager()
+        result = packager._find_mp3(ep_dir, mock_state)
+
+        assert result == mp3_path
+
+
+# ---------------------------------------------------------------------------
+# TestFindClips — _find_clips() artifact discovery
+# ---------------------------------------------------------------------------
+
+
+class TestFindClips:
+    """Tests for _find_clips() pipeline state path."""
+
+    def test_find_clips_via_convert_videos_state(self, tmp_path):
+        """_find_clips returns paths from convert_videos step when completed."""
+        from demo_packager import DemoPackager
+
+        clips_dir = tmp_path / "clips" / "client" / "ep01"
+        clips_dir.mkdir(parents=True)
+        clip1 = clips_dir / "clip_01.mp4"
+        clip2 = clips_dir / "clip_02.mp4"
+        clip1.write_bytes(b"FAKE")
+        clip2.write_bytes(b"FAKE")
+
+        mock_state = MagicMock()
+        mock_state.is_step_completed.side_effect = lambda s: s == "convert_videos"
+        mock_state.get_step_outputs.return_value = {
+            "video_clip_paths": [str(clip1), str(clip2)]
+        }
+
+        packager = DemoPackager()
+        result = packager._find_clips(clips_dir, mock_state)
+
+        assert len(result) == 2
+        assert clip1 in result
+        assert clip2 in result
+
+
+# ---------------------------------------------------------------------------
+# TestFindCompliance — _find_compliance() edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestFindCompliance:
+    """Tests for _find_compliance() edge cases."""
+
+    def test_find_compliance_returns_none_when_no_files(self, tmp_path):
+        """_find_compliance returns (None, None) when no compliance JSON exists."""
+        from demo_packager import DemoPackager
+
+        ep_dir = tmp_path / "output" / "ep01"
+        ep_dir.mkdir(parents=True)
+
+        packager = DemoPackager()
+        result, path = packager._find_compliance(ep_dir)
+
+        assert result is None
+        assert path is None
+
+    def test_find_compliance_returns_none_on_json_error(self, tmp_path):
+        """_find_compliance returns (None, None) when JSON is malformed."""
+        from demo_packager import DemoPackager
+
+        ep_dir = tmp_path / "output" / "ep01"
+        ep_dir.mkdir(parents=True)
+        bad_json = ep_dir / "compliance_report_001_20260328.json"
+        bad_json.write_text("NOT VALID JSON", encoding="utf-8")
+
+        packager = DemoPackager()
+        result, path = packager._find_compliance(ep_dir)
+
+        assert result is None
+        assert path is None
+
+
+# ---------------------------------------------------------------------------
+# TestExtractAudioSegment — _extract_audio_segment() failure path
+# ---------------------------------------------------------------------------
+
+
+class TestExtractAudioSegment:
+    """Tests for _extract_audio_segment() error handling."""
+
+    def test_extract_audio_segment_logs_warning_on_failure(self, tmp_path, caplog):
+        """_extract_audio_segment logs warning when FFmpeg subprocess fails."""
+        import logging
+        from demo_packager import DemoPackager
+
+        src = tmp_path / "source.wav"
+        src.write_bytes(b"FAKE")
+        dest = tmp_path / "output.wav"
+
+        with (
+            patch("demo_packager.subprocess.run", side_effect=Exception("ffmpeg boom")),
+            caplog.at_level(logging.WARNING),
+        ):
+            packager = DemoPackager()
+            packager._extract_audio_segment(src, 0.0, 60.0, dest)
+
+        assert any("Failed to extract" in msg for msg in caplog.messages)
+
+
+# ---------------------------------------------------------------------------
+# TestFormatHelpers — _format_clip_list() and _format_compliance_summary()
+# ---------------------------------------------------------------------------
+
+
+class TestFormatHelpers:
+    """Tests for _format_clip_list() and _format_compliance_summary()."""
+
+    def test_format_clip_list_empty(self):
+        """_format_clip_list returns fallback text for empty list."""
+        from demo_packager import DemoPackager
+
+        packager = DemoPackager()
+        result = packager._format_clip_list([])
+
+        assert result == "No clips available."
+
+    def test_format_compliance_summary_none(self):
+        """_format_compliance_summary returns fallback text when data is None."""
+        from demo_packager import DemoPackager
+
+        packager = DemoPackager()
+        result = packager._format_compliance_summary(None, False, 0)
+
+        assert result == "No compliance report available."
+
+
+# ---------------------------------------------------------------------------
+# TestPackageDemoEdgeCases — additional package_demo() coverage
+# ---------------------------------------------------------------------------
+
+
+class TestPackageDemoEdgeCases:
+    """Tests for edge cases in package_demo()."""
+
+    def test_no_analysis_raises_file_not_found(self, tmp_path, monkeypatch):
+        """package_demo raises FileNotFoundError when no analysis JSON exists."""
+        from demo_packager import DemoPackager
+
+        ep_dir = tmp_path / "output" / "truecrime" / "ep01"
+        ep_dir.mkdir(parents=True)
+
+        monkeypatch.setattr(Config, "OUTPUT_DIR", tmp_path / "output" / "truecrime")
+        monkeypatch.setattr(Config, "CLIPS_DIR", tmp_path / "clips")
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+
+        with patch("demo_packager.PipelineState") as mock_state_cls:
+            mock_state = MagicMock()
+            mock_state.is_step_completed.return_value = False
+            mock_state_cls.return_value = mock_state
+
+            packager = DemoPackager()
+            with pytest.raises(FileNotFoundError, match="No analysis JSON"):
+                packager.package_demo("truecrime", "ep01")
+
+    def test_missing_mp3_skips_processed_audio(self, tmp_path, monkeypatch):
+        """package_demo skips processed_audio.mp3 when no MP3 is found."""
+        from demo_packager import DemoPackager
+
+        ep_dir, analysis_path, wav_path, mp3_path, thumb_path, clips_dir = (
+            _make_episode_dir(tmp_path)
+        )
+        # Remove MP3
+        mp3_path.unlink()
+
+        monkeypatch.setattr(Config, "OUTPUT_DIR", tmp_path / "output" / "truecrime")
+        monkeypatch.setattr(Config, "CLIPS_DIR", tmp_path / "clips")
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+
+        with (
+            patch("demo_packager.PipelineState") as mock_state_cls,
+            patch(
+                "demo_packager.DemoPackager._measure_lufs",
+                return_value=SAMPLE_LUFS_STATS,
+            ),
+        ):
+            mock_state = MagicMock()
+            mock_state.is_step_completed.return_value = False
+            mock_state_cls.return_value = mock_state
+
+            packager = DemoPackager()
+            demo_path = packager.package_demo("truecrime", "ep01")
+
+        assert not (demo_path / "processed_audio.mp3").exists()
+
+    def test_before_after_sets_flag_when_processed_exists(self, tmp_path, monkeypatch):
+        """DEMO.md contains before/after section when raw+processed snapshots exist."""
+        from demo_packager import DemoPackager
+
+        ep_dir, analysis_path, wav_path, mp3_path, thumb_path, clips_dir = (
+            _make_episode_dir(tmp_path)
+        )
+
+        # Create raw snapshot
+        raw_snapshot = ep_dir / "audio_20260328_raw_snapshot.wav"
+        raw_snapshot.write_bytes(b"FAKE_RAW")
+
+        monkeypatch.setattr(Config, "OUTPUT_DIR", tmp_path / "output" / "truecrime")
+        monkeypatch.setattr(Config, "CLIPS_DIR", tmp_path / "clips")
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+
+        def fake_extract(src, start, end, dest):
+            """Create the output file to simulate successful extraction."""
+            dest.write_bytes(b"EXTRACTED")
+
+        with (
+            patch("demo_packager.PipelineState") as mock_state_cls,
+            patch(
+                "demo_packager.DemoPackager._measure_lufs",
+                return_value=SAMPLE_LUFS_STATS,
+            ),
+            patch.object(
+                DemoPackager,
+                "_extract_audio_segment",
+                side_effect=fake_extract,
+            ),
+        ):
+            mock_state = MagicMock()
+            mock_state.is_step_completed.return_value = False
+            mock_state_cls.return_value = mock_state
+
+            packager = DemoPackager()
+            demo_path = packager.package_demo("truecrime", "ep01")
+
+        demo_md = (demo_path / "DEMO.md").read_text(encoding="utf-8")
+        assert "before_after/" in demo_md
+        assert "raw_60s.wav" in demo_md
+
+
+# ---------------------------------------------------------------------------
+# TestRunDemoWorkflowCli — run_demo_workflow_cli() function
+# ---------------------------------------------------------------------------
+
+
+class TestRunDemoWorkflowCli:
+    """Tests for run_demo_workflow_cli() CLI handler."""
+
+    def test_cli_missing_args_prints_usage(self, capsys):
+        """run_demo_workflow_cli prints usage when slug or ep_id is missing."""
+        from demo_packager import run_demo_workflow_cli
+
+        run_demo_workflow_cli(["main.py", "demo-workflow"], {})
+
+        captured = capsys.readouterr()
+        assert "Usage:" in captured.out
+
+    def test_cli_missing_ep_id_prints_usage(self, capsys):
+        """run_demo_workflow_cli prints usage when only slug is provided."""
+        from demo_packager import run_demo_workflow_cli
+
+        run_demo_workflow_cli(["main.py", "demo-workflow", "my-slug"], {})
+
+        captured = capsys.readouterr()
+        assert "Usage:" in captured.out
+
+    def test_cli_value_error_prints_error(self, capsys):
+        """run_demo_workflow_cli catches ValueError and prints error message."""
+        from demo_packager import run_demo_workflow_cli
+
+        with patch(
+            "demo_packager.run_demo_workflow",
+            side_effect=ValueError("not found"),
+        ):
+            run_demo_workflow_cli(["main.py", "demo-workflow", "slug", "ep01"], {})
+
+        captured = capsys.readouterr()
+        assert "Error: not found" in captured.out
+
+    def test_cli_generic_exception_prints_error(self, capsys):
+        """run_demo_workflow_cli catches generic exceptions and prints error."""
+        from demo_packager import run_demo_workflow_cli
+
+        with patch(
+            "demo_packager.run_demo_workflow",
+            side_effect=RuntimeError("something broke"),
+        ):
+            run_demo_workflow_cli(["main.py", "demo-workflow", "slug", "ep01"], {})
+
+        captured = capsys.readouterr()
+        assert "Error during demo workflow: something broke" in captured.out
+
+    def test_cli_calls_run_demo_workflow_with_correct_args(self):
+        """run_demo_workflow_cli passes slug and ep_id to run_demo_workflow."""
+        from demo_packager import run_demo_workflow_cli
+
+        with patch("demo_packager.run_demo_workflow") as mock_run:
+            mock_run.return_value = None
+            run_demo_workflow_cli(
+                ["main.py", "demo-workflow", "my-slug", "ep05"],
+                {"test_mode": True},
+            )
+
+        mock_run.assert_called_once_with("my-slug", "ep05", {"test_mode": True})
+
+
+# ---------------------------------------------------------------------------
+# TestRunDemoWorkflowInputFallback — input() fallback
+# ---------------------------------------------------------------------------
+
+
+class TestRunDemoWorkflowInputFallback:
+    """Tests for run_demo_workflow() input() fallback when consent_fn is None."""
+
+    def test_uses_builtin_input_when_no_consent_fn(self):
+        """run_demo_workflow falls back to input() when consent_fn is None."""
+        from demo_packager import run_demo_workflow
+        from pathlib import Path
+
+        mock_tracker = MagicMock()
+        mock_tracker.get_prospect.return_value = {
+            "slug": "test",
+            "show_name": "Test Show",
+            "status": "new",
+            "contact_email": "",
+        }
+        mock_tracker.update_status.return_value = True
+
+        mock_packager = MagicMock()
+        mock_packager.package_demo.return_value = Path("/tmp/demo")
+        mock_pitch = MagicMock()
+        mock_pitch.generate_demo_pitch.return_value = None
+
+        with (
+            patch("demo_packager.OutreachTracker", return_value=mock_tracker),
+            patch("demo_packager.activate_client"),
+            patch("demo_packager.run_with_notification"),
+            patch("demo_packager.DemoPackager", return_value=mock_packager),
+            patch("demo_packager.PitchGenerator", return_value=mock_pitch),
+            patch("builtins.input", return_value="yes") as mock_input,
+        ):
+            result = run_demo_workflow("test", "ep01", {}, consent_fn=None)
+
+        mock_input.assert_called_once()
+        assert result is not None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

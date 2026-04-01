@@ -6,3 +6,4 @@ iteration	commit	metric	delta	guard	status	description
 2	4210689	92	+3.00	pass	keep	add 45 tests for pipeline/runner.py (31% → ~65%) — 1041 passed, 1462 uncovered
 3	83a1721	93	+1.00	pass	keep	add 29 tests for pipeline/steps/distribute.py (26% → ~55%) — 1070 passed, 1231 uncovered
 4	77f655d	93	+0.00	pass	keep	add 12 tests for content_editor.py merge/validate/refine (78% → ~88%) — 1082 passed, 1202 uncovered
+5	c31626a	94	+1.00	pass	keep	add 8 tests for video.py + content_editor.py (70%/78% → ~85%/88%) — 1090 passed, 1148 uncovered
