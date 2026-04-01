@@ -1,11 +1,24 @@
 """Tests for video_converter module."""
 
 import subprocess
+from pathlib import Path
 
 import pytest
 from unittest.mock import patch, MagicMock
 from config import Config
 from video_converter import VideoConverter, get_video_duration
+
+
+def _mock_run_creating_output(*args, **kwargs):
+    """Mock subprocess.run that creates the output file (last positional arg)."""
+    cmd = args[0] if args else kwargs.get("args", [])
+    # FFmpeg output is the last arg before flags or after -y
+    for i, arg in enumerate(cmd):
+        if arg == "-y" and i + 1 < len(cmd):
+            Path(cmd[i + 1]).parent.mkdir(parents=True, exist_ok=True)
+            Path(cmd[i + 1]).write_text("fake video")
+            break
+    return MagicMock(returncode=0)
 
 
 @pytest.fixture
@@ -24,7 +37,13 @@ class TestAudioToVideo:
     def test_success(self, mock_run, converter, tmp_path):
         audio = tmp_path / "test.wav"
         audio.write_text("fake")
-        mock_run.return_value = MagicMock(returncode=0)
+        output = tmp_path / "test.mp4"
+
+        def _create_output(*args, **kwargs):
+            output.write_text("fake video")
+            return MagicMock(returncode=0)
+
+        mock_run.side_effect = _create_output
 
         result = converter.audio_to_video(str(audio))
         assert result is not None
@@ -52,7 +71,7 @@ class TestAudioToVideoWithSubtitles:
         audio.write_text("fake")
         srt = tmp_path / "test.srt"
         srt.write_text("1\n00:00:00,000 --> 00:00:01,000\nHello\n")
-        mock_run.return_value = MagicMock(returncode=0)
+        mock_run.side_effect = _mock_run_creating_output
 
         result = converter.audio_to_video_with_subtitles(str(audio), str(srt))
         assert result is not None
@@ -65,7 +84,7 @@ class TestAudioToVideoWithSubtitles:
     def test_fallback_on_missing_srt(self, mock_run, converter, tmp_path):
         audio = tmp_path / "test.wav"
         audio.write_text("fake")
-        mock_run.return_value = MagicMock(returncode=0)
+        mock_run.side_effect = _mock_run_creating_output
 
         result = converter.audio_to_video_with_subtitles(str(audio), "/no/such.srt")
         assert result is not None  # Falls back to no subtitles
@@ -76,11 +95,15 @@ class TestAudioToVideoWithSubtitles:
         audio.write_text("fake")
         srt = tmp_path / "test.srt"
         srt.write_text("1\n00:00:00,000 --> 00:00:01,000\nHello\n")
+
         # First call fails (subtitle), second succeeds (fallback)
-        mock_run.side_effect = [
-            MagicMock(returncode=1, stderr="subtitle error"),
-            MagicMock(returncode=0),
-        ]
+        def _fail_then_succeed(*args, **kwargs):
+            cmd = args[0] if args else []
+            if any("subtitles=" in str(a) for a in cmd):
+                return MagicMock(returncode=1, stderr="subtitle error")
+            return _mock_run_creating_output(*args, **kwargs)
+
+        mock_run.side_effect = _fail_then_succeed
 
         result = converter.audio_to_video_with_subtitles(str(audio), str(srt))
         assert result is not None
@@ -95,7 +118,7 @@ class TestConvertClipsToVideos:
             p = tmp_path / f"clip{i}.wav"
             p.write_text("fake")
             clips.append(str(p))
-        mock_run.return_value = MagicMock(returncode=0)
+        mock_run.side_effect = _mock_run_creating_output
 
         results = converter.convert_clips_to_videos(clips, output_dir=str(tmp_path))
         assert len(results) == 3
@@ -106,7 +129,7 @@ class TestConvertClipsToVideos:
         clip.write_text("fake")
         srt = tmp_path / "clip.srt"
         srt.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n")
-        mock_run.return_value = MagicMock(returncode=0)
+        mock_run.side_effect = _mock_run_creating_output
 
         results = converter.convert_clips_to_videos(
             [str(clip)], output_dir=str(tmp_path), srt_paths=[str(srt)]
@@ -148,7 +171,7 @@ class TestFaststartFlag:
         """audio_to_video includes -movflags +faststart for progressive playback."""
         audio = tmp_path / "test.wav"
         audio.write_text("fake")
-        mock_run.return_value = MagicMock(returncode=0)
+        mock_run.side_effect = _mock_run_creating_output
 
         converter.audio_to_video(str(audio))
 
@@ -163,7 +186,7 @@ class TestFaststartFlag:
         audio.write_text("fake")
         srt = tmp_path / "test.srt"
         srt.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n")
-        mock_run.return_value = MagicMock(returncode=0)
+        mock_run.side_effect = _mock_run_creating_output
 
         converter.audio_to_video_with_subtitles(str(audio), str(srt))
 
@@ -180,7 +203,7 @@ class TestAudioToVideoFormats:
         """Custom resolution is used in FFmpeg command."""
         audio = tmp_path / "test.wav"
         audio.write_text("fake")
-        mock_run.return_value = MagicMock(returncode=0)
+        mock_run.side_effect = _mock_run_creating_output
 
         converter.audio_to_video(str(audio), resolution=(800, 600))
 
@@ -193,7 +216,7 @@ class TestAudioToVideoFormats:
         """Vertical format uses Config.VERTICAL_RESOLUTION."""
         audio = tmp_path / "test.wav"
         audio.write_text("fake")
-        mock_run.return_value = MagicMock(returncode=0)
+        mock_run.side_effect = _mock_run_creating_output
 
         converter.audio_to_video(str(audio), format_type="vertical")
 
@@ -206,7 +229,7 @@ class TestAudioToVideoFormats:
         """Square format uses Config.SQUARE_RESOLUTION."""
         audio = tmp_path / "test.wav"
         audio.write_text("fake")
-        mock_run.return_value = MagicMock(returncode=0)
+        mock_run.side_effect = _mock_run_creating_output
 
         converter.audio_to_video(str(audio), format_type="square")
 
@@ -262,8 +285,17 @@ class TestSubtitleErrors:
         audio.write_text("fake")
         srt = tmp_path / "test.srt"
         srt.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n")
+
         # First call raises, second (fallback) succeeds
-        mock_run.side_effect = [OSError("broken"), MagicMock(returncode=0)]
+        call_count = {"n": 0}
+
+        def _raise_then_succeed(*args, **kwargs):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                raise OSError("broken")
+            return _mock_run_creating_output(*args, **kwargs)
+
+        mock_run.side_effect = _raise_then_succeed
 
         result = converter.audio_to_video_with_subtitles(str(audio), str(srt))
         assert result is not None
@@ -277,7 +309,7 @@ class TestCreateEpisodeVideo:
         """Creates a horizontal video for full episode."""
         audio = tmp_path / "episode.wav"
         audio.write_text("fake")
-        mock_run.return_value = MagicMock(returncode=0)
+        mock_run.side_effect = _mock_run_creating_output
 
         result = converter.create_episode_video(str(audio))
         assert result is not None

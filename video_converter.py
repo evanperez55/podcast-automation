@@ -120,9 +120,12 @@ class VideoConverter:
                 timeout=7200,  # 2 hour timeout for long episodes
             )
 
-            if result.returncode == 0:
+            if result.returncode == 0 and output_path.exists():
                 logger.info("Video created: %s", output_path)
                 return str(output_path)
+            elif result.returncode == 0:
+                logger.error("FFmpeg exited 0 but output file not created")
+                return None
             else:
                 logger.error("FFmpeg failed: %s", result.stderr)
                 return None
