@@ -309,5 +309,240 @@ class TestRunVideoThumbnail:
         assert result.thumbnail_path is None
 
 
+class TestRunVideoSourceBranch:
+    """Tests for has_video_source branch — cut clips from source video."""
+
+    @patch("video_utils.mux_audio_to_video")
+    @patch("video_utils.cut_video_clip")
+    def test_video_source_cuts_clips(self, mock_cut, mock_mux, tmp_path):
+        """Cuts clips from source video when has_video_source is True."""
+        clip_dir = tmp_path / "clips"
+        clip_dir.mkdir()
+        (tmp_path / "ep25.wav").write_text("fake")
+
+        mock_cut.return_value = str(clip_dir / "clip_01_video.mp4")
+
+        # Override analysis to have 1 clip, and audio_processor to return 1 clip
+        audio_proc = MagicMock()
+        audio_proc.create_clips.return_value = [clip_dir / "clip_01.wav"]
+
+        ctx = _make_ctx(
+            tmp_path,
+            has_video_source=True,
+            source_video_path=tmp_path / "source.mp4",
+            analysis={
+                "best_clips": [
+                    {"start_seconds": 10, "end_seconds": 30, "title": "Clip 1"},
+                ],
+                "episode_title": "Test Episode",
+            },
+        )
+        components = _make_components(
+            audio_processor=audio_proc,
+            subtitle_clip_generator=None,
+            audiogram_generator=None,
+        )
+
+        result = run_video(ctx, components)
+
+        mock_cut.assert_called_once()
+        assert len(result.video_clip_paths) == 1
+
+    @patch("video_utils.mux_audio_to_video")
+    @patch("video_utils.cut_video_clip")
+    def test_video_source_muxes_full_episode(self, mock_cut, mock_mux, tmp_path):
+        """Muxes censored audio onto source video for full episode."""
+        clip_dir = tmp_path / "clips"
+        clip_dir.mkdir()
+        (tmp_path / "ep25.wav").write_text("fake")
+        censored = tmp_path / "ep25_censored.wav"
+        censored.write_text("fake")
+
+        mock_cut.return_value = None  # No clips
+        mock_mux.return_value = str(tmp_path / "episode.mp4")
+
+        ctx = _make_ctx(
+            tmp_path,
+            has_video_source=True,
+            source_video_path=tmp_path / "source.mp4",
+            censored_audio=censored,
+            clip_paths=[],
+        )
+        components = _make_components()
+
+        result = run_video(ctx, components)
+
+        mock_mux.assert_called_once()
+        assert result.full_episode_video_path is not None
+
+    @patch("video_utils.mux_audio_to_video", return_value=None)
+    @patch("video_utils.cut_video_clip")
+    def test_video_source_mux_failure(self, mock_cut, mock_mux, tmp_path):
+        """Handles mux failure gracefully."""
+        clip_dir = tmp_path / "clips"
+        clip_dir.mkdir()
+        (tmp_path / "ep25.wav").write_text("fake")
+        censored = tmp_path / "ep25_censored.wav"
+        censored.write_text("fake")
+
+        ctx = _make_ctx(
+            tmp_path,
+            has_video_source=True,
+            source_video_path=tmp_path / "source.mp4",
+            censored_audio=censored,
+            clip_paths=[],
+        )
+        components = _make_components()
+
+        result = run_video(ctx, components)
+        assert result.full_episode_video_path is None
+
+    @patch("video_utils.mux_audio_to_video")
+    @patch("video_utils.cut_video_clip")
+    def test_video_source_with_subtitles(self, mock_cut, mock_mux, tmp_path):
+        """Video source branch generates ASS subtitles when subtitle_clip_generator enabled."""
+        clip_dir = tmp_path / "clips"
+        clip_dir.mkdir()
+        (tmp_path / "ep25.wav").write_text("fake")
+
+        mock_cut.return_value = str(clip_dir / "clip_01_video.mp4")
+
+        mock_scg = MagicMock()
+        mock_scg.enabled = True
+
+        ctx = _make_ctx(
+            tmp_path,
+            has_video_source=True,
+            source_video_path=tmp_path / "source.mp4",
+            clip_paths=[clip_dir / "clip_01.wav"],
+            transcript_data={
+                "words": [{"word": "hello", "start": 10.0, "end": 10.5}],
+            },
+        )
+        components = _make_components(subtitle_clip_generator=mock_scg)
+
+        with patch("subtitle_generator.SubtitleGenerator") as mock_sub:
+            mock_sub_instance = MagicMock()
+            mock_sub_instance.extract_words_for_clip.return_value = [
+                {"word": "hello", "start": 0.0, "end": 0.5}
+            ]
+            mock_sub.return_value = mock_sub_instance
+
+            with patch(
+                "subtitle_clip_generator.normalize_word_timestamps", return_value=[]
+            ):
+                run_video(ctx, components)
+
+        assert mock_cut.called
+
+
+class TestSubtitleClipFullEpisode:
+    """Tests for subtitle_clip_generator branch creating full episode video."""
+
+    def test_subtitle_clip_creates_full_episode(self, tmp_path):
+        """Subtitle clip branch also creates full episode via video_converter."""
+        clip_dir = tmp_path / "clips"
+        clip_dir.mkdir()
+
+        mock_scg = MagicMock()
+        mock_scg.enabled = True
+        mock_scg.create_subtitle_clips.return_value = [str(clip_dir / "clip_01.mp4")]
+
+        mock_vc = MagicMock()
+        mock_vc.create_episode_video.return_value = str(tmp_path / "episode.mp4")
+
+        ctx = _make_ctx(
+            tmp_path,
+            clip_paths=[clip_dir / "clip_01.wav"],
+            srt_paths=[clip_dir / "clip_01.srt"],
+        )
+        components = _make_components(
+            subtitle_clip_generator=mock_scg,
+            video_converter=mock_vc,
+        )
+
+        result = run_video(ctx, components)
+
+        mock_scg.create_subtitle_clips.assert_called_once()
+        mock_vc.create_episode_video.assert_called_once()
+        assert result.full_episode_video_path is not None
+
+
+class TestVideoConverterFullEpisodeFailure:
+    """Tests for video_converter branch edge cases."""
+
+    def test_full_episode_failure_logged(self, tmp_path):
+        """When full episode video creation fails, warning logged but no crash."""
+        clip_dir = tmp_path / "clips"
+        clip_dir.mkdir()
+
+        mock_vc = MagicMock()
+        mock_vc.convert_clips_to_videos.return_value = [Path(clip_dir / "clip_01.mp4")]
+        mock_vc.create_episode_video.return_value = None  # Failure
+
+        ctx = _make_ctx(
+            tmp_path,
+            clip_paths=[clip_dir / "clip_01.wav"],
+            srt_paths=[clip_dir / "clip_01.srt"],
+        )
+        components = _make_components(video_converter=mock_vc)
+
+        result = run_video(ctx, components)
+
+        assert result.full_episode_video_path is None
+        assert len(result.video_clip_paths) == 1
+
+    def test_no_clips_message(self, tmp_path):
+        """When video_converter exists but no clips, logs 'No clips to convert'."""
+        mock_vc = MagicMock()
+
+        ctx = _make_ctx(tmp_path, clip_paths=[])
+        # Override audio_processor to return empty clips
+        audio_proc = MagicMock()
+        audio_proc.create_clips.return_value = []
+        components = _make_components(
+            video_converter=mock_vc,
+            audio_processor=audio_proc,
+        )
+
+        result = run_video(ctx, components)
+
+        mock_vc.convert_clips_to_videos.assert_not_called()
+        assert result.video_clip_paths == []
+
+
+class TestAudiogramStateCheckpoint:
+    """Tests for audiogram generator branch with state checkpoint."""
+
+    def test_audiogram_saves_state(self, tmp_path):
+        """Audiogram branch saves state checkpoint."""
+        clip_dir = tmp_path / "clips"
+        clip_dir.mkdir()
+
+        mock_ag = MagicMock()
+        mock_ag.enabled = True
+        mock_ag.create_audiogram_clips.return_value = [str(clip_dir / "clip_01.mp4")]
+
+        state = MagicMock()
+        state.is_step_completed.return_value = False
+
+        ctx = _make_ctx(
+            tmp_path,
+            clip_paths=[clip_dir / "clip_01.wav"],
+            srt_paths=[None],
+        )
+        components = _make_components(audiogram_generator=mock_ag)
+
+        run_video(ctx, components, state=state)
+
+        # Verify state was saved for convert_videos
+        convert_call = [
+            c for c in state.complete_step.call_args_list if c[0][0] == "convert_videos"
+        ]
+        assert len(convert_call) == 1
+        saved = convert_call[0][0][1]
+        assert str(clip_dir / "clip_01.mp4") in saved["video_clip_paths"]
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
