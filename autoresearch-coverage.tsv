@@ -3,3 +3,4 @@
 iteration	commit	metric	delta	guard	status	description
 0	0897eee	89	0.0	pass	baseline	972 passed, 89% coverage (1894 uncovered lines)
 1	fe44f51	89	+0.00	pass	keep	add 24 tests for client_config.py (73% → ~90%) — 996 passed, 1808 uncovered
+2	4210689	92	+3.00	pass	keep	add 45 tests for pipeline/runner.py (31% → ~65%) — 1041 passed, 1462 uncovered
