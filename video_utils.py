@@ -22,8 +22,29 @@ _NVENC_PRESET_MAP = {"ultrafast": "p1", "fast": "p2", "medium": "p4", "slow": "p
 _probe_cache: dict = {}
 
 
+def _libx264_args(preset="medium", crf=18, profile="high"):
+    """Return libx264 software encoder args (fallback)."""
+    args = [
+        "-c:v",
+        "libx264",
+        "-preset",
+        preset,
+        "-crf",
+        str(crf),
+        "-pix_fmt",
+        "yuv420p",
+    ]
+    if profile:
+        args.extend(["-profile:v", profile])
+    return args
+
+
 def get_h264_encoder_args(preset="medium", crf=18, profile="high"):
     """Return FFmpeg encoder args, using NVENC if available.
+
+    Falls back to libx264 if NVENC was detected at startup but fails at
+    runtime (driver mismatch, session limit, etc.).  The fallback is
+    sticky for the process lifetime to avoid retrying on every clip.
 
     Args:
         preset: libx264-style preset name (ultrafast/fast/medium/slow).
@@ -47,19 +68,24 @@ def get_h264_encoder_args(preset="medium", crf=18, profile="high"):
             "yuv420p",
         ]
     else:
-        args = [
-            "-c:v",
-            "libx264",
-            "-preset",
-            preset,
-            "-crf",
-            str(crf),
-            "-pix_fmt",
-            "yuv420p",
-        ]
-        if profile:
-            args.extend(["-profile:v", profile])
-        return args
+        return _libx264_args(preset, crf, profile)
+
+
+def disable_nvenc_and_get_fallback_args(preset="medium", crf=18, profile="high"):
+    """Disable NVENC for the rest of this process and return libx264 args.
+
+    Called when an FFmpeg NVENC command fails at runtime (e.g., driver
+    mismatch, session limit exceeded).  Sets Config.USE_NVENC = False so
+    all subsequent calls to get_h264_encoder_args use libx264.
+
+    Returns:
+        List of libx264 FFmpeg command-line arguments.
+    """
+    Config.USE_NVENC = False
+    logger.warning(
+        "NVENC failed at runtime — falling back to libx264 for remaining encodes"
+    )
+    return _libx264_args(preset, crf, profile)
 
 
 def is_video_file(file_path: Path) -> bool:
@@ -291,8 +317,41 @@ def cut_video_clip(
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         if result.returncode != 0:
-            logger.warning("Video clip cut failed: %s", result.stderr.strip()[:200])
-            return None
+            stderr = result.stderr.strip()[:300]
+            # NVENC runtime failure — retry with libx264 fallback
+            if Config.USE_NVENC and (
+                "nvenc" in stderr.lower()
+                or "nvcuda" in stderr.lower()
+                or "session" in stderr.lower()
+            ):
+                fallback_args = disable_nvenc_and_get_fallback_args(
+                    preset="fast", crf=23, profile="high"
+                )
+                # Rebuild command with libx264
+                nvenc_idx = next(
+                    (i for i, a in enumerate(cmd) if a in ("h264_nvenc", "-cq")),
+                    None,
+                )
+                if nvenc_idx is not None:
+                    # Replace encoder section: find -c:v and replace through -pix_fmt
+                    cv_idx = cmd.index("-c:v")
+                    pf_idx = cmd.index("yuv420p")
+                    cmd[cv_idx : pf_idx + 1] = fallback_args
+                    result = subprocess.run(
+                        cmd, capture_output=True, text=True, timeout=300
+                    )
+                    if result.returncode != 0:
+                        logger.warning(
+                            "Video clip cut failed (libx264 fallback): %s",
+                            result.stderr.strip()[:200],
+                        )
+                        return None
+                else:
+                    logger.warning("Video clip cut failed: %s", stderr)
+                    return None
+            else:
+                logger.warning("Video clip cut failed: %s", stderr)
+                return None
 
         if not Path(output_path).exists():
             logger.warning("Video clip cut produced no output file")
