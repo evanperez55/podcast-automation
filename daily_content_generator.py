@@ -15,9 +15,24 @@ class DailyContentGenerator:
     """Generates platform-specific 'Fake Problem of the Day' social media posts."""
 
     def __init__(self):
-        """Initialize with self.enabled gated by DAILY_CONTENT_ENABLED env var."""
+        """Initialize with self.enabled gated by DAILY_CONTENT_ENABLED env var.
+
+        Uses OpenAI when OPENAI_API_KEY is set and Ollama is unavailable
+        (e.g., in CI/GitHub Actions). Falls back to Ollama for local use.
+        """
         self.enabled = os.getenv("DAILY_CONTENT_ENABLED", "true").lower() == "true"
-        self.ollama = OllamaClient(model=Config.OLLAMA_MODEL)
+        self.use_openai = (
+            bool(Config.OPENAI_API_KEY)
+            and os.getenv("DAILY_CONTENT_USE_OPENAI", "false").lower() == "true"
+        )
+        if self.use_openai:
+            import openai
+
+            self.openai_client = openai.OpenAI(api_key=Config.OPENAI_API_KEY)
+            self.ollama = None
+        else:
+            self.ollama = OllamaClient(model=Config.OLLAMA_MODEL)
+            self.openai_client = None
         self.topic_data_dir = Path("topic_data")
 
     def generate_fake_problem(self, topic_hint: Optional[str] = None) -> dict:
@@ -43,21 +58,41 @@ class DailyContentGenerator:
         prompt = self._build_prompt(topic_context)
 
         try:
-            response = self.ollama.chat(
-                messages=[
-                    {"role": "system", "content": prompt},
-                    {
-                        "role": "user",
-                        "content": "Generate a Fake Problem of the Day with platform-specific versions. Return ONLY valid JSON.",
-                    },
-                ],
-                temperature=0.9,
-                max_tokens=500,
-            )
+            response = self._call_llm(prompt)
             return self._parse_response(response)
         except Exception as e:
             logger.warning("Failed to generate daily content: %s", e)
             return {}
+
+    def _call_llm(self, prompt: str) -> str:
+        """Call LLM backend (OpenAI or Ollama).
+
+        Args:
+            prompt: System prompt for content generation.
+
+        Returns:
+            Raw response text from the LLM.
+        """
+        user_msg = "Generate a Fake Problem of the Day with platform-specific versions. Return ONLY valid JSON."
+        if self.use_openai and self.openai_client:
+            response = self.openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                temperature=0.9,
+                max_tokens=500,
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": user_msg},
+                ],
+            )
+            return response.choices[0].message.content
+        return self.ollama.chat(
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": user_msg},
+            ],
+            temperature=0.9,
+            max_tokens=500,
+        )
 
     def generate_and_save(self, output_dir: Optional[Path] = None) -> Optional[Path]:
         """Generate fake problem content and save to a JSON file.
