@@ -285,6 +285,18 @@ class AudioProcessor:
             # Make sure we don't go past the end
             end_ms = min(end_ms, len(audio))
 
+            # Skip invalid ranges (start past end, or both past audio end)
+            if start_ms >= end_ms:
+                logger.warning(
+                    "[%d/%d] Skipping invalid censor range %.2fs-%.2fs: %s",
+                    i + 1,
+                    len(sorted_timestamps),
+                    start_seconds,
+                    end_seconds,
+                    reason,
+                )
+                continue
+
             # Duck the censored segment (smooth volume fade — no beep)
             audio = self._apply_duck_segment(audio, start_ms, end_ms)
 
@@ -305,7 +317,10 @@ class AudioProcessor:
             output_path = Path(output_path)
 
         logger.debug("Exporting censored audio...")
-        audio.export(str(output_path), format="wav")
+        tmp_path = output_path.with_suffix(".tmp.wav")
+        audio.export(str(tmp_path), format="wav")
+        if tmp_path.exists():
+            os.replace(str(tmp_path), str(output_path))
 
         logger.info("Censored audio saved to: %s", output_path)
         return output_path
@@ -341,6 +356,14 @@ class AudioProcessor:
         # Extract clip
         start_ms = int(start_seconds * 1000)
         end_ms = int(end_seconds * 1000)
+
+        if start_ms >= end_ms:
+            logger.warning(
+                "Invalid clip range: start=%.2fs >= end=%.2fs, skipping",
+                start_seconds,
+                end_seconds,
+            )
+            return None
 
         clip = audio[start_ms:end_ms]
 
