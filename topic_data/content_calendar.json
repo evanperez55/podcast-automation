@@ -215,6 +215,24 @@
         "uploaded_at": null,
         "upload_results": {}
       },
+      "clip_8": {
+        "slot_type": "clip_8",
+        "day_offset": 11,
+        "scheduled_at": "2026-04-12T14:00:00",
+        "platforms": [
+          "youtube",
+          "twitter",
+          "bluesky"
+        ],
+        "clip_index": 7,
+        "content": {
+          "caption": "What if you could pet any animal into a pet?",
+          "clip_title": "How Petting Turned Wolves Into Dogs"
+        },
+        "status": "pending",
+        "uploaded_at": null,
+        "upload_results": {}
+      },
       "quote_1": {
         "slot_type": "quote_1",
         "day_offset": 2,
