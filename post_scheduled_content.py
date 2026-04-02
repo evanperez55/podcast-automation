@@ -204,7 +204,62 @@ def post_scheduled(dry_run=False):
 
     # Save log
     _save_log(all_results)
+
+    # Send Discord summary
+    if all_results:
+        _send_discord_summary(all_results)
+
     return all_results
+
+
+def _send_discord_summary(results):
+    """Send a summary of posted content to Discord."""
+    try:
+        from notifications import DiscordNotifier
+
+        notifier = DiscordNotifier()
+        if not notifier.enabled:
+            return
+
+        succeeded = [
+            r
+            for r in results
+            if not any(
+                "error" in v
+                for v in (r.get("results") or {}).values()
+                if isinstance(v, dict)
+            )
+        ]
+        failed = [r for r in results if r not in succeeded]
+
+        description = ""
+        for r in succeeded:
+            slot_type = r.get("slot_type", "")
+            content = ""
+            platforms = []
+            res = r.get("results", {})
+            for platform, data in res.items():
+                if isinstance(data, dict) and data.get("status") != "error":
+                    platforms.append(platform)
+            if slot_type.startswith("clip_"):
+                content = f"Clip → {', '.join(platforms)}"
+            elif slot_type.startswith("quote_"):
+                content = f"Quote card → {', '.join(platforms)}"
+            else:
+                content = f"{slot_type} → {', '.join(platforms)}"
+            description += f"**{r['episode_key']}/{r['slot_name']}**: {content}\n"
+
+        if failed:
+            description += f"\n{len(failed)} slot(s) failed"
+
+        color = 0x00FF00 if not failed else 0xFF9900
+        notifier.send_notification(
+            title=f"Scheduled Content Posted ({len(succeeded)}/{len(results)})",
+            description=description.strip(),
+            color=color,
+        )
+    except Exception as e:
+        logger.warning("Discord notification failed: %s", e)
 
 
 def _save_log(results):
