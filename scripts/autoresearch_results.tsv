@@ -1,0 +1,12 @@
+iteration	timestamp	action	description	score	delta	decision	notes
+0	2026-03-29	baseline	Initial state: 768 passed, 5 errors, 81% coverage	86.51	0	baseline	passed=768 failed=0 errors=5 coverage=81%
+1	2026-03-29	fix	Fix PIL fixture + video_utils vertical crop test	87.40	+0.89	keep	5 errors fixed, 1 failure fixed, +6 tests
+2	2026-03-29	test	Add 16 tests for pipeline/steps/video.py	88.10	+0.70	keep	coverage 83%
+3	2026-03-29	test	Add 10 tests for pipeline/steps/analysis.py	88.10	+0.00	keep	+10 tests, coverage same (rounding)
+4	2026-03-29	test	Add 11 tests for transcription.py	88.80	+0.70	keep	coverage 84%
+5	2026-03-29	test	Add 11 tests for ollama_client.py	88.80	+0.00	keep	+11 tests, coverage same
+6	2026-03-29	test	Add 5 tests for topic_scorer.py	88.80	+0.00	keep	+5 tests, coverage same
+7	2026-03-29	test	Add 12 tests for video_utils.py error paths	89.50	+0.70	keep	coverage 85%
+8	2026-03-29	test	Add 15 tests for video_converter.py	89.50	+0.00	keep	+15 tests, coverage same
+9	2026-03-29	test	Add 17 tests for rss_feed_generator.py	90.20	+0.70	keep	coverage 86%, 871 tests
+10	2026-03-29	test	Add 7 tests for pipeline/steps/ingest.py	90.20	+0.00	keep	+7 tests, 878 total

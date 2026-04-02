@@ -154,6 +154,7 @@ class EpisodeWebpageGenerator:
             thumbnail_url=thumbnail_url,
             audio_url=audio_url,
             podcast_name=Config.PODCAST_NAME,
+            show_notes=show_notes,
         )
 
     def generate_sitemap(

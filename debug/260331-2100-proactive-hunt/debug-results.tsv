@@ -1,0 +1,21 @@
+iteration	type	hypothesis	result	severity	location	description
+1	hypothesis	ThreadPoolExecutor swallows exceptions in video.py	disproven	-	pipeline/steps/video.py	future.result() properly propagates exceptions
+2	hypothesis	Race condition in analytics engagement_history write	disproven	LOW	analytics.py	Non-atomic but single-user CLI tool
+3	hypothesis	Non-atomic pipeline state write loses checkpoint data	confirmed	MEDIUM	pipeline_state.py:55-56	open("w") truncates before json.dump — crash = data loss
+4	hypothesis	_merge_censor_timestamps false duplicate via 0-default	disproven	-	content_editor.py	Defensive default, not practical issue
+5	hypothesis	RSS feed transcript_data re-read shadows ctx variable	confirmed	LOW	distribute.py:483-484	Unnecessary file re-read when ctx.transcript_data exists
+6	hypothesis	Zero-duration censor entries cause pydub error	disproven	-	audio_processor.py	50ms padding handles zero-duration entries
+7	hypothesis	Naive datetime in scheduler publish_at	confirmed	MEDIUM	scheduler.py:253	datetime.now().isoformat() missing timezone for YouTube API
+8	hypothesis	RSS feed XML escaping for special chars	disproven	-	rss_feed_generator.py	ElementTree handles XML escaping automatically
+9	hypothesis	Compliance checker truncates long transcripts	disproven	-	content_compliance_checker.py	Full transcript sent, within GPT-4o context window
+10	hypothesis	filter_clips misaligns paths and info	disproven	-	clip_previewer.py	Same indices for both lists, bounded by preview_clips
+11	hypothesis	ASS subtitle hardcoded font sizes	disproven	-	subtitle_clip_generator.py	Width/height parameterized, PlayRes scales
+12	hypothesis	Concurrent access to outreach tracker JSON	disproven	-	outreach_tracker.py	Single-user CLI, same as analytics
+13	hypothesis	upload_clips partial failure handling	disproven	-	dropbox_handler.py	Individual failures handled correctly
+14	hypothesis	video_converter missing output file check	confirmed	LOW	video_converter.py:123-125	Returns path without verifying file exists
+15	hypothesis	Config.validate misses optional API keys	disproven	-	config.py	By design — optional services use self.enabled pattern
+16	hypothesis	Missing timeout on FFmpeg subprocess calls	confirmed	MEDIUM	audio_processor.py:143,185	Two-pass normalization has no timeout — pipeline can hang
+17	hypothesis	GPT response missing required keys causes KeyError	disproven	-	content_editor.py	json_schema structured output guarantees all fields
+18	hypothesis	FTS5 search crashes on special characters	disproven	-	search_index.py	Exception caught, returns empty list
+19	hypothesis	Word matching fails with Whisper punctuation	disproven	-	content_editor.py	strip() handles punctuation correctly
+20	hypothesis	FFmpeg misinterprets float second timestamps	disproven	-	demo_packager.py	FFmpeg natively accepts float seconds

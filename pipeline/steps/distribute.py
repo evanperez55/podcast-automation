@@ -368,6 +368,83 @@ def _upload_to_social_media(
             logger.info("No video clips available")
             results["tiktok"] = {"status": "no_videos"}
 
+    # Bluesky
+    if "bluesky" in uploaders:
+        yt_full_url = None
+        if youtube_results and youtube_results.get("full_episode"):
+            yt_full_url = youtube_results["full_episode"].get("video_url")
+        if test_mode:
+            logger.info("[TEST MODE] Skipping Bluesky posts")
+            results["bluesky"] = {"status": "test_mode", "skipped": True}
+        else:
+            try:
+                bluesky_caption = analysis.get("social_captions", {}).get(
+                    "bluesky", analysis.get("social_captions", {}).get("twitter")
+                )
+                bluesky_result = uploaders["bluesky"].post_episode_announcement(
+                    episode_number=episode_number,
+                    episode_summary=analysis.get("episode_summary", ""),
+                    youtube_url=yt_full_url,
+                    bluesky_caption=bluesky_caption,
+                )
+                if bluesky_result:
+                    results["bluesky"] = {"announcement": bluesky_result}
+
+                # Post clips with YouTube Shorts links
+                clip_shorts = (youtube_results or {}).get("shorts", [])
+                best_clips = analysis.get("best_clips", [])
+                clip_posts = []
+                for i, short in enumerate(clip_shorts):
+                    short_url = short.get("video_url")
+                    short_title = short.get("title", f"Clip {i + 1}")
+                    hook = ""
+                    tags = []
+                    if i < len(best_clips):
+                        hook = best_clips[i].get("hook_caption", "")
+                        tags = best_clips[i].get("clip_hashtags", [])[:3]
+                    text = hook or short_title
+                    if tags:
+                        hashtag_line = " ".join(f"#{t}" for t in tags)
+                        if len(text) + len(hashtag_line) + 2 <= 300:
+                            text = f"{text}\n\n{hashtag_line}"
+                    clip_result = uploaders["bluesky"].post(
+                        text=text,
+                        url=short_url,
+                        url_title=short_title,
+                        url_description=f"{Config.PODCAST_NAME} - Episode {episode_number}",
+                    )
+                    if clip_result:
+                        clip_posts.append(clip_result)
+                if clip_posts:
+                    results.setdefault("bluesky", {})["clips"] = clip_posts
+                    logger.info("Posted %d clip(s) to Bluesky", len(clip_posts))
+            except Exception as e:
+                logger.error("Bluesky upload failed: %s", e)
+                results["bluesky"] = {"error": str(e)}
+
+    # Reddit
+    if "reddit" in uploaders:
+        yt_full_url = None
+        if youtube_results and youtube_results.get("full_episode"):
+            yt_full_url = youtube_results["full_episode"].get("video_url")
+        if test_mode:
+            logger.info("[TEST MODE] Skipping Reddit posts")
+            results["reddit"] = {"status": "test_mode", "skipped": True}
+        else:
+            try:
+                episode_title = analysis.get("episode_title", "")
+                reddit_results = uploaders["reddit"].post_episode_announcement(
+                    episode_number=episode_number,
+                    episode_summary=analysis.get("episode_summary", ""),
+                    youtube_url=yt_full_url,
+                    episode_title=episode_title,
+                )
+                if reddit_results:
+                    results["reddit"] = reddit_results
+            except Exception as e:
+                logger.error("Reddit upload failed: %s", e)
+                results["reddit"] = {"error": str(e)}
+
     # Spotify (RSS feed — updated after Dropbox upload in Step 7.5)
     if "spotify" in uploaders:
         logger.info("[Spotify] RSS feed will be updated after Dropbox upload")
@@ -635,6 +712,23 @@ def run_distribute(
         logger.info("Webpage deployment disabled or not configured")
     print()
 
+    # Step 8.65: Generate quote cards
+    try:
+        from quote_card_generator import QuoteCardGenerator
+
+        qcg = QuoteCardGenerator()
+        if qcg.enabled and analysis.get("best_quotes"):
+            quote_card_paths = qcg.generate_all_quote_cards(
+                analysis, episode_number, str(episode_output_dir)
+            )
+            if quote_card_paths:
+                logger.info("Generated %d quote card(s)", len(quote_card_paths))
+                ctx.quote_card_paths = quote_card_paths
+        else:
+            logger.info("Quote card generation skipped (disabled or no quotes)")
+    except Exception as e:
+        logger.warning("Quote card generation failed: %s", e)
+
     # Step 8.7: Generate content calendar
     print("STEP 8.7: CONTENT CALENDAR")
     print("-" * 60)
@@ -660,6 +754,54 @@ def run_distribute(
                 slot_count,
                 episode_number,
             )
+
+            # Persist YouTube URLs into calendar slots for staggered social posting
+            ep_key = f"ep_{episode_number}"
+            yt_results = social_media_results.get("youtube", {})
+
+            # Full episode URL -> episode slot
+            full_ep = yt_results.get("full_episode") or {}
+            if full_ep.get("video_url"):
+                calendar.update_slot_content(
+                    ep_key,
+                    "episode",
+                    {
+                        "youtube_url": full_ep["video_url"],
+                        "youtube_video_id": full_ep.get("video_id", ""),
+                    },
+                )
+
+            # Shorts URLs -> clip slots
+            shorts = yt_results.get("shorts", [])
+            best_clips = analysis.get("best_clips", [])
+            for i, short in enumerate(shorts):
+                slot_name = f"clip_{i + 1}"
+                clip_title = ""
+                clip_caption = ""
+                if i < len(best_clips):
+                    clip_title = best_clips[i].get("suggested_title", "")
+                    clip_caption = best_clips[i].get("hook_caption", "")
+                calendar.update_slot_content(
+                    ep_key,
+                    slot_name,
+                    {
+                        "youtube_url": short.get("video_url", ""),
+                        "youtube_video_id": short.get("video_id", ""),
+                        "clip_title": clip_title,
+                        "caption": clip_caption,
+                    },
+                )
+
+            # Hot take -> teaser slot
+            hot_take = analysis.get("hot_take", "")
+            if hot_take:
+                calendar.update_slot_content(
+                    ep_key,
+                    "teaser",
+                    {"caption": hot_take},
+                )
+
+            logger.info("Persisted YouTube URLs to content calendar slots")
         else:
             logger.info("Content calendar disabled")
     except Exception as e:
@@ -715,6 +857,8 @@ def run_distribute_only(
         SpotifyUploader,
         InstagramUploader,
         TikTokUploader,
+        BlueskyUploader,
+        RedditUploader,
     )
     from scheduler import UploadScheduler
     from blog_generator import BlogPostGenerator
@@ -806,11 +950,14 @@ def run_distribute_only(
     except Exception as e:
         logger.info("YouTube not available: %s", str(e).split("\n")[0])
 
-    try:
-        uploaders["twitter"] = TwitterUploader()
-        logger.info("Twitter uploader initialized")
-    except Exception as e:
-        logger.info("Twitter not available: %s", str(e).split("\n")[0])
+    if Config.TWITTER_ENABLED:
+        try:
+            uploaders["twitter"] = TwitterUploader()
+            logger.info("Twitter uploader initialized")
+        except Exception as e:
+            logger.info("Twitter not available: %s", str(e).split("\n")[0])
+    else:
+        logger.info("[SKIP] Twitter: disabled (TWITTER_ENABLED=false)")
 
     try:
         uploaders["spotify"] = SpotifyUploader()
@@ -829,6 +976,18 @@ def run_distribute_only(
         logger.info("TikTok uploader initialized")
     except Exception as e:
         logger.info("TikTok not available: %s", str(e).split("\n")[0])
+
+    try:
+        uploaders["bluesky"] = BlueskyUploader()
+        logger.info("Bluesky uploader initialized")
+    except (ValueError, Exception) as e:
+        logger.info("[SKIP] Bluesky: %s", str(e).split("\n")[0])
+
+    try:
+        uploaders["reddit"] = RedditUploader()
+        logger.info("Reddit uploader initialized")
+    except (ValueError, Exception) as e:
+        logger.info("[SKIP] Reddit: %s", str(e).split("\n")[0])
 
     try:
         scheduler = UploadScheduler()

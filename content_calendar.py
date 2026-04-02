@@ -18,9 +18,9 @@ from posting_time_optimizer import PostingTimeOptimizer
 
 logger = logging.getLogger(__name__)
 
-# Slot day offsets: teaser=D-1, episode=D0, clips=D+2, D+4, D+6
-_CLIP_OFFSETS = [2, 4, 6]
-_MAX_CLIP_SLOTS = 3
+# Slot day offsets: teaser=D-1, episode=D0, clips spread across D+1 to D+8
+_CLIP_OFFSETS = [1, 2, 4, 6, 8]
+_MAX_CLIP_SLOTS = 5
 
 # Mapping from slot type / platform to Config fallback hour attribute
 _PLATFORM_HOUR_ATTR = {
@@ -238,6 +238,57 @@ class ContentCalendar:
         )
         self.save(data)
 
+    def update_slot_content(
+        self,
+        episode_key: str,
+        slot_name: str,
+        content_updates: dict,
+    ) -> None:
+        """Merge additional content keys into an existing slot.
+
+        Args:
+            episode_key: e.g. 'ep_30'.
+            slot_name: Slot identifier, e.g. 'clip_1'.
+            content_updates: Dict of keys to merge into slot["content"].
+        """
+        data = self.load_all()
+        if episode_key not in data:
+            return
+        slots = data[episode_key].get("slots", {})
+        if slot_name not in slots:
+            return
+        slots[slot_name].setdefault("content", {}).update(content_updates)
+        self.save(data)
+
+    def get_all_pending_slots(self) -> list[dict]:
+        """Return all pending slots across all episodes that are past due.
+
+        Returns:
+            List of slot dicts augmented with 'episode_key' and 'slot_name'.
+        """
+        now = datetime.now()
+        results = []
+        for ep_key, ep_data in self.load_all().items():
+            for slot_name, slot in (ep_data.get("slots") or {}).items():
+                if slot.get("status") != "pending":
+                    continue
+                scheduled_str = slot.get("scheduled_at", "")
+                if not scheduled_str:
+                    continue
+                try:
+                    scheduled = datetime.fromisoformat(scheduled_str)
+                except (ValueError, TypeError):
+                    continue
+                if scheduled <= now:
+                    results.append(
+                        {
+                            "episode_key": ep_key,
+                            "slot_name": slot_name,
+                            **slot,
+                        }
+                    )
+        return results
+
     def load_all(self) -> dict:
         """Load the full calendar from disk.
 
@@ -286,9 +337,11 @@ class ContentCalendar:
         slots_info = [
             ("teaser", -1, "twitter"),
             ("episode", 0, "youtube"),
-            ("clip_1", 2, "youtube"),
-            ("clip_2", 4, "youtube"),
-            ("clip_3", 6, "youtube"),
+            ("clip_1", 1, "youtube"),
+            ("clip_2", 2, "youtube"),
+            ("clip_3", 4, "youtube"),
+            ("clip_4", 6, "youtube"),
+            ("clip_5", 8, "youtube"),
         ]
         for slot_type, day_offset, primary_platform in slots_info:
             dt = self._slot_datetime(release_date, day_offset, primary_platform)

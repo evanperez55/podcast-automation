@@ -98,11 +98,26 @@ class Config:
 
     # Spotify (RSS-only, no API credentials needed)
 
-    # Twitter
+    # Twitter (pay-per-use credits ~$0.01/tweet)
+    TWITTER_ENABLED = os.getenv("TWITTER_ENABLED", "true").lower() == "true"
     TWITTER_API_KEY = os.getenv("TWITTER_API_KEY")
     TWITTER_API_SECRET = os.getenv("TWITTER_API_SECRET")
     TWITTER_ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
     TWITTER_ACCESS_SECRET = os.getenv("TWITTER_ACCESS_SECRET")
+
+    # Bluesky
+    BLUESKY_HANDLE = os.getenv("BLUESKY_HANDLE")
+    BLUESKY_APP_PASSWORD = os.getenv("BLUESKY_APP_PASSWORD")
+
+    # Reddit
+    REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
+    REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET")
+    REDDIT_USERNAME = os.getenv("REDDIT_USERNAME")
+    REDDIT_PASSWORD = os.getenv("REDDIT_PASSWORD")
+    REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT", "PodcastAutomation/1.0")
+    REDDIT_SUBREDDITS = [
+        s.strip() for s in os.getenv("REDDIT_SUBREDDITS", "").split(",") if s.strip()
+    ]
 
     # Instagram
     INSTAGRAM_ACCESS_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
@@ -152,6 +167,12 @@ class Config:
     THUMBNAIL_BG_COLOR = os.getenv("THUMBNAIL_BG_COLOR", "#1a1a2e")
     THUMBNAIL_TEXT_COLOR = os.getenv("THUMBNAIL_TEXT_COLOR", "#ffffff")
     THUMBNAIL_BADGE_COLOR = os.getenv("THUMBNAIL_BADGE_COLOR", "#e94560")
+
+    # Quote Card Generation
+    QUOTE_CARD_ENABLED = os.getenv("QUOTE_CARD_ENABLED", "true").lower() == "true"
+    QUOTE_CARD_BG_COLOR = os.getenv("QUOTE_CARD_BG_COLOR", "#1a1a2e")
+    QUOTE_CARD_TEXT_COLOR = os.getenv("QUOTE_CARD_TEXT_COLOR", "#ffffff")
+    QUOTE_CARD_ACCENT_COLOR = os.getenv("QUOTE_CARD_ACCENT_COLOR", "#e94560")
 
     # Analytics Feedback Loop
     ANALYTICS_ENABLED = os.getenv("ANALYTICS_ENABLED", "true").lower() == "true"
@@ -242,11 +263,12 @@ class Config:
 
     # Clip Settings
     CLIP_MIN_DURATION = 15  # seconds
-    CLIP_MAX_DURATION = int(
-        os.getenv("CLIP_MAX_DURATION", "60")
-    )  # seconds (longer clips perform better on TikTok/Reels)
+    CLIP_MAX_DURATION = int(os.getenv("CLIP_MAX_DURATION", "60"))  # seconds
+    CLIP_TARGET_DURATION = int(
+        os.getenv("CLIP_TARGET_DURATION", "30")
+    )  # ideal clip length for YouTube Shorts (15-30s sweet spot)
     NUM_CLIPS = int(
-        os.getenv("NUM_CLIPS", "5")
+        os.getenv("NUM_CLIPS", "8")
     )  # clips per episode (volume > perfection for discovery)
     CLIP_AUDIO_TOP_N = int(
         os.getenv("CLIP_AUDIO_TOP_N", "10")

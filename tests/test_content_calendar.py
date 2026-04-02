@@ -124,8 +124,8 @@ class TestPlanEpisode:
         slots = entry["slots"]
         assert len(slots) == 3
 
-    def test_cap_at_3_clips(self, tmp_path):
-        """plan_episode caps clip slots at 3 even with more paths provided."""
+    def test_cap_at_5_clips(self, tmp_path):
+        """plan_episode caps clip slots at 5 even with more paths provided."""
         with patch("content_calendar.Config") as mock_cfg:
             mock_cfg.CONTENT_CALENDAR_ENABLED = True
             mock_cfg.TOPIC_DATA_DIR = tmp_path
@@ -144,12 +144,20 @@ class TestPlanEpisode:
                     episode_number=29,
                     release_date=RELEASE_DATE,
                     analysis=_analysis_with_clips(2),
-                    video_clip_paths=["c1.mp4", "c2.mp4", "c3.mp4", "c4.mp4", "c5.mp4"],
+                    video_clip_paths=[
+                        "c1.mp4",
+                        "c2.mp4",
+                        "c3.mp4",
+                        "c4.mp4",
+                        "c5.mp4",
+                        "c6.mp4",
+                        "c7.mp4",
+                    ],
                 )
 
         slots = entry["slots"]
         clip_slots = [s for s in slots.values() if s["slot_type"].startswith("clip_")]
-        assert len(clip_slots) == 3
+        assert len(clip_slots) == 5
 
     def test_no_best_clips_skips_teaser(self, tmp_path):
         """plan_episode with no best_clips in analysis skips teaser slot."""

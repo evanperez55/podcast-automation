@@ -105,19 +105,32 @@ class TestInitUploaders:
         uploaders = _init_uploaders()
         assert uploaders == {}
 
+    @patch("pipeline.runner.RedditUploader", side_effect=ValueError("no creds"))
+    @patch("pipeline.runner.BlueskyUploader", side_effect=ValueError("no creds"))
     @patch("pipeline.runner.SpotifyUploader")
     @patch("pipeline.runner.TikTokUploader")
     @patch("pipeline.runner.InstagramUploader")
     @patch("pipeline.runner.TwitterUploader")
     @patch("pipeline.runner.YouTubeUploader")
     def test_all_uploaders_initialize_successfully(
-        self, mock_yt, mock_tw, mock_ig, mock_tt, mock_sp, monkeypatch
+        self,
+        mock_yt,
+        mock_tw,
+        mock_ig,
+        mock_tt,
+        mock_sp,
+        mock_bs,
+        mock_rd,
+        monkeypatch,
     ):
         """When all credentials are available, all uploaders are initialized."""
         mock_ig.return_value.functional = True
         mock_tt.return_value.functional = True
         monkeypatch.setattr(
             "pipeline.runner.Config.EPISODE_SOURCE", "dropbox", raising=False
+        )
+        monkeypatch.setattr(
+            "pipeline.runner.Config.TWITTER_ENABLED", True, raising=False
         )
 
         from pipeline.runner import _init_uploaders

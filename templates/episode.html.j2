@@ -61,6 +61,13 @@
   <h1>{{ episode_title }}</h1>
   <p>{{ episode_summary }}</p>
 
+  {% if show_notes %}
+  <div class="show-notes">
+    <h2>Show Notes</h2>
+    {{ show_notes | replace('\n', '<br>') }}
+  </div>
+  {% endif %}
+
   {% if chapters %}
   <nav class="chapters">
     <h2>Chapters</h2>
@@ -76,11 +83,13 @@
   </nav>
   {% endif %}
 
-  <div class="transcript">
-    <h2>Full Transcript</h2>
-    {% for segment in segments %}
-    <span id="t-{{ segment.start_int }}" class="segment">{{ segment.text }}</span>
-    {% endfor %}
-  </div>
+  <details class="transcript-toggle">
+    <summary><h2 style="display:inline">Full Transcript</h2></summary>
+    <div class="transcript">
+      {% for segment in segments %}
+      <span id="t-{{ segment.start_int }}" class="segment">{{ segment.text }}</span>
+      {% endfor %}
+    </div>
+  </details>
 </body>
 </html>

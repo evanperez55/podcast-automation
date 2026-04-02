@@ -1,0 +1,49 @@
+name: Scheduled Content Posting
+
+on:
+  schedule:
+    # Every day at 10 AM ET (2 PM UTC) — optimal Twitter/social posting hour
+    - cron: "0 14 * * *"
+  workflow_dispatch:  # Manual trigger for testing
+
+jobs:
+  post-scheduled-content:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --no-dev --extra daily
+
+      - name: Post pending scheduled content
+        env:
+          TWITTER_ENABLED: "true"
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
+          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+        run: uv run python post_scheduled_content.py
+
+      - name: Commit calendar updates
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add topic_data/content_calendar.json
+          git diff --cached --quiet || git commit -m "chore: update content calendar slot statuses"
+          git push
+
+      - name: Upload posting log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scheduled-content-${{ github.run_number }}
+          path: output/scheduled_content/
+          retention-days: 30

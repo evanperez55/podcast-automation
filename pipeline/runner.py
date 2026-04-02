@@ -24,6 +24,8 @@ from uploaders import (
     TikTokUploader,
     TwitterUploader,
     SpotifyUploader,
+    BlueskyUploader,
+    RedditUploader,
 )
 from notifications import DiscordNotifier
 from scheduler import UploadScheduler
@@ -71,12 +73,15 @@ def _init_uploaders():
     except (ValueError, FileNotFoundError) as e:
         logger.info("YouTube uploader not available: %s", str(e).split("\n")[0])
 
-    # Twitter
-    try:
-        uploaders["twitter"] = TwitterUploader()
-        logger.info("Twitter uploader initialized")
-    except ValueError as e:
-        logger.info("Twitter uploader not available: %s", str(e).split("\n")[0])
+    # Twitter (disabled by default — X API requires paid plan)
+    if Config.TWITTER_ENABLED:
+        try:
+            uploaders["twitter"] = TwitterUploader()
+            logger.info("Twitter uploader initialized")
+        except ValueError as e:
+            logger.info("Twitter uploader not available: %s", str(e).split("\n")[0])
+    else:
+        logger.info("[SKIP] Twitter: disabled (TWITTER_ENABLED=false)")
 
     # Instagram
     uploaders["instagram"] = InstagramUploader()
@@ -100,6 +105,20 @@ def _init_uploaders():
         logger.info("Spotify uploader initialized")
     except ValueError as e:
         logger.info("Spotify uploader not available: %s", str(e).split("\n")[0])
+
+    # Bluesky
+    try:
+        uploaders["bluesky"] = BlueskyUploader()
+        logger.info("Bluesky uploader initialized")
+    except ValueError as e:
+        logger.info("[SKIP] Bluesky: %s", str(e).split("\n")[0])
+
+    # Reddit
+    try:
+        uploaders["reddit"] = RedditUploader()
+        logger.info("Reddit uploader initialized")
+    except ValueError as e:
+        logger.info("[SKIP] Reddit: %s", str(e).split("\n")[0])
 
     return uploaders
 

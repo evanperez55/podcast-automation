@@ -82,6 +82,20 @@ _ANALYSIS_SCHEMA = {
                     "additionalProperties": False,
                 },
             },
+            "hot_take": {"type": "string"},
+            "best_quotes": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "quote": {"type": "string"},
+                        "timestamp": {"type": "string"},
+                        "speaker_context": {"type": "string"},
+                    },
+                    "required": ["quote", "timestamp", "speaker_context"],
+                    "additionalProperties": False,
+                },
+            },
         },
         "required": [
             "episode_title",
@@ -91,6 +105,8 @@ _ANALYSIS_SCHEMA = {
             "social_captions",
             "show_notes",
             "chapters",
+            "hot_take",
+            "best_quotes",
         ],
         "additionalProperties": False,
     },
@@ -190,6 +206,8 @@ class ContentEditor:
             # Ensure new fields have defaults (backward compat with older responses)
             analysis.setdefault("show_notes", "")
             analysis.setdefault("chapters", [])
+            analysis.setdefault("hot_take", "")
+            analysis.setdefault("best_quotes", [])
             analysis.get("social_captions", {}).setdefault("tiktok", "")
 
             # DIRECT SEARCH: Find words to censor by searching transcript directly
@@ -442,9 +460,10 @@ GOOD: "turns out immortality is real, it just only applies to lobsters. link in 
 
    For each REAL instance, provide the timestamp and the exact quote containing the word.
 
-2. **IDENTIFY BEST MOMENTS FOR CLIPS (15-60 seconds):**
-   Find {Config.NUM_CLIPS} compelling moments that would make great social media clips.
-   PREFER LONGER CLIPS (30-60s) over short ones — TikTok/Reels algorithms favor 45-90s content.
+2. **IDENTIFY BEST MOMENTS FOR CLIPS (15-45 seconds, ideal 20-30s):**
+   Find {Config.NUM_CLIPS} compelling moments that would make great YouTube Shorts.
+   PREFER 20-30 SECOND CLIPS — this is the sweet spot for YouTube Shorts virality.
+   Shorter, punchier clips outperform longer ones. Only go above 30s if the moment truly requires it.
    Each segment includes a WPM (words-per-minute) indicator — use this to identify delivery changes:
    - High WPM (180+) = excited/fast speech, high energy moments
    - Low WPM (80-120) = deliberate/dramatic delivery, emphasis
@@ -496,6 +515,22 @@ GOOD: "turns out immortality is real, it just only applies to lobsters. link in 
    - Each chapter should have a timestamp (HH:MM:SS) and a short title (3-8 words)
    - Chapters should mark when the conversation shifts to a new topic
    - Space them relatively evenly throughout the episode
+
+8. **EXTRACT BEST QUOTES:**
+   Find 3-5 memorable, standalone quotes from the episode.
+   These will be used to create shareable quote card images for social media.
+   Each quote should:
+   - Work completely out of context (someone seeing just the quote should find it funny/thought-provoking)
+   - Be a single sentence or short exchange (max ~20 words)
+   - Include the timestamp where it occurs
+   - Attribute to "one of the hosts" or "the hosts" — NEVER use real names
+   - Prefer funny, absurd, or quotable lines over insightful ones
+
+9. **WRITE A HOT TAKE:**
+   Write a single bold, controversial, or funny statement derived from the episode.
+   This should work as a standalone tweet or text overlay — no context needed.
+   Make it provocative enough that someone would quote-tweet it or reply.
+   Channel the show's voice: dry, darkly amused, confidently wrong.
 
 **CRITICAL - ANONYMITY REQUIREMENT:**
    The hosts' names are being CENSORED from the audio for privacy/anonymity reasons.
@@ -552,6 +587,14 @@ Please respond with ONLY valid JSON in this exact format:
     {{
       "start_timestamp": "00:05:30",
       "title": "Topic Title Here"
+    }}
+  ],
+  "hot_take": "A bold, provocative one-liner from the episode that works as a standalone tweet",
+  "best_quotes": [
+    {{
+      "quote": "A memorable standalone quote from the episode",
+      "timestamp": "HH:MM:SS",
+      "speaker_context": "one of the hosts"
     }}
   ]
 }}
