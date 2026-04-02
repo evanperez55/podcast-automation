@@ -39,7 +39,7 @@ class TestPlanEpisode:
     """Tests for ContentCalendar.plan_episode()."""
 
     def test_generates_correct_slots_with_2_clips(self, tmp_path):
-        """plan_episode with 2 clips produces 4 slots: teaser, episode, clip_1, clip_2."""
+        """plan_episode with only 2 clips produces teaser + episode (clips 1-2 go public on D+0)."""
         with patch("content_calendar.Config") as mock_cfg:
             mock_cfg.CONTENT_CALENDAR_ENABLED = True
             mock_cfg.TOPIC_DATA_DIR = tmp_path
@@ -62,12 +62,11 @@ class TestPlanEpisode:
                 )
 
         slots = entry["slots"]
-        assert len(slots) == 4
+        # Only 2 clips = both go public on D+0, no staggered clip slots
+        assert len(slots) == 2
         slot_types = {s["slot_type"] for s in slots.values()}
         assert "teaser" in slot_types
         assert "episode" in slot_types
-        assert "clip_1" in slot_types
-        assert "clip_2" in slot_types
 
     def test_no_clips_skips_clip_slots(self, tmp_path):
         """plan_episode with 0 clips produces only teaser + episode (2 slots)."""
@@ -98,8 +97,8 @@ class TestPlanEpisode:
         assert "episode" in slot_types
         assert "teaser" in slot_types
 
-    def test_one_clip_one_slot(self, tmp_path):
-        """plan_episode with 1 clip produces 3 slots: teaser, episode, clip_1."""
+    def test_one_clip_no_staggered(self, tmp_path):
+        """plan_episode with 1 clip produces only teaser + episode (clip goes public D+0)."""
         with patch("content_calendar.Config") as mock_cfg:
             mock_cfg.CONTENT_CALENDAR_ENABLED = True
             mock_cfg.TOPIC_DATA_DIR = tmp_path
@@ -122,10 +121,10 @@ class TestPlanEpisode:
                 )
 
         slots = entry["slots"]
-        assert len(slots) == 3
+        assert len(slots) == 2
 
-    def test_cap_at_5_clips(self, tmp_path):
-        """plan_episode caps clip slots at 5 even with more paths provided."""
+    def test_cap_at_6_staggered_clips(self, tmp_path):
+        """plan_episode caps staggered clip slots at 6 (clips 3-8, skipping first 2)."""
         with patch("content_calendar.Config") as mock_cfg:
             mock_cfg.CONTENT_CALENDAR_ENABLED = True
             mock_cfg.TOPIC_DATA_DIR = tmp_path
@@ -140,24 +139,21 @@ class TestPlanEpisode:
                 mock_pto_cls.return_value = mock_pto
 
                 cal = ContentCalendar()
+                # 10 clips: first 2 go public D+0, next 6 get staggered slots (capped)
                 entry = cal.plan_episode(
                     episode_number=29,
                     release_date=RELEASE_DATE,
                     analysis=_analysis_with_clips(2),
-                    video_clip_paths=[
-                        "c1.mp4",
-                        "c2.mp4",
-                        "c3.mp4",
-                        "c4.mp4",
-                        "c5.mp4",
-                        "c6.mp4",
-                        "c7.mp4",
-                    ],
+                    video_clip_paths=[f"c{i}.mp4" for i in range(1, 11)],
                 )
 
         slots = entry["slots"]
         clip_slots = [s for s in slots.values() if s["slot_type"].startswith("clip_")]
-        assert len(clip_slots) == 5
+        assert len(clip_slots) == 6
+        # Clips should be numbered 3-8 (skipping 1-2)
+        clip_types = {s["slot_type"] for s in clip_slots}
+        assert "clip_3" in clip_types
+        assert "clip_8" in clip_types
 
     def test_no_best_clips_skips_teaser(self, tmp_path):
         """plan_episode with no best_clips in analysis skips teaser slot."""
@@ -268,11 +264,8 @@ class TestPlanEpisode:
                 )
 
         assert entry1 == entry2
-        # Should still have original 2 clip slots
-        clip_slots = [
-            s for s in entry2["slots"].values() if s["slot_type"].startswith("clip_")
-        ]
-        assert len(clip_slots) == 2
+        # Second call returns same entry unchanged
+        assert entry1["slots"] == entry2["slots"]
 
 
 # ---------------------------------------------------------------------------

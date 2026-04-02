@@ -67,9 +67,32 @@ def _post_slot(slot, uploaders):
     else:
         text = caption
 
+    # For clip slots: make the YouTube Short public before promoting it
+    youtube_video_id = content.get("youtube_video_id", "")
+    if slot_type.startswith("clip_") and youtube_video_id and "youtube" in platforms:
+        try:
+            from uploaders.youtube_uploader import YouTubeUploader
+
+            yt = YouTubeUploader()
+            if yt.set_video_privacy(youtube_video_id, "public"):
+                results["youtube"] = {
+                    "status": "made_public",
+                    "video_id": youtube_video_id,
+                }
+                logger.info("Made YouTube Short %s public", youtube_video_id)
+            else:
+                logger.warning(
+                    "Failed to make YouTube Short %s public", youtube_video_id
+                )
+        except Exception as e:
+            logger.error("YouTube privacy update failed: %s", e)
+            results["youtube"] = {"error": str(e)}
+
     for platform in platforms:
         if platform not in uploaders:
             continue
+        if platform == "youtube":
+            continue  # handled above via privacy change
 
         try:
             if platform == "twitter":

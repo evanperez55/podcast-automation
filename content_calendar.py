@@ -18,9 +18,13 @@ from posting_time_optimizer import PostingTimeOptimizer
 
 logger = logging.getLogger(__name__)
 
-# Slot day offsets: teaser=D-1, episode=D0, clips spread across D+1 to D+8
-_CLIP_OFFSETS = [1, 2, 4, 6, 8]
-_MAX_CLIP_SLOTS = 5
+# 2-week content calendar for bi-weekly episodes
+# Clips 1-2 go public on YouTube at D+0 (pipeline upload)
+# Clips 3-8 are uploaded private, made public on their scheduled day
+_CLIP_OFFSETS = [1, 3, 5, 7, 9, 11]  # D+1,3,5,7,9,11 for clips 3-8
+_QUOTE_OFFSETS = [2, 4, 6]  # D+2,4,6 interleaved with clips
+_MAX_CLIP_SLOTS = 6
+_MAX_QUOTE_SLOTS = 3
 
 # Mapping from slot type / platform to Config fallback hour attribute
 _PLATFORM_HOUR_ATTR = {
@@ -113,23 +117,44 @@ class ContentCalendar:
             },
         )
 
-        # Clip slots: D+2, D+4, D+6 (capped at _MAX_CLIP_SLOTS)
-        clip_paths = (video_clip_paths or [])[:_MAX_CLIP_SLOTS]
-        for idx, clip_path in enumerate(clip_paths):
-            slot_name = f"clip_{idx + 1}"
+        # Clip slots: clips 3-8 get staggered across 2 weeks
+        # (clips 1-2 are uploaded public on D+0 by the pipeline)
+        all_clip_paths = video_clip_paths or []
+        stagger_clips = all_clip_paths[2:]  # skip first 2 (already public)
+        for idx, clip_path in enumerate(stagger_clips[:_MAX_CLIP_SLOTS]):
+            clip_num = idx + 3  # clip_3 through clip_8
+            slot_name = f"clip_{clip_num}"
             day_offset = _CLIP_OFFSETS[idx]
             caption = ""
-            if idx < len(best_clips):
-                caption = best_clips[idx].get("hook_caption", "")
+            clip_idx_in_analysis = clip_num - 1  # 0-indexed into best_clips
+            if clip_idx_in_analysis < len(best_clips):
+                caption = best_clips[clip_idx_in_analysis].get("hook_caption", "")
             slots[slot_name] = self._build_slot(
                 slot_type=slot_name,
                 day_offset=day_offset,
                 release_date=release_date,
-                platforms=["youtube", "twitter"],
-                clip_index=idx,
+                platforms=["youtube", "twitter", "bluesky"],
+                clip_index=clip_idx_in_analysis,
                 content={
                     "caption": caption,
                     "clip_path": clip_path,
+                },
+            )
+
+        # Quote card slots: D+2, D+4, D+6 (interleaved with clips)
+        best_quotes = analysis.get("best_quotes", [])
+        for idx, quote_data in enumerate(best_quotes[:_MAX_QUOTE_SLOTS]):
+            slot_name = f"quote_{idx + 1}"
+            day_offset = _QUOTE_OFFSETS[idx]
+            slots[slot_name] = self._build_slot(
+                slot_type=slot_name,
+                day_offset=day_offset,
+                release_date=release_date,
+                platforms=["twitter", "bluesky"],
+                clip_index=None,
+                content={
+                    "quote_text": quote_data.get("quote", ""),
+                    "timestamp": quote_data.get("timestamp", ""),
                 },
             )
 
@@ -337,11 +362,15 @@ class ContentCalendar:
         slots_info = [
             ("teaser", -1, "twitter"),
             ("episode", 0, "youtube"),
-            ("clip_1", 1, "youtube"),
-            ("clip_2", 2, "youtube"),
-            ("clip_3", 4, "youtube"),
-            ("clip_4", 6, "youtube"),
-            ("clip_5", 8, "youtube"),
+            ("clip_3", 1, "youtube"),
+            ("quote_1", 2, "twitter"),
+            ("clip_4", 3, "youtube"),
+            ("quote_2", 4, "twitter"),
+            ("clip_5", 5, "youtube"),
+            ("quote_3", 6, "twitter"),
+            ("clip_6", 7, "youtube"),
+            ("clip_7", 9, "youtube"),
+            ("clip_8", 11, "youtube"),
         ]
         for slot_type, day_offset, primary_platform in slots_info:
             dt = self._slot_datetime(release_date, day_offset, primary_platform)

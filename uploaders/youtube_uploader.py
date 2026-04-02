@@ -21,7 +21,7 @@ class YouTubeUploader:
     """Handle YouTube uploads with OAuth2 authentication."""
 
     # YouTube API scopes
-    SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+    SCOPES = ["https://www.googleapis.com/auth/youtube"]
 
     # Default token storage path
     TOKEN_PATH = Config.BASE_DIR / "credentials" / "youtube_token.pickle"
@@ -363,6 +363,52 @@ class YouTubeUploader:
 
         except HttpError as e:
             logger.error("Failed to update video: %s", e)
+            return False
+
+    @retry_with_backoff(
+        max_retries=3,
+        base_delay=2.0,
+        retryable_exceptions=(ConnectionError, TimeoutError, OSError),
+    )
+    def set_video_privacy(
+        self,
+        video_id: str,
+        privacy_status: str = "public",
+    ) -> bool:
+        """
+        Change the privacy status of a video.
+
+        Args:
+            video_id: YouTube video ID
+            privacy_status: "public", "private", or "unlisted"
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.youtube:
+            logger.error("YouTube API not authenticated")
+            return False
+
+        try:
+            video = self.youtube.videos().list(part="status", id=video_id).execute()
+
+            if not video["items"]:
+                logger.error("Video not found: %s", video_id)
+                return False
+
+            self.youtube.videos().update(
+                part="status",
+                body={
+                    "id": video_id,
+                    "status": {"privacyStatus": privacy_status},
+                },
+            ).execute()
+
+            logger.info("Set video %s privacy to %s", video_id, privacy_status)
+            return True
+
+        except HttpError as e:
+            logger.error("Failed to set privacy for %s: %s", video_id, e)
             return False
 
     def get_upload_quota_usage(self) -> Dict[str, Any]:

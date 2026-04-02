@@ -113,12 +113,15 @@ def _upload_youtube(
                     )
                 else:
                     try:
+                        # First 2 clips go public immediately; rest are private
+                        # for staggered release via scheduled-content workflow
+                        clip_privacy = "public" if i < 2 else "private"
                         upload_result = uploaders["youtube"].upload_short(
                             video_path=str(video_path),
                             title=metadata["title"],
                             description=metadata["description"],
                             tags=metadata["tags"],
-                            privacy_status="public",
+                            privacy_status=clip_privacy,
                         )
                         if upload_result:
                             youtube_results["clips"].append(upload_result)
