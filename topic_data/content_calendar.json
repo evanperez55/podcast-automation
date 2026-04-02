@@ -1,0 +1,180 @@
+{
+  "ep_1": {
+    "episode_number": 1,
+    "release_date": "2026-03-18T22:51:37.570746",
+    "planned_at": "2026-03-18T22:51:37.571748",
+    "slots": {
+      "episode": {
+        "slot_type": "episode",
+        "day_offset": 0,
+        "scheduled_at": "2026-03-18T14:00:00",
+        "platforms": [
+          "youtube",
+          "twitter"
+        ],
+        "clip_index": null,
+        "content": {
+          "title": "Episode 1",
+          "video_path": null
+        },
+        "status": "uploaded",
+        "uploaded_at": "2026-03-18T22:51:38.822705",
+        "upload_results": {
+          "twitter": {
+            "tweet_id": "2034477876519501953",
+            "tweet_url": "https://twitter.com/i/web/status/2034477876519501953",
+            "text": "Episode 1",
+            "media_count": 0,
+            "status": "success"
+          }
+        }
+      }
+    }
+  },
+  "ep_25": {
+    "episode_number": 25,
+    "release_date": "2026-03-31T19:17:10.991542",
+    "planned_at": "2026-03-31T19:17:10.992542",
+    "slots": {
+      "teaser": {
+        "slot_type": "teaser",
+        "day_offset": -1,
+        "scheduled_at": "2026-03-30T10:00:00",
+        "platforms": [
+          "twitter"
+        ],
+        "clip_index": null,
+        "content": {
+          "caption": "Wait for it..."
+        },
+        "status": "uploaded",
+        "uploaded_at": "2026-03-31T19:19:01.815957",
+        "upload_results": {
+          "twitter": null
+        }
+      },
+      "episode": {
+        "slot_type": "episode",
+        "day_offset": 0,
+        "scheduled_at": "2026-03-31T14:00:00",
+        "platforms": [
+          "youtube",
+          "twitter"
+        ],
+        "clip_index": null,
+        "content": {
+          "title": "Episode 25",
+          "video_path": null
+        },
+        "status": "uploaded",
+        "uploaded_at": "2026-03-31T19:19:03.747001",
+        "upload_results": {
+          "twitter": null
+        }
+      }
+    }
+  },
+  "ep_30": {
+    "episode_number": 30,
+    "release_date": "2026-04-01T20:39:37.400474",
+    "planned_at": "2026-04-01T20:39:37.401480",
+    "slots": {
+      "teaser": {
+        "slot_type": "teaser",
+        "day_offset": -1,
+        "scheduled_at": "2026-03-31T10:00:00",
+        "platforms": [
+          "twitter"
+        ],
+        "clip_index": null,
+        "content": {
+          "caption": "What if a nuke really went off here?"
+        },
+        "status": "uploaded",
+        "uploaded_at": "2026-04-01T21:13:15.029522",
+        "upload_results": {
+          "twitter": null
+        }
+      },
+      "episode": {
+        "slot_type": "episode",
+        "day_offset": 0,
+        "scheduled_at": "2026-04-01T14:00:00",
+        "platforms": [
+          "youtube",
+          "twitter"
+        ],
+        "clip_index": null,
+        "content": {
+          "title": "Episode 30",
+          "video_path": "C:\\Users\\evanp\\projects\\podcast-automation\\output\\ep_30\\ep_30_raw_20260401_201352_episode.mp4"
+        },
+        "status": "uploaded",
+        "uploaded_at": "2026-04-01T21:20:01.789278",
+        "upload_results": {
+          "twitter": null
+        }
+      },
+      "clip_1": {
+        "slot_type": "clip_1",
+        "day_offset": 2,
+        "scheduled_at": "2026-04-03T14:00:00",
+        "platforms": [
+          "youtube",
+          "twitter"
+        ],
+        "clip_index": 0,
+        "content": {
+          "caption": "What if a nuke really went off here?",
+          "clip_path": "C:\\Users\\evanp\\projects\\podcast-automation\\output\\ep_30\\clips\\ep_30_raw_20260401_201352_censored_clip_01_subtitle.mp4",
+          "youtube_url": "https://www.youtube.com/watch?v=7LYxLPpHcHg",
+          "youtube_video_id": "7LYxLPpHcHg",
+          "clip_title": "This Nuke Almost Wiped Out Half the Country"
+        },
+        "status": "pending",
+        "uploaded_at": null,
+        "upload_results": {}
+      },
+      "clip_2": {
+        "slot_type": "clip_2",
+        "day_offset": 4,
+        "scheduled_at": "2026-04-05T14:00:00",
+        "platforms": [
+          "youtube",
+          "twitter"
+        ],
+        "clip_index": 1,
+        "content": {
+          "caption": "When kids just won't leave you alone",
+          "clip_path": "C:\\Users\\evanp\\projects\\podcast-automation\\output\\ep_30\\clips\\ep_30_raw_20260401_201352_censored_clip_02_subtitle.mp4",
+          "youtube_url": "https://www.youtube.com/watch?v=MJWuJACj-bY",
+          "youtube_video_id": "MJWuJACj-bY",
+          "clip_title": "Bullied by Kids on the Pickleball Court"
+        },
+        "status": "pending",
+        "uploaded_at": null,
+        "upload_results": {}
+      },
+      "clip_3": {
+        "slot_type": "clip_3",
+        "day_offset": 6,
+        "scheduled_at": "2026-04-07T14:00:00",
+        "platforms": [
+          "youtube",
+          "twitter"
+        ],
+        "clip_index": 2,
+        "content": {
+          "caption": "Ever met someone who doesn't know the Holocaust?",
+          "clip_path": "C:\\Users\\evanp\\projects\\podcast-automation\\output\\ep_30\\clips\\ep_30_raw_20260401_201352_censored_clip_03_subtitle.mp4",
+          "youtube_url": "https://www.youtube.com/watch?v=Em1SJ_U6qck",
+          "youtube_video_id": "Em1SJ_U6qck",
+          "clip_title": "Appalachia Is Basically Its Own Country"
+        },
+        "status": "pending",
+        "uploaded_at": null,
+        "upload_results": {}
+      }
+    }
+  }
+}
