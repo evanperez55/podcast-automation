@@ -164,6 +164,41 @@ class Config:
 
     # Website Landing Page Generator
     WEBSITE_ENABLED = os.getenv("WEBSITE_ENABLED", "true").lower() == "true"
+    WEBSITE_GITHUB_REPO = os.getenv(
+        "WEBSITE_GITHUB_REPO", "fakeproblemspodcast/fakeproblemspodcast.github.io"
+    )
+    WEBSITE_GITHUB_BRANCH = os.getenv("WEBSITE_GITHUB_BRANCH", "main")
+
+    # Episode Webpage Generator (GitHub Pages per-episode pages)
+    PAGES_ENABLED = os.getenv("PAGES_ENABLED", "true").lower() == "true"
+    GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+    GITHUB_PAGES_REPO = os.getenv("GITHUB_PAGES_REPO", "")
+    GITHUB_PAGES_BRANCH = os.getenv("GITHUB_PAGES_BRANCH", "main")
+    SITE_BASE_URL = os.getenv("SITE_BASE_URL", "")
+
+    # Chapter Generator
+    CHAPTERS_ENABLED = os.getenv("CHAPTERS_ENABLED", "true").lower() == "true"
+
+    # Content Compliance Checker
+    COMPLIANCE_ENABLED = os.getenv("COMPLIANCE_ENABLED", "true").lower() == "true"
+
+    # Compilation Generator
+    COMPILATION_ENABLED = os.getenv("COMPILATION_ENABLED", "true").lower() == "true"
+
+    # Subtitle Clip Generator
+    USE_SUBTITLE_CLIPS = os.getenv("USE_SUBTITLE_CLIPS", "true").lower() == "true"
+    SUBTITLE_FONT_SIZE = int(os.getenv("SUBTITLE_FONT_SIZE", "48"))
+    SUBTITLE_FONT_COLOR = os.getenv("SUBTITLE_FONT_COLOR", "#FFFFFF")
+    SUBTITLE_BG_COLOR = os.getenv("SUBTITLE_BG_COLOR", "#000000")
+    SUBTITLE_ACCENT_COLOR = os.getenv("SUBTITLE_ACCENT_COLOR", "#e94560")
+
+    # YouTube Analytics
+    YOUTUBE_CHANNEL_ID = os.getenv("YOUTUBE_CHANNEL_ID", "")
+
+    # Daily Content Generator (OpenAI mode)
+    DAILY_CONTENT_USE_OPENAI = (
+        os.getenv("DAILY_CONTENT_USE_OPENAI", "true").lower() == "true"
+    )
 
     # Thumbnail Generation
     THUMBNAIL_FONT = os.getenv("THUMBNAIL_FONT")

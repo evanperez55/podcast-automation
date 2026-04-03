@@ -51,6 +51,13 @@ credentials/
 # Per-client credential directories (keep .yaml templates tracked)
 clients/*/
 
+# Test/coverage artifacts
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+
 # IDE
 .vscode/
 .idea/

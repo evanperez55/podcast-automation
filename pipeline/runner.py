@@ -226,10 +226,9 @@ def _init_components(
     # Initialize social media uploaders (optional)
     uploaders = _init_uploaders()
 
-    # Initialize Google Docs topic tracker (optional) - DISABLED FOR NOW
-    # TODO: Re-enable after fixing Google OAuth credentials
+    # Google Docs topic tracker — disabled (requires Google OAuth credentials
+    # in credentials/google_docs_*.json which aren't currently configured)
     topic_tracker = None
-    logger.info("Google Docs topic tracker disabled")
 
     # Initialize new feature modules
     notifier = DiscordNotifier()
