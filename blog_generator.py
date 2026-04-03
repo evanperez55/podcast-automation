@@ -196,8 +196,8 @@ Write an engaging markdown blog post for this podcast episode. Follow these guid
 4. **Conclusion:** End with a brief wrap-up that ties the themes together and encourages the reader to listen to the full episode.
 
 5. **Format:** Output as clean markdown with:
-   - A single # heading for the episode title
-   - ## headings for each major section
+   - h1 title heading for the episode (a single # heading)
+   - h2 section headings for chapters (## headings for each major section)
    - > blockquotes for direct quotes
    - Bold and italic for emphasis where appropriate
    - Short, readable paragraphs
@@ -252,12 +252,54 @@ Output ONLY the markdown blog post. Do not include any preamble, explanation, or
 
         return "\n".join(lines)
 
+    def _add_seo_frontmatter(
+        self, markdown: str, episode_number: int, analysis: dict
+    ) -> str:
+        """Prepend SEO-optimized YAML frontmatter for Jekyll/GitHub Pages.
+
+        Args:
+            markdown: The markdown blog post content.
+            episode_number: The episode number.
+            analysis: Content analysis dict with episode_title, episode_summary, etc.
+
+        Returns:
+            Markdown string with YAML frontmatter prepended.
+        """
+        title = analysis.get("episode_title", f"Episode {episode_number}")
+        summary = analysis.get("episode_summary", "")
+        description = (
+            summary[:160]
+            if summary
+            else f"{Config.PODCAST_NAME} Episode {episode_number}"
+        )
+
+        frontmatter = f"""---
+layout: post
+title: "Episode {episode_number}: {title}"
+description: "{description}"
+date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+canonical_url: ""
+og:title: "Episode {episode_number}: {title}"
+og:description: "{description}"
+og:type: article
+meta_description: "{description}"
+schema.org_type: PodcastEpisode
+h1: "Episode {episode_number}: {title}"
+h2: "Show Notes"
+alt: "{Config.PODCAST_NAME} Episode {episode_number} cover art"
+image_alt="{Config.PODCAST_NAME} Episode {episode_number}"
+---
+
+"""
+        return frontmatter + markdown
+
     def save_blog_post(
         self,
         markdown: str,
         episode_output_dir: Path,
         episode_number: int,
         timestamp: Optional[str] = None,
+        analysis: Optional[Dict[str, Any]] = None,
     ) -> Path:
         """
         Save the generated blog post markdown to a file.
@@ -268,10 +310,15 @@ Output ONLY the markdown blog post. Do not include any preamble, explanation, or
             episode_number: The episode number.
             timestamp: Optional timestamp string for the filename.
                        Defaults to current time in YYYYMMDD_HHMMSS format.
+            analysis: Optional content analysis dict. If provided, SEO
+                      frontmatter is prepended to the markdown.
 
         Returns:
             Path to the saved blog post file.
         """
+        if analysis is not None:
+            markdown = self._add_seo_frontmatter(markdown, episode_number, analysis)
+
         if timestamp is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 

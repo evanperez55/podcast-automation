@@ -23,6 +23,9 @@ class YouTubeUploader:
     # YouTube API scopes
     SCOPES = ["https://www.googleapis.com/auth/youtube"]
 
+    # YouTube SEO: descriptions of 1000+ chars are recommended for discoverability
+    YOUTUBE_SEO_MIN_DESCRIPTION_LENGTH = 200
+
     # Default token storage path
     TOKEN_PATH = Config.BASE_DIR / "credentials" / "youtube_token.pickle"
     CREDENTIALS_PATH = Config.BASE_DIR / "credentials" / "youtube_credentials.json"
@@ -94,6 +97,47 @@ class YouTubeUploader:
         # Build YouTube API client
         self.youtube = build("youtube", "v3", credentials=creds)
 
+    @staticmethod
+    def _append_hashtags(description: str, tags: list) -> str:
+        """Append hashtags to description if not already present.
+
+        Args:
+            description: Video description text.
+            tags: List of tag strings to convert to hashtags.
+
+        Returns:
+            Description with hashtags appended (if none were present).
+        """
+        if not tags or "#" in description:
+            return description
+        hashtags = " ".join(f"#{tag.replace(' ', '')}" for tag in tags[:15])
+        return f"{description.rstrip()}\n\n{hashtags}"
+
+    def _ensure_min_description_length(
+        self, description: str, title: str, episode_info: str = ""
+    ) -> str:
+        """Pad description to YouTube SEO minimum length if needed.
+
+        YouTube SEO: descriptions should be at least 200 chars; 1000+ chars
+        are recommended for optimal discoverability.
+
+        Args:
+            description: Current description text.
+            title: Video title for padding context.
+            episode_info: Additional episode info to pad with.
+
+        Returns:
+            Description padded to at least YOUTUBE_SEO_MIN_DESCRIPTION_LENGTH chars.
+        """
+        if len(description) >= self.YOUTUBE_SEO_MIN_DESCRIPTION_LENGTH:
+            return description
+        padding = f"\n\n{title}"
+        if episode_info:
+            padding += f" | {episode_info}"
+        padding += f" | {Config.PODCAST_NAME}"
+        description = description.rstrip() + padding
+        return description
+
     def upload_episode(
         self,
         video_path: str,
@@ -134,6 +178,10 @@ class YouTubeUploader:
         logger.info("Uploading episode to YouTube: %s", video_path.name)
         logger.info("Title: %s", title)
         logger.info("Privacy: %s", privacy_status)
+
+        # SEO: append hashtags and ensure minimum description length
+        description = self._append_hashtags(description, tags or [])
+        description = self._ensure_min_description_length(description, title)
 
         # Prepare video metadata
         body = {
@@ -261,6 +309,10 @@ class YouTubeUploader:
         # Ensure #Shorts is in the title or description
         if "#Shorts" not in title and "#Shorts" not in description:
             title = f"{title} #Shorts"
+
+        # SEO: append hashtags and ensure minimum description length
+        description = self._append_hashtags(description, tags or [])
+        description = self._ensure_min_description_length(description, title)
 
         # Use same upload method as regular video
         # YouTube automatically detects Shorts based on duration and aspect ratio
