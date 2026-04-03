@@ -26,6 +26,7 @@ The full episode processing pipeline runs 18 steps in order:
 | 7.5 | RSS Feed | `rss_feed_generator.py` | Update `podcast_feed.xml` for Spotify/Apple |
 | 8 | Platform Uploads | `uploaders/*` | Upload to YouTube, Twitter, Bluesky, Instagram, TikTok |
 | 8.5 | Blog Post | `blog_generator.py` | Generate blog post from transcript + analysis |
+| 8.8 | Website | `website_generator.py` | Update GitHub Pages landing page with latest episode data |
 | 9 | Search Index | `search_index.py` | Index transcript into SQLite FTS5 |
 
 ## Pipeline Flowchart
@@ -48,7 +49,8 @@ flowchart TD
     M --> N[Step 7.5: RSS Feed Update]
     N --> O[Step 8: Platform Uploads]
     O --> P[Step 8.5: Blog Post]
-    P --> Q[Step 9: Search Index]
+    P --> P2[Step 8.8: Website Update]
+    P2 --> Q[Step 9: Search Index]
 
     O --> O1[YouTube]
     O --> O2[Twitter/X]
@@ -107,6 +109,7 @@ flowchart TD
 | `episode_webpage_generator.py` | Episode webpage generation (GitHub Pages) |
 | `content_calendar.py` | 2-week content calendar with staggered posting |
 | `daily_content_generator.py` | Daily content scheduling |
+| `website_generator.py` | GitHub Pages landing page generator and deployer |
 | `content_compliance_checker.py` | Content compliance validation |
 
 ### Distribution
@@ -192,7 +195,8 @@ output/ep_N/{stem}_mp3.mp3              -- Step 6: final MP3
 Dropbox (finished folder)              -- Step 7: uploaded MP3
 output/podcast_feed.xml                -- Step 7.5: RSS feed
 YouTube / Twitter / Bluesky / etc.     -- Step 8: platform uploads
-output/ep_N/{stem}_blog.html           -- Step 8.5: blog post
+output/ep_N/{stem}_blog.html           -- Step 8.5: blog post (HTML sanitized)
+fakeproblemspodcast.github.io          -- Step 8.8: website landing page
 output/episode_search.db               -- Step 9: FTS5 index
 ```
 
@@ -296,6 +300,33 @@ Delays are configurable via `SCHEDULE_{PLATFORM}_DELAY_HOURS` env vars.
 ### Discord Notifications
 
 `notifications.py` sends webhook notifications for pipeline events (episode processed, uploads completed, errors). Enabled only when `DISCORD_WEBHOOK_URL` is set.
+
+### GitHub Actions Automation
+
+Two GitHub Actions workflows automate content distribution:
+
+| Workflow | File | Schedule | Purpose |
+|----------|------|----------|---------|
+| Scheduled Content Posting | `.github/workflows/scheduled-content.yml` | Daily 10 AM ET | Posts pending content calendar slots (YouTube Shorts, Twitter, Bluesky), commits calendar state updates |
+| Daily Fake Problem | `.github/workflows/daily-content.yml` | Daily 12 PM ET | Generates and posts daily content via OpenAI + Twitter |
+
+Both workflows support `workflow_dispatch` for manual triggering and upload run artifacts for debugging.
+
+### Website Generator
+
+`website_generator.py` (Step 8.8) rebuilds the static landing page for [fakeproblemspodcast.com](https://fakeproblemspodcast.com) after each episode is processed. It collects all episode analysis files, generates an HTML index page, and deploys it to the GitHub Pages repository (`fakeproblemspodcast/fakeproblemspodcast.github.io`) via the GitHub API. Gated by `WEBSITE_ENABLED` and requires `GITHUB_TOKEN`.
+
+## Security
+
+A full security audit was completed on 2026-04-03 covering all Python source files. Results:
+
+- **0 Critical, 0 High, 1 Medium, 7 Low** findings across 20 vectors tested
+- **STRIDE coverage:** 5/6 categories | **OWASP coverage:** 8/10 categories
+- **Medium finding (fixed):** Blog generator HTML sanitization -- LLM-generated markdown is now sanitized via `_sanitize_html()` before saving to prevent XSS from prompt injection or hallucinated script tags
+- **Accepted risks:** Pickle deserialization for YouTube tokens (local files only), no request timeouts on some uploaders (self-DoS only), static API credentials (standard for Twitter/Bluesky)
+- All SQL queries are parameterized, all YAML uses `safe_load`, all HTML generation escapes dynamic content, subprocess calls use list form
+
+Full audit report: `security/260403-1430-full-pipeline-audit/`
 
 ## Error Handling Strategy
 
