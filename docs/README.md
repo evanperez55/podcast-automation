@@ -1,11 +1,11 @@
 # Podcast Automation
 
-Automated production pipeline for podcast episodes. Handles the full workflow from raw audio to multi-platform distribution: transcription, AI-powered content analysis, automatic censorship, clip generation, video conversion, and uploads to YouTube, Twitter/X, Bluesky, Instagram, TikTok, and Spotify.
+Automated production pipeline for podcast episodes. Handles the full workflow from raw audio to multi-platform distribution: transcription, AI-powered content analysis, automatic censorship, clip generation, video conversion, and uploads to YouTube, Twitter/X, Bluesky, Instagram, TikTok, and Spotify. Auto-updates the podcast website at [fakeproblemspodcast.com](https://fakeproblemspodcast.com) via GitHub Pages.
 
-Built for the **Fake Problems Podcast**, with multi-client support for additional podcasts.
+Built for the **Fake Problems Podcast**, with multi-client support for additional podcasts via YAML configuration.
 
 <!-- Badges -->
-<!-- ![Tests](https://img.shields.io/badge/tests-1255%2B-green) -->
+<!-- ![Tests](https://img.shields.io/badge/tests-1262%2B-green) -->
 <!-- ![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen) -->
 
 ## Quick Start
@@ -37,7 +37,7 @@ Raw Audio --> Transcribe --> Analyze --> Censor --> Clips --> Video --> Upload
                 (Whisper)   (GPT-4o)   (beep)    (8x)     (MP4)   (6 platforms)
 ```
 
-**18-step pipeline** with checkpoint/resume:
+**19-step pipeline** with checkpoint/resume:
 
 1. Download raw audio (Dropbox, RSS, or local)
 2. Transcribe with Whisper/WhisperX (word-level timestamps)
@@ -48,7 +48,7 @@ Raw Audio --> Transcribe --> Analyze --> Censor --> Clips --> Video --> Upload
 7. Generate subtitles, vertical video, thumbnails
 8. Export MP3, update RSS feed
 9. Upload to YouTube, Twitter/X, Bluesky, Instagram, TikTok
-10. Generate blog post, index for search
+10. Generate blog post, update website, index for search
 
 ## Commands
 
@@ -74,8 +74,10 @@ uv run main.py health-check        # Validate all API credentials
 | Video | FFmpeg (h264_nvenc GPU encoding) |
 | Image | Pillow |
 | Platforms | YouTube API, Twitter/X API, Bluesky AT Protocol, Instagram Graph API, TikTok API |
+| Website | GitHub Pages (auto-deployed via GitHub API) |
 | Storage | Dropbox API, SQLite FTS5 |
-| Testing | pytest (1,255+ tests, ~94% coverage) |
+| CI/CD | GitHub Actions (scheduled content posting, daily content) |
+| Testing | pytest (1,262+ tests, ~94% coverage) |
 | Linting | ruff (lint + format, pre-commit enforced) |
 | Package Mgr | uv |
 
@@ -86,7 +88,7 @@ main.py                  CLI entry point + orchestration
 config.py                Central configuration (env vars)
 pipeline/                Pipeline runner + step modules
 uploaders/               Platform upload clients (7 platforms)
-tests/                   55 test files, 1,255+ tests
+tests/                   54 test files, 1,262+ tests
 output/                  Processed episode artifacts
 clips/                   Generated short clips
 ```
