@@ -148,20 +148,10 @@ def _init_components(
     from content_editor import ContentEditor
     from audio_processor import AudioProcessor
     from video_converter import VideoConverter
-    from uploaders import (  # noqa: F401
-        YouTubeUploader,
-        InstagramUploader,
-        TikTokUploader,
-        TwitterUploader,
-        SpotifyUploader,
-        BlueskyUploader,
-        RedditUploader,
-    )
     from notifications import DiscordNotifier
     from scheduler import UploadScheduler
     from blog_generator import BlogPostGenerator
     from thumbnail_generator import ThumbnailGenerator
-    from analytics import AnalyticsCollector, TopicEngagementScorer  # noqa: F401
 
     print("=" * 60)
     print(f"{Config.PODCAST_NAME.upper()} AUTOMATION")
@@ -284,45 +274,14 @@ def _init_components(
 def _load_scored_topics():
     """Load the most recent scored topics from topic_data/ directory.
 
+    Delegates to pipeline.steps.analysis._load_scored_topics.
+
     Returns:
         List of topic dicts with 'topic', 'score', 'category', or None if unavailable
     """
-    topic_dir = Config.BASE_DIR / "topic_data"
-    if not topic_dir.exists():
-        return None
+    from pipeline.steps.analysis import _load_scored_topics as _load
 
-    # Find the most recent scored_topics file
-    scored_files = sorted(topic_dir.glob("scored_topics_*.json"), reverse=True)
-    if not scored_files:
-        return None
-
-    try:
-        with open(scored_files[0], "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        # Flatten topics from all categories into a single ranked list
-        topics = []
-        for category, category_topics in data.get("topics_by_category", {}).items():
-            for t in category_topics:
-                score = t.get("score", {})
-                if isinstance(score, dict) and score.get("recommended", False):
-                    topics.append(
-                        {
-                            "topic": t.get("title", ""),
-                            "score": score.get("total", 0),
-                            "category": score.get("category", category),
-                        }
-                    )
-
-        # Sort by score descending
-        topics.sort(key=lambda x: x["score"], reverse=True)
-        logger.info(
-            "Loaded %d scored topics from %s", len(topics), scored_files[0].name
-        )
-        return topics if topics else None
-    except (json.JSONDecodeError, KeyError) as e:
-        logger.warning("Failed to load scored topics: %s", e)
-        return None
+    return _load()
 
 
 def _acquire_pipeline_lock():

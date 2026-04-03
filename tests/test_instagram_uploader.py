@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import Mock, patch
 import requests
 
-from uploaders.instagram_uploader import InstagramUploader, create_instagram_caption
+from uploaders.instagram_uploader import InstagramUploader
 from config import Config
 
 
@@ -178,106 +178,6 @@ class TestInstagramUploader:
         assert info is not None
         assert info["username"] == "testuser"
         assert info["followers_count"] == 1000
-
-
-class TestCreateInstagramCaption:
-    """Test cases for create_instagram_caption function."""
-
-    @patch.object(Config, "PODCAST_NAME", "Test Podcast")
-    def test_create_caption_basic(self):
-        """Test basic caption creation."""
-        caption = create_instagram_caption(
-            episode_number=25,
-            clip_title="Funny Moment",
-            social_caption="This was hilarious!",
-            hashtags=None,
-        )
-
-        assert "Funny Moment" in caption
-        assert "This was hilarious!" in caption
-        assert "Episode 25" in caption
-        assert "#podcast" in caption
-
-    @patch.object(Config, "PODCAST_NAME", "Test Podcast")
-    def test_create_caption_custom_hashtags(self):
-        """Test caption with custom hashtags."""
-        caption = create_instagram_caption(
-            episode_number=1,
-            clip_title="Test",
-            social_caption="Caption",
-            hashtags=["custom", "tags"],
-        )
-
-        assert "#custom" in caption
-        assert "#tags" in caption
-
-    @patch.object(Config, "PODCAST_NAME", "Test Podcast")
-    def test_caption_length_limit(self):
-        """Test caption respects Instagram length limit."""
-        long_caption = "A" * 3000
-
-        caption = create_instagram_caption(
-            episode_number=1,
-            clip_title="Test",
-            social_caption=long_caption,
-            hashtags=None,
-        )
-
-        assert len(caption) <= 2200
-
-
-class TestCreateInstagramCaptionNewFields:
-    """Test cases for hook_caption and clip_hashtags in create_instagram_caption."""
-
-    @patch.object(Config, "PODCAST_NAME", "Test Podcast")
-    def test_hook_caption_prepended(self):
-        """Test that hook_caption is prepended to caption."""
-        caption = create_instagram_caption(
-            episode_number=25,
-            clip_title="Funny Moment",
-            social_caption="This was hilarious!",
-            hook_caption="Wait for it...",
-        )
-        assert caption.startswith("Wait for it...")
-        assert "Funny Moment" in caption
-
-    @patch.object(Config, "PODCAST_NAME", "Test Podcast")
-    def test_no_hook_caption(self):
-        """Test caption without hook_caption starts with clip_title."""
-        caption = create_instagram_caption(
-            episode_number=25,
-            clip_title="Funny Moment",
-            social_caption="This was hilarious!",
-        )
-        assert caption.startswith("Funny Moment")
-
-    @patch.object(Config, "PODCAST_NAME", "Test Podcast")
-    def test_clip_hashtags_used_when_no_explicit(self):
-        """Test that clip_hashtags are used when no explicit hashtags provided."""
-        caption = create_instagram_caption(
-            episode_number=25,
-            clip_title="Test",
-            social_caption="Caption",
-            clip_hashtags=["ai", "funny", "viral"],
-        )
-        assert "#ai" in caption
-        assert "#funny" in caption
-        assert "#viral" in caption
-        # Should NOT have default hashtags
-        assert "#podcastrecommendations" not in caption
-
-    @patch.object(Config, "PODCAST_NAME", "Test Podcast")
-    def test_explicit_hashtags_override_clip_hashtags(self):
-        """Test that explicit hashtags take priority over clip_hashtags."""
-        caption = create_instagram_caption(
-            episode_number=25,
-            clip_title="Test",
-            social_caption="Caption",
-            hashtags=["explicit"],
-            clip_hashtags=["clip_tag"],
-        )
-        assert "#explicit" in caption
-        assert "#clip_tag" not in caption
 
 
 class TestInstagramFunctionalFlag:

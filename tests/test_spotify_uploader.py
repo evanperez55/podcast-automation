@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import Mock, patch
 from datetime import datetime
 
-from uploaders.spotify_uploader import SpotifyUploader, create_spotify_episode_data
+from uploaders.spotify_uploader import SpotifyUploader
 from config import Config
 
 
@@ -74,50 +74,6 @@ class TestSpotifyUploader:
         assert "<item>" in rss_item
         assert "No Date Episode" in rss_item
         assert "00:30:00" in rss_item
-
-
-class TestCreateSpotifyEpisodeData:
-    """Test cases for create_spotify_episode_data function."""
-
-    @patch.object(Config, "PODCAST_NAME", "Test Podcast")
-    @patch("pathlib.Path.exists")
-    def test_create_episode_data(self, mock_exists):
-        """Test episode data creation."""
-        mock_exists.return_value = True
-
-        with patch("pathlib.Path.stat") as mock_stat:
-            mock_stat.return_value = Mock(st_size=10000000)
-
-            data = create_spotify_episode_data(
-                episode_number=1,
-                episode_summary="Test summary",
-                audio_url="https://example.com/audio.mp3",
-                audio_file_path=__file__,
-                duration_seconds=3600,
-            )
-
-            assert data["episode_number"] == 1
-            assert "Episode 1" in data["title"]
-            assert data["description"] == "Test summary"
-            assert data["audio_url"] == "https://example.com/audio.mp3"
-            assert data["audio_file_size"] == 10000000
-            assert data["duration_seconds"] == 3600
-
-    @patch.object(Config, "PODCAST_NAME", "Test Podcast")
-    @patch("pathlib.Path.exists")
-    def test_create_episode_data_missing_file(self, mock_exists):
-        """Test episode data with missing file."""
-        mock_exists.return_value = False
-
-        data = create_spotify_episode_data(
-            episode_number=1,
-            episode_summary="Test",
-            audio_url="https://example.com/audio.mp3",
-            audio_file_path="/nonexistent/file.mp3",
-            duration_seconds=3600,
-        )
-
-        assert data["audio_file_size"] == 0
 
 
 class TestUpdateRssFeed:

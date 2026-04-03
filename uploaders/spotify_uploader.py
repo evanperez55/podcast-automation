@@ -298,37 +298,3 @@ class SpotifyUploader:
 </rss>"""
 
         return rss_header + rss_items + rss_footer
-
-
-def create_spotify_episode_data(
-    episode_number: int,
-    episode_summary: str,
-    audio_url: str,
-    audio_file_path: str,
-    duration_seconds: int,
-) -> Dict[str, Any]:
-    """
-    Create episode data for RSS feed generation.
-
-    Args:
-        episode_number: Episode number
-        episode_summary: Episode summary
-        audio_url: Public URL to audio file
-        audio_file_path: Local path to audio file (for size)
-        duration_seconds: Episode duration
-
-    Returns:
-        Dictionary with episode data for RSS generation
-    """
-    audio_path = Path(audio_file_path)
-    file_size = audio_path.stat().st_size if audio_path.exists() else 0
-
-    return {
-        "episode_number": episode_number,
-        "title": f"{Config.PODCAST_NAME} - Episode {episode_number}",
-        "description": episode_summary,
-        "audio_url": audio_url,
-        "audio_file_size": file_size,
-        "duration_seconds": duration_seconds,
-        "pub_date": datetime.now(),
-    }

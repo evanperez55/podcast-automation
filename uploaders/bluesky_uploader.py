@@ -324,35 +324,6 @@ class BlueskyUploader:
         )
 
 
-def create_bluesky_caption(
-    clip_title: str, social_caption: str, hashtags: Optional[list] = None
-) -> str:
-    """
-    Create a Bluesky caption within character limits.
-
-    Args:
-        clip_title: Title of the clip
-        social_caption: Caption from AI analysis
-        hashtags: Optional list of hashtags
-
-    Returns:
-        Formatted caption string (max 300 characters)
-    """
-    if not hashtags:
-        hashtags = ["podcast", "comedy"]
-
-    caption = f"{clip_title}\n\n{social_caption}"
-    hashtag_str = " ".join(f"#{tag}" for tag in hashtags)
-    full_caption = f"{caption}\n\n{hashtag_str}"
-
-    if len(full_caption) > 300:
-        if len(caption) <= 300:
-            return caption[:300]
-        return caption[:297] + "..."
-
-    return full_caption
-
-
 def _iso_now():
     """Return current UTC time in ISO 8601 format."""
     from datetime import datetime, timezone

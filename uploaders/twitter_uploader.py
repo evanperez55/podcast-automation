@@ -381,39 +381,3 @@ class TwitterUploader:
         except tweepy.TweepyException as e:
             logger.error("Failed to delete tweet: %s", e)
             return False
-
-
-def create_twitter_caption(
-    clip_title: str, social_caption: str, hashtags: Optional[list] = None
-) -> str:
-    """
-    Create a Twitter caption within character limits.
-
-    Args:
-        clip_title: Title of the clip
-        social_caption: Caption from Claude analysis
-        hashtags: Optional list of hashtags
-
-    Returns:
-        Formatted caption string (max 280 characters)
-    """
-    # Default hashtags if none provided
-    if not hashtags:
-        hashtags = ["podcast", "comedy", "fakeproblems"]
-
-    # Build caption
-    caption = f"{clip_title}\n\n{social_caption}"
-
-    # Add hashtags if space allows
-    hashtag_str = " ".join(f"#{tag}" for tag in hashtags)
-    full_caption = f"{caption}\n\n{hashtag_str}"
-
-    # Trim if too long
-    if len(full_caption) > 280:
-        # Try without hashtags
-        if len(caption) <= 280:
-            return caption[:280]
-        # Trim caption
-        return caption[:277] + "..."
-
-    return full_caption

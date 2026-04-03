@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import Mock, patch
 from pathlib import Path
 
-from uploaders.tiktok_uploader import TikTokUploader, create_tiktok_caption
+from uploaders.tiktok_uploader import TikTokUploader
 from config import Config
 
 
@@ -159,89 +159,6 @@ class TestTikTokUploader:
         assert info is not None
         assert info["display_name"] == "Test User"
         assert info["follower_count"] == 1000
-
-
-class TestCreateTikTokCaption:
-    """Test cases for create_tiktok_caption function."""
-
-    def test_create_caption_basic(self):
-        """Test basic caption creation."""
-        caption = create_tiktok_caption(
-            clip_title="Funny Moment",
-            social_caption="This was hilarious!",
-            hashtags=None,
-        )
-
-        assert "Funny Moment" in caption
-        assert "#podcast" in caption
-        assert "#fyp" in caption
-
-    def test_create_caption_custom_hashtags(self):
-        """Test caption with custom hashtags."""
-        caption = create_tiktok_caption(
-            clip_title="Test", social_caption="Caption", hashtags=["custom", "tags"]
-        )
-
-        assert "#custom" in caption
-        assert "#tags" in caption
-
-    def test_caption_length_limit(self):
-        """Test caption respects TikTok length limit."""
-        long_title = "A" * 200
-
-        caption = create_tiktok_caption(
-            clip_title=long_title, social_caption="Caption", hashtags=None
-        )
-
-        assert len(caption) <= 150
-
-    def test_caption_without_social_caption(self):
-        """Test caption works without social_caption."""
-        caption = create_tiktok_caption(clip_title="Short Title")
-
-        assert "Short Title" in caption
-        assert len(caption) <= 150
-
-
-class TestCreateTikTokCaptionHook:
-    """Test cases for hook_caption in create_tiktok_caption."""
-
-    def test_hook_caption_used_as_primary_text(self):
-        """Test that short hook_caption is used as primary text."""
-        caption = create_tiktok_caption(
-            clip_title="Long Clip Title That Is Boring",
-            hook_caption="Wait for it...",
-        )
-        assert "Wait for it..." in caption
-        assert "Long Clip Title" not in caption
-
-    def test_long_hook_caption_ignored(self):
-        """Test that hook_caption >= 80 chars falls back to clip_title."""
-        long_hook = "A" * 80
-        caption = create_tiktok_caption(
-            clip_title="Short Title",
-            hook_caption=long_hook,
-        )
-        assert "Short Title" in caption
-        assert long_hook not in caption
-
-    def test_hook_caption_none_uses_title(self):
-        """Test that None hook_caption uses clip_title."""
-        caption = create_tiktok_caption(
-            clip_title="Clip Title",
-            hook_caption=None,
-        )
-        assert "Clip Title" in caption
-
-    def test_hook_caption_with_custom_hashtags(self):
-        """Test hook_caption with custom hashtags."""
-        caption = create_tiktok_caption(
-            clip_title="Title",
-            hook_caption="This is wild",
-            hashtags=["custom"],
-        )
-        assert "This is wild" in caption
-        assert "#custom" in caption
 
 
 class TestTikTokFunctionalFlag:
@@ -560,24 +477,6 @@ class TestWaitForPublishEdgeCases:
         assert result is None
         # 30 polling attempts + 1 initial sleep
         assert mock_sleep.call_count == 31
-
-
-class TestCreateTikTokCaptionLastResort:
-    """Test for create_tiktok_caption last resort truncation path."""
-
-    def test_caption_last_resort_truncation(self):
-        """Falls back to primary_text[:150] when hashtags leave no room."""
-        # Use many long hashtags so hashtag_str is very long (max_title_len <= 10)
-        long_hashtags = [f"verylonghashtag{i:03d}" for i in range(20)]
-        long_title = "A" * 200
-
-        caption = create_tiktok_caption(
-            clip_title=long_title,
-            hashtags=long_hashtags,
-        )
-
-        assert len(caption) == 150
-        assert caption == "A" * 150
 
 
 if __name__ == "__main__":

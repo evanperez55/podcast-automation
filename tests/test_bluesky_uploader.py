@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
-from uploaders.bluesky_uploader import BlueskyUploader, create_bluesky_caption
+from uploaders.bluesky_uploader import BlueskyUploader
 
 
 MOCK_SESSION = {
@@ -504,35 +504,6 @@ class TestPostWithImage:
         uploader.session = MOCK_SESSION
         result = uploader.post_with_image("Hello!", "/img.png")
         assert result is None
-
-
-class TestCreateBlueskyCaption:
-    """Tests for create_bluesky_caption helper."""
-
-    def test_caption_within_limits(self):
-        """Caption under 300 chars includes hashtags."""
-        result = create_bluesky_caption("Title", "Description")
-        assert "#podcast" in result
-        assert len(result) <= 300
-
-    def test_caption_truncated(self):
-        """Long caption is truncated to 300 chars."""
-        result = create_bluesky_caption("Title", "x" * 500)
-        assert len(result) <= 300
-        assert result.endswith("...")
-
-    def test_custom_hashtags(self):
-        """Custom hashtags are used when provided."""
-        result = create_bluesky_caption("Title", "Desc", hashtags=["custom"])
-        assert "#custom" in result
-
-    def test_caption_over_300_but_without_hashtags_fits(self):
-        """Caption without hashtags fits under 300 — returns without hashtags."""
-        # Create a caption that is >300 with hashtags but <=300 without
-        caption_text = "x" * 290
-        result = create_bluesky_caption("T", caption_text)
-        # Should be truncated to 300 chars (caption without hashtags)
-        assert len(result) <= 300
 
 
 if __name__ == "__main__":

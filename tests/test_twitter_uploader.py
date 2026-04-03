@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import Mock, patch
 
-from uploaders.twitter_uploader import TwitterUploader, create_twitter_caption
+from uploaders.twitter_uploader import TwitterUploader
 from config import Config
 
 
@@ -175,51 +175,6 @@ class TestTwitterUploader:
         assert info is not None
         assert info["username"] == "testuser"
         assert info["followers"] == 1000
-
-
-class TestCreateTwitterCaption:
-    """Test cases for create_twitter_caption function."""
-
-    def test_create_caption_basic(self):
-        """Test basic caption creation."""
-        caption = create_twitter_caption(
-            clip_title="Funny Moment",
-            social_caption="This was hilarious!",
-            hashtags=None,
-        )
-
-        assert "Funny Moment" in caption
-        assert "This was hilarious!" in caption
-        assert "#podcast" in caption
-
-    def test_create_caption_custom_hashtags(self):
-        """Test caption with custom hashtags."""
-        caption = create_twitter_caption(
-            clip_title="Test", social_caption="Caption", hashtags=["custom"]
-        )
-
-        assert "#custom" in caption
-
-    def test_caption_length_limit(self):
-        """Test caption respects Twitter length limit."""
-        long_caption = "A" * 300
-
-        caption = create_twitter_caption(
-            clip_title="Test", social_caption=long_caption, hashtags=None
-        )
-
-        assert len(caption) <= 280
-
-    def test_caption_trimming(self):
-        """Test caption is trimmed when too long."""
-        long_text = "A" * 300
-
-        caption = create_twitter_caption(
-            clip_title=long_text, social_caption="", hashtags=["tag1", "tag2", "tag3"]
-        )
-
-        assert len(caption) <= 280
-        assert caption.endswith("...")
 
 
 class TestPostEpisodeAnnouncementAICaption:
@@ -874,23 +829,6 @@ class TestDeleteTweet:
         result = uploader.delete_tweet("99999")
 
         assert result is False
-
-
-class TestCreateTwitterCaptionEdgeCases:
-    """Test edge cases for create_twitter_caption function."""
-
-    def test_caption_without_hashtags_when_only_caption_fits(self):
-        """Returns caption without hashtags when caption alone fits but with hashtags does not."""
-        clip_title = "Title"
-        social_caption = "X" * 260
-        caption = create_twitter_caption(
-            clip_title=clip_title,
-            social_caption=social_caption,
-            hashtags=["verylonghashtag", "anotherlongone"],
-        )
-
-        assert "#" not in caption
-        assert len(caption) <= 280
 
 
 if __name__ == "__main__":

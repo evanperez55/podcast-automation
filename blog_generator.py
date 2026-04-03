@@ -1,8 +1,6 @@
 """Blog post generator for podcast episodes using LLM-powered content transformation."""
 
-import json  # noqa: F401
 import os
-import re  # noqa: F401
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, Any

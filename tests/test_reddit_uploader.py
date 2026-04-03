@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 
 import praw
 
-from uploaders.reddit_uploader import RedditUploader, create_reddit_caption
+from uploaders.reddit_uploader import RedditUploader
 
 
 class TestRedditUploaderInit:
@@ -256,30 +256,6 @@ class TestRedditEpisodeAnnouncement:
         calls = mock_post.call_args_list
         assert calls[0].kwargs["subreddit"] == "custom1"
         assert calls[1].kwargs["subreddit"] == "custom2"
-
-
-class TestCreateRedditCaption:
-    """Tests for create_reddit_caption helper."""
-
-    def test_caption_with_youtube(self):
-        """Caption includes YouTube link."""
-        result = create_reddit_caption(
-            30, "Test Episode", "Summary", "https://youtube.com/watch?v=abc"
-        )
-        assert "Episode 30" in result
-        assert "https://youtube.com/watch?v=abc" in result
-        assert "Test Episode" in result
-
-    def test_caption_without_youtube(self):
-        """Caption without YouTube link omits watch link."""
-        result = create_reddit_caption(30, "Test Episode", "Summary")
-        assert "Episode 30" in result
-        assert "Watch" not in result
-
-    def test_caption_has_discussion_prompt(self):
-        """Caption includes discussion prompt."""
-        result = create_reddit_caption(30, "Test", "Summary")
-        assert "thoughts" in result.lower()
 
 
 if __name__ == "__main__":

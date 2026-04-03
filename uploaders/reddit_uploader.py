@@ -203,29 +203,3 @@ class RedditUploader:
                 results.append(result)
 
         return results
-
-
-def create_reddit_caption(
-    episode_number: int,
-    episode_title: str,
-    episode_summary: str,
-    youtube_url: Optional[str] = None,
-) -> str:
-    """
-    Create a Reddit post body for an episode.
-
-    Args:
-        episode_number: Episode number
-        episode_title: Episode title
-        episode_summary: Episode summary
-        youtube_url: Optional YouTube URL
-
-    Returns:
-        Formatted post body (markdown)
-    """
-    body = f"# Episode {episode_number}: {episode_title}\n\n"
-    body += f"{episode_summary}\n\n"
-    if youtube_url:
-        body += f"**Watch/Listen:** {youtube_url}\n\n"
-    body += "---\n*What did you think? Drop your thoughts below!*"
-    return body
