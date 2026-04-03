@@ -243,3 +243,61 @@ class TestBlogVoicePrompt:
         assert first_message["role"] == "system", (
             f"First message must have role='system', got role='{first_message['role']}'"
         )
+
+
+class TestSanitizeHtml:
+    """Tests for _sanitize_html stripping dangerous tags."""
+
+    def test_strips_script_tags(self):
+        """Script tags are removed from markdown."""
+        gen = BlogPostGenerator.__new__(BlogPostGenerator)
+        md = 'Hello <script>alert("xss")</script> world'
+        assert "<script>" not in gen._sanitize_html(md)
+        assert "Hello" in gen._sanitize_html(md)
+        assert "world" in gen._sanitize_html(md)
+
+    def test_strips_iframe(self):
+        """Iframe tags are removed."""
+        gen = BlogPostGenerator.__new__(BlogPostGenerator)
+        md = 'Text <iframe src="http://evil.com"></iframe> more'
+        result = gen._sanitize_html(md)
+        assert "<iframe" not in result
+        assert "Text" in result
+
+    def test_strips_style_tags(self):
+        """Style tags are removed."""
+        gen = BlogPostGenerator.__new__(BlogPostGenerator)
+        md = "Text <style>body{display:none}</style> more"
+        result = gen._sanitize_html(md)
+        assert "<style>" not in result
+
+    def test_preserves_safe_tags(self):
+        """Safe formatting tags are preserved."""
+        gen = BlogPostGenerator.__new__(BlogPostGenerator)
+        md = "**<strong>bold</strong>** and <em>italic</em> and <a href='#'>link</a>"
+        result = gen._sanitize_html(md)
+        assert "<strong>" in result
+        assert "<em>" in result
+        assert "<a href" in result
+
+    def test_preserves_headings(self):
+        """Heading tags are preserved."""
+        gen = BlogPostGenerator.__new__(BlogPostGenerator)
+        md = "<h2>Section</h2> <h3>Subsection</h3>"
+        result = gen._sanitize_html(md)
+        assert "<h2>" in result
+        assert "<h3>" in result
+
+    def test_strips_event_handlers(self):
+        """Tags with event handlers are removed."""
+        gen = BlogPostGenerator.__new__(BlogPostGenerator)
+        md = '<div onload="alert(1)">content</div>'
+        result = gen._sanitize_html(md)
+        assert "onload" not in result
+
+    def test_case_insensitive(self):
+        """Stripping works regardless of case."""
+        gen = BlogPostGenerator.__new__(BlogPostGenerator)
+        md = "<SCRIPT>alert(1)</SCRIPT>"
+        result = gen._sanitize_html(md)
+        assert "<SCRIPT>" not in result

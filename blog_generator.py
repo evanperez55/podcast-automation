@@ -1,6 +1,7 @@
 """Blog post generator for podcast episodes using LLM-powered content transformation."""
 
 import os
+import re
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, Any
@@ -291,6 +292,25 @@ image_alt="{Config.PODCAST_NAME} Episode {episode_number}"
 """
         return frontmatter + markdown
 
+    @staticmethod
+    def _sanitize_html(markdown: str) -> str:
+        """Strip unsafe HTML tags from LLM-generated markdown.
+
+        Allows safe formatting tags (headings, bold, italic, links, lists,
+        blockquotes, code blocks) while removing script, iframe, style,
+        event handlers, and other potentially dangerous HTML.
+        """
+        safe_tags = (
+            r"b|i|em|strong|a|blockquote|code|pre|"
+            r"h[1-6]|ul|ol|li|p|br|hr|img|table|thead|tbody|tr|th|td"
+        )
+        return re.sub(
+            rf"<(?!/?\s*(?:{safe_tags})\b)[^>]+>",
+            "",
+            markdown,
+            flags=re.IGNORECASE,
+        )
+
     def save_blog_post(
         self,
         markdown: str,
@@ -314,6 +334,8 @@ image_alt="{Config.PODCAST_NAME} Episode {episode_number}"
         Returns:
             Path to the saved blog post file.
         """
+        markdown = self._sanitize_html(markdown)
+
         if analysis is not None:
             markdown = self._add_seo_frontmatter(markdown, episode_number, analysis)
 
