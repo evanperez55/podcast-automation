@@ -14,7 +14,7 @@ class ThumbnailGenerator:
     def __init__(self):
         self.font_path = os.getenv("THUMBNAIL_FONT", None)  # None = use Pillow default
         self.bg_color = os.getenv("THUMBNAIL_BG_COLOR", "#1a1a2e")
-        self.text_color = os.getenv("THUMBNAIL_TEXT_COLOR", "#ffffff")
+        self.text_color = os.getenv("THUMBNAIL_TEXT_COLOR", "#FFD600")
         self.badge_color = os.getenv("THUMBNAIL_BADGE_COLOR", "#e94560")
         self.width = 1280
         self.height = 720
@@ -84,15 +84,18 @@ class ThumbnailGenerator:
         Returns:
             PIL Image with title text drawn.
         """
-        from PIL import ImageDraw, ImageFont
+        from PIL import Image, ImageDraw, ImageFont
 
         draw = ImageDraw.Draw(image)
 
-        # Load font
+        # Load font — try custom, then Impact (bold), then default
         try:
-            font = ImageFont.truetype(self.font_path, size=60)
+            font = ImageFont.truetype(self.font_path, size=84)
         except Exception:
-            font = ImageFont.load_default()
+            try:
+                font = ImageFont.truetype("C:/Windows/Fonts/impact.ttf", size=84)
+            except Exception:
+                font = ImageFont.load_default()
 
         padding = 80
         max_width = image.width - (padding * 2)
@@ -120,10 +123,21 @@ class ThumbnailGenerator:
             - draw.textbbox((0, 0), "Ay", font=font)[1]
         )
         spacing = 10
-        total_height = len(lines) * line_height + (len(lines) - 1) * spacing
 
-        # Start at roughly 40% from top
-        y = int(image.height * 0.4) - total_height // 2
+        # Center text vertically within the dark overlay zone (top 45%)
+        overlay_zone_height = int(image.height * 0.45)
+        text_block_height = len(lines) * (line_height + spacing) - spacing
+        y = max(20, (overlay_zone_height - text_block_height) // 2)
+
+        # Draw dark overlay covering top 45% for text contrast
+        overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+        overlay_draw = ImageDraw.Draw(overlay)
+        overlay_draw.rectangle(
+            [0, 0, image.width, int(image.height * 0.45)],
+            fill=(0, 0, 0, 240),
+        )
+        image = Image.alpha_composite(image, overlay)
+        draw = ImageDraw.Draw(image)
 
         for line in lines:
             bbox = draw.textbbox((0, 0), line, font=font)
@@ -131,7 +145,18 @@ class ThumbnailGenerator:
             x = (image.width - line_width) // 2
 
             # Draw shadow
-            draw.text((x + 3, y + 3), line, fill="#000000", font=font)
+            # Draw thick shadow/outline for readability at small sizes
+            for ox, oy in [
+                (-3, -3),
+                (-3, 3),
+                (3, -3),
+                (3, 3),
+                (-3, 0),
+                (3, 0),
+                (0, -3),
+                (0, 3),
+            ]:
+                draw.text((x + ox, y + oy), line, fill="#000000", font=font)
             # Draw main text
             draw.text((x, y), line, fill=self.text_color, font=font)
 

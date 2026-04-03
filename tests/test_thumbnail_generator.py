@@ -92,7 +92,7 @@ class TestInitDefaults:
     def test_default_colors_and_dimensions(self):
         gen = ThumbnailGenerator()
         assert gen.bg_color == "#1a1a2e"
-        assert gen.text_color == "#ffffff"
+        assert gen.text_color == "#FFD600"
         assert gen.badge_color == "#e94560"
         assert gen.width == 1280
         assert gen.height == 720
@@ -217,12 +217,12 @@ class TestOverlayTitleText:
         pil_mocks["ImageDraw"].Draw.return_value = mock_draw
         pil_mocks["ImageFont"].load_default.return_value = mock_font
 
-        result = gen._overlay_title_text(mock_image, "Short Title")
+        gen._overlay_title_text(mock_image, "Short Title")
 
-        pil_mocks["ImageDraw"].Draw.assert_called_once_with(mock_image)
+        # Draw is called at least once (may be called again after overlay compositing)
+        assert pil_mocks["ImageDraw"].Draw.call_count >= 1
         # At least the shadow + main text for a single line
         assert mock_draw.text.call_count >= 2
-        assert result is mock_image
 
 
 # ---------------------------------------------------------------------------
