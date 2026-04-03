@@ -408,7 +408,7 @@ def _run_pipeline(args):
         audio_file = components["dropbox"].download_episode(dropbox_path)
         if not audio_file:
             raise Exception("Failed to download episode from Dropbox")
-    elif episode_number is not None:
+    elif episode_number is not None and "dropbox" in components:
         logger.info("Looking for Episode %d...", episode_number)
         episode = components["dropbox"].get_episode_by_number(episode_number)
         if not episode:
