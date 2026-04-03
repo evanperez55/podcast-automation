@@ -90,6 +90,8 @@ class RSSFeedGenerator:
         # iTunes-specific tags
         ET.SubElement(channel, "itunes:author").text = author
         ET.SubElement(channel, "itunes:summary").text = description
+        ET.SubElement(channel, "itunes:subtitle").text = description[:255]
+        ET.SubElement(channel, "itunes:type").text = "episodic"
         ET.SubElement(channel, "itunes:explicit").text = "yes" if explicit else "no"
 
         # Owner
