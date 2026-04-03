@@ -168,6 +168,17 @@ class ContentEditor:
         # Create a readable version with timestamps
         timestamped_text = self._format_transcript_for_analysis(words, segments)
 
+        # Truncate if transcript is too long for context window (~4 chars/token,
+        # reserve ~10k tokens for prompt template + output)
+        max_transcript_chars = 400_000
+        if len(timestamped_text) > max_transcript_chars:
+            logger.warning(
+                "Transcript too long (%d chars) — truncating to %d chars",
+                len(timestamped_text),
+                max_transcript_chars,
+            )
+            timestamped_text = timestamped_text[:max_transcript_chars]
+
         # Score segments by audio energy if audio is available
         energy_candidates = None
         if audio_path:
@@ -274,6 +285,18 @@ class ContentEditor:
                 self._openai.APIStatusError,
             ) as e:
                 last_error = e
+                # Don't retry client errors (4xx) except rate limits (429)
+                is_client_error = (
+                    isinstance(e, self._openai.APIStatusError)
+                    and hasattr(e, "status_code")
+                    and 400 <= e.status_code < 500
+                    and e.status_code != 429
+                )
+                if is_client_error:
+                    logger.error(
+                        "OpenAI non-retriable error (%s): %s", e.status_code, e
+                    )
+                    raise
                 if attempt < max_retries:
                     delay = min(2.0 * (2**attempt), 60.0)
                     logger.warning(
@@ -611,7 +634,12 @@ Please respond with ONLY valid JSON in this exact format:
             "episode_summary": "",
             "censor_timestamps": [],
             "best_clips": [],
-            "social_captions": {"youtube": "", "twitter": "", "instagram": ""},
+            "social_captions": {
+                "youtube": "",
+                "twitter": "",
+                "instagram": "",
+                "tiktok": "",
+            },
             "show_notes": "",
             "chapters": [],
             "hot_take": "",
@@ -630,18 +658,29 @@ Please respond with ONLY valid JSON in this exact format:
         return analysis
 
     def _parse_llm_response(self, response_text):
-        """Parse Claude's JSON response."""
+        """Parse LLM JSON response, handling markdown fences and raw JSON."""
         try:
-            # Extract JSON from response (Claude sometimes adds explanation text)
-            # Find the JSON block
-            start_idx = response_text.find("{")
-            end_idx = response_text.rfind("}") + 1
+            # Strip markdown code fences if present (```json ... ```)
+            text = response_text.strip()
+            if text.startswith("```"):
+                # Remove opening fence (with optional language tag)
+                first_newline = text.find("\n")
+                if first_newline != -1:
+                    text = text[first_newline + 1 :]
+                # Remove closing fence
+                if text.rstrip().endswith("```"):
+                    text = text.rstrip()[:-3].rstrip()
 
-            if start_idx == -1 or end_idx == 0:
-                raise ValueError("No JSON found in Claude's response")
-
-            json_str = response_text[start_idx:end_idx]
-            analysis = json.loads(json_str)
+            # Try direct parse first (works with structured outputs)
+            try:
+                analysis = json.loads(text)
+            except json.JSONDecodeError:
+                # Fallback: extract JSON object from surrounding text
+                start_idx = text.find("{")
+                end_idx = text.rfind("}") + 1
+                if start_idx == -1 or end_idx == 0:
+                    raise ValueError("No JSON found in LLM response")
+                analysis = json.loads(text[start_idx:end_idx])
 
             # Convert timestamp strings to seconds for easier use
             for item in analysis.get("censor_timestamps", []):
@@ -668,19 +707,28 @@ Please respond with ONLY valid JSON in this exact format:
             raise
 
     def _timestamp_to_seconds(self, timestamp_str):
-        """Convert HH:MM:SS to seconds (with sub-second precision if present)."""
-        parts = timestamp_str.split(":")
-        if len(parts) == 3:
-            hours = int(parts[0])
-            minutes = int(parts[1])
-            seconds = float(parts[2])  # Use float to preserve sub-second precision
-            return hours * 3600 + minutes * 60 + seconds
-        elif len(parts) == 2:
-            minutes = int(parts[0])
-            seconds = float(parts[1])
-            return minutes * 60 + seconds
-        else:
-            return float(parts[0])
+        """Convert HH:MM:SS to seconds (with sub-second precision if present).
+
+        Returns 0.0 for malformed timestamps to avoid crashing the pipeline.
+        """
+        try:
+            parts = timestamp_str.split(":")
+            if len(parts) == 3:
+                hours = int(parts[0])
+                minutes = int(parts[1])
+                seconds = float(parts[2])
+                return hours * 3600 + minutes * 60 + seconds
+            elif len(parts) == 2:
+                minutes = int(parts[0])
+                seconds = float(parts[1])
+                return minutes * 60 + seconds
+            else:
+                return float(parts[0])
+        except (ValueError, TypeError, AttributeError):
+            logger.warning(
+                "Malformed timestamp from LLM: %r — defaulting to 0.0", timestamp_str
+            )
+            return 0.0
 
     def _find_words_to_censor_directly(self, words):
         """

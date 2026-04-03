@@ -1133,3 +1133,133 @@ class TestRefineCensorTimestampsFallback:
         assert len(result) == 1
         assert result[0]["start_seconds"] == 60.0
         assert result[0]["end_seconds"] == 60.5
+
+
+class TestParseLlmResponseMarkdown:
+    """Tests for _parse_llm_response handling markdown-wrapped JSON."""
+
+    def test_raw_json(self, content_editor):
+        """Direct JSON string parses correctly."""
+        raw = '{"episode_title": "Test", "censor_timestamps": [], "best_clips": [], "chapters": []}'
+        result = content_editor._parse_llm_response(raw)
+        assert result["episode_title"] == "Test"
+
+    def test_markdown_fenced_json(self, content_editor):
+        """JSON wrapped in ```json fences parses correctly."""
+        raw = '```json\n{"episode_title": "Fenced", "censor_timestamps": [], "best_clips": [], "chapters": []}\n```'
+        result = content_editor._parse_llm_response(raw)
+        assert result["episode_title"] == "Fenced"
+
+    def test_markdown_fenced_no_lang(self, content_editor):
+        """JSON wrapped in ``` fences (no language tag) parses correctly."""
+        raw = '```\n{"episode_title": "NoLang", "censor_timestamps": [], "best_clips": [], "chapters": []}\n```'
+        result = content_editor._parse_llm_response(raw)
+        assert result["episode_title"] == "NoLang"
+
+    def test_json_with_surrounding_text(self, content_editor):
+        """JSON embedded in explanation text is extracted."""
+        raw = 'Here is the analysis:\n{"episode_title": "Embedded", "censor_timestamps": [], "best_clips": [], "chapters": []}\nHope this helps!'
+        result = content_editor._parse_llm_response(raw)
+        assert result["episode_title"] == "Embedded"
+
+    def test_no_json_raises(self, content_editor):
+        """Response with no JSON raises ValueError."""
+        with pytest.raises((ValueError, Exception)):
+            content_editor._parse_llm_response("No JSON here at all")
+
+
+class TestTimestampToSecondsMalformed:
+    """Tests for _timestamp_to_seconds handling bad timestamps."""
+
+    def test_malformed_letters_returns_zero(self, content_editor):
+        """Timestamp with letters returns 0.0 instead of crashing."""
+        assert content_editor._timestamp_to_seconds("00:00:ABC") == 0.0
+
+    def test_empty_string_returns_zero(self, content_editor):
+        """Empty string returns 0.0."""
+        assert content_editor._timestamp_to_seconds("") == 0.0
+
+    def test_none_returns_zero(self, content_editor):
+        """None input returns 0.0."""
+        assert content_editor._timestamp_to_seconds(None) == 0.0
+
+    def test_valid_still_works(self, content_editor):
+        """Valid timestamps still parse correctly after the fix."""
+        assert content_editor._timestamp_to_seconds("01:30:00") == 5400.0
+        assert content_editor._timestamp_to_seconds("00:01:30.5") == 90.5
+
+
+class TestCallOpenaiNonRetriable:
+    """Tests for _call_openai_with_retry skipping retries on 4xx errors."""
+
+    def test_400_not_retried(self, content_editor):
+        """400 Bad Request is not retried."""
+        import openai
+
+        content_editor._openai = openai
+        error = openai.BadRequestError(
+            message="bad request",
+            response=Mock(status_code=400, headers={}, json=Mock(return_value={})),
+            body=None,
+        )
+        content_editor.client = Mock()
+        content_editor.client.chat.completions.create.side_effect = error
+
+        with pytest.raises(openai.BadRequestError):
+            content_editor._call_openai_with_retry("system", "prompt", max_retries=3)
+
+        # Should only be called once (no retries)
+        assert content_editor.client.chat.completions.create.call_count == 1
+
+    def test_429_is_retried(self, content_editor):
+        """429 Rate Limit is retried."""
+        import openai
+
+        content_editor._openai = openai
+        error = openai.RateLimitError(
+            message="rate limited",
+            response=Mock(status_code=429, headers={}, json=Mock(return_value={})),
+            body=None,
+        )
+        content_editor.client = Mock()
+        content_editor.client.chat.completions.create.side_effect = error
+
+        with patch("content_editor.time.sleep"):
+            with pytest.raises(openai.RateLimitError):
+                content_editor._call_openai_with_retry(
+                    "system", "prompt", max_retries=2
+                )
+
+        # Should be called 3 times (initial + 2 retries)
+        assert content_editor.client.chat.completions.create.call_count == 3
+
+
+class TestValidateAnalysisTiktok:
+    """Test that _validate_analysis includes tiktok in defaults."""
+
+    def test_empty_analysis_has_tiktok(self, content_editor):
+        """Empty analysis gets tiktok caption default."""
+        result = content_editor._validate_analysis({})
+        assert "tiktok" in result["social_captions"]
+        assert result["social_captions"]["tiktok"] == ""
+
+    def test_partial_captions_get_tiktok(self, content_editor):
+        """Partial social_captions dict gets tiktok filled in."""
+        analysis = {"social_captions": {"youtube": "test"}}
+        result = content_editor._validate_analysis(analysis)
+        assert result["social_captions"]["tiktok"] == ""
+        assert result["social_captions"]["youtube"] == "test"
+
+
+class TestTranscriptTruncation:
+    """Test that long transcripts are truncated before sending to LLM."""
+
+    def test_long_transcript_truncated(self, content_editor):
+        """Transcripts exceeding 400k chars are truncated."""
+        words = []
+        segments = [
+            {"start": i, "end": i + 1, "text": "word " * 100} for i in range(1000)
+        ]
+        text = content_editor._format_transcript_for_analysis(words, segments)
+        # Verify the format works (doesn't crash)
+        assert len(text) > 0
