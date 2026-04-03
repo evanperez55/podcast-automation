@@ -309,7 +309,7 @@ class DemoPackager:
         print(f"\n{'=' * 60}")
         print(f"Demo packaged: {demo_dir}")
         print(f"  Clips: {copied_clips}")
-        print(f"  LUFS: {lufs_input} → {lufs_output}")
+        print(f"  LUFS: {lufs_input} -> {lufs_output}")
         print(f"  Censor segments: {censor_count}")
         if skipped:
             print(f"  Skipped (not found): {', '.join(skipped)}")

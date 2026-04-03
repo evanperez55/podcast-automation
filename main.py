@@ -181,6 +181,7 @@ def main():
     """Main entry point."""
     args = _parse_flags()
     client_name = args["client_name"]
+    _activate_client(client_name)
 
     if len(sys.argv) > 1:
         cmd = sys.argv[1].lower()
