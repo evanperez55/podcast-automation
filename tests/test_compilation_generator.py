@@ -63,11 +63,12 @@ class TestGenerateBestOf:
 class TestDiscoverAndScoreClips:
     """Tests for _discover_and_score_clips."""
 
-    def test_returns_empty_when_no_output_dir(self, generator, tmp_path, monkeypatch):
-        """Returns empty list when output dir doesn't exist."""
+    def test_returns_empty_when_no_episode_dirs(self, generator, tmp_path, monkeypatch):
+        """Returns empty list when output dir has no episode folders."""
         from config import Config
 
-        monkeypatch.setattr(Config, "OUTPUT_DIR", tmp_path / "nonexistent")
+        tmp_path.mkdir(exist_ok=True)
+        monkeypatch.setattr(Config, "OUTPUT_DIR", tmp_path)
         result = generator._discover_and_score_clips()
         assert result == []
 
