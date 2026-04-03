@@ -1,0 +1,27 @@
+iteration	type	hypothesis	result	severity	location	description
+1	hypothesis	mark_slot_uploaded passes upload_results to json.dumps without serialization safety	confirmed	HIGH	content_calendar.py:230	Non-serializable objects in upload_results corrupt calendar JSON — evidence: MagicMock error in production data
+2	hypothesis	subprocess.run calls missing stdin=DEVNULL can cause FFmpeg hangs	confirmed	MEDIUM	video_converter.py:116,239 + 9 more	10 FFmpeg subprocess calls across 5 files lack stdin=DEVNULL — can hang up to 2hrs on missing input
+3	hypothesis	get_all_pending_slots uses naive datetime.now() causing timezone mismatch in CI	confirmed	HIGH	content_calendar.py:294	Slots scheduled in ET fire at wrong time in GitHub Actions (UTC) — posts could go out 4-5 hours early
+4	hypothesis	Bluesky returns non-dict response	disproven	-	-	Bluesky always returns dict or None
+4	discovery	YouTube silent failure not tracked in results	new_lead	MEDIUM	post_scheduled_content.py:83-86	If set_video_privacy fails, slot marked uploaded but Short stays private
+5	hypothesis	pipeline_state checkpoint write is not atomic	disproven	-	pipeline_state.py:53-61	Already uses tmp + fsync + os.replace — atomic write pattern
+6	hypothesis	test_thumbnail_generator.py leaks MagicMock into PIL modules via sys.modules patching	confirmed	MEDIUM	tests/test_thumbnail_generator.py:14-19	PIL mock in sys.modules leaks into quote_card_generator causing 6 test failures in full suite
+7	hypothesis	video_converter.py lacks NVENC-to-libx264 fallback unlike video_utils.py	confirmed	MEDIUM	video_converter.py:116-131	Full episode and subtitle video creation fails silently on NVENC errors instead of falling back to libx264
+8	hypothesis	demo_packager subprocess calls dont check returncode	disproven	-	demo_packager.py:344-355	LUFS call doesnt check rc but is caught by except — low risk. Other call uses check=True.
+9	hypothesis	Twitter text truncation at [:280] can break URLs mid-link	confirmed	MEDIUM	post_scheduled_content.py:105-107	If text+URL exceeds 280 chars the URL gets cut mid-string producing a broken link
+10	hypothesis	_build_slots doesnt validate clip_index bounds	disproven	-	content_calendar.py:130	Bounds check exists at line 130
+11	hypothesis	compilation_generator doesnt handle different sample rates	disproven	-	compilation_generator.py:188-217	pydub handles sample rate normalization during append
+12	hypothesis	set_video_privacy silently fails on expired OAuth	disproven	-	youtube_uploader.py:373-412	HttpError caught; generic exceptions caught by caller
+13	hypothesis	audiogram_generator doesnt handle short audio files	disproven	-	audiogram_generator.py:50-98	FFmpeg handles short audio gracefully
+14	hypothesis	RSS feed doesnt escape XML special chars	disproven	-	rss_feed_generator.py:82	xml.etree.ElementTree auto-escapes .text content
+15	hypothesis	retry_utils accumulates delay state between calls	disproven	-	retry_utils.py:39	Delay computed fresh from attempt counter each invocation
+16	pattern_search	Silent except Exception blocks without logging	confirmed	LOW	audio_clip_scorer.py:36 + 15 more locations	Most are intentional graceful degradation but a few (video_converter:377) silently swallow errors
+17	hypothesis	Scheduler mixes naive and UTC-aware datetimes	confirmed	MEDIUM	scheduler.py:56 vs 254	create_schedule uses naive datetime.now() but get_optimal_publish_at uses timezone.utc — inconsistent timezone handling
+18	pattern_search	File I/O missing with context manager	disproven	-	-	All file I/O uses with statements and utf-8 encoding
+19	pattern_search	Race conditions in ThreadPoolExecutor usage	disproven	-	video.py:191	Concurrent clip cutting has no shared mutable state
+20	hypothesis	Dropbox download doesnt verify file integrity after download	confirmed	MEDIUM	dropbox_handler.py:118-123	No size/hash verification after download — partial downloads could silently corrupt pipeline input
+21	hypothesis	Content calendar stores Windows absolute paths that break in GitHub Actions	confirmed	HIGH	content_calendar.py + topic_data/content_calendar.json	Windows paths like C:\Users\... dont exist on Linux CI runner — image_path checks always fail
+22	pattern_search	Systemic naive datetime.now() usage across 30+ locations	confirmed	MEDIUM	30+ files	Pervasive timezone issue — already tracked as bugs 3 and 8
+23	pattern_search	f-string in logger calls (18 instances)	confirmed	LOW	audiogram_generator.py + others	18 instances of logger.info(f"...") — evaluates format even when log level suppressed
+24	pattern_search	File I/O and concurrent access patterns	disproven	-	-	All file ops use context managers; concurrent access is on independent files
+25	pattern_search	Path handling in uploaders	disproven	-	uploaders/*.py	Uploaders use Path objects correctly with str() conversion at API boundaries
