@@ -812,6 +812,26 @@ def run_distribute(
         logger.warning("Content calendar generation failed: %s", e)
     print()
 
+    # Step 8.8: Update website landing page
+    print("STEP 8.8: UPDATING WEBSITE LANDING PAGE")
+    print("-" * 60)
+    website_generator = components.get("website_generator")
+    if website_generator and website_generator.enabled:
+        if state and state.is_step_completed("website"):
+            logger.info("[RESUME] Skipping website update (already completed)")
+        else:
+            try:
+                site_url = website_generator.generate_and_deploy()
+                if site_url:
+                    logger.info("Website updated: %s", site_url)
+                if state:
+                    state.complete_step("website", {"site_url": site_url or ""})
+            except Exception as e:
+                logger.warning("Website update failed: %s", e)
+    else:
+        logger.info("Website generation disabled or not configured")
+    print()
+
     # Step 9: Index episode for search
     print("STEP 9: INDEXING EPISODE FOR SEARCH")
     print("-" * 60)

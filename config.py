@@ -162,6 +162,9 @@ class Config:
     BLOG_ENABLED = os.getenv("BLOG_ENABLED", "true").lower() == "true"
     BLOG_USE_OPENAI = os.getenv("BLOG_USE_OPENAI", "true").lower() == "true"
 
+    # Website Landing Page Generator
+    WEBSITE_ENABLED = os.getenv("WEBSITE_ENABLED", "true").lower() == "true"
+
     # Thumbnail Generation
     THUMBNAIL_FONT = os.getenv("THUMBNAIL_FONT")
     THUMBNAIL_BG_COLOR = os.getenv("THUMBNAIL_BG_COLOR", "#1a1a2e")

@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fake Problems Podcast</title>
+    <meta name="description" content="An irreverent comedy podcast about dark, weird, and absurd topics. New episodes every other Saturday.">
+    <meta property="og:title" content="Fake Problems Podcast">
+    <meta property="og:description" content="Dark, weird, and absurd comedy. Deadpan delivery, zero corporate energy.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="assets/podcast_logo.jpg">
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;700&family=Playfair+Display:ital,wght@1,700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #C0582A;
+            --accent-bright: #D4622B;
+            --accent-glow: rgba(192, 88, 42, 0.15);
+            --bg: #FAF6EE;
+            --bg-elevated: #F0EBE0;
+            --bg-card: #F5F0E6;
+            --text: #4A3F33;
+            --text-dim: #9B8E7B;
+            --text-bright: #1E1810;
+            --border: #DDD4C4;
+            --mono: 'JetBrains Mono', monospace;
+            --sans: 'Space Grotesk', sans-serif;
+            --serif: 'Playfair Display', serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: var(--sans);
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+            cursor: default;
+        }
+
+        /* ── Scroll Progress Bar ── */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-bright));
+            z-index: 1000;
+            transform-origin: left;
+            transform: scaleX(0);
+            width: 100%;
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        /* ── Grain Overlay ── */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 9998;
+            pointer-events: none;
+            opacity: 0.045;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            mix-blend-mode: multiply;
+        }
+
+        /* ── Reveal System ── */
+        .reveal {
+            opacity: 0;
+            transform: translateY(40px);
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .reveal.visible { opacity: 1; transform: none; }
+        .reveal-delay-1 { transition-delay: 0.1s; }
+        .reveal-delay-2 { transition-delay: 0.2s; }
+        .reveal-delay-3 { transition-delay: 0.3s; }
+        .reveal-delay-4 { transition-delay: 0.4s; }
+
+        /* ── Nav ── */
+        nav {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 100;
+            padding: 1rem 2.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: transparent;
+            transition: background 0.4s, backdrop-filter 0.4s;
+        }
+
+        nav.scrolled {
+            background: rgba(250, 246, 238, 0.92);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        nav .logo {
+            font-family: var(--mono);
+            font-weight: 700;
+            font-size: 0.8rem;
+            color: var(--accent);
+            text-decoration: none;
+            letter-spacing: 0.1em;
+        }
+
+        nav .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        nav .nav-links a {
+            font-family: var(--mono);
+            color: var(--text-dim);
+            text-decoration: none;
+            font-size: 0.7rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            transition: color 0.3s;
+            position: relative;
+        }
+
+        nav .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 1px;
+            background: var(--accent);
+            transition: width 0.3s;
+        }
+
+        nav .nav-links a:hover { color: var(--accent); }
+        nav .nav-links a:hover::after { width: 100%; }
+
+        /* ── Floating Elements ── */
+        .floaters {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .floater {
+            position: absolute;
+            opacity: 0.07;
+            animation: drift linear infinite;
+        }
+
+        .floater svg { width: 100%; height: 100%; }
+
+        .floater.star { color: #D4A017; }
+        .floater.bolt { color: #C0582A; }
+        .floater.burst { color: #3B6FB6; }
+
+        @keyframes drift {
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(-120vh) rotate(360deg); }
+        }
+
+        /* ── Hero ── */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 6rem 2rem 4rem;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        /* Color blobs from logo palette */
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -10%;
+            right: -15%;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(212, 160, 23, 0.12) 0%, transparent 65%);
+            pointer-events: none;
+            animation: blobFloat 12s ease-in-out infinite;
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            bottom: 5%;
+            left: -10%;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(192, 88, 42, 0.1) 0%, transparent 65%);
+            pointer-events: none;
+            animation: blobFloat 15s ease-in-out infinite reverse;
+        }
+
+        @keyframes blobFloat {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -20px) scale(1.05); }
+            66% { transform: translate(-20px, 15px) scale(0.95); }
+        }
+
+        /* Comic burst rays behind logo */
+        .hero-burst {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -60%);
+            width: 600px;
+            height: 600px;
+            pointer-events: none;
+            z-index: 0;
+            animation: burstSpin 90s linear infinite;
+        }
+
+        .hero-burst svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        @keyframes burstSpin {
+            from { transform: translate(-50%, -60%) rotate(0deg); }
+            to { transform: translate(-50%, -60%) rotate(360deg); }
+        }
+
+        /* Blue blob on opposite side */
+        .hero-blob-blue {
+            position: absolute;
+            top: 20%;
+            left: 8%;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(59, 111, 182, 0.08) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: blobFloat 18s ease-in-out infinite;
+        }
+
+        .hero-logo-wrap {
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-logo {
+            width: 160px;
+            height: 160px;
+            border-radius: 32px;
+            margin-bottom: 3rem;
+            box-shadow:
+                0 0 0 4px var(--bg),
+                0 0 0 6px rgba(192, 88, 42, 0.3),
+                0 0 80px rgba(192, 88, 42, 0.15),
+                0 20px 60px rgba(0,0,0,0.2);
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.6s;
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-logo:hover {
+            transform: scale(1.12) rotate(-3deg);
+            box-shadow:
+                0 0 0 4px var(--bg),
+                0 0 0 6px rgba(192, 88, 42, 0.5),
+                0 0 120px rgba(192, 88, 42, 0.25),
+                0 25px 70px rgba(0,0,0,0.25);
+        }
+
+        /* ── Halftone Section Divider ── */
+        .halftone-divider {
+            height: 40px;
+            background-image: radial-gradient(circle, var(--text-dim) 1px, transparent 1px);
+            background-size: 8px 8px;
+            opacity: 0.08;
+            margin: 0 -2rem;
+        }
+
+        /* ── Action Lines (quotes section) ── */
+        .action-lines {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .action-lines::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 200%;
+            height: 200%;
+            transform: translate(-50%, -50%);
+            background: repeating-conic-gradient(
+                from 0deg,
+                transparent 0deg 8deg,
+                rgba(192, 88, 42, 0.02) 8deg 10deg
+            );
+        }
+
+        .hero-title {
+            font-size: clamp(3rem, 10vw, 7rem);
+            font-weight: 700;
+            color: var(--text-bright);
+            letter-spacing: -0.05em;
+            line-height: 0.9;
+            margin-bottom: 0.2em;
+        }
+
+        .hero-title .word-fake {
+            color: var(--accent);
+            font-style: italic;
+            font-family: var(--serif);
+            display: inline-block;
+            text-shadow: 0 0 80px var(--accent-glow);
+        }
+
+        .hero-subtitle {
+            font-family: var(--mono);
+            font-size: clamp(0.75rem, 1.5vw, 0.9rem);
+            color: var(--text-dim);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 3rem;
+        }
+
+        .hero-tagline {
+            font-size: 1.1rem;
+            color: var(--text);
+            max-width: 480px;
+            margin-bottom: 3rem;
+            line-height: 1.8;
+        }
+
+        /* ── Platform Buttons ── */
+        .platforms {
+            display: flex;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .platform-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-family: var(--mono);
+            font-weight: 700;
+            font-size: 0.7rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            border: 1px solid var(--border);
+            color: var(--text);
+            background: transparent;
+            transition: all 0.3s;
+        }
+
+        .platform-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            box-shadow: 0 0 20px var(--accent-glow);
+            transform: translateY(-2px);
+        }
+
+        .platform-btn svg { width: 14px; height: 14px; fill: currentColor; }
+
+        /* ── Scroll Indicator ── */
+        .scroll-hint {
+            position: absolute;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            animation: float 2s ease-in-out infinite;
+        }
+
+        .scroll-hint span {
+            font-family: var(--mono);
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+
+        .scroll-hint .arrow {
+            width: 1px;
+            height: 30px;
+            background: linear-gradient(to bottom, var(--text-dim), transparent);
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(8px); }
+        }
+
+        /* ── Container ── */
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* ── Section ── */
+        .section {
+            padding: 6rem 0;
+            position: relative;
+        }
+
+        .section-label {
+            font-family: var(--mono);
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.25em;
+            color: var(--accent);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .section-label::before {
+            content: '';
+            width: 30px;
+            height: 1px;
+            background: var(--accent);
+        }
+
+        .section-heading {
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
+            font-weight: 700;
+            color: var(--text-bright);
+            margin-bottom: 2rem;
+            letter-spacing: -0.03em;
+            line-height: 1.1;
+        }
+
+        /* ── Episode Player ── */
+        .player-wrapper {
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            position: relative;
+        }
+
+        .player-wrapper::before {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: 17px;
+            background: linear-gradient(135deg, rgba(192,88,42,0.15), transparent 50%);
+            z-index: -1;
+        }
+
+        .video-embed {
+            position: relative;
+            padding-bottom: 56.25%;
+            height: 0;
+        }
+
+        .video-embed iframe {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            border: none;
+        }
+
+        .player-info {
+            padding: 1.5rem 2rem;
+        }
+
+        .player-info .ep-tag {
+            font-family: var(--mono);
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: var(--bg);
+            background: var(--accent);
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            display: inline-block;
+            margin-bottom: 0.75rem;
+        }
+
+        .player-info h3 {
+            font-size: 1.15rem;
+            color: var(--text-bright);
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.01em;
+        }
+
+        .player-info p {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        /* ── Clips (Horizontal Scroll) ── */
+        .clips-scroll-wrapper {
+            margin: 0 -2rem;
+            padding: 0 2rem;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+
+        .clips-scroll-wrapper::-webkit-scrollbar { display: none; }
+
+        .clips-track {
+            display: flex;
+            gap: 1rem;
+            padding-bottom: 1rem;
+        }
+
+        .clip-card {
+            flex: 0 0 220px;
+            background: var(--bg-card);
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            transition: border-color 0.3s, transform 0.3s;
+        }
+
+        .clip-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-4px) scale(1.02);
+        }
+
+        .clip-card .clip-video {
+            position: relative;
+            padding-bottom: 177.78%;
+            height: 0;
+        }
+
+        .clip-card .clip-video iframe {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            border: none;
+        }
+
+        .clip-card .clip-label {
+            padding: 0.65rem 0.75rem;
+            font-family: var(--mono);
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: var(--text);
+            text-align: center;
+            letter-spacing: 0.03em;
+        }
+
+        /* ── Pull Quotes ── */
+        .quotes-section {
+            background: var(--bg-elevated);
+            margin: 0 -2rem;
+            padding: 6rem 2rem;
+            position: relative;
+        }
+
+        .quotes-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0.3;
+        }
+
+        .quotes-section::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0.3;
+        }
+
+        .quotes-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        .quote-card {
+            padding: 0;
+            position: relative;
+        }
+
+        .quote-card .big-quote {
+            font-family: var(--serif);
+            font-size: 5rem;
+            color: var(--accent);
+            opacity: 0.15;
+            line-height: 1;
+            position: absolute;
+            top: -0.3em;
+            left: -0.1em;
+            user-select: none;
+        }
+
+        .quote-card blockquote {
+            font-size: 1.05rem;
+            font-weight: 400;
+            color: var(--text-bright);
+            line-height: 1.7;
+            margin-bottom: 0.75rem;
+            position: relative;
+        }
+
+        .quote-card cite {
+            font-family: var(--mono);
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            font-style: normal;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        /* ── Listener Reviews ── */
+        .review-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: border-color 0.3s;
+        }
+
+        .review-card:hover { border-color: rgba(192, 88, 42, 0.2); }
+
+        .review-stars {
+            color: var(--accent);
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            margin-bottom: 0.75rem;
+        }
+
+        .review-card p {
+            font-size: 0.9rem;
+            color: var(--text);
+            line-height: 1.6;
+            margin-bottom: 0.75rem;
+            font-style: italic;
+        }
+
+        .review-card .reviewer {
+            font-family: var(--mono);
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .reviews-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        /* ── About ── */
+        .about-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: start;
+        }
+
+        .about-text p {
+            font-size: 1rem;
+            color: var(--text);
+            line-height: 1.9;
+            margin-bottom: 1.25rem;
+        }
+
+        .about-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .stat-card {
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            text-align: center;
+            transition: border-color 0.3s, transform 0.3s;
+        }
+
+        .stat-card:hover {
+            border-color: rgba(192, 88, 42, 0.3);
+            transform: translateX(4px);
+        }
+
+        .stat-card .stat-icon {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-card h4 {
+            font-size: 0.9rem;
+            color: var(--text-bright);
+            font-weight: 700;
+            margin-bottom: 0.2rem;
+        }
+
+        .stat-card p {
+            font-family: var(--mono);
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            letter-spacing: 0.05em;
+        }
+
+        /* ── Episode Cards (older episodes) ── */
+        .episode-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .episode-card:hover { border-color: rgba(192, 88, 42, 0.3); }
+
+        .episode-card h3 {
+            font-size: 1.05rem;
+            color: var(--text-bright);
+            font-weight: 700;
+            margin-bottom: 0.4rem;
+        }
+
+        .episode-card p {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            line-height: 1.6;
+        }
+
+        .ep-link {
+            font-family: var(--mono);
+            font-size: 0.65rem;
+            color: var(--accent);
+            text-decoration: none;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-top: 0.5rem;
+            display: inline-block;
+        }
+
+        .ep-link:hover { text-decoration: underline; }
+
+        /* ── Footer ── */
+        footer {
+            padding: 4rem 2rem;
+            text-align: center;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 2.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .footer-links a {
+            font-family: var(--mono);
+            color: var(--text-dim);
+            text-decoration: none;
+            font-size: 0.7rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            transition: color 0.3s;
+        }
+
+        .footer-links a:hover { color: var(--accent); }
+
+        .footer-copy {
+            font-family: var(--mono);
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            letter-spacing: 0.08em;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 768px) {
+            .hero { padding: 5rem 1.5rem 3rem; min-height: 90vh; }
+            .hero-logo { width: 110px; height: 110px; }
+            .quotes-grid { grid-template-columns: 1fr; }
+            .about-grid { grid-template-columns: 1fr; gap: 2rem; }
+            .reviews-grid { grid-template-columns: 1fr; }
+            .section { padding: 4rem 0; }
+            nav { padding: 0.8rem 1.5rem; }
+        }
+
+        @media (max-width: 480px) {
+            .hero-title { letter-spacing: -0.03em; }
+            .platforms { gap: 0.4rem; }
+            .platform-btn { padding: 0.5rem 0.8rem; font-size: 0.6rem; }
+            nav .nav-links { gap: 1rem; }
+            nav .nav-links a { font-size: 0.6rem; }
+            .clip-card { flex: 0 0 180px; }
+        }
+
+        /* ── Reduced Motion ── */
+        @media (prefers-reduced-motion: reduce) {
+            .reveal { opacity: 1; transform: none; transition: none; }
+            .scroll-hint { animation: none; }
+            .progress-bar { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+
+<nav id="mainNav">
+    <a href="#" class="logo">fake_problems://</a>
+    <div class="nav-links">
+        <a href="#listen">Listen</a>
+        <a href="#clips">Clips</a>
+        <a href="#about">About</a>
+    </div>
+</nav>
+
+<!-- ── Floating Background Elements ── -->
+<div class="floaters" id="floaters" aria-hidden="true"></div>
+
+<!-- ── Hero ── -->
+<section class="hero">
+    <!-- Comic burst rays -->
+    <div class="hero-burst" aria-hidden="true">
+        <svg viewBox="0 0 800 800" fill="none">
+            <g opacity="0.06">
+                <polygon points="400,400 340,0 460,0" fill="#D4A017"/>
+                <polygon points="400,400 0,340 0,460" fill="#C0582A"/>
+                <polygon points="400,400 340,800 460,800" fill="#3B6FB6"/>
+                <polygon points="400,400 800,340 800,460" fill="#D4A017"/>
+                <polygon points="400,400 160,25 255,0" fill="#C0582A"/>
+                <polygon points="400,400 640,25 545,0" fill="#3B6FB6"/>
+                <polygon points="400,400 25,160 0,255" fill="#D4A017"/>
+                <polygon points="400,400 775,160 800,255" fill="#C0582A"/>
+                <polygon points="400,400 25,640 0,545" fill="#3B6FB6"/>
+                <polygon points="400,400 775,640 800,545" fill="#D4A017"/>
+                <polygon points="400,400 160,775 255,800" fill="#C0582A"/>
+                <polygon points="400,400 640,775 545,800" fill="#3B6FB6"/>
+            </g>
+        </svg>
+    </div>
+    <div class="hero-blob-blue" aria-hidden="true"></div>
+
+    <div class="hero-logo-wrap">
+        <img src="assets/podcast_logo.jpg" alt="Fake Problems Podcast" class="hero-logo reveal">
+    </div>
+    <h1 class="hero-title reveal reveal-delay-1">
+        <span class="word-fake">Fake</span> Problems
+    </h1>
+    <p class="hero-subtitle reveal reveal-delay-2">podcast</p>
+    <p class="hero-tagline reveal reveal-delay-3">
+        Two guys solving problems that don't exist with the kind of deadpan confidence that makes you wonder if they're joking. They're not.
+    </p>
+    <div class="platforms reveal reveal-delay-4">
+        <a href="https://www.youtube.com/channel/UCmuoi8QYHAYnOmkOjkg9TrA" class="platform-btn">
+            <svg viewBox="0 0 24 24"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.9 31.9 0 0 0 0 12a31.9 31.9 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.9 31.9 0 0 0 24 12a31.9 31.9 0 0 0-.5-5.8zM9.5 15.6V8.4l6.3 3.6-6.3 3.6z"/></svg>
+            YouTube
+        </a>
+        <a href="https://open.spotify.com/show/4C8HAr55dGMgkM9pJXPgDQ" class="platform-btn">
+            <svg viewBox="0 0 24 24"><path d="M12 0a12 12 0 1 0 0 24 12 12 0 0 0 0-24zm5.5 17.3a.75.75 0 0 1-1 .25c-2.8-1.7-6.4-2.1-10.5-1.1a.75.75 0 1 1-.3-1.5c4.5-1 8.5-.6 11.5 1.3a.75.75 0 0 1 .3 1zm1.4-3.3a.94.94 0 0 1-1.3.3c-3.2-2-8.2-2.5-12-1.4a.94.94 0 1 1-.5-1.8c4.4-1.3 9.8-.7 13.5 1.6a.94.94 0 0 1 .3 1.3zm.1-3.4C15.4 8.4 9 8.2 5.2 9.3a1.13 1.13 0 1 1-.6-2.2c4.3-1.3 11.4-1 15.9 1.6a1.13 1.13 0 0 1-1.5 1.9z"/></svg>
+            Spotify
+        </a>
+        <a href="https://twitter.com/fakeproblemspod" class="platform-btn">
+            <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            Twitter
+        </a>
+        <a href="https://bsky.app/profile/fakeproblemspod.bsky.social" class="platform-btn">
+            <svg viewBox="0 0 600 530"><path d="M135.72 44.03C202.22 93.87 273.73 195.16 300 249.12c26.27-53.96 97.78-155.25 164.28-205.09C528.06-5.45 600-23.93 600 66.54c0 18.09-10.38 151.96-16.48 173.6-21.19 75.14-98.42 94.35-167.7 82.75 121.05 20.63 151.85 88.94 85.31 157.25-126.4 129.81-181.76-32.57-195.93-74.19-2.59-7.59-3.8-11.15-5.2-11.15-1.4 0-2.62 3.56-5.2 11.15-14.17 41.62-69.53 204-195.93 74.19-66.54-68.31-35.74-136.62 85.31-157.25-69.28 11.6-146.51-7.61-167.7-82.75C10.38 218.5 0 84.63 0 66.54 0-23.93 71.94-5.45 135.72 44.03z"/></svg>
+            Bluesky
+        </a>
+    </div>
+
+    <div class="scroll-hint">
+        <span>Scroll</span>
+        <div class="arrow"></div>
+    </div>
+</section>
+
+<!-- ── Latest Episode ── -->
+<div class="container">
+    <section class="section" id="listen">
+        <div class="reveal">
+            <p class="section-label">Now Playing</p>
+            <h2 class="section-heading">Latest Episode</h2>
+        </div>
+        {{LATEST_EPISODE}}
+    </section>
+
+    <!-- ── Best Clips ── -->
+    <section class="section" id="clips">
+        <div class="reveal">
+            <p class="section-label">Highlights</p>
+            <h2 class="section-heading">Best Moments</h2>
+        </div>
+        <div class="clips-scroll-wrapper reveal reveal-delay-1">
+            <div class="clips-track">
+                {{CLIPS}}
+            </div>
+        </div>
+    </section>
+</div>
+
+<div class="halftone-divider" aria-hidden="true"></div>
+
+<!-- ── Quotes (Full-Width Section) ── -->
+<div class="quotes-section" style="position:relative;">
+    <div class="action-lines" aria-hidden="true"></div>
+    <div class="container" style="position:relative;z-index:1;">
+        <div class="reveal">
+            <p class="section-label">From the Show</p>
+            <h2 class="section-heading">Actual Things We Said</h2>
+        </div>
+        <div class="quotes-grid">
+            {{QUOTES}}
+        </div>
+    </div>
+</div>
+
+<!-- ── Reviews + About ── -->
+<div class="container">
+    <section class="section">
+        <div class="reveal">
+            <p class="section-label">Listeners</p>
+            <h2 class="section-heading">What People Are Saying</h2>
+        </div>
+        <div class="reviews-grid">
+            <div class="review-card reveal reveal-delay-1">
+                <div class="review-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+                <p>"I listen to this at work and had to pretend I was crying, not laughing."</p>
+                <span class="reviewer">Apple Podcasts listener</span>
+            </div>
+            <div class="review-card reveal reveal-delay-2">
+                <div class="review-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+                <p>"Two guys confidently debating things that absolutely do not matter. It's perfect."</p>
+                <span class="reviewer">YouTube comment</span>
+            </div>
+            <div class="review-card reveal reveal-delay-3">
+                <div class="review-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+                <p>"Like if Wikipedia had a dark sense of humor and zero editorial oversight."</p>
+                <span class="reviewer">Bluesky listener</span>
+            </div>
+        </div>
+    </section>
+
+    {{OLDER_EPISODES}}
+
+    <section class="section" id="about">
+        <div class="reveal">
+            <p class="section-label">About</p>
+            <h2 class="section-heading">What Is This?</h2>
+        </div>
+        <div class="about-grid">
+            <div class="about-text reveal reveal-delay-1">
+                <p>Fake Problems Podcast is what happens when two guys with too much free time and not enough impulse control start talking into microphones.</p>
+                <p>Every episode dives into the dark, weird, and absurd corners of life with the kind of deadpan confidence that makes you wonder if they're joking. Topics include nuclear accidents, cannibalism, penguin domestication, and whatever else seemed funny at 2 AM.</p>
+                <p>No guests. No sponsors. No filter.</p>
+            </div>
+            <div class="about-stats reveal reveal-delay-2">
+                <div class="stat-card">
+                    <div class="stat-icon">&#127911;</div>
+                    <h4>Every Other Saturday</h4>
+                    <p>New episode drops bi-weekly</p>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">&#9760;</div>
+                    <h4>Dark Comedy</h4>
+                    <p>Topics your therapist warned you about</p>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">&#128683;</div>
+                    <h4>Zero Corporate Energy</h4>
+                    <p>No sponsors, no scripts, no filter</p>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- ── Footer ── -->
+<footer>
+    <div class="footer-links">
+        <a href="https://www.youtube.com/channel/UCmuoi8QYHAYnOmkOjkg9TrA">YouTube</a>
+        <a href="https://open.spotify.com/show/4C8HAr55dGMgkM9pJXPgDQ">Spotify</a>
+        <a href="https://twitter.com/fakeproblemspod">Twitter</a>
+        <a href="https://bsky.app/profile/fakeproblemspod.bsky.social">Bluesky</a>
+    </div>
+    <p class="footer-copy">&copy; 2026 Fake Problems Podcast</p>
+</footer>
+
+<script>
+// Scroll progress bar
+const progressBar = document.getElementById('progressBar');
+const nav = document.getElementById('mainNav');
+
+window.addEventListener('scroll', () => {
+    const scrollTop = window.scrollY;
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    const progress = scrollTop / docHeight;
+    progressBar.style.transform = `scaleX(${progress})`;
+
+    // Nav background on scroll
+    nav.classList.toggle('scrolled', scrollTop > 60);
+}, { passive: true });
+
+// Scroll reveal with staggered animations
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+        }
+    });
+}, { threshold: 0.08, rootMargin: '0px 0px -60px 0px' });
+
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// Floating background elements (stars, lightning bolts, bursts)
+const floaters = document.getElementById('floaters');
+const shapes = [
+    // 4-point star
+    `<svg viewBox="0 0 40 40"><path d="M20 0 L24 16 L40 20 L24 24 L20 40 L16 24 L0 20 L16 16 Z" fill="currentColor"/></svg>`,
+    // Lightning bolt
+    `<svg viewBox="0 0 30 50"><path d="M18 0 L6 22 L14 22 L10 50 L26 18 L17 18 Z" fill="currentColor"/></svg>`,
+    // 6-point star
+    `<svg viewBox="0 0 40 40"><polygon points="20,0 24,15 40,15 27,24 31,40 20,30 9,40 13,24 0,15 16,15" fill="currentColor"/></svg>`,
+];
+const types = ['star', 'bolt', 'burst'];
+
+for (let i = 0; i < 18; i++) {
+    const el = document.createElement('div');
+    const typeIdx = i % 3;
+    el.className = `floater ${types[typeIdx]}`;
+    el.innerHTML = shapes[typeIdx];
+    const size = 15 + Math.random() * 30;
+    el.style.width = size + 'px';
+    el.style.height = size + 'px';
+    el.style.left = Math.random() * 100 + '%';
+    el.style.top = (100 + Math.random() * 40) + '%';
+    el.style.animationDuration = (25 + Math.random() * 40) + 's';
+    el.style.animationDelay = -(Math.random() * 40) + 's';
+    el.style.opacity = 0.04 + Math.random() * 0.06;
+    floaters.appendChild(el);
+}
+
+// Parallax floating elements on mouse move (desktop only)
+if (window.matchMedia('(hover: hover)').matches) {
+    document.addEventListener('mousemove', (e) => {
+        const x = (e.clientX / window.innerWidth - 0.5) * 2;
+        const y = (e.clientY / window.innerHeight - 0.5) * 2;
+        const burst = document.querySelector('.hero-burst');
+        if (burst) {
+            burst.style.transform = `translate(calc(-50% + ${x * 15}px), calc(-60% + ${y * 10}px)) rotate(${burst.style.getPropertyValue('--rot') || '0'}deg)`;
+        }
+        floaters.style.transform = `translate(${x * 8}px, ${y * 5}px)`;
+    }, { passive: true });
+}
+</script>
+
+</body>
+</html>

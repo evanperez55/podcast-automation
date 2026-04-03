@@ -21,6 +21,7 @@ KNOWN_CHECKPOINT_KEYS = {
     "convert_videos",
     "convert_mp3",
     "blog_post",
+    "website",
 }
 
 

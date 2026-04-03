@@ -188,6 +188,7 @@ def _init_components(
             "subtitle_clip_generator": SubtitleClipGenerator(),
             "webpage_generator": EpisodeWebpageGenerator(),
             "compliance_checker": ContentComplianceChecker(),
+            "website_generator": None,
         }
         if episode_source == "rss":
             dry_run_components["rss_fetcher"] = None
@@ -243,6 +244,10 @@ def _init_components(
     webpage_generator = EpisodeWebpageGenerator()
     compliance_checker = ContentComplianceChecker()
 
+    from website_generator import WebsiteGenerator
+
+    website_generator = WebsiteGenerator()
+
     print()
 
     components = {
@@ -263,6 +268,7 @@ def _init_components(
         "subtitle_clip_generator": subtitle_clip_generator,
         "webpage_generator": webpage_generator,
         "compliance_checker": compliance_checker,
+        "website_generator": website_generator,
     }
     if episode_source == "rss":
         components["rss_fetcher"] = rss_fetcher
