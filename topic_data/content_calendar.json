@@ -236,7 +236,9 @@
         "clip_index": 7,
         "content": {
           "caption": "What if you could pet any animal into a pet?",
-          "clip_title": "How Petting Turned Wolves Into Dogs"
+          "clip_title": "How Petting Turned Wolves Into Dogs",
+          "youtube_video_id": "-WhM61KyIZQ",
+          "youtube_url": "https://www.youtube.com/watch?v=-WhM61KyIZQ"
         },
         "status": "pending",
         "uploaded_at": null,
@@ -255,9 +257,19 @@
           "quote_text": "If anyone comes up to you and just says you suck for 30 minutes, you start to believe it.",
           "timestamp": "00:16:21"
         },
-        "status": "pending",
-        "uploaded_at": null,
-        "upload_results": {}
+        "status": "uploaded",
+        "uploaded_at": "2026-04-03T10:40:44",
+        "upload_results": {
+          "twitter": {
+            "tweet_id": "2040077041224368186",
+            "tweet_url": "https://twitter.com/i/web/status/2040077041224368186",
+            "status": "success"
+          },
+          "bluesky": {
+            "post_url": "https://bsky.app/profile/fakeproblemspod.bsky.social/post/3milxap3rbm2l",
+            "status": "success"
+          }
+        }
       },
       "quote_2": {
         "slot_type": "quote_2",
