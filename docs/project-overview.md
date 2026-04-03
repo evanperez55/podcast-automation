@@ -1,6 +1,6 @@
 # Podcast Automation -- Project Overview
 
-Automated production pipeline for the **Fake Problems Podcast**. Takes raw audio from Dropbox and produces a fully distributed episode: transcribed, analyzed, censored, clipped, converted to video, uploaded to YouTube/Twitter/Bluesky, and indexed for search.
+Automated production pipeline for the **Fake Problems Podcast**. Takes raw audio from Dropbox and produces a fully distributed episode: transcribed, analyzed, censored, clipped, converted to video, uploaded to YouTube/Twitter/Bluesky, and indexed for search. The podcast website at [fakeproblemspodcast.com](https://fakeproblemspodcast.com) is auto-updated via GitHub Pages on every processed episode.
 
 ## Quick Start
 
@@ -78,13 +78,15 @@ uv run main.py --dry-run latest
 - TikTok uploads
 - Spotify via RSS feed
 - Dropbox upload of finished files
+- Website landing page auto-update (GitHub Pages)
 
 **Content Marketing:**
 - 2-week content calendar with staggered Shorts release
 - Quote card image generation
-- Blog post generation from transcript
+- Blog post generation from transcript (HTML sanitized for security)
 - Discord notifications for pipeline events
 - Per-platform upload scheduling with optimal posting times
+- GitHub Actions automation: scheduled content posting and daily content generation
 
 **Topic Engine (standalone):**
 - Reddit/RSS topic scraping
@@ -138,6 +140,8 @@ uv run main.py --dry-run latest
          |
   [8.5] Blog Post Generation
          |
+  [8.8] Website Update (GitHub Pages landing page)
+         |
   [9] Search Index (SQLite FTS5)
 ```
 
@@ -182,7 +186,7 @@ podcast-automation/
         runner.py           Step orchestration
         steps/              Individual pipeline steps
     uploaders/              Platform-specific upload clients
-    tests/                  55 test files, 1255+ tests
+    tests/                  54 test files, 1,262+ tests
     output/                 Processed episode artifacts
     clips/                  Generated short clips
     downloads/              Raw audio staging
