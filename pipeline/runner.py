@@ -4,6 +4,7 @@ Extracted from main.py's PodcastAutomation class and module-level functions.
 Called by the thin main.py CLI shim.
 """
 
+import os
 import re
 import json
 import time
@@ -299,6 +300,36 @@ def _load_scored_topics():
         return None
 
 
+def _acquire_pipeline_lock():
+    """Acquire exclusive pipeline lock. Returns True if acquired, False if another run is active."""
+    lock_path = Config.OUTPUT_DIR / ".pipeline_lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    if lock_path.exists():
+        try:
+            old_pid = int(lock_path.read_text().strip())
+            try:
+                os.kill(old_pid, 0)  # signal 0 = check existence
+                return False  # process is still running
+            except OSError:
+                logger.warning(
+                    "Stale lock file found (PID %d not running), removing", old_pid
+                )
+        except (ValueError, OSError):
+            logger.warning("Invalid lock file, removing")
+    lock_path.write_text(str(os.getpid()))
+    return True
+
+
+def _release_pipeline_lock():
+    """Release the pipeline lock."""
+    lock_path = Config.OUTPUT_DIR / ".pipeline_lock"
+    try:
+        if lock_path.exists():
+            lock_path.unlink()
+    except OSError:
+        pass
+
+
 def run(args):
     """Run the full episode processing pipeline.
 
@@ -316,6 +347,21 @@ def run(args):
         PipelineContext with all results populated, or dict of results for
         backward-compatibility.
     """
+    if not _acquire_pipeline_lock():
+        logger.error(
+            "Another pipeline run is active (lock file: %s). Exiting.",
+            Config.OUTPUT_DIR / ".pipeline_lock",
+        )
+        return None
+
+    try:
+        return _run_pipeline(args)
+    finally:
+        _release_pipeline_lock()
+
+
+def _run_pipeline(args):
+    """Internal pipeline execution (called by run() after acquiring lock)."""
     # Support both Namespace and dict
     if isinstance(args, dict):
         episode_number = args.get("episode_number")

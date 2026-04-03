@@ -255,10 +255,12 @@ class ContentCalendar:
                 episode_key,
             )
             return
+        current_retries = data[episode_key]["slots"][slot_name].get("retry_count", 0)
         data[episode_key]["slots"][slot_name].update(
             {
                 "status": "failed",
                 "error": error,
+                "retry_count": current_retries + 1,
             }
         )
         self.save(data)
@@ -286,7 +288,7 @@ class ContentCalendar:
         self.save(data)
 
     def get_all_pending_slots(self) -> list[dict]:
-        """Return all pending slots across all episodes that are past due.
+        """Return all pending or retryable failed slots across all episodes that are past due.
 
         Returns:
             List of slot dicts augmented with 'episode_key' and 'slot_name'.
@@ -295,7 +297,9 @@ class ContentCalendar:
         results = []
         for ep_key, ep_data in self.load_all().items():
             for slot_name, slot in (ep_data.get("slots") or {}).items():
-                if slot.get("status") != "pending":
+                if slot.get("status") not in ("pending", "failed"):
+                    continue
+                if slot.get("status") == "failed" and slot.get("retry_count", 0) >= 3:
                     continue
                 scheduled_str = slot.get("scheduled_at", "")
                 if not scheduled_str:

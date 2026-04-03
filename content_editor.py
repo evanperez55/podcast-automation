@@ -203,12 +203,8 @@ class ContentEditor:
             response_text = response.choices[0].message.content
             analysis = self._parse_llm_response(response_text)
 
-            # Ensure new fields have defaults (backward compat with older responses)
-            analysis.setdefault("show_notes", "")
-            analysis.setdefault("chapters", [])
-            analysis.setdefault("hot_take", "")
-            analysis.setdefault("best_quotes", [])
-            analysis.get("social_captions", {}).setdefault("tiktok", "")
+            # Validate/normalize analysis to ensure all expected keys exist
+            analysis = self._validate_analysis(analysis)
 
             # DIRECT SEARCH: Find words to censor by searching transcript directly
             # This is more reliable than GPT-4 which can hallucinate
@@ -601,6 +597,38 @@ Please respond with ONLY valid JSON in this exact format:
 """
 
         return prompt
+
+    def _validate_analysis(self, analysis):
+        """Ensure all expected analysis fields exist with safe defaults.
+
+        Args:
+            analysis: Raw analysis dict from LLM response.
+
+        Returns:
+            The analysis dict with missing keys filled in.
+        """
+        defaults = {
+            "episode_title": "Untitled Episode",
+            "episode_summary": "",
+            "censor_timestamps": [],
+            "best_clips": [],
+            "social_captions": {"youtube": "", "twitter": "", "instagram": ""},
+            "show_notes": "",
+            "chapters": [],
+            "hot_take": "",
+            "best_quotes": [],
+        }
+        for key, default in defaults.items():
+            if key not in analysis or analysis[key] is None:
+                analysis[key] = default
+        # Ensure social_captions sub-keys exist
+        captions = analysis.get("social_captions", {})
+        if not isinstance(captions, dict):
+            captions = {}
+            analysis["social_captions"] = captions
+        for platform in ("youtube", "twitter", "instagram", "tiktok"):
+            captions.setdefault(platform, "")
+        return analysis
 
     def _parse_llm_response(self, response_text):
         """Parse Claude's JSON response."""

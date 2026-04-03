@@ -184,19 +184,40 @@ def post_scheduled(dry_run=False):
 
         results = _post_slot(slot, uploaders)
 
-        if results and not any(
-            "error" in v for v in results.values() if isinstance(v, dict)
-        ):
-            calendar.mark_slot_uploaded(ep_key, slot_name, results)
-            logger.info("Marked %s/%s as uploaded", ep_key, slot_name)
-        elif results:
-            errors = "; ".join(
-                f"{k}: {v.get('error', '?')}"
-                for k, v in results.items()
-                if isinstance(v, dict) and "error" in v
+        if results:
+            has_errors = any(
+                "error" in v for v in results.values() if isinstance(v, dict)
             )
-            calendar.mark_slot_failed(ep_key, slot_name, errors)
-            logger.warning("Marked %s/%s as failed: %s", ep_key, slot_name, errors)
+            has_successes = any(
+                isinstance(v, dict) and "error" not in v for v in results.values()
+            )
+            if has_successes and not has_errors:
+                # All platforms succeeded
+                calendar.mark_slot_uploaded(ep_key, slot_name, results)
+                logger.info("Marked %s/%s as uploaded", ep_key, slot_name)
+            elif has_successes and has_errors:
+                # Partial success — some platforms worked, some didn't
+                calendar.mark_slot_uploaded(ep_key, slot_name, results)
+                failed_platforms = [
+                    k
+                    for k, v in results.items()
+                    if isinstance(v, dict) and "error" in v
+                ]
+                logger.warning(
+                    "Partial success for %s/%s — failed on: %s",
+                    ep_key,
+                    slot_name,
+                    ", ".join(failed_platforms),
+                )
+            else:
+                # All failed
+                errors = "; ".join(
+                    f"{k}: {v.get('error', '?')}"
+                    for k, v in results.items()
+                    if isinstance(v, dict) and "error" in v
+                )
+                calendar.mark_slot_failed(ep_key, slot_name, errors)
+                logger.warning("Marked %s/%s as failed: %s", ep_key, slot_name, errors)
 
         all_results.append(
             {
