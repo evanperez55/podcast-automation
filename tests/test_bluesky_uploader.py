@@ -69,9 +69,10 @@ class TestBlueskyUploaderInit:
 class TestBlueskyPost:
     """Tests for BlueskyUploader.post."""
 
+    @patch("uploaders.bluesky_uploader.requests.get")
     @patch("uploaders.bluesky_uploader.requests.post")
     @patch("uploaders.bluesky_uploader.Config")
-    def test_post_success(self, mock_config, mock_post):
+    def test_post_success(self, mock_config, mock_post, mock_get):
         """Successful post returns post info."""
         mock_config.BLUESKY_HANDLE = "test.bsky.social"
         mock_config.BLUESKY_APP_PASSWORD = "xxxx"
@@ -83,6 +84,7 @@ class TestBlueskyPost:
         )
         post_response.raise_for_status = MagicMock()
         mock_post.side_effect = [auth_response, post_response]
+        mock_get.return_value = MagicMock(status_code=200)
 
         uploader = BlueskyUploader()
         result = uploader.post("Hello Bluesky!")
@@ -101,10 +103,11 @@ class TestBlueskyPost:
         result = uploader.post("Hello!")
         assert result is None
 
+    @patch("uploaders.bluesky_uploader.requests.get")
     @patch("uploaders.bluesky_uploader.requests.post")
     @patch("uploaders.bluesky_uploader.Config")
-    def test_post_truncates_to_300(self, mock_config, mock_post):
-        """Text longer than 300 chars should be truncated."""
+    def test_post_truncates_long_text(self, mock_config, mock_post, mock_get):
+        """Text longer than 280 chars should be truncated for grapheme safety."""
         mock_config.BLUESKY_HANDLE = "test.bsky.social"
         mock_config.BLUESKY_APP_PASSWORD = "xxxx"
 
@@ -115,16 +118,18 @@ class TestBlueskyPost:
         )
         post_response.raise_for_status = MagicMock()
         mock_post.side_effect = [auth_response, post_response]
+        mock_get.return_value = MagicMock(status_code=200)
 
         uploader = BlueskyUploader()
         long_text = "a" * 500
         result = uploader.post(long_text)
         assert result is not None
-        assert result["text"] == "a" * 300
+        assert result["text"] == "a" * 280
 
+    @patch("uploaders.bluesky_uploader.requests.get")
     @patch("uploaders.bluesky_uploader.requests.post")
     @patch("uploaders.bluesky_uploader.Config")
-    def test_post_with_external_url(self, mock_config, mock_post):
+    def test_post_with_external_url(self, mock_config, mock_post, mock_get):
         """Post with URL not in text adds external embed."""
         mock_config.BLUESKY_HANDLE = "test.bsky.social"
         mock_config.BLUESKY_APP_PASSWORD = "xxxx"
@@ -136,6 +141,7 @@ class TestBlueskyPost:
         )
         post_response.raise_for_status = MagicMock()
         mock_post.side_effect = [auth_response, post_response]
+        mock_get.return_value = MagicMock(status_code=200)
 
         uploader = BlueskyUploader()
         result = uploader.post(
@@ -227,9 +233,10 @@ class TestGetHeaders:
 class TestPostLinkFacet:
     """Tests for post with URL in text (link facet)."""
 
+    @patch("uploaders.bluesky_uploader.requests.get")
     @patch("uploaders.bluesky_uploader.requests.post")
     @patch("uploaders.bluesky_uploader.Config")
-    def test_post_with_url_in_text(self, mock_config, mock_post):
+    def test_post_with_url_in_text(self, mock_config, mock_post, mock_get):
         """URL embedded in text creates a link facet."""
         mock_config.BLUESKY_HANDLE = "test.bsky.social"
         mock_config.BLUESKY_APP_PASSWORD = "xxxx"
@@ -241,6 +248,7 @@ class TestPostLinkFacet:
         )
         post_response.raise_for_status = MagicMock()
         mock_post.side_effect = [auth_response, post_response]
+        mock_get.return_value = MagicMock(status_code=200)
 
         uploader = BlueskyUploader()
         url = "https://example.com"
@@ -255,9 +263,10 @@ class TestPostLinkFacet:
 class TestPostUnicodeEncodeError:
     """Tests for UnicodeEncodeError handling in post logging."""
 
+    @patch("uploaders.bluesky_uploader.requests.get")
     @patch("uploaders.bluesky_uploader.requests.post")
     @patch("uploaders.bluesky_uploader.Config")
-    def test_post_unicode_logging_fallback(self, mock_config, mock_post):
+    def test_post_unicode_logging_fallback(self, mock_config, mock_post, mock_get):
         """UnicodeEncodeError in logging falls back to ASCII replacement."""
         mock_config.BLUESKY_HANDLE = "test.bsky.social"
         mock_config.BLUESKY_APP_PASSWORD = "xxxx"
@@ -269,6 +278,7 @@ class TestPostUnicodeEncodeError:
         )
         post_response.raise_for_status = MagicMock()
         mock_post.side_effect = [auth_response, post_response]
+        mock_get.return_value = MagicMock(status_code=200)
 
         uploader = BlueskyUploader()
 
@@ -296,9 +306,10 @@ class TestPostUnicodeEncodeError:
 class TestPostRequestFailure:
     """Tests for post request failure handling."""
 
+    @patch("uploaders.bluesky_uploader.requests.get")
     @patch("uploaders.bluesky_uploader.requests.post")
     @patch("uploaders.bluesky_uploader.Config")
-    def test_post_request_exception(self, mock_config, mock_post):
+    def test_post_request_exception(self, mock_config, mock_post, mock_get):
         """RequestException during post returns None."""
         mock_config.BLUESKY_HANDLE = "test.bsky.social"
         mock_config.BLUESKY_APP_PASSWORD = "xxxx"
@@ -310,6 +321,7 @@ class TestPostRequestFailure:
             auth_response,
             req.RequestException("Post failed"),
         ]
+        mock_get.return_value = MagicMock(status_code=200)
 
         uploader = BlueskyUploader()
         result = uploader.post("Hello!")
@@ -425,24 +437,29 @@ class TestPostWithImage:
         result = uploader.post_with_image("Hello", "/some/image.png")
         assert result is None
 
+    @patch("uploaders.bluesky_uploader.requests.get")
     @patch.object(BlueskyUploader, "upload_image", return_value=None)
     @patch.object(BlueskyUploader, "_authenticate")
     @patch("uploaders.bluesky_uploader.Config")
-    def test_post_with_image_upload_fails(self, mock_config, mock_auth, mock_upload):
+    def test_post_with_image_upload_fails(
+        self, mock_config, mock_auth, mock_upload, mock_get
+    ):
         """Returns None when image upload fails."""
         mock_config.BLUESKY_HANDLE = "test.bsky.social"
         mock_config.BLUESKY_APP_PASSWORD = "xxxx"
+        mock_get.return_value = MagicMock(status_code=200)
         uploader = BlueskyUploader()
         uploader.session = MOCK_SESSION
         result = uploader.post_with_image("Hello", "/some/image.png")
         assert result is None
 
+    @patch("uploaders.bluesky_uploader.requests.get")
     @patch("uploaders.bluesky_uploader.requests.post")
     @patch.object(BlueskyUploader, "upload_image", return_value={"ref": "blob-ref"})
     @patch.object(BlueskyUploader, "_authenticate")
     @patch("uploaders.bluesky_uploader.Config")
     def test_post_with_image_success(
-        self, mock_config, mock_auth, mock_upload, mock_post
+        self, mock_config, mock_auth, mock_upload, mock_post, mock_get
     ):
         """Successfully posts with image embed."""
         mock_config.BLUESKY_HANDLE = "test.bsky.social"
@@ -453,6 +470,7 @@ class TestPostWithImage:
         )
         post_response.raise_for_status = MagicMock()
         mock_post.return_value = post_response
+        mock_get.return_value = MagicMock(status_code=200)
 
         uploader = BlueskyUploader()
         uploader.session = MOCK_SESSION
@@ -461,12 +479,13 @@ class TestPostWithImage:
         assert result["status"] == "success"
         assert "img1" in result["post_url"]
 
+    @patch("uploaders.bluesky_uploader.requests.get")
     @patch("uploaders.bluesky_uploader.requests.post")
     @patch.object(BlueskyUploader, "upload_image", return_value={"ref": "blob-ref"})
     @patch.object(BlueskyUploader, "_authenticate")
     @patch("uploaders.bluesky_uploader.Config")
     def test_post_with_image_no_alt_text(
-        self, mock_config, mock_auth, mock_upload, mock_post
+        self, mock_config, mock_auth, mock_upload, mock_post, mock_get
     ):
         """Uses text[:100] as alt text when none provided."""
         mock_config.BLUESKY_HANDLE = "test.bsky.social"
@@ -477,6 +496,7 @@ class TestPostWithImage:
         )
         post_response.raise_for_status = MagicMock()
         mock_post.return_value = post_response
+        mock_get.return_value = MagicMock(status_code=200)
 
         uploader = BlueskyUploader()
         uploader.session = MOCK_SESSION
@@ -487,12 +507,13 @@ class TestPostWithImage:
         record = call_kwargs["json"]["record"]
         assert record["embed"]["images"][0]["alt"] == "Hello image!"
 
+    @patch("uploaders.bluesky_uploader.requests.get")
     @patch("uploaders.bluesky_uploader.requests.post")
     @patch.object(BlueskyUploader, "upload_image", return_value={"ref": "blob-ref"})
     @patch.object(BlueskyUploader, "_authenticate")
     @patch("uploaders.bluesky_uploader.Config")
     def test_post_with_image_request_exception(
-        self, mock_config, mock_auth, mock_upload, mock_post
+        self, mock_config, mock_auth, mock_upload, mock_post, mock_get
     ):
         """Returns None on post request failure."""
         mock_config.BLUESKY_HANDLE = "test.bsky.social"
@@ -500,6 +521,7 @@ class TestPostWithImage:
         import requests as req
 
         mock_post.side_effect = req.RequestException("Post failed")
+        mock_get.return_value = MagicMock(status_code=200)
         uploader = BlueskyUploader()
         uploader.session = MOCK_SESSION
         result = uploader.post_with_image("Hello!", "/img.png")

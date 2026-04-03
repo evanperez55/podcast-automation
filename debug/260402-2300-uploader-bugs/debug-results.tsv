@@ -1,0 +1,8 @@
+iteration	type	hypothesis	result	severity	location	description
+1	hypothesis	Twitter hashtag truncation cuts YouTube URL	confirmed	MEDIUM	twitter_uploader.py:287	main_tweet[:max_len] can cut the YouTube URL when hashtags need space
+2	hypothesis	Bluesky post truncates text to 300 chars but uses Python len() not grapheme count	confirmed	MEDIUM	bluesky_uploader.py:91	text[:300] counts Python chars but Bluesky limits graphemes — emoji/CJK chars count differently
+3	hypothesis	Bluesky session never refreshes — tokens expire after ~2 hours	confirmed	HIGH	bluesky_uploader.py:35-51	_authenticate called once in __init__, no refresh logic. Pipeline can run 30+ min before posting
+4	hypothesis	Twitter post_tweet returns full text in result including truncated portion	confirmed	LOW	twitter_uploader.py:135	result["text"] = text (pre-truncation), not the actual posted text[:280]
+5	hypothesis	Bluesky facet byte indices wrong for emoji in text before URL	confirmed	MEDIUM	bluesky_uploader.py:106	byteStart/byteEnd use UTF-8 encoding, but text[:start] might miscalculate if emoji are present before URL
+6	hypothesis	YouTube _append_hashtags could exceed 500 char tag field limit	confirmed	LOW	youtube_uploader.py:_append_hashtags	Appends up to 15 tags but YouTube tag field has a 500 char total limit
+7	hypothesis	Twitter rate limiter uses module-level global — shared across instances	confirmed	LOW	twitter_uploader.py:14	_last_tweet_time is module global, fine for single process but weird in tests

@@ -50,6 +50,24 @@ class BlueskyUploader:
             logger.warning("Bluesky authentication failed: %s", e)
             self.session = None
 
+    def _ensure_authenticated(self):
+        """Re-authenticate if session is expired or missing."""
+        if not self.session:
+            self._authenticate()
+            return
+        # Quick check: try to use the session, re-auth if 401
+        try:
+            response = requests.get(
+                f"{self.API_BASE}/com.atproto.server.getSession",
+                headers=self._get_headers(),
+                timeout=5,
+            )
+            if response.status_code == 401:
+                logger.info("Bluesky session expired, re-authenticating...")
+                self._authenticate()
+        except requests.RequestException:
+            self._authenticate()
+
     def _get_headers(self):
         """Get authorization headers."""
         if not self.session:
@@ -83,12 +101,14 @@ class BlueskyUploader:
         Returns:
             Dictionary with post info, or None if failed
         """
+        self._ensure_authenticated()
         if not self.session:
             logger.error("Bluesky not authenticated")
             return None
 
         headers = self._get_headers()
-        text = text[:300]
+        # Conservative: Bluesky limits 300 graphemes; truncate to 280 chars for safety
+        text = text[:280]
 
         # Build the record
         record = {
@@ -222,6 +242,7 @@ class BlueskyUploader:
         Returns:
             Dictionary with post info, or None if failed.
         """
+        self._ensure_authenticated()
         if not self.session:
             logger.error("Bluesky not authenticated")
             return None
@@ -230,7 +251,8 @@ class BlueskyUploader:
         if not blob:
             return None
 
-        text = text[:300]
+        # Conservative: Bluesky limits 300 graphemes; truncate to 280 chars for safety
+        text = text[:280]
         record = {
             "$type": "app.bsky.feed.post",
             "text": text,

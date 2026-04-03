@@ -282,6 +282,12 @@ class TwitterUploader:
             hashtag_addition = f"\n\n{hashtag_line}"
             if len(main_tweet) + len(hashtag_addition) <= 280:
                 main_tweet = main_tweet + hashtag_addition
+            elif youtube_url and youtube_url in main_tweet:
+                # Preserve URL: truncate caption part only
+                url_part = f"\n\n{youtube_url}"
+                caption_part = main_tweet.replace(url_part, "")
+                max_caption = 280 - len(url_part) - len(hashtag_addition)
+                main_tweet = caption_part[:max_caption] + url_part + hashtag_addition
             else:
                 max_len = 280 - len(hashtag_addition)
                 main_tweet = main_tweet[:max_len] + hashtag_addition
