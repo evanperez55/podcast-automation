@@ -360,7 +360,7 @@ class SubtitleClipGenerator:
         audio_path_obj = Path(audio_path)
 
         if not audio_path_obj.exists():
-            logger.error(f"Audio file not found: {audio_path}")
+            logger.error("Audio file not found: %s", audio_path)
             return None
 
         # Resolve dimensions
@@ -394,7 +394,9 @@ class SubtitleClipGenerator:
         )
 
         logger.info(
-            f"Creating subtitle clip: {audio_path_obj.name} -> {Path(output_path).name}"
+            "Creating subtitle clip: %s -> %s",
+            audio_path_obj.name,
+            Path(output_path).name,
         )
 
         try:
@@ -412,18 +414,18 @@ class SubtitleClipGenerator:
                 )
 
             if result.returncode != 0:
-                logger.error(f"FFmpeg subtitle clip failed (exit {result.returncode})")
-                logger.error(f"FFmpeg stderr: {result.stderr}")
+                logger.error("FFmpeg subtitle clip failed (exit %d)", result.returncode)
+                logger.error("FFmpeg stderr: %s", result.stderr)
                 return None
 
-            logger.info(f"Subtitle clip created: {output_path}")
+            logger.info("Subtitle clip created: %s", output_path)
             return output_path
 
         except subprocess.TimeoutExpired:
             logger.error("FFmpeg subtitle clip timed out after 300 seconds")
             return None
         except Exception as e:
-            logger.error(f"Subtitle clip generation error: {e}")
+            logger.error("Subtitle clip generation error: %s", e)
             return None
 
     def create_subtitle_clips(

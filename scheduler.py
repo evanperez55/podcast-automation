@@ -130,7 +130,7 @@ class UploadScheduler:
         tmp_path.write_text(json.dumps(schedule, indent=2), encoding="utf-8")
         tmp_path.replace(schedule_path)
 
-        logger.info(f"Saved upload schedule to {schedule_path}")
+        logger.info("Saved upload schedule to %s", schedule_path)
         return schedule_path
 
     def load_schedule(self, episode_folder: str) -> Optional[dict]:
@@ -145,11 +145,11 @@ class UploadScheduler:
         schedule_path = Config.OUTPUT_DIR / episode_folder / "upload_schedule.json"
 
         if not schedule_path.exists():
-            logger.debug(f"No schedule found at {schedule_path}")
+            logger.debug("No schedule found at %s", schedule_path)
             return None
 
         schedule = json.loads(schedule_path.read_text(encoding="utf-8"))
-        logger.debug(f"Loaded upload schedule from {schedule_path}")
+        logger.debug("Loaded upload schedule from %s", schedule_path)
         return schedule
 
     def get_pending_uploads(self, schedule: dict) -> List[dict]:
@@ -188,7 +188,7 @@ class UploadScheduler:
             schedule["platforms"][platform]["status"] = "uploaded"
             schedule["platforms"][platform]["upload_result"] = result
             schedule["platforms"][platform]["uploaded_at"] = datetime.now().isoformat()
-            logger.info(f"Marked {platform} as uploaded for schedule")
+            logger.info("Marked %s as uploaded for schedule", platform)
 
         return schedule
 
@@ -270,6 +270,6 @@ class UploadScheduler:
             publish_at = (
                 datetime.now(timezone.utc) + timedelta(hours=self.youtube_delay)
             ).isoformat()
-            logger.debug(f"YouTube publishAt: {publish_at}")
+            logger.debug("YouTube publishAt: %s", publish_at)
             return publish_at
         return None

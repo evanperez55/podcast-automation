@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional, List
 from config import Config
 from logger import logger
-from video_utils import get_h264_encoder_args
+from video_utils import get_h264_encoder_args, disable_nvenc_and_get_fallback_args
 
 
 class VideoConverter:
@@ -128,7 +128,39 @@ class VideoConverter:
                 logger.error("FFmpeg exited 0 but output file not created")
                 return None
             else:
-                logger.error("FFmpeg failed: %s", result.stderr)
+                stderr = result.stderr.strip()[:300]
+                # NVENC runtime failure — retry with libx264 fallback
+                if Config.USE_NVENC and (
+                    "nvenc" in stderr.lower()
+                    or "nvcuda" in stderr.lower()
+                    or "session" in stderr.lower()
+                ):
+                    fallback_args = disable_nvenc_and_get_fallback_args(
+                        preset="medium", crf=18, profile="high"
+                    )
+                    cv_idx = command.index("-c:v")
+                    pf_idx = command.index("yuv420p")
+                    command[cv_idx : pf_idx + 1] = fallback_args
+                    # Add -tune stillimage now that we're using libx264
+                    ca_idx = command.index("-c:a")
+                    command.insert(ca_idx, "stillimage")
+                    command.insert(ca_idx, "-tune")
+                    result = subprocess.run(
+                        command,
+                        capture_output=True,
+                        text=True,
+                        stdin=subprocess.DEVNULL,
+                        timeout=7200,
+                    )
+                    if result.returncode == 0 and output_path.exists():
+                        logger.info("Video created (libx264 fallback): %s", output_path)
+                        return str(output_path)
+                    logger.error(
+                        "FFmpeg failed (libx264 fallback): %s",
+                        result.stderr.strip()[:200],
+                    )
+                    return None
+                logger.error("FFmpeg failed: %s", stderr)
                 return None
 
         except subprocess.TimeoutExpired:
@@ -249,9 +281,39 @@ class VideoConverter:
                 logger.info("Video with subtitles created: %s", output_path)
                 return str(output_path)
             else:
+                stderr = result.stderr.strip()[:300]
+                # NVENC runtime failure — retry with libx264 fallback
+                if Config.USE_NVENC and (
+                    "nvenc" in stderr.lower()
+                    or "nvcuda" in stderr.lower()
+                    or "session" in stderr.lower()
+                ):
+                    fallback_args = disable_nvenc_and_get_fallback_args(
+                        preset="medium", crf=18, profile="high"
+                    )
+                    cv_idx = command.index("-c:v")
+                    pf_idx = command.index("yuv420p")
+                    command[cv_idx : pf_idx + 1] = fallback_args
+                    # Add -tune stillimage now that we're using libx264
+                    ca_idx = command.index("-c:a")
+                    command.insert(ca_idx, "stillimage")
+                    command.insert(ca_idx, "-tune")
+                    result = subprocess.run(
+                        command,
+                        capture_output=True,
+                        text=True,
+                        stdin=subprocess.DEVNULL,
+                        timeout=7200,
+                    )
+                    if result.returncode == 0:
+                        logger.info(
+                            "Video with subtitles created (libx264 fallback): %s",
+                            output_path,
+                        )
+                        return str(output_path)
                 logger.warning(
                     "Subtitle burn failed, falling back to no subtitles: %s",
-                    result.stderr[:200],
+                    stderr[:200],
                 )
                 return self.audio_to_video(
                     str(audio_path), str(output_path), format_type, resolution

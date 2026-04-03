@@ -44,10 +44,10 @@ class ThumbnailGenerator:
             output = Path(output_path)
             output.parent.mkdir(parents=True, exist_ok=True)
             image.save(str(output), "PNG")
-            logger.info(f"Thumbnail saved to {output}")
+            logger.info("Thumbnail saved to %s", output)
             return output
         except Exception as e:
-            logger.error(f"Failed to generate thumbnail: {e}")
+            logger.error("Failed to generate thumbnail: %s", e)
             return None
 
     def _create_background(self, width: int, height: int):
@@ -69,7 +69,7 @@ class ThumbnailGenerator:
                 # Ensure RGBA so we can composite later
                 return logo.convert("RGBA")
         except Exception as e:
-            logger.warning(f"Could not load logo, using solid background: {e}")
+            logger.warning("Could not load logo, using solid background: %s", e)
 
         image = Image.new("RGBA", (width, height), self.bg_color)
         return image

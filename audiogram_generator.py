@@ -51,7 +51,7 @@ class AudiogramGenerator:
         audio_path = Path(audio_path)
 
         if not audio_path.exists():
-            logger.error(f"Audio file not found: {audio_path}")
+            logger.error("Audio file not found: %s", audio_path)
             return None
 
         # Resolve dimensions from format type
@@ -63,8 +63,9 @@ class AudiogramGenerator:
 
         if format_type not in resolution_map:
             logger.error(
-                f"Invalid format_type '{format_type}'. "
-                f"Must be one of: {', '.join(resolution_map.keys())}"
+                "Invalid format_type '%s'. Must be one of: %s",
+                format_type,
+                ", ".join(resolution_map.keys()),
             )
             return None
 
@@ -77,8 +78,11 @@ class AudiogramGenerator:
         output_path = str(output_path)
 
         logger.info(
-            f"Creating {format_type} audiogram ({width}x{height}) "
-            f"from {audio_path.name}"
+            "Creating %s audiogram (%dx%d) from %s",
+            format_type,
+            width,
+            height,
+            audio_path.name,
         )
 
         # Build and run FFmpeg command
@@ -96,18 +100,18 @@ class AudiogramGenerator:
             )
 
             if result.returncode != 0:
-                logger.error(f"FFmpeg audiogram failed (exit {result.returncode})")
-                logger.error(f"FFmpeg stderr: {result.stderr}")
+                logger.error("FFmpeg audiogram failed (exit %d)", result.returncode)
+                logger.error("FFmpeg stderr: %s", result.stderr)
                 return None
 
-            logger.info(f"Audiogram created: {output_path}")
+            logger.info("Audiogram created: %s", output_path)
             return output_path
 
         except subprocess.TimeoutExpired:
             logger.error("FFmpeg audiogram timed out after 300 seconds")
             return None
         except Exception as e:
-            logger.error(f"Audiogram generation error: {e}")
+            logger.error("Audiogram generation error: %s", e)
             return None
 
     def _build_ffmpeg_command(

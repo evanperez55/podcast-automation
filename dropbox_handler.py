@@ -119,6 +119,15 @@ class DropboxHandler:
                         f.write(chunk)
                         pbar.update(len(chunk))
 
+            # Verify download integrity
+            downloaded_size = Path(local_path).stat().st_size
+            if downloaded_size != file_size:
+                logger.warning(
+                    "Download size mismatch: expected %d bytes, got %d bytes",
+                    file_size,
+                    downloaded_size,
+                )
+
             logger.info("Downloaded to: %s", local_path)
             return local_path
 
