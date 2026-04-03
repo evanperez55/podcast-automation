@@ -294,6 +294,8 @@ class ContentCalendar:
             List of slot dicts augmented with 'episode_key' and 'slot_name'.
         """
         now = datetime.now()
+        # Grace window: treat slots within 5 minutes of now as due
+        grace = now + timedelta(minutes=5)
         results = []
         for ep_key, ep_data in self.load_all().items():
             for slot_name, slot in (ep_data.get("slots") or {}).items():
@@ -306,9 +308,12 @@ class ContentCalendar:
                     continue
                 try:
                     scheduled = datetime.fromisoformat(scheduled_str)
+                    # Strip timezone info to avoid naive vs aware comparison crash
+                    if scheduled.tzinfo is not None:
+                        scheduled = scheduled.replace(tzinfo=None)
                 except (ValueError, TypeError):
                     continue
-                if scheduled <= now:
+                if scheduled <= grace:
                     results.append(
                         {
                             "episode_key": ep_key,

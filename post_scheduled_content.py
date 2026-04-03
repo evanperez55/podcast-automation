@@ -173,7 +173,13 @@ def post_scheduled(dry_run=False):
 
     uploaders = _init_uploaders()
     if not uploaders:
-        logger.warning("No uploaders available, skipping scheduled posts")
+        logger.warning("No uploaders available — marking pending slots as failed")
+        for slot in pending:
+            calendar.mark_slot_failed(
+                slot["episode_key"],
+                slot["slot_name"],
+                "No uploaders available (credentials missing)",
+            )
         return []
 
     all_results = []
