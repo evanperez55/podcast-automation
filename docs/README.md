@@ -59,6 +59,7 @@ uv run main.py list                # List available episodes
 uv run main.py search "keyword"    # Full-text search
 uv run main.py analytics all       # View engagement analytics
 uv run main.py --client foo latest # Process for a specific client
+uv run main.py health-check        # Validate all API credentials
 ```
 
 **Flags:** `--dry-run`, `--test`, `--auto-approve`, `--client <name>`

@@ -277,6 +277,12 @@ Available uploaders: YouTube, Twitter/X, Bluesky, Instagram, TikTok, Reddit, Spo
 
 `content_calendar.py` manages a 2-week content calendar that staggers YouTube Shorts releases across 14 days. Rather than posting all clips on day one, it distributes them for sustained engagement.
 
+Key behaviors:
+- **Retry logic:** Failed slots retry up to 3 times (tracked via `retry_count`)
+- **Per-platform tracking:** Each platform records success/failure independently; partial success marks the slot as uploaded
+- **Scheduling tolerance:** 5-minute grace window on slot scheduling times
+- **Timezone safety:** Datetime comparisons strip tzinfo to avoid naive/aware mismatches
+
 ### Scheduled Posting
 
 `scheduler.py` supports per-platform upload delays and optimal posting hours:
@@ -293,6 +299,7 @@ Delays are configurable via `SCHEDULE_{PLATFORM}_DELAY_HOURS` env vars.
 
 ## Error Handling Strategy
 
+- **Pipeline lock:** PID-based lock file at `output/.pipeline_lock` prevents concurrent pipeline runs. Lock is acquired at startup and released on completion or crash
 - **Required services** (Dropbox, OpenAI): raise `ValueError` in `__init__`, caught by `Config.validate()` before pipeline starts
 - **Optional uploaders** (YouTube, Twitter, etc.): raise `ValueError` if unconfigured, caught during initialization, excluded from upload list
 - **Each upload step**: wrapped in `try/except Exception`, logs error, records `{"status": "error"}`, continues pipeline

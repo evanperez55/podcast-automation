@@ -29,7 +29,7 @@ uv run pytest tests/test_analytics.py::TestFetchYouTubeAnalytics::test_fetch_you
 
 - **Test files:** 55 files in `tests/`
 - **Total tests:** 1,255+
-- **Coverage:** ~94%
+- **Coverage:** ~94% (notable: `bluesky_uploader` 100%, `video_converter` 99%)
 - **Lines of test code:** ~25,500
 
 ## Pre-Commit Hook

@@ -93,6 +93,8 @@ uv run main.py --dry-run latest
 
 **Operations:**
 - Pipeline checkpoint/resume (crash recovery)
+- PID-based pipeline lock (`output/.pipeline_lock`) prevents concurrent runs
+- Credential health check (`health-check` command) for all connected services
 - Full-text episode search (SQLite FTS5)
 - YouTube/Twitter engagement analytics
 - Content compliance checking
@@ -158,6 +160,7 @@ Each step checkpoints its output. If the pipeline crashes, re-running the same e
 | `uv run main.py find-prospects` | Find potential podcast clients |
 | `uv run main.py gen-pitch <slug>` | Generate a pitch for a prospect |
 | `uv run main.py outreach <action>` | Manage prospect outreach |
+| `uv run main.py health-check` | Validate all API credentials (YouTube, Twitter, Bluesky, Discord, Dropbox, OpenAI) |
 
 **Flags:**
 
