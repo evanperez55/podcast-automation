@@ -10,6 +10,7 @@ from pipeline import (
     run_backfill_ids,
     run_search,
     dry_run,
+    health_check,
     list_episodes_by_number,
     list_available_episodes,
 )
@@ -187,6 +188,9 @@ def main():
         if _handle_client_command(cmd, args):
             return
 
+        if cmd == "health-check":
+            health_check()
+            return
         if cmd == "upload-scheduled":
             _activate_client(client_name)
             run_upload_scheduled()

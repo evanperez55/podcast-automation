@@ -269,10 +269,9 @@ class ContentEditor:
                     ],
                 )
             except (
-                self._openai.RateLimitError,
-                self._openai.APIError,
                 self._openai.APIConnectionError,
-                self._openai.APITimeoutError,
+                self._openai.RateLimitError,
+                self._openai.APIStatusError,
             ) as e:
                 last_error = e
                 if attempt < max_retries:

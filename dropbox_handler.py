@@ -133,6 +133,21 @@ class DropboxHandler:
 
         except ApiError as e:
             logger.error("Error downloading file: %s", e)
+            if local_path and Path(local_path).exists():
+                try:
+                    Path(local_path).unlink()
+                    logger.info("Cleaned up partial download: %s", local_path)
+                except OSError:
+                    pass
+            return None
+        except Exception as e:
+            logger.error("Unexpected error downloading file: %s", e)
+            if local_path and Path(local_path).exists():
+                try:
+                    Path(local_path).unlink()
+                    logger.info("Cleaned up partial download: %s", local_path)
+                except OSError:
+                    pass
             return None
 
     def get_latest_episode(self):

@@ -9,6 +9,7 @@ from pipeline.runner import (
     run_backfill_ids,
     run_search,
     dry_run,
+    health_check,
     list_episodes_by_number,
     list_available_episodes,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "run_backfill_ids",
     "run_search",
     "dry_run",
+    "health_check",
     "run_distribute_only",
     "list_episodes_by_number",
     "list_available_episodes",
