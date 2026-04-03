@@ -81,6 +81,7 @@ def _post_slot(slot, uploaders):
                 }
                 logger.info("Made YouTube Short %s public", youtube_video_id)
             else:
+                results["youtube"] = {"error": "set_video_privacy returned False"}
                 logger.warning(
                     "Failed to make YouTube Short %s public", youtube_video_id
                 )
@@ -102,7 +103,12 @@ def _post_slot(slot, uploaders):
                     media = [image_path]
                 tweet_text = text
                 if youtube_url and not image_path:
-                    tweet_text = f"{text}\n\n{youtube_url}" if text else youtube_url
+                    url_space = len(youtube_url) + 2  # for \n\n
+                    max_text = 280 - url_space
+                    truncated = text[:max_text] if text else ""
+                    tweet_text = (
+                        f"{truncated}\n\n{youtube_url}" if truncated else youtube_url
+                    )
                 result = uploader.post_tweet(
                     text=tweet_text[:280],
                     media_paths=media,

@@ -271,7 +271,11 @@ class CompilationGenerator:
 
         try:
             result = subprocess.run(
-                command, capture_output=True, text=True, timeout=3600
+                command,
+                capture_output=True,
+                text=True,
+                stdin=subprocess.DEVNULL,
+                timeout=3600,
             )
             if result.returncode == 0 and mp4_path.exists():
                 logger.info("Compilation video created: %s", mp4_path)

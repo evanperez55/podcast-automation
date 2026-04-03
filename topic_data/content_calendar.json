@@ -131,9 +131,18 @@
           "youtube_video_id": "F6S7FjljtGU",
           "clip_title": "Torture works by turning pain way up"
         },
-        "status": "pending",
-        "uploaded_at": null,
-        "upload_results": {}
+        "status": "uploaded",
+        "uploaded_at": "2026-04-02T18:24:12.903437",
+        "upload_results": {
+          "twitter": {
+            "tweet_id": "2039846399500505516",
+            "tweet_url": "https://twitter.com/i/web/status/2039846399500505516",
+            "text": "Torture works by turning pain way up",
+            "media_count": 0,
+            "status": "success"
+          }
+        },
+        "error": "Object of type MagicMock is not JSON serializable"
       },
       "clip_4": {
         "slot_type": "clip_4",

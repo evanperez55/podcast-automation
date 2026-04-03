@@ -53,7 +53,7 @@ class UploadScheduler:
         Returns:
             Schedule dict with platform entries for all platforms with delay > 0.
         """
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         platforms: Dict[str, Any] = {}
 
         if self.youtube_delay > 0:
@@ -161,7 +161,7 @@ class UploadScheduler:
         Returns:
             List of platform entry dicts, each with an added "platform" key.
         """
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         pending = []
 
         for platform, entry in schedule.get("platforms", {}).items():

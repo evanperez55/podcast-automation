@@ -117,6 +117,7 @@ class VideoConverter:
                 command,
                 capture_output=True,
                 text=True,
+                stdin=subprocess.DEVNULL,
                 timeout=7200,  # 2 hour timeout for long episodes
             )
 
@@ -237,7 +238,11 @@ class VideoConverter:
 
         try:
             result = subprocess.run(
-                command, capture_output=True, text=True, timeout=7200
+                command,
+                capture_output=True,
+                text=True,
+                stdin=subprocess.DEVNULL,
+                timeout=7200,
             )
 
             if result.returncode == 0:

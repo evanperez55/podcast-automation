@@ -398,7 +398,13 @@ class SubtitleClipGenerator:
         )
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                stdin=subprocess.DEVNULL,
+                timeout=300,
+            )
 
             if "substituting font" in result.stderr.lower():
                 logger.warning(

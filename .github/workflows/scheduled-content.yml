@@ -38,6 +38,7 @@ jobs:
 
       - name: Post pending scheduled content
         env:
+          TZ: America/New_York
           TWITTER_ENABLED: "true"
           TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
           TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}

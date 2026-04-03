@@ -167,7 +167,7 @@ class TestGetPendingUploads:
     def test_get_pending_uploads_none_ready(self):
         """Returns empty list when publish_at is in the future."""
         scheduler = UploadScheduler()
-        future = (datetime.now() + timedelta(hours=24)).isoformat()
+        future = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
         schedule = {
             "platforms": {
                 "youtube": {"status": "pending", "publish_at": future},
@@ -179,7 +179,7 @@ class TestGetPendingUploads:
     def test_get_pending_uploads_ready(self):
         """Returns entries whose publish_at is in the past."""
         scheduler = UploadScheduler()
-        past = (datetime.now() - timedelta(hours=1)).isoformat()
+        past = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
         schedule = {
             "platforms": {
                 "twitter": {"status": "pending", "publish_at": past, "data": "tw"},
@@ -194,7 +194,7 @@ class TestGetPendingUploads:
     def test_get_pending_uploads_already_uploaded(self):
         """Skips entries whose status is 'uploaded'."""
         scheduler = UploadScheduler()
-        past = (datetime.now() - timedelta(hours=1)).isoformat()
+        past = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
         schedule = {
             "platforms": {
                 "youtube": {"status": "uploaded", "publish_at": past},

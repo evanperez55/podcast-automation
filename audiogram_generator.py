@@ -87,7 +87,13 @@ class AudiogramGenerator:
         )
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                stdin=subprocess.DEVNULL,
+                timeout=300,
+            )
 
             if result.returncode != 0:
                 logger.error(f"FFmpeg audiogram failed (exit {result.returncode})")

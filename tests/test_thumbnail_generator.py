@@ -11,12 +11,14 @@ import pytest
 # all PIL sub-modules so that ``thumbnail_generator`` can be imported even
 # when Pillow is absent.
 # ---------------------------------------------------------------------------
-_pil_mock = MagicMock()
-
-sys.modules.setdefault("PIL", _pil_mock)
-sys.modules.setdefault("PIL.Image", _pil_mock.Image)
-sys.modules.setdefault("PIL.ImageDraw", _pil_mock.ImageDraw)
-sys.modules.setdefault("PIL.ImageFont", _pil_mock.ImageFont)
+try:
+    import PIL  # noqa: F401
+except ImportError:
+    _pil_mock = MagicMock()
+    sys.modules.setdefault("PIL", _pil_mock)
+    sys.modules.setdefault("PIL.Image", _pil_mock.Image)
+    sys.modules.setdefault("PIL.ImageDraw", _pil_mock.ImageDraw)
+    sys.modules.setdefault("PIL.ImageFont", _pil_mock.ImageFont)
 
 from thumbnail_generator import ThumbnailGenerator  # noqa: E402
 

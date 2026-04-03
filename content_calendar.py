@@ -339,7 +339,7 @@ class ContentCalendar:
         """
         self.calendar_path.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = self.calendar_path.with_suffix(".json.tmp")
-        tmp_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        tmp_path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
         tmp_path.replace(self.calendar_path)
 
     def get_calendar_display(
