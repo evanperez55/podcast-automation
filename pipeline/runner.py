@@ -14,25 +14,19 @@ from pathlib import Path
 from config import Config
 from logger import logger
 from pipeline_state import PipelineState
-from dropbox_handler import DropboxHandler
-from transcription import Transcriber
-from content_editor import ContentEditor
-from audio_processor import AudioProcessor
-from video_converter import VideoConverter
-from uploaders import (
-    YouTubeUploader,
-    InstagramUploader,
-    TikTokUploader,
-    TwitterUploader,
-    SpotifyUploader,
-    BlueskyUploader,
-    RedditUploader,
-)
-from notifications import DiscordNotifier
-from scheduler import UploadScheduler
-from blog_generator import BlogPostGenerator
-from thumbnail_generator import ThumbnailGenerator
-from analytics import AnalyticsCollector, TopicEngagementScorer
+
+# Heavy modules lazy-imported in _init_components() to speed up CLI startup
+# from dropbox_handler import DropboxHandler
+# from transcription import Transcriber
+# from content_editor import ContentEditor
+# from audio_processor import AudioProcessor
+# from video_converter import VideoConverter
+# from uploaders import YouTubeUploader, etc.
+# from notifications import DiscordNotifier
+# from scheduler import UploadScheduler
+# from blog_generator import BlogPostGenerator
+# from thumbnail_generator import ThumbnailGenerator
+# from analytics import AnalyticsCollector, TopicEngagementScorer
 from clip_previewer import ClipPreviewer
 from search_index import EpisodeSearchIndex
 from audiogram_generator import AudiogramGenerator
@@ -56,6 +50,16 @@ def _init_uploaders():
     picking up Fake Problems' shared credentials from env vars and the credentials/
     directory. Per-client uploaders can be enabled later via explicit YAML config.
     """
+    from uploaders import (
+        YouTubeUploader,
+        InstagramUploader,
+        TikTokUploader,
+        TwitterUploader,
+        SpotifyUploader,
+        BlueskyUploader,
+        RedditUploader,
+    )
+
     uploaders = {}
 
     episode_source = getattr(Config, "EPISODE_SOURCE", "dropbox")
@@ -138,6 +142,27 @@ def _init_components(
         resume: If True, resuming from checkpoint (informational only here)
         force: If True, --force flag was passed (bypass compliance upload block)
     """
+    # Lazy imports — these are heavy (google API 1.4s, scipy 1s, numpy 0.3s)
+    from dropbox_handler import DropboxHandler
+    from transcription import Transcriber
+    from content_editor import ContentEditor
+    from audio_processor import AudioProcessor
+    from video_converter import VideoConverter
+    from uploaders import (  # noqa: F401
+        YouTubeUploader,
+        InstagramUploader,
+        TikTokUploader,
+        TwitterUploader,
+        SpotifyUploader,
+        BlueskyUploader,
+        RedditUploader,
+    )
+    from notifications import DiscordNotifier
+    from scheduler import UploadScheduler
+    from blog_generator import BlogPostGenerator
+    from thumbnail_generator import ThumbnailGenerator
+    from analytics import AnalyticsCollector, TopicEngagementScorer  # noqa: F401
+
     print("=" * 60)
     print(f"{Config.PODCAST_NAME.upper()} AUTOMATION")
     if dry_run:
@@ -1041,6 +1066,8 @@ def run_with_notification(
         dropbox_path: Specific Dropbox path (optional)
         local_audio_path: Local audio file path (optional)
     """
+    from notifications import DiscordNotifier
+
     # Merge episode targeting into args
     if isinstance(args, dict):
         run_args = dict(args)
@@ -1130,6 +1157,15 @@ def _dispatch_calendar_slot(uploader_instance, platform, slot):
 
 def run_upload_scheduled():
     """Scan output folders for pending scheduled uploads and execute them."""
+    from notifications import DiscordNotifier
+    from scheduler import UploadScheduler
+    from uploaders import (
+        YouTubeUploader,
+        InstagramUploader,
+        TikTokUploader,
+        TwitterUploader,
+    )
+
     print("=" * 60)
     print("EXECUTING SCHEDULED UPLOADS")
     print("=" * 60)
@@ -1278,6 +1314,8 @@ def run_upload_scheduled():
 
 def run_analytics(episode_arg):
     """Collect and display analytics for episodes."""
+    from analytics import AnalyticsCollector, TopicEngagementScorer
+
     print("=" * 60)
     print("ANALYTICS FEEDBACK LOOP")
     print("=" * 60)
@@ -1410,6 +1448,8 @@ def run_backfill_ids():
     After backfill, `python main.py analytics all` will use stored video IDs
     instead of search API calls (100 quota units → 1 quota unit per episode).
     """
+    from analytics import AnalyticsCollector
+
     print("=" * 60)
     print("BACKFILL PLATFORM IDS")
     print("=" * 60)
@@ -1505,6 +1545,8 @@ def run_search(query):
 
 def list_available_episodes(components=None):
     """List all available episodes in Dropbox."""
+    from dropbox_handler import DropboxHandler
+
     print("Available episodes in Dropbox:")
     print("-" * 60)
 
@@ -1532,6 +1574,8 @@ def list_available_episodes(components=None):
 
 def list_episodes_by_number(components=None):
     """List all episodes sorted by episode number."""
+    from dropbox_handler import DropboxHandler
+
     print("Available episodes (sorted by episode number):")
     print("-" * 60)
 

@@ -66,11 +66,11 @@ SAMPLE_TRANSCRIPT = {
 class TestInitUploaders:
     """Tests for _init_uploaders()."""
 
-    @patch("pipeline.runner.SpotifyUploader", side_effect=ValueError("no creds"))
-    @patch("pipeline.runner.TikTokUploader")
-    @patch("pipeline.runner.InstagramUploader")
-    @patch("pipeline.runner.TwitterUploader", side_effect=ValueError("no creds"))
-    @patch("pipeline.runner.YouTubeUploader", side_effect=ValueError("no creds"))
+    @patch("uploaders.SpotifyUploader", side_effect=ValueError("no creds"))
+    @patch("uploaders.TikTokUploader")
+    @patch("uploaders.InstagramUploader")
+    @patch("uploaders.TwitterUploader", side_effect=ValueError("no creds"))
+    @patch("uploaders.YouTubeUploader", side_effect=ValueError("no creds"))
     def test_uploaders_with_missing_credentials(
         self, mock_yt, mock_tw, mock_ig, mock_tt, mock_sp, monkeypatch
     ):
@@ -105,13 +105,13 @@ class TestInitUploaders:
         uploaders = _init_uploaders()
         assert uploaders == {}
 
-    @patch("pipeline.runner.RedditUploader", side_effect=ValueError("no creds"))
-    @patch("pipeline.runner.BlueskyUploader", side_effect=ValueError("no creds"))
-    @patch("pipeline.runner.SpotifyUploader")
-    @patch("pipeline.runner.TikTokUploader")
-    @patch("pipeline.runner.InstagramUploader")
-    @patch("pipeline.runner.TwitterUploader")
-    @patch("pipeline.runner.YouTubeUploader")
+    @patch("uploaders.RedditUploader", side_effect=ValueError("no creds"))
+    @patch("uploaders.BlueskyUploader", side_effect=ValueError("no creds"))
+    @patch("uploaders.SpotifyUploader")
+    @patch("uploaders.TikTokUploader")
+    @patch("uploaders.InstagramUploader")
+    @patch("uploaders.TwitterUploader")
+    @patch("uploaders.YouTubeUploader")
     def test_all_uploaders_initialize_successfully(
         self,
         mock_yt,
@@ -705,7 +705,7 @@ class TestRunWithNotification:
     """Tests for run_with_notification()."""
 
     @patch("pipeline.runner.run")
-    @patch("pipeline.runner.DiscordNotifier")
+    @patch("notifications.DiscordNotifier")
     def test_success_sends_notification(self, mock_notifier_cls, mock_run):
         """On success, sends Discord notification."""
         from pipeline.runner import run_with_notification
@@ -722,7 +722,7 @@ class TestRunWithNotification:
         mock_notifier.notify_success.assert_called_once()
 
     @patch("pipeline.runner.run", side_effect=RuntimeError("pipeline boom"))
-    @patch("pipeline.runner.DiscordNotifier")
+    @patch("notifications.DiscordNotifier")
     def test_failure_sends_notification_and_raises(self, mock_notifier_cls, mock_run):
         """On failure, sends Discord failure notification then re-raises."""
         from pipeline.runner import run_with_notification
@@ -737,7 +737,7 @@ class TestRunWithNotification:
         mock_notifier.notify_failure.assert_called_once()
 
     @patch("pipeline.runner.run")
-    @patch("pipeline.runner.DiscordNotifier")
+    @patch("notifications.DiscordNotifier")
     def test_notification_skipped_when_disabled(self, mock_notifier_cls, mock_run):
         """No notification sent when notifier is disabled."""
         from pipeline.runner import run_with_notification
@@ -751,7 +751,7 @@ class TestRunWithNotification:
         mock_notifier.notify_success.assert_not_called()
 
     @patch("pipeline.runner.run")
-    @patch("pipeline.runner.DiscordNotifier")
+    @patch("notifications.DiscordNotifier")
     def test_args_as_namespace(self, mock_notifier_cls, mock_run):
         """Accepts argparse Namespace-style args object."""
         from pipeline.runner import run_with_notification
@@ -816,8 +816,8 @@ class TestRunAnalytics:
     """Tests for run_analytics()."""
 
     @patch("pipeline.runner._collect_episode_analytics")
-    @patch("pipeline.runner.TopicEngagementScorer")
-    @patch("pipeline.runner.AnalyticsCollector")
+    @patch("analytics.TopicEngagementScorer")
+    @patch("analytics.AnalyticsCollector")
     def test_analytics_single_episode(
         self, mock_collector_cls, mock_scorer_cls, mock_collect
     ):
@@ -830,8 +830,8 @@ class TestRunAnalytics:
         assert args[2] == 25  # episode number
 
     @patch("pipeline.runner._collect_episode_analytics")
-    @patch("pipeline.runner.TopicEngagementScorer")
-    @patch("pipeline.runner.AnalyticsCollector")
+    @patch("analytics.TopicEngagementScorer")
+    @patch("analytics.AnalyticsCollector")
     def test_analytics_all_episodes(
         self, mock_collector_cls, mock_scorer_cls, mock_collect, tmp_path, monkeypatch
     ):
@@ -846,8 +846,8 @@ class TestRunAnalytics:
         assert mock_collect.call_count == 2
 
     @patch("pipeline.runner._collect_episode_analytics")
-    @patch("pipeline.runner.TopicEngagementScorer")
-    @patch("pipeline.runner.AnalyticsCollector")
+    @patch("analytics.TopicEngagementScorer")
+    @patch("analytics.AnalyticsCollector")
     def test_analytics_invalid_episode(
         self, mock_collector_cls, mock_scorer_cls, mock_collect, capsys
     ):
@@ -865,7 +865,7 @@ class TestRunAnalytics:
 class TestListEpisodes:
     """Tests for list_available_episodes() and list_episodes_by_number()."""
 
-    @patch("pipeline.runner.DropboxHandler")
+    @patch("dropbox_handler.DropboxHandler")
     def test_list_available_no_episodes(self, mock_dbx_cls, capsys):
         """Shows 'No episodes found' when Dropbox is empty."""
         from pipeline.runner import list_available_episodes
@@ -878,7 +878,7 @@ class TestListEpisodes:
         assert result == []
         assert "No episodes found" in capsys.readouterr().out
 
-    @patch("pipeline.runner.DropboxHandler")
+    @patch("dropbox_handler.DropboxHandler")
     def test_list_available_with_episodes(self, mock_dbx_cls, capsys):
         """Lists episodes with size and date."""
         from pipeline.runner import list_available_episodes
@@ -900,7 +900,7 @@ class TestListEpisodes:
         assert "ep25.wav" in output
         assert "50.0 MB" in output
 
-    @patch("pipeline.runner.DropboxHandler")
+    @patch("dropbox_handler.DropboxHandler")
     def test_list_by_number_no_episodes(self, mock_dbx_cls, capsys):
         """Shows 'No episodes found' when none exist."""
         from pipeline.runner import list_episodes_by_number
@@ -913,7 +913,7 @@ class TestListEpisodes:
         assert result == []
         assert "No episodes found" in capsys.readouterr().out
 
-    @patch("pipeline.runner.DropboxHandler")
+    @patch("dropbox_handler.DropboxHandler")
     def test_list_by_number_with_episodes(self, mock_dbx_cls, capsys):
         """Lists episodes sorted by number."""
         from pipeline.runner import list_episodes_by_number
@@ -970,10 +970,10 @@ class TestInitComponents:
     @patch("pipeline.runner.AudiogramGenerator")
     @patch("pipeline.runner.EpisodeSearchIndex")
     @patch("pipeline.runner.ClipPreviewer")
-    @patch("pipeline.runner.ThumbnailGenerator")
-    @patch("pipeline.runner.BlogPostGenerator")
-    @patch("pipeline.runner.UploadScheduler")
-    @patch("pipeline.runner.DiscordNotifier")
+    @patch("thumbnail_generator.ThumbnailGenerator")
+    @patch("blog_generator.BlogPostGenerator")
+    @patch("scheduler.UploadScheduler")
+    @patch("notifications.DiscordNotifier")
     @patch("pipeline.runner.Config.create_directories")
     def test_dry_run_mode_skips_validation(
         self,
@@ -1009,16 +1009,16 @@ class TestInitComponents:
     @patch("pipeline.runner.AudiogramGenerator")
     @patch("pipeline.runner.EpisodeSearchIndex")
     @patch("pipeline.runner.ClipPreviewer")
-    @patch("pipeline.runner.ThumbnailGenerator")
-    @patch("pipeline.runner.BlogPostGenerator")
-    @patch("pipeline.runner.UploadScheduler")
-    @patch("pipeline.runner.DiscordNotifier")
+    @patch("thumbnail_generator.ThumbnailGenerator")
+    @patch("blog_generator.BlogPostGenerator")
+    @patch("scheduler.UploadScheduler")
+    @patch("notifications.DiscordNotifier")
     @patch("pipeline.runner._init_uploaders", return_value={})
-    @patch("pipeline.runner.VideoConverter")
-    @patch("pipeline.runner.AudioProcessor")
-    @patch("pipeline.runner.ContentEditor")
-    @patch("pipeline.runner.Transcriber")
-    @patch("pipeline.runner.DropboxHandler")
+    @patch("video_converter.VideoConverter")
+    @patch("audio_processor.AudioProcessor")
+    @patch("content_editor.ContentEditor")
+    @patch("transcription.Transcriber")
+    @patch("dropbox_handler.DropboxHandler")
     @patch("pipeline.runner.Config.create_directories")
     @patch("pipeline.runner.Config.validate")
     def test_full_init_creates_all_components(
@@ -1065,16 +1065,16 @@ class TestInitComponents:
     @patch("pipeline.runner.AudiogramGenerator")
     @patch("pipeline.runner.EpisodeSearchIndex")
     @patch("pipeline.runner.ClipPreviewer")
-    @patch("pipeline.runner.ThumbnailGenerator")
-    @patch("pipeline.runner.BlogPostGenerator")
-    @patch("pipeline.runner.UploadScheduler")
-    @patch("pipeline.runner.DiscordNotifier")
+    @patch("thumbnail_generator.ThumbnailGenerator")
+    @patch("blog_generator.BlogPostGenerator")
+    @patch("scheduler.UploadScheduler")
+    @patch("notifications.DiscordNotifier")
     @patch("pipeline.runner._init_uploaders", return_value={})
-    @patch("pipeline.runner.VideoConverter", side_effect=FileNotFoundError("no ffmpeg"))
-    @patch("pipeline.runner.AudioProcessor")
-    @patch("pipeline.runner.ContentEditor")
-    @patch("pipeline.runner.Transcriber")
-    @patch("pipeline.runner.DropboxHandler")
+    @patch("video_converter.VideoConverter", side_effect=FileNotFoundError("no ffmpeg"))
+    @patch("audio_processor.AudioProcessor")
+    @patch("content_editor.ContentEditor")
+    @patch("transcription.Transcriber")
+    @patch("dropbox_handler.DropboxHandler")
     @patch("pipeline.runner.Config.create_directories")
     @patch("pipeline.runner.Config.validate")
     def test_video_converter_optional(

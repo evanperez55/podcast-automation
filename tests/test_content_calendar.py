@@ -761,7 +761,7 @@ class TestUploadScheduledIntegration:
             "content_calendar.ContentCalendar", MagicMock(return_value=mock_calendar)
         ):
             with patch(
-                "pipeline.runner.YouTubeUploader",
+                "uploaders.YouTubeUploader",
                 MagicMock(return_value=mock_yt_uploader),
             ):
                 runner.run_upload_scheduled()

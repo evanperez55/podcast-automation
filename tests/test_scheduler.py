@@ -330,9 +330,9 @@ class TestRunUploadScheduled:
             },
         }
 
-    @patch("pipeline.runner.DiscordNotifier")
-    @patch("pipeline.runner.YouTubeUploader")
-    @patch("pipeline.runner.UploadScheduler")
+    @patch("notifications.DiscordNotifier")
+    @patch("uploaders.YouTubeUploader")
+    @patch("scheduler.UploadScheduler")
     def test_upload_success(
         self,
         mock_scheduler_cls,
@@ -369,9 +369,9 @@ class TestRunUploadScheduled:
         mock_scheduler.mark_uploaded.assert_called_once()
         mock_scheduler.mark_failed.assert_not_called()
 
-    @patch("pipeline.runner.DiscordNotifier")
-    @patch("pipeline.runner.YouTubeUploader")
-    @patch("pipeline.runner.UploadScheduler")
+    @patch("notifications.DiscordNotifier")
+    @patch("uploaders.YouTubeUploader")
+    @patch("scheduler.UploadScheduler")
     def test_upload_failure_after_retries(
         self,
         mock_scheduler_cls,
@@ -409,9 +409,9 @@ class TestRunUploadScheduled:
         mock_notifier_instance.notify_failure.assert_called_once()
         mock_scheduler.mark_uploaded.assert_not_called()
 
-    @patch("pipeline.runner.DiscordNotifier")
-    @patch("pipeline.runner.YouTubeUploader")
-    @patch("pipeline.runner.UploadScheduler")
+    @patch("notifications.DiscordNotifier")
+    @patch("uploaders.YouTubeUploader")
+    @patch("scheduler.UploadScheduler")
     def test_no_silent_success(
         self,
         mock_scheduler_cls,

@@ -643,7 +643,7 @@ class TestRunBackfillIds:
         mock_youtube.search().list().execute.return_value = mock_search_response
 
         with (
-            patch("pipeline.runner.AnalyticsCollector") as MockCollector,
+            patch("analytics.AnalyticsCollector") as MockCollector,
             patch("pipeline.runner.Config") as MockConfig,
             patch("pipeline.runner.re") as mock_re,
             patch("pipeline.runner.time"),
@@ -690,7 +690,7 @@ class TestRunBackfillIds:
         mock_youtube = MagicMock()
 
         with (
-            patch("pipeline.runner.AnalyticsCollector") as MockCollector,
+            patch("analytics.AnalyticsCollector") as MockCollector,
             patch("pipeline.runner.Config") as MockConfig,
             patch("pipeline.runner.time"),
         ):
@@ -724,7 +724,7 @@ class TestRunBackfillIds:
         ]
 
         with (
-            patch("pipeline.runner.AnalyticsCollector") as MockCollector,
+            patch("analytics.AnalyticsCollector") as MockCollector,
             patch("pipeline.runner.Config") as MockConfig,
             patch("pipeline.runner.time"),
         ):
@@ -758,7 +758,7 @@ class TestRunBackfillIds:
         sleep_calls = []
 
         with (
-            patch("pipeline.runner.AnalyticsCollector") as MockCollector,
+            patch("analytics.AnalyticsCollector") as MockCollector,
             patch("pipeline.runner.Config") as MockConfig,
             patch("pipeline.runner.time") as mock_time_mod,
         ):
