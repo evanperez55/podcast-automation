@@ -106,6 +106,19 @@ All configuration is centralized in `config.py` via the `Config` class. Values a
 | `SCHEDULE_INSTAGRAM_POSTING_HOUR` | `12` | Optimal posting hour for Instagram (24h) |
 | `SCHEDULE_TIKTOK_POSTING_HOUR` | `12` | Optimal posting hour for TikTok (24h) |
 
+### Website / GitHub Pages
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WEBSITE_ENABLED` | `"true"` | Enable website landing page generation (Step 8.8) |
+| `WEBSITE_GITHUB_REPO` | `"fakeproblemspodcast/fakeproblemspodcast.github.io"` | GitHub Pages repository (org/repo) |
+| `WEBSITE_GITHUB_BRANCH` | `"main"` | Branch to deploy website to |
+| `PAGES_ENABLED` | `"true"` | Enable per-episode webpage generation |
+| `GITHUB_TOKEN` | *(none)* | GitHub personal access token (for Pages deployment) |
+| `GITHUB_PAGES_REPO` | *(none)* | GitHub Pages repo for per-episode pages |
+| `GITHUB_PAGES_BRANCH` | `"main"` | Branch for per-episode pages |
+| `SITE_BASE_URL` | *(none)* | Base URL for the published site |
+
 ### Feature Toggles
 
 | Variable | Default | Description |
@@ -115,9 +128,11 @@ All configuration is centralized in `config.py` via the `Config` class. Values a
 | `BLOG_USE_OPENAI` | `"true"` | Use OpenAI for blog posts (vs Ollama) |
 | `ANALYTICS_ENABLED` | `"true"` | Enable analytics collection |
 | `DAILY_CONTENT_ENABLED` | `"true"` | Enable daily content generation |
+| `DAILY_CONTENT_USE_OPENAI` | `"true"` | Use OpenAI for daily content (vs Ollama) |
 | `QUOTE_CARD_ENABLED` | `"true"` | Enable quote card image generation |
 | `USE_AUDIOGRAM` | `"true"` | Enable audiogram waveform videos |
 | `TWITTER_ENABLED` | `"true"` | Enable Twitter/X uploads |
+| `WEBSITE_ENABLED` | `"true"` | Enable website landing page updates |
 
 ### Audio Settings
 
@@ -307,6 +322,7 @@ QUOTE_CARD_ENABLED=false
 USE_AUDIOGRAM=false
 CONTENT_CALENDAR_ENABLED=false
 DAILY_CONTENT_ENABLED=false
+WEBSITE_ENABLED=false
 ```
 
 Features also disable themselves automatically when their required credentials are missing. For example, YouTube uploads are skipped if `YOUTUBE_CLIENT_ID` is not set.
