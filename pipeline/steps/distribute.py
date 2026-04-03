@@ -93,7 +93,7 @@ def _upload_youtube(
     # Upload clips as Shorts
     if video_clip_paths:
         logger.info("Uploading %d clips as YouTube Shorts...", len(video_clip_paths))
-        for i, video_path in enumerate(video_clip_paths[:3], 1):
+        for i, video_path in enumerate(video_clip_paths, 1):
             if i - 1 < len(best_clips):
                 clip_info = best_clips[i - 1]
                 metadata = create_episode_metadata(
@@ -115,7 +115,7 @@ def _upload_youtube(
                     try:
                         # First 2 clips go public immediately; rest are private
                         # for staggered release via scheduled-content workflow
-                        clip_privacy = "public" if i < 2 else "private"
+                        clip_privacy = "public" if i <= 2 else "private"
                         upload_result = uploaders["youtube"].upload_short(
                             video_path=str(video_path),
                             title=metadata["title"],
@@ -394,7 +394,7 @@ def _upload_to_social_media(
                     results["bluesky"] = {"announcement": bluesky_result}
 
                 # Post clips with YouTube Shorts links
-                clip_shorts = (youtube_results or {}).get("shorts", [])
+                clip_shorts = (youtube_results or {}).get("clips", [])
                 best_clips = analysis.get("best_clips", [])
                 clip_posts = []
                 for i, short in enumerate(clip_shorts):
@@ -685,6 +685,7 @@ def run_distribute(
                         episode_output_dir=episode_output_dir,
                         episode_number=episode_number,
                         timestamp=timestamp,
+                        analysis=analysis,
                     )
                 )
                 logger.info("Blog post generated: %s", blog_post_path)
@@ -775,7 +776,7 @@ def run_distribute(
                 )
 
             # Shorts URLs -> clip slots
-            shorts = yt_results.get("shorts", [])
+            shorts = yt_results.get("clips", [])
             best_clips = analysis.get("best_clips", [])
             for i, short in enumerate(shorts):
                 slot_name = f"clip_{i + 1}"
