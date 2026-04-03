@@ -27,8 +27,8 @@ uv run pytest tests/test_analytics.py::TestFetchYouTubeAnalytics::test_fetch_you
 
 ## Current Stats
 
-- **Test files:** 55 files in `tests/`
-- **Total tests:** 1,255+
+- **Test files:** 54 files in `tests/`
+- **Total tests:** 1,262+
 - **Coverage:** ~94% (notable: `bluesky_uploader` 100%, `video_converter` 99%)
 - **Lines of test code:** ~25,500
 
@@ -58,6 +58,7 @@ Each test file maps directly to a source module:
 | `analytics.py` | `tests/test_analytics.py` |
 | `uploaders/youtube_uploader.py` | `tests/test_youtube_uploader.py` |
 | `pipeline/steps/video.py` | `tests/test_video_step.py` |
+| `website_generator.py` | `tests/test_website_generator.py` |
 | `pipeline/runner.py` | `tests/test_runner.py` |
 
 ### Class Grouping
