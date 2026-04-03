@@ -178,5 +178,127 @@ class TestHelperMethods:
         assert matches == []
 
 
+class TestTranscriberInitPath:
+    """Tests for FFmpeg PATH setup during Transcriber init."""
+
+    @patch("faster_whisper.WhisperModel")
+    def test_adds_ffmpeg_to_path(self, mock_model_cls):
+        """Adds FFmpeg directory to PATH if not already present."""
+        import os
+
+        mock_torch = MagicMock()
+        mock_torch.cuda.is_available.return_value = False
+
+        with (
+            patch.dict(sys.modules, {"torch": mock_torch}),
+            patch.object(Config, "FFMPEG_PATH", "/custom/ffmpeg/bin/ffmpeg"),
+            patch.dict("os.environ", {"PATH": "/usr/bin"}),
+        ):
+            Transcriber("tiny")
+            assert "/custom/ffmpeg/bin" in os.environ["PATH"]
+
+    @patch("faster_whisper.WhisperModel")
+    def test_skips_adding_ffmpeg_if_already_in_path(self, mock_model_cls):
+        """Does not duplicate FFmpeg dir if already in PATH."""
+        import os
+
+        mock_torch = MagicMock()
+        mock_torch.cuda.is_available.return_value = False
+
+        ffmpeg_dir = "/custom/ffmpeg/bin"
+        with (
+            patch.dict(sys.modules, {"torch": mock_torch}),
+            patch.object(Config, "FFMPEG_PATH", f"{ffmpeg_dir}/ffmpeg"),
+            patch.dict("os.environ", {"PATH": f"{ffmpeg_dir}{os.pathsep}/usr/bin"}),
+        ):
+            Transcriber("tiny")
+            count = os.environ["PATH"].split(os.pathsep).count(ffmpeg_dir)
+            assert count == 1
+
+
+class TestTranscribeGpuOomFallback:
+    """Tests for GPU out-of-memory fallback in transcribe."""
+
+    def test_gpu_oom_retries_on_cpu(self, tmp_path):
+        """GPU OOM error triggers CPU fallback transcription."""
+        mock_torch = MagicMock()
+        mock_torch.cuda.is_available.return_value = True
+        mock_torch.cuda.empty_cache = MagicMock()
+
+        mock_model = MagicMock()
+        mock_cpu_model = MagicMock()
+
+        mock_segment = MagicMock()
+        mock_segment.start = 0.0
+        mock_segment.end = 1.0
+        mock_segment.text = "hello"
+        mock_segment.words = []
+
+        mock_info = MagicMock()
+        mock_info.language = "en"
+        mock_info.language_probability = 0.99
+
+        # First call (GPU) raises OOM, second call (CPU) succeeds
+        mock_model.transcribe.side_effect = RuntimeError(
+            "CUDA out of memory. Tried to allocate..."
+        )
+        mock_cpu_model.transcribe.return_value = ([mock_segment], mock_info)
+
+        with (
+            patch(
+                "faster_whisper.WhisperModel", side_effect=[mock_model, mock_cpu_model]
+            ),
+            patch.dict(sys.modules, {"torch": mock_torch}),
+        ):
+            t = Transcriber("base")
+
+        # The model is the original GPU model
+        assert t.device == "cuda"
+
+        audio = tmp_path / "test.wav"
+        audio.write_bytes(b"fake audio")
+
+        # Patch WhisperModel for the CPU fallback inside transcribe
+        with (
+            patch("faster_whisper.WhisperModel", return_value=mock_cpu_model),
+            patch.dict(sys.modules, {"torch": mock_torch}),
+        ):
+            result = t.transcribe(str(audio))
+
+        assert result is not None
+        assert result["text"] == "hello"
+        assert t.device == "cpu"
+        mock_torch.cuda.empty_cache.assert_called_once()
+
+    def test_non_oom_runtime_error_propagates(self, transcriber, tmp_path):
+        """Non-OOM RuntimeError is re-raised, not caught."""
+        audio = tmp_path / "test.wav"
+        audio.write_bytes(b"fake")
+
+        transcriber.model.transcribe.side_effect = RuntimeError("driver error")
+
+        with pytest.raises(RuntimeError, match="driver error"):
+            transcriber.transcribe(str(audio))
+
+    def test_gpu_oom_on_cpu_device_propagates(self, tmp_path):
+        """OOM error on CPU device is re-raised (no fallback)."""
+        mock_torch = MagicMock()
+        mock_torch.cuda.is_available.return_value = False
+
+        with (
+            patch("faster_whisper.WhisperModel"),
+            patch.dict(sys.modules, {"torch": mock_torch}),
+        ):
+            t = Transcriber("tiny")
+
+        audio = tmp_path / "test.wav"
+        audio.write_bytes(b"fake")
+
+        t.model.transcribe.side_effect = RuntimeError("out of memory")
+        # On CPU, device != "cuda", so OOM is re-raised
+        with pytest.raises(RuntimeError, match="out of memory"):
+            t.transcribe(str(audio))
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

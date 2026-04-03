@@ -315,6 +315,255 @@ class TestCreateEpisodeVideo:
         assert result is not None
 
 
+class TestInitDefaultLogoFallback:
+    """Tests for VideoConverter init with default logo fallback."""
+
+    def test_init_default_logo_no_client(self, tmp_path, monkeypatch):
+        """Falls back to assets/podcast_logo.jpg when no client logo."""
+        logo = tmp_path / "podcast_logo.jpg"
+        logo.write_bytes(b"\xff\xd8")
+        monkeypatch.setattr(Config, "CLIENT_LOGO_PATH", None)
+        monkeypatch.setattr(Config, "ASSETS_DIR", tmp_path)
+
+        vc = VideoConverter()
+        assert vc.logo_path == str(logo)
+
+
+class TestAudioToVideoNvencFallback:
+    """Tests for NVENC fallback in audio_to_video."""
+
+    @patch("video_converter.subprocess.run")
+    @patch("video_converter.disable_nvenc_and_get_fallback_args")
+    @patch("video_converter.get_h264_encoder_args")
+    @patch.object(Config, "USE_NVENC", True)
+    def test_nvenc_fallback_success(
+        self, mock_encoder_args, mock_fallback_args, mock_run, converter, tmp_path
+    ):
+        """NVENC failure triggers libx264 fallback which succeeds."""
+        audio = tmp_path / "test.wav"
+        audio.write_text("fake")
+        output = tmp_path / "test.mp4"
+
+        mock_encoder_args.return_value = ["-c:v", "h264_nvenc", "-pix_fmt", "yuv420p"]
+        mock_fallback_args.return_value = ["-c:v", "libx264", "-pix_fmt", "yuv420p"]
+
+        call_count = {"n": 0}
+
+        def _fail_then_succeed(*args, **kwargs):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                return MagicMock(returncode=1, stderr="NVENC session limit error")
+            output.write_text("fake video")
+            return MagicMock(returncode=0)
+
+        mock_run.side_effect = _fail_then_succeed
+
+        result = converter.audio_to_video(str(audio))
+        assert result is not None
+        assert mock_run.call_count == 2
+
+    @patch("video_converter.subprocess.run")
+    @patch("video_converter.disable_nvenc_and_get_fallback_args")
+    @patch("video_converter.get_h264_encoder_args")
+    @patch.object(Config, "USE_NVENC", True)
+    def test_nvenc_fallback_also_fails(
+        self, mock_encoder_args, mock_fallback_args, mock_run, converter, tmp_path
+    ):
+        """Returns None when both NVENC and libx264 fallback fail."""
+        audio = tmp_path / "test.wav"
+        audio.write_text("fake")
+
+        mock_encoder_args.return_value = ["-c:v", "h264_nvenc", "-pix_fmt", "yuv420p"]
+        mock_fallback_args.return_value = ["-c:v", "libx264", "-pix_fmt", "yuv420p"]
+
+        mock_run.return_value = MagicMock(returncode=1, stderr="nvenc session error")
+
+        result = converter.audio_to_video(str(audio))
+        assert result is None
+
+    @patch("video_converter.subprocess.run")
+    def test_returncode_0_but_no_output_file(self, mock_run, converter, tmp_path):
+        """Returns None when FFmpeg exits 0 but output file missing."""
+        audio = tmp_path / "test.wav"
+        audio.write_text("fake")
+        mock_run.return_value = MagicMock(returncode=0)
+
+        result = converter.audio_to_video(str(audio))
+        assert result is None
+
+
+class TestAudioToVideoUnknownFormat:
+    """Tests for unknown format_type fallback."""
+
+    @patch("video_converter.subprocess.run")
+    def test_unknown_format_defaults_to_horizontal(self, mock_run, converter, tmp_path):
+        """Unknown format_type defaults to horizontal resolution."""
+        audio = tmp_path / "test.wav"
+        audio.write_text("fake")
+        mock_run.side_effect = _mock_run_creating_output
+
+        result = converter.audio_to_video(str(audio), format_type="widescreen")
+        assert result is not None
+        cmd = mock_run.call_args[0][0]
+        vf_args = " ".join(str(a) for a in cmd)
+        assert "1280:720" in vf_args
+
+
+class TestAudioToVideoNvencSkipTune:
+    """Tests for USE_NVENC skipping -tune stillimage."""
+
+    @patch("video_converter.subprocess.run")
+    @patch.object(Config, "USE_NVENC", True)
+    def test_nvenc_skips_tune_stillimage(self, mock_run, converter, tmp_path):
+        """When USE_NVENC is True, -tune stillimage is not included."""
+        audio = tmp_path / "test.wav"
+        audio.write_text("fake")
+        mock_run.side_effect = _mock_run_creating_output
+
+        converter.audio_to_video(str(audio))
+        cmd = mock_run.call_args[0][0]
+        assert "-tune" not in cmd
+
+
+class TestSubtitleFormats:
+    """Tests for subtitle video format types."""
+
+    @patch("video_converter.subprocess.run")
+    def test_subtitle_horizontal_format(self, mock_run, converter, tmp_path):
+        """Horizontal format uses Config.HORIZONTAL_RESOLUTION."""
+        audio = tmp_path / "test.wav"
+        audio.write_text("fake")
+        srt = tmp_path / "test.srt"
+        srt.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n")
+        mock_run.side_effect = _mock_run_creating_output
+
+        result = converter.audio_to_video_with_subtitles(
+            str(audio), str(srt), format_type="horizontal"
+        )
+        assert result is not None
+        cmd = mock_run.call_args[0][0]
+        vf_args = " ".join(str(a) for a in cmd)
+        assert "1280:720" in vf_args
+
+    @patch("video_converter.subprocess.run")
+    def test_subtitle_square_format(self, mock_run, converter, tmp_path):
+        """Square format uses Config.SQUARE_RESOLUTION."""
+        audio = tmp_path / "test.wav"
+        audio.write_text("fake")
+        srt = tmp_path / "test.srt"
+        srt.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n")
+        mock_run.side_effect = _mock_run_creating_output
+
+        result = converter.audio_to_video_with_subtitles(
+            str(audio), str(srt), format_type="square"
+        )
+        assert result is not None
+        cmd = mock_run.call_args[0][0]
+        vf_args = " ".join(str(a) for a in cmd)
+        assert "720:720" in vf_args
+
+    @patch("video_converter.subprocess.run")
+    def test_subtitle_unknown_format_defaults_to_horizontal(
+        self, mock_run, converter, tmp_path
+    ):
+        """Unknown format_type defaults to horizontal resolution for subtitles."""
+        audio = tmp_path / "test.wav"
+        audio.write_text("fake")
+        srt = tmp_path / "test.srt"
+        srt.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n")
+        mock_run.side_effect = _mock_run_creating_output
+
+        result = converter.audio_to_video_with_subtitles(
+            str(audio), str(srt), format_type="widescreen"
+        )
+        assert result is not None
+        cmd = mock_run.call_args[0][0]
+        vf_args = " ".join(str(a) for a in cmd)
+        assert "1280:720" in vf_args
+
+    @patch("video_converter.subprocess.run")
+    def test_subtitle_custom_resolution(self, mock_run, converter, tmp_path):
+        """Custom resolution overrides format_type for subtitles."""
+        audio = tmp_path / "test.wav"
+        audio.write_text("fake")
+        srt = tmp_path / "test.srt"
+        srt.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n")
+        mock_run.side_effect = _mock_run_creating_output
+
+        result = converter.audio_to_video_with_subtitles(
+            str(audio), str(srt), resolution=(640, 480)
+        )
+        assert result is not None
+        cmd = mock_run.call_args[0][0]
+        vf_args = " ".join(str(a) for a in cmd)
+        assert "640:480" in vf_args
+
+
+class TestSubtitleNvenc:
+    """Tests for NVENC handling in subtitle video."""
+
+    @patch("video_converter.subprocess.run")
+    @patch.object(Config, "USE_NVENC", True)
+    def test_subtitle_nvenc_skips_tune(self, mock_run, converter, tmp_path):
+        """When USE_NVENC is True, subtitle video skips -tune stillimage."""
+        audio = tmp_path / "test.wav"
+        audio.write_text("fake")
+        srt = tmp_path / "test.srt"
+        srt.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n")
+        mock_run.side_effect = _mock_run_creating_output
+
+        converter.audio_to_video_with_subtitles(str(audio), str(srt))
+        cmd = mock_run.call_args[0][0]
+        assert "-tune" not in cmd
+
+    @patch("video_converter.subprocess.run")
+    @patch("video_converter.disable_nvenc_and_get_fallback_args")
+    @patch("video_converter.get_h264_encoder_args")
+    @patch.object(Config, "USE_NVENC", True)
+    def test_subtitle_nvenc_fallback_success(
+        self, mock_encoder_args, mock_fallback_args, mock_run, converter, tmp_path
+    ):
+        """NVENC failure in subtitle video triggers libx264 fallback that succeeds."""
+        audio = tmp_path / "test.wav"
+        audio.write_text("fake")
+        srt = tmp_path / "test.srt"
+        srt.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n")
+        output = tmp_path / "test.mp4"
+
+        mock_encoder_args.return_value = ["-c:v", "h264_nvenc", "-pix_fmt", "yuv420p"]
+        mock_fallback_args.return_value = ["-c:v", "libx264", "-pix_fmt", "yuv420p"]
+
+        call_count = {"n": 0}
+
+        def _fail_then_succeed(*args, **kwargs):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                return MagicMock(returncode=1, stderr="nvcuda driver error")
+            output.write_text("fake video")
+            return MagicMock(returncode=0)
+
+        mock_run.side_effect = _fail_then_succeed
+
+        result = converter.audio_to_video_with_subtitles(str(audio), str(srt))
+        assert result is not None
+        assert mock_run.call_count == 2
+
+
+class TestConvertClipsWithoutOutputDir:
+    """Tests for convert_clips_to_videos without output_dir."""
+
+    @patch("video_converter.subprocess.run")
+    def test_clips_no_output_dir(self, mock_run, converter, tmp_path):
+        """Without output_dir, output goes alongside the clip file."""
+        clip = tmp_path / "clip.wav"
+        clip.write_text("fake")
+        mock_run.side_effect = _mock_run_creating_output
+
+        results = converter.convert_clips_to_videos([str(clip)])
+        assert len(results) == 1
+        assert results[0].endswith(".mp4")
+
+
 class TestGetVideoDuration:
     """Tests for get_video_duration standalone function."""
 
