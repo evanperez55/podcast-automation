@@ -2,8 +2,8 @@ name: Scheduled Content Posting
 
 on:
   schedule:
-    # Every day at 10 AM ET (2 PM UTC) — optimal Twitter/social posting hour
-    - cron: "0 14 * * *"
+    # Every day at 3 PM ET (7 PM UTC) — runs after all scheduled slots (latest is 2 PM ET)
+    - cron: "0 19 * * *"
   workflow_dispatch:  # Manual trigger for testing
 
 permissions:
