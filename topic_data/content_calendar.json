@@ -151,7 +151,8 @@
         "platforms": [
           "youtube",
           "twitter",
-          "bluesky"
+          "bluesky",
+          "instagram"
         ],
         "clip_index": 3,
         "content": {
@@ -171,7 +172,8 @@
         "platforms": [
           "youtube",
           "twitter",
-          "bluesky"
+          "bluesky",
+          "instagram"
         ],
         "clip_index": 4,
         "content": {
@@ -191,7 +193,8 @@
         "platforms": [
           "youtube",
           "twitter",
-          "bluesky"
+          "bluesky",
+          "instagram"
         ],
         "clip_index": 5,
         "content": {
@@ -211,7 +214,8 @@
         "platforms": [
           "youtube",
           "twitter",
-          "bluesky"
+          "bluesky",
+          "instagram"
         ],
         "clip_index": 6,
         "content": {
@@ -231,7 +235,8 @@
         "platforms": [
           "youtube",
           "twitter",
-          "bluesky"
+          "bluesky",
+          "instagram"
         ],
         "clip_index": 7,
         "content": {
