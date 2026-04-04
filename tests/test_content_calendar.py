@@ -422,12 +422,20 @@ class TestMarkSlot:
                     analysis=_analysis_with_clips(1),
                     video_clip_paths=["c1.mp4"],
                 )
-                cal.mark_slot_uploaded("ep_29", "episode", {"video_id": "abc123"})
+                cal.mark_slot_uploaded(
+                    "ep_29",
+                    "episode",
+                    {
+                        "youtube": {"video_id": "abc123"},
+                        "twitter": {"tweet_id": "456"},
+                    },
+                )
                 data = cal.load_all()
 
         slot = data["ep_29"]["slots"]["episode"]
         assert slot["status"] == "uploaded"
-        assert slot["upload_results"] == {"video_id": "abc123"}
+        assert slot["upload_results"]["youtube"] == {"video_id": "abc123"}
+        assert slot["upload_results"]["twitter"] == {"tweet_id": "456"}
         assert slot["uploaded_at"] is not None
 
     def test_mark_failed(self, tmp_path):

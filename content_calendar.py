@@ -200,12 +200,17 @@ class ContentCalendar:
         slot_name: str,
         upload_results: dict,
     ) -> None:
-        """Mark a slot as successfully uploaded.
+        """Mark a slot as uploaded (full or partial).
+
+        Merges new upload_results with any existing results (supports
+        per-platform incremental updates). Sets status to 'uploaded' only
+        when all target platforms have non-null, non-error results.
+        Otherwise sets 'partial'.
 
         Args:
             episode_key: e.g. 'ep_29'.
             slot_name: Slot identifier, e.g. 'episode' or 'clip_1'.
-            upload_results: Dict of upload metadata (e.g. video_id).
+            upload_results: Dict of platform -> result metadata.
         """
         data = self.load_all()
         if episode_key not in data:
@@ -220,11 +225,32 @@ class ContentCalendar:
                 episode_key,
             )
             return
-        data[episode_key]["slots"][slot_name].update(
+
+        slot = data[episode_key]["slots"][slot_name]
+
+        # Merge results with existing (don't overwrite previous platform results)
+        existing_results = slot.get("upload_results") or {}
+        existing_results.update(upload_results)
+
+        # Determine status: check if all target platforms have successful results
+        target_platforms = set(slot.get("platforms", []))
+        successful = set()
+        for platform, result in existing_results.items():
+            if result is None:
+                continue
+            if isinstance(result, dict) and "error" in result:
+                continue
+            successful.add(platform)
+
+        # Mark as 'uploaded' only when all target platforms have results
+        all_done = target_platforms and target_platforms <= successful
+        status = "uploaded" if all_done else "partial"
+
+        slot.update(
             {
-                "status": "uploaded",
+                "status": status,
                 "uploaded_at": datetime.now().isoformat(),
-                "upload_results": upload_results,
+                "upload_results": existing_results,
             }
         )
         self.save(data)
@@ -299,7 +325,7 @@ class ContentCalendar:
         results = []
         for ep_key, ep_data in self.load_all().items():
             for slot_name, slot in (ep_data.get("slots") or {}).items():
-                if slot.get("status") not in ("pending", "failed"):
+                if slot.get("status") not in ("pending", "failed", "partial"):
                     continue
                 if slot.get("status") == "failed" and slot.get("retry_count", 0) >= 3:
                     continue

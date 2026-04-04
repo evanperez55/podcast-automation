@@ -300,24 +300,23 @@ def post_scheduled(dry_run=False):
             has_successes = any(
                 isinstance(v, dict) and "error" not in v for v in results.values()
             )
-            if has_successes and not has_errors:
-                # All platforms succeeded
+            if has_successes:
+                # mark_slot_uploaded handles full vs partial status automatically
                 calendar.mark_slot_uploaded(ep_key, slot_name, results)
-                logger.info("Marked %s/%s as uploaded", ep_key, slot_name)
-            elif has_successes and has_errors:
-                # Partial success — some platforms worked, some didn't
-                calendar.mark_slot_uploaded(ep_key, slot_name, results)
-                failed_platforms = [
-                    k
-                    for k, v in results.items()
-                    if isinstance(v, dict) and "error" in v
-                ]
-                logger.warning(
-                    "Partial success for %s/%s — failed on: %s",
-                    ep_key,
-                    slot_name,
-                    ", ".join(failed_platforms),
-                )
+                if has_errors:
+                    failed_platforms = [
+                        k
+                        for k, v in results.items()
+                        if isinstance(v, dict) and "error" in v
+                    ]
+                    logger.warning(
+                        "Partial success for %s/%s — failed on: %s",
+                        ep_key,
+                        slot_name,
+                        ", ".join(failed_platforms),
+                    )
+                else:
+                    logger.info("Marked %s/%s as uploaded", ep_key, slot_name)
             else:
                 # All failed
                 errors = "; ".join(

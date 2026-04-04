@@ -1238,6 +1238,7 @@ def run_upload_scheduled():
                 for slot in pending_slots:
                     slot_name = slot["slot_name"]
                     platforms = slot.get("platforms", [])
+                    slot_results = {}
                     for platform in platforms:
                         uploader_cls = dispatch.get(platform)
                         if uploader_cls is None:
@@ -1247,9 +1248,7 @@ def run_upload_scheduled():
                             result = _dispatch_calendar_slot(
                                 uploader_instance, platform, slot
                             )
-                            calendar.mark_slot_uploaded(
-                                ep_key, slot_name, {platform: result}
-                            )
+                            slot_results[platform] = result
                             logger.info(
                                 "Calendar slot %s/%s uploaded to %s",
                                 ep_key,
@@ -1264,7 +1263,23 @@ def run_upload_scheduled():
                                 platform,
                                 e,
                             )
-                            calendar.mark_slot_failed(ep_key, slot_name, str(e))
+                            slot_results[platform] = {"error": str(e)}
+
+                    # Mark once with all results — status determined by mark_slot_uploaded
+                    if slot_results:
+                        has_success = any(
+                            v is not None and not (isinstance(v, dict) and "error" in v)
+                            for v in slot_results.values()
+                        )
+                        if has_success:
+                            calendar.mark_slot_uploaded(ep_key, slot_name, slot_results)
+                        else:
+                            errors = "; ".join(
+                                f"{k}: {v.get('error', '?')}"
+                                for k, v in slot_results.items()
+                                if isinstance(v, dict) and "error" in v
+                            )
+                            calendar.mark_slot_failed(ep_key, slot_name, errors)
     except ImportError:
         pass  # content_calendar module not available
     except Exception as e:
