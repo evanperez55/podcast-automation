@@ -292,9 +292,6 @@ class Config:
         "retarded",
     ]
 
-    # Legacy - kept for backwards compatibility
-    SLURS_TO_REMOVE = []
-
     # Audio Settings
     MP3_BITRATE = os.getenv("MP3_BITRATE", "192k")
     WHISPER_MODEL = os.getenv("WHISPER_MODEL", "distil-large-v3")
