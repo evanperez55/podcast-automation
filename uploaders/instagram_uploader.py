@@ -397,6 +397,9 @@ class InstagramUploader:
     def delete_media(self, media_id: str) -> bool:
         """Delete a media item (Reel, photo, etc.) from Instagram.
 
+        Safety: verifies the media caption contains '[TEST]' before deleting
+        to prevent accidental deletion of real content.
+
         Args:
             media_id: Instagram media ID to delete.
 
@@ -404,6 +407,24 @@ class InstagramUploader:
             True if successful, False otherwise.
         """
         if not self.functional:
+            return False
+
+        # Safety check: verify the media is a test upload
+        try:
+            check_resp = requests.get(
+                f"{self.API_BASE}/{media_id}",
+                params={"fields": "caption", "access_token": self.access_token},
+            )
+            if check_resp.status_code == 200:
+                caption = check_resp.json().get("caption", "")
+                if "[TEST]" not in caption:
+                    logger.error(
+                        "Refusing to delete media %s — caption does not contain [TEST]",
+                        media_id,
+                    )
+                    return False
+        except requests.exceptions.RequestException:
+            logger.error("Cannot verify media %s before deletion — aborting", media_id)
             return False
 
         endpoint = f"{self.API_BASE}/{media_id}"

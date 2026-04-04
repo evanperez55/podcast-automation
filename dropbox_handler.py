@@ -456,12 +456,22 @@ class DropboxHandler:
     def delete_file(self, dropbox_path: str) -> bool:
         """Delete a file from Dropbox.
 
+        Safety: only allows deletion from /podcast/test_upload/ path
+        to prevent accidental deletion of real content.
+
         Args:
             dropbox_path: Path to the file in Dropbox.
 
         Returns:
             True if successful, False otherwise.
         """
+        if "/test_upload/" not in dropbox_path:
+            logger.error(
+                "Refusing to delete %s — only /test_upload/ paths allowed",
+                dropbox_path,
+            )
+            return False
+
         try:
             self.dbx.files_delete_v2(dropbox_path)
             logger.info("Deleted Dropbox file: %s", dropbox_path)

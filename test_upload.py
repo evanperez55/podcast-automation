@@ -38,11 +38,12 @@ def _init_platform(name, init_fn):
         return None
 
 
-def run_test_upload(keep=False):
+def run_test_upload(keep=False, yes=False):
     """Upload test clip to all configured platforms and optionally delete.
 
     Args:
         keep: If True, don't delete test uploads after verification.
+        yes: If True, skip confirmation prompt.
 
     Returns:
         Dict of platform -> result.
@@ -61,6 +62,19 @@ def run_test_upload(keep=False):
     print(f"Test clip: {TEST_CLIP} ({TEST_CLIP.stat().st_size} bytes)")
     print(f"Auto-delete: {'No (--keep)' if keep else 'Yes'}")
     print()
+    print("WARNING: This will post test content to LIVE social media accounts.")
+    print("Test posts are labeled [TEST] and will be auto-deleted after verification.")
+    print()
+
+    # Require explicit confirmation unless --yes flag is passed
+    if not yes:
+        try:
+            confirm = input("Type 'yes' to continue: ").strip().lower()
+        except EOFError:
+            confirm = ""
+        if confirm != "yes":
+            print("Aborted.")
+            return {}
 
     results = {}
     cleanup = []  # List of (platform, cleanup_fn) tuples
@@ -227,13 +241,30 @@ def run_test_upload(keep=False):
         print()
         print("Cleaning up test uploads...")
         # Give platforms a moment to process
-        time.sleep(2)
+        time.sleep(3)
+        failed_cleanups = []
         for platform, cleanup_fn in cleanup:
             try:
-                cleanup_fn()
-                print(f"  [{platform}] Deleted")
+                success = cleanup_fn()
+                if success is False:
+                    failed_cleanups.append(platform)
+                    print(f"  [{platform}] DELETE FAILED - test content is still live!")
+                else:
+                    print(f"  [{platform}] Deleted")
             except Exception as e:
-                print(f"  [{platform}] Delete failed: {e}")
+                failed_cleanups.append(platform)
+                print(f"  [{platform}] DELETE FAILED: {e}")
+                print("           ^ You must manually delete the test content!")
+
+        if failed_cleanups:
+            print()
+            print(f"WARNING: {len(failed_cleanups)} platform(s) still have test content:")
+            for p in failed_cleanups:
+                r = results.get(p.lower(), {})
+                # Print the ID so they can manually delete
+                for key in ["video_id", "tweet_id", "media_id", "post_uri", "url"]:
+                    if key in r:
+                        print(f"  {p}: {key}={r[key]}")
     elif cleanup and keep:
         print()
         print("--keep flag set, skipping cleanup. Test uploads remain on platforms.")
@@ -244,6 +275,7 @@ def run_test_upload(keep=False):
 def main():
     args = sys.argv[1:]
     keep = "--keep" in args
+    yes = "--yes" in args
 
     # Handle --client flag
     if "--client" in args:
@@ -254,7 +286,7 @@ def main():
 
             activate_client(client_name)
 
-    run_test_upload(keep=keep)
+    run_test_upload(keep=keep, yes=yes)
 
 
 if __name__ == "__main__":

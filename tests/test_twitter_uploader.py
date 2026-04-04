@@ -799,16 +799,45 @@ class TestDeleteTweet:
     @patch("uploaders.twitter_uploader.tweepy.API")
     @patch("uploaders.twitter_uploader.tweepy.Client")
     def test_delete_tweet_success(self, mock_client_class, mock_api_class):
-        """Successful delete returns True."""
+        """Successful delete of [TEST] tweet returns True."""
         uploader = TwitterUploader()
 
         mock_client = Mock()
+        # Mock get_tweet to return a test tweet (safety check)
+        mock_tweet_data = Mock()
+        mock_tweet_data.text = "[TEST] Automated integration test"
+        mock_tweet_response = Mock()
+        mock_tweet_response.data = mock_tweet_data
+        mock_client.get_tweet.return_value = mock_tweet_response
         uploader.client = mock_client
 
         result = uploader.delete_tweet("12345")
 
         assert result is True
         mock_client.delete_tweet.assert_called_once_with("12345")
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_delete_tweet_refuses_non_test(self, mock_client_class, mock_api_class):
+        """Refuses to delete tweet without [TEST] in text."""
+        uploader = TwitterUploader()
+
+        mock_client = Mock()
+        mock_tweet_data = Mock()
+        mock_tweet_data.text = "Real episode announcement"
+        mock_tweet_response = Mock()
+        mock_tweet_response.data = mock_tweet_data
+        mock_client.get_tweet.return_value = mock_tweet_response
+        uploader.client = mock_client
+
+        result = uploader.delete_tweet("12345")
+
+        assert result is False
+        mock_client.delete_tweet.assert_not_called()
 
     @patch.object(Config, "TWITTER_API_KEY", "valid_key")
     @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
@@ -823,6 +852,11 @@ class TestDeleteTweet:
         uploader = TwitterUploader()
 
         mock_client = Mock()
+        mock_tweet_data = Mock()
+        mock_tweet_data.text = "[TEST] will fail"
+        mock_tweet_response = Mock()
+        mock_tweet_response.data = mock_tweet_data
+        mock_client.get_tweet.return_value = mock_tweet_response
         mock_client.delete_tweet.side_effect = tweepy.TweepyException("Not found")
         uploader.client = mock_client
 

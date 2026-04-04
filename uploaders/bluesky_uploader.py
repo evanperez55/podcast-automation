@@ -191,6 +191,9 @@ class BlueskyUploader:
     def delete_post(self, post_uri: str) -> bool:
         """Delete a post from Bluesky.
 
+        Safety: verifies the post text contains '[TEST]' before deleting
+        to prevent accidental deletion of real content.
+
         Args:
             post_uri: The AT Protocol URI of the post (e.g. at://did/collection/rkey).
 
@@ -211,6 +214,27 @@ class BlueskyUploader:
         repo = parts[0]
         collection = parts[1]
         rkey = parts[2]
+
+        # Safety check: fetch the post and verify it's a test post
+        try:
+            check_resp = requests.get(
+                f"{self.API_BASE}/com.atproto.repo.getRecord",
+                headers=self._get_headers(),
+                params={"repo": repo, "collection": collection, "rkey": rkey},
+                timeout=10,
+            )
+            if check_resp.status_code == 200:
+                record = check_resp.json().get("value", {})
+                text = record.get("text", "")
+                if "[TEST]" not in text:
+                    logger.error(
+                        "Refusing to delete post %s — text does not contain [TEST]",
+                        post_uri,
+                    )
+                    return False
+        except requests.RequestException:
+            logger.error("Cannot verify post %s before deletion — aborting", post_uri)
+            return False
 
         try:
             response = requests.post(

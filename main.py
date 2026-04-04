@@ -86,7 +86,10 @@ def _handle_client_command(cmd, args):
     elif cmd == "test-upload":
         from test_upload import run_test_upload
 
-        run_test_upload(keep=args.get("keep", "--keep" in sys.argv))
+        run_test_upload(
+            keep=args.get("keep", "--keep" in sys.argv),
+            yes=args.get("yes", "--yes" in sys.argv),
+        )
     elif cmd == "status":
         from client_config import client_status
 

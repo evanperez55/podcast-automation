@@ -466,6 +466,9 @@ class YouTubeUploader:
     def delete_video(self, video_id: str) -> bool:
         """Delete a video from YouTube.
 
+        Safety: verifies the video title contains '[TEST]' before deleting
+        to prevent accidental deletion of real content.
+
         Args:
             video_id: YouTube video ID to delete.
 
@@ -477,6 +480,24 @@ class YouTubeUploader:
             return False
 
         try:
+            # Safety check: verify the video is a test upload
+            video = (
+                self.youtube.videos().list(part="snippet", id=video_id).execute()
+            )
+            items = video.get("items", [])
+            if not items:
+                logger.error("Video not found: %s", video_id)
+                return False
+
+            title = items[0].get("snippet", {}).get("title", "")
+            if "[TEST]" not in title:
+                logger.error(
+                    "Refusing to delete video %s — title %r does not contain [TEST]",
+                    video_id,
+                    title,
+                )
+                return False
+
             self.youtube.videos().delete(id=video_id).execute()
             logger.info("Deleted YouTube video %s", video_id)
             return True

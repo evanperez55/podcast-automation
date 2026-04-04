@@ -373,6 +373,9 @@ class TwitterUploader:
         """
         Delete a tweet.
 
+        Safety: verifies the tweet text contains '[TEST]' before deleting
+        to prevent accidental deletion of real content.
+
         Args:
             tweet_id: ID of tweet to delete
 
@@ -380,6 +383,17 @@ class TwitterUploader:
             True if successful, False otherwise
         """
         try:
+            # Safety check: verify the tweet is a test post
+            tweet = self.client.get_tweet(tweet_id, tweet_fields=["text"])
+            if tweet.data:
+                text = tweet.data.text or ""
+                if "[TEST]" not in text:
+                    logger.error(
+                        "Refusing to delete tweet %s — text does not contain [TEST]",
+                        tweet_id,
+                    )
+                    return False
+
             self.client.delete_tweet(tweet_id)
             logger.info("Deleted tweet %s", tweet_id)
             return True
