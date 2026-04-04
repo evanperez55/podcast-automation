@@ -188,6 +188,48 @@ class BlueskyUploader:
             logger.error("Failed to post to Bluesky: %s", e)
             return None
 
+    def delete_post(self, post_uri: str) -> bool:
+        """Delete a post from Bluesky.
+
+        Args:
+            post_uri: The AT Protocol URI of the post (e.g. at://did/collection/rkey).
+
+        Returns:
+            True if successful, False otherwise.
+        """
+        self._ensure_authenticated()
+        if not self.session:
+            logger.error("Bluesky not authenticated")
+            return False
+
+        # Parse the URI: at://did:plc:xxx/app.bsky.feed.post/rkey
+        parts = post_uri.replace("at://", "").split("/")
+        if len(parts) < 3:
+            logger.error("Invalid post URI: %s", post_uri)
+            return False
+
+        repo = parts[0]
+        collection = parts[1]
+        rkey = parts[2]
+
+        try:
+            response = requests.post(
+                f"{self.API_BASE}/com.atproto.repo.deleteRecord",
+                headers=self._get_headers(),
+                json={
+                    "repo": repo,
+                    "collection": collection,
+                    "rkey": rkey,
+                },
+                timeout=10,
+            )
+            response.raise_for_status()
+            logger.info("Deleted Bluesky post %s", post_uri)
+            return True
+        except requests.RequestException as e:
+            logger.error("Failed to delete Bluesky post: %s", e)
+            return False
+
     def upload_image(self, image_path: str) -> Optional[Dict[str, Any]]:
         """Upload an image blob to Bluesky.
 

@@ -400,6 +400,8 @@ def validate_client(client_name: str, ping: bool = False) -> None:
         has_yt,
         f"token: {token_path}" if token_path else "default credentials",
     )
+    if ping and has_yt:
+        _ping(results, "YouTube", _ping_youtube)
 
     # --- Twitter ---
     has_twitter = all(
@@ -411,12 +413,24 @@ def validate_client(client_name: str, ping: bool = False) -> None:
         ]
     )
     _check(results, "Twitter", has_twitter)
+    if ping and has_twitter:
+        _ping(results, "Twitter", _ping_twitter)
 
     # --- Instagram ---
     has_ig = bool(getattr(Config, "INSTAGRAM_ACCESS_TOKEN", None)) and bool(
         getattr(Config, "INSTAGRAM_ACCOUNT_ID", None)
     )
     _check(results, "Instagram", has_ig)
+    if ping and has_ig:
+        _ping(results, "Instagram", _ping_instagram)
+
+    # --- Bluesky ---
+    has_bluesky = bool(getattr(Config, "BLUESKY_HANDLE", None)) and bool(
+        getattr(Config, "BLUESKY_APP_PASSWORD", None)
+    )
+    _check(results, "Bluesky", has_bluesky)
+    if ping and has_bluesky:
+        _ping(results, "Bluesky", _ping_bluesky)
 
     # --- TikTok ---
     has_tt = bool(getattr(Config, "TIKTOK_CLIENT_KEY", None)) and bool(
@@ -427,6 +441,8 @@ def validate_client(client_name: str, ping: bool = False) -> None:
     # --- Discord ---
     has_discord = bool(getattr(Config, "DISCORD_WEBHOOK_URL", None))
     _check(results, "Discord", has_discord)
+    if ping and has_discord:
+        _ping(results, "Discord", _ping_discord)
 
     # --- Content settings ---
     has_names = bool(getattr(Config, "NAMES_TO_REMOVE", None))
@@ -544,6 +560,56 @@ def _ping_rss_feed():
     url = getattr(Config, "RSS_FEED_URL", None)
     r = requests.head(url, timeout=10, allow_redirects=True)
     r.raise_for_status()
+
+
+def _ping_youtube():
+    """Test YouTube API credentials by listing channels."""
+    from uploaders.youtube_uploader import YouTubeUploader
+
+    yt = YouTubeUploader()
+    # channels().list with "mine" verifies auth works
+    result = yt.youtube.channels().list(part="snippet", mine=True).execute()
+    channel = result.get("items", [{}])[0].get("snippet", {}).get("title", "unknown")
+    print(f"         ^ channel: {channel}")
+
+
+def _ping_twitter():
+    """Test Twitter API credentials by fetching authenticated user."""
+    from uploaders.twitter_uploader import TwitterUploader
+
+    tw = TwitterUploader()
+    user = tw.client.get_me()
+    username = user.data.username if user.data else "unknown"
+    print(f"         ^ @{username}")
+
+
+def _ping_instagram():
+    """Test Instagram token by fetching account info."""
+    from uploaders.instagram_uploader import InstagramUploader
+
+    ig = InstagramUploader()
+    info = ig.get_account_info()
+    if not info:
+        raise RuntimeError("get_account_info returned None")
+    print(f"         ^ @{info.get('username', 'unknown')}")
+
+
+def _ping_bluesky():
+    """Test Bluesky credentials by authenticating."""
+    from uploaders.bluesky_uploader import BlueskyUploader
+
+    BlueskyUploader()  # authenticates in __init__ — raises on failure
+    print(f"         ^ handle: {Config.BLUESKY_HANDLE}")
+
+
+def _ping_discord():
+    """Test Discord webhook by sending a silent ping (no visible message)."""
+    # Use the webhook info endpoint (GET) to verify it's valid without posting
+    url = Config.DISCORD_WEBHOOK_URL
+    r = requests.get(url, timeout=10)
+    r.raise_for_status()
+    data = r.json()
+    print(f"         ^ webhook: {data.get('name', 'unknown')}")
 
 
 def client_status(client_name: str) -> None:

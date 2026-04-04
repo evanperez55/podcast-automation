@@ -83,6 +83,10 @@ def _handle_client_command(cmd, args):
             print("Usage: uv run main.py validate-client <name>")
             return True
         validate_client(n, ping=args.get("ping", False))
+    elif cmd == "test-upload":
+        from test_upload import run_test_upload
+
+        run_test_upload(keep=args.get("keep", "--keep" in sys.argv))
     elif cmd == "status":
         from client_config import client_status
 

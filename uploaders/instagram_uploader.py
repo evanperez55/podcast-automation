@@ -1,6 +1,5 @@
 """Instagram uploader for podcast clips as Reels."""
 
-import os
 import time
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -394,3 +393,27 @@ class InstagramUploader:
         except requests.exceptions.RequestException as e:
             logger.error("Failed to get account info: %s", e)
             return None
+
+    def delete_media(self, media_id: str) -> bool:
+        """Delete a media item (Reel, photo, etc.) from Instagram.
+
+        Args:
+            media_id: Instagram media ID to delete.
+
+        Returns:
+            True if successful, False otherwise.
+        """
+        if not self.functional:
+            return False
+
+        endpoint = f"{self.API_BASE}/{media_id}"
+        params = {"access_token": self.access_token}
+
+        try:
+            response = requests.delete(endpoint, params=params)
+            response.raise_for_status()
+            logger.info("Deleted Instagram media %s", media_id)
+            return True
+        except requests.exceptions.RequestException as e:
+            logger.error("Failed to delete Instagram media %s: %s", media_id, e)
+            return False

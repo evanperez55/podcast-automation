@@ -453,6 +453,23 @@ class DropboxHandler:
             logger.error("Failed to get shared link: %s", e)
             return None
 
+    def delete_file(self, dropbox_path: str) -> bool:
+        """Delete a file from Dropbox.
+
+        Args:
+            dropbox_path: Path to the file in Dropbox.
+
+        Returns:
+            True if successful, False otherwise.
+        """
+        try:
+            self.dbx.files_delete_v2(dropbox_path)
+            logger.info("Deleted Dropbox file: %s", dropbox_path)
+            return True
+        except Exception as e:
+            logger.error("Failed to delete Dropbox file %s: %s", dropbox_path, e)
+            return False
+
 
 if __name__ == "__main__":
     # Test the Dropbox handler

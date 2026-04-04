@@ -463,6 +463,27 @@ class YouTubeUploader:
             logger.error("Failed to set privacy for %s: %s", video_id, e)
             return False
 
+    def delete_video(self, video_id: str) -> bool:
+        """Delete a video from YouTube.
+
+        Args:
+            video_id: YouTube video ID to delete.
+
+        Returns:
+            True if successful, False otherwise.
+        """
+        if not self.youtube:
+            logger.error("YouTube API not authenticated")
+            return False
+
+        try:
+            self.youtube.videos().delete(id=video_id).execute()
+            logger.info("Deleted YouTube video %s", video_id)
+            return True
+        except HttpError as e:
+            logger.error("Failed to delete video %s: %s", video_id, e)
+            return False
+
     def get_upload_quota_usage(self) -> Dict[str, Any]:
         """
         Get information about API quota usage.
