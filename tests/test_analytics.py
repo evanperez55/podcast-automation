@@ -644,10 +644,10 @@ class TestRunBackfillIds:
 
         with (
             patch("analytics.AnalyticsCollector") as MockCollector,
-            patch("pipeline.runner.Config") as MockConfig,
-            patch("pipeline.runner.re") as mock_re,
-            patch("pipeline.runner.time"),
-            patch("pipeline.runner.json"),
+            patch("pipeline.analytics_runner.Config") as MockConfig,
+            patch("pipeline.analytics_runner.re") as mock_re,
+            patch("pipeline.analytics_runner.time"),
+            patch("pipeline.analytics_runner.json"),
         ):
             mock_re.search = __import__("re").search
             MockConfig.OUTPUT_DIR = tmp_path
@@ -669,7 +669,7 @@ class TestRunBackfillIds:
                 return original_open(path, *args, **kwargs)
 
             with patch("builtins.open", side_effect=fake_open):
-                from pipeline.runner import run_backfill_ids
+                from pipeline.analytics_runner import run_backfill_ids
 
                 run_backfill_ids()
 
@@ -691,15 +691,15 @@ class TestRunBackfillIds:
 
         with (
             patch("analytics.AnalyticsCollector") as MockCollector,
-            patch("pipeline.runner.Config") as MockConfig,
-            patch("pipeline.runner.time"),
+            patch("pipeline.analytics_runner.Config") as MockConfig,
+            patch("pipeline.analytics_runner.time"),
         ):
             MockConfig.OUTPUT_DIR = tmp_path
             mock_collector_instance = MagicMock()
             MockCollector.return_value = mock_collector_instance
             mock_collector_instance._build_youtube_client.return_value = mock_youtube
 
-            from pipeline.runner import run_backfill_ids
+            from pipeline.analytics_runner import run_backfill_ids
 
             run_backfill_ids()
 
@@ -725,15 +725,15 @@ class TestRunBackfillIds:
 
         with (
             patch("analytics.AnalyticsCollector") as MockCollector,
-            patch("pipeline.runner.Config") as MockConfig,
-            patch("pipeline.runner.time"),
+            patch("pipeline.analytics_runner.Config") as MockConfig,
+            patch("pipeline.analytics_runner.time"),
         ):
             MockConfig.OUTPUT_DIR = tmp_path
             mock_collector_instance = MagicMock()
             MockCollector.return_value = mock_collector_instance
             mock_collector_instance._build_youtube_client.return_value = mock_youtube
 
-            from pipeline.runner import run_backfill_ids
+            from pipeline.analytics_runner import run_backfill_ids
 
             # Should not raise even when search fails for one episode
             run_backfill_ids()
@@ -759,8 +759,8 @@ class TestRunBackfillIds:
 
         with (
             patch("analytics.AnalyticsCollector") as MockCollector,
-            patch("pipeline.runner.Config") as MockConfig,
-            patch("pipeline.runner.time") as mock_time_mod,
+            patch("pipeline.analytics_runner.Config") as MockConfig,
+            patch("pipeline.analytics_runner.time") as mock_time_mod,
         ):
             mock_time_mod.sleep.side_effect = lambda s: sleep_calls.append(s)
             MockConfig.OUTPUT_DIR = tmp_path
@@ -768,7 +768,7 @@ class TestRunBackfillIds:
             MockCollector.return_value = mock_collector_instance
             mock_collector_instance._build_youtube_client.return_value = mock_youtube
 
-            from pipeline.runner import run_backfill_ids
+            from pipeline.analytics_runner import run_backfill_ids
 
             run_backfill_ids()
 
@@ -803,10 +803,10 @@ class TestRunAnalyticsWiring:
         }
         mock_scorer.calculate_engagement_score.return_value = 5.5
 
-        with patch("pipeline.runner.Config") as MockConfig:
+        with patch("pipeline.analytics_runner.Config") as MockConfig:
             MockConfig.OUTPUT_DIR = tmp_path
 
-            from pipeline.runner import _collect_episode_analytics
+            from pipeline.analytics_runner import _collect_episode_analytics
 
             _collect_episode_analytics(mock_collector, mock_scorer, 25)
 
@@ -843,10 +843,10 @@ class TestRunAnalyticsWiring:
         mock_collector.collect_analytics.return_value = analytics_data
         mock_scorer.calculate_engagement_score.return_value = 3.5
 
-        with patch("pipeline.runner.Config") as MockConfig:
+        with patch("pipeline.analytics_runner.Config") as MockConfig:
             MockConfig.OUTPUT_DIR = tmp_path
 
-            from pipeline.runner import _collect_episode_analytics
+            from pipeline.analytics_runner import _collect_episode_analytics
 
             _collect_episode_analytics(mock_collector, mock_scorer, 1)
 

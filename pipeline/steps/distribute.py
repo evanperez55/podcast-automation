@@ -361,6 +361,92 @@ def _build_instagram_caption(
     return caption
 
 
+def _upload_tiktok(video_clip_paths, analysis, components: dict = None):
+    """Log TikTok readiness (upload not yet implemented)."""
+    uploaders = (components or {}).get("uploaders", {})
+    if "tiktok" not in uploaders:
+        return None
+
+    logger.info("[TikTok] Uploading clips...")
+    if not video_clip_paths:
+        logger.info("No video clips available")
+        return {"status": "no_videos"}
+
+    logger.info("%d vertical videos ready for TikTok", len(video_clip_paths))
+    best_clips = (analysis or {}).get("best_clips", [])
+    for i, clip_info in enumerate(best_clips[: len(video_clip_paths)]):
+        hook = clip_info.get("hook_caption", "")
+        tags = clip_info.get("clip_hashtags", [])
+        if hook or tags:
+            logger.info("  Clip %d caption: hook=%r hashtags=%s", i + 1, hook, tags)
+    return {"status": "videos_ready", "clips": len(video_clip_paths)}
+
+
+def _upload_bluesky(
+    episode_number, analysis, youtube_results, components: dict = None, test_mode=False
+):
+    """Upload episode announcement and first 2 clips to Bluesky."""
+    uploaders = (components or {}).get("uploaders", {})
+    if "bluesky" not in uploaders:
+        return None
+
+    if test_mode:
+        logger.info("[TEST MODE] Skipping Bluesky posts")
+        return {"status": "test_mode", "skipped": True}
+
+    yt_full_url = None
+    if youtube_results and youtube_results.get("full_episode"):
+        yt_full_url = youtube_results["full_episode"].get("video_url")
+
+    try:
+        bluesky_caption = analysis.get("social_captions", {}).get(
+            "bluesky", analysis.get("social_captions", {}).get("twitter")
+        )
+        result = {}
+        announcement = uploaders["bluesky"].post_episode_announcement(
+            episode_number=episode_number,
+            episode_summary=analysis.get("episode_summary", ""),
+            youtube_url=yt_full_url,
+            bluesky_caption=bluesky_caption,
+        )
+        if announcement:
+            result["announcement"] = announcement
+
+        # Post first 2 clips with YouTube Shorts links (rest staggered via calendar)
+        clip_shorts = (youtube_results or {}).get("clips", [])[:2]
+        best_clips = analysis.get("best_clips", [])
+        clip_posts = []
+        for i, short in enumerate(clip_shorts):
+            short_url = short.get("video_url")
+            short_title = short.get("title", f"Clip {i + 1}")
+            hook = ""
+            tags = []
+            if i < len(best_clips):
+                hook = best_clips[i].get("hook_caption", "")
+                tags = best_clips[i].get("clip_hashtags", [])[:3]
+            text = hook or short_title
+            if tags:
+                hashtag_line = " ".join(f"#{t}" for t in tags)
+                if len(text) + len(hashtag_line) + 2 <= 300:
+                    text = f"{text}\n\n{hashtag_line}"
+            clip_result = uploaders["bluesky"].post(
+                text=text,
+                url=short_url,
+                url_title=short_title,
+                url_description=f"{Config.PODCAST_NAME} - Episode {episode_number}",
+            )
+            if clip_result:
+                clip_posts.append(clip_result)
+        if clip_posts:
+            result["clips"] = clip_posts
+            logger.info("Posted %d clip(s) to Bluesky", len(clip_posts))
+
+        return result if result else None
+    except Exception as e:
+        logger.error("Bluesky upload failed: %s", e)
+        return {"error": str(e)}
+
+
 def _upload_to_social_media(
     episode_number: int,
     mp3_path: Path,
@@ -454,84 +540,20 @@ def _upload_to_social_media(
         results["instagram"] = instagram_results
 
     # TikTok
-    if "tiktok" in uploaders:
-        logger.info("[TikTok] Uploading clips...")
-        if video_clip_paths:
-            logger.info("%d vertical videos ready for TikTok", len(video_clip_paths))
-            logger.info("Ready to upload (upload code commented out for safety)")
-            # Log prepared captions with hook + hashtags
-            best_clips = analysis.get("best_clips", [])
-            for i, clip_info in enumerate(best_clips[: len(video_clip_paths)]):
-                hook = clip_info.get("hook_caption", "")
-                tags = clip_info.get("clip_hashtags", [])
-                if hook or tags:
-                    logger.info(
-                        "  Clip %d caption: hook=%r hashtags=%s",
-                        i + 1,
-                        hook,
-                        tags,
-                    )
-            results["tiktok"] = {
-                "status": "videos_ready",
-                "clips": len(video_clip_paths),
-            }
-        else:
-            logger.info("No video clips available")
-            results["tiktok"] = {"status": "no_videos"}
+    tiktok_results = _upload_tiktok(video_clip_paths, analysis, components=components)
+    if tiktok_results:
+        results["tiktok"] = tiktok_results
 
     # Bluesky
-    if "bluesky" in uploaders:
-        yt_full_url = None
-        if youtube_results and youtube_results.get("full_episode"):
-            yt_full_url = youtube_results["full_episode"].get("video_url")
-        if test_mode:
-            logger.info("[TEST MODE] Skipping Bluesky posts")
-            results["bluesky"] = {"status": "test_mode", "skipped": True}
-        else:
-            try:
-                bluesky_caption = analysis.get("social_captions", {}).get(
-                    "bluesky", analysis.get("social_captions", {}).get("twitter")
-                )
-                bluesky_result = uploaders["bluesky"].post_episode_announcement(
-                    episode_number=episode_number,
-                    episode_summary=analysis.get("episode_summary", ""),
-                    youtube_url=yt_full_url,
-                    bluesky_caption=bluesky_caption,
-                )
-                if bluesky_result:
-                    results["bluesky"] = {"announcement": bluesky_result}
-
-                # Post first 2 clips with YouTube Shorts links (rest staggered via calendar)
-                clip_shorts = (youtube_results or {}).get("clips", [])[:2]
-                best_clips = analysis.get("best_clips", [])
-                clip_posts = []
-                for i, short in enumerate(clip_shorts):
-                    short_url = short.get("video_url")
-                    short_title = short.get("title", f"Clip {i + 1}")
-                    hook = ""
-                    tags = []
-                    if i < len(best_clips):
-                        hook = best_clips[i].get("hook_caption", "")
-                        tags = best_clips[i].get("clip_hashtags", [])[:3]
-                    text = hook or short_title
-                    if tags:
-                        hashtag_line = " ".join(f"#{t}" for t in tags)
-                        if len(text) + len(hashtag_line) + 2 <= 300:
-                            text = f"{text}\n\n{hashtag_line}"
-                    clip_result = uploaders["bluesky"].post(
-                        text=text,
-                        url=short_url,
-                        url_title=short_title,
-                        url_description=f"{Config.PODCAST_NAME} - Episode {episode_number}",
-                    )
-                    if clip_result:
-                        clip_posts.append(clip_result)
-                if clip_posts:
-                    results.setdefault("bluesky", {})["clips"] = clip_posts
-                    logger.info("Posted %d clip(s) to Bluesky", len(clip_posts))
-            except Exception as e:
-                logger.error("Bluesky upload failed: %s", e)
-                results["bluesky"] = {"error": str(e)}
+    bluesky_results = _upload_bluesky(
+        episode_number,
+        analysis,
+        youtube_results,
+        components=components,
+        test_mode=test_mode,
+    )
+    if bluesky_results:
+        results["bluesky"] = bluesky_results
 
     # Reddit
     if "reddit" in uploaders:
@@ -563,6 +585,15 @@ def _upload_to_social_media(
             "status": "rss_ready",
             "note": "RSS feed updated in Step 7.5",
         }
+
+    # Aggregated error summary
+    errors = {k: v for k, v in results.items() if isinstance(v, dict) and "error" in v}
+    if errors:
+        logger.warning(
+            "Upload errors on %d platform(s): %s",
+            len(errors),
+            ", ".join(errors.keys()),
+        )
 
     return results
 

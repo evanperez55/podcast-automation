@@ -254,8 +254,8 @@ class TestLoadEpisodeTopics:
 
     def test_no_episode_dir(self, tmp_path, monkeypatch):
         """Returns empty list when episode dir doesn't exist."""
-        monkeypatch.setattr("pipeline.runner.Config.OUTPUT_DIR", tmp_path)
-        from pipeline.runner import _load_episode_topics
+        monkeypatch.setattr("pipeline.analytics_runner.Config.OUTPUT_DIR", tmp_path)
+        from pipeline.analytics_runner import _load_episode_topics
 
         assert _load_episode_topics(99) == []
 
@@ -263,8 +263,8 @@ class TestLoadEpisodeTopics:
         """Returns empty list when no analysis JSON found."""
         ep_dir = tmp_path / "ep_25"
         ep_dir.mkdir()
-        monkeypatch.setattr("pipeline.runner.Config.OUTPUT_DIR", tmp_path)
-        from pipeline.runner import _load_episode_topics
+        monkeypatch.setattr("pipeline.analytics_runner.Config.OUTPUT_DIR", tmp_path)
+        from pipeline.analytics_runner import _load_episode_topics
 
         assert _load_episode_topics(25) == []
 
@@ -283,8 +283,8 @@ class TestLoadEpisodeTopics:
         with open(ep_dir / "test_analysis.json", "w") as f:
             json.dump(analysis, f)
 
-        monkeypatch.setattr("pipeline.runner.Config.OUTPUT_DIR", tmp_path)
-        from pipeline.runner import _load_episode_topics
+        monkeypatch.setattr("pipeline.analytics_runner.Config.OUTPUT_DIR", tmp_path)
+        from pipeline.analytics_runner import _load_episode_topics
 
         topics = _load_episode_topics(25)
         assert topics == ["Clip A", "Clip B", "Clip C"]
@@ -295,8 +295,8 @@ class TestLoadEpisodeTopics:
         ep_dir.mkdir()
         (ep_dir / "test_analysis.json").write_text("{bad}")
 
-        monkeypatch.setattr("pipeline.runner.Config.OUTPUT_DIR", tmp_path)
-        from pipeline.runner import _load_episode_topics
+        monkeypatch.setattr("pipeline.analytics_runner.Config.OUTPUT_DIR", tmp_path)
+        from pipeline.analytics_runner import _load_episode_topics
 
         assert _load_episode_topics(25) == []
 
@@ -777,10 +777,10 @@ class TestRunWithNotification:
 class TestRunSearch:
     """Tests for run_search()."""
 
-    @patch("pipeline.runner.EpisodeSearchIndex")
+    @patch("pipeline.search_runner.EpisodeSearchIndex")
     def test_search_with_results(self, mock_index_cls, capsys):
         """Displays search results."""
-        from pipeline.runner import run_search
+        from pipeline.search_runner import run_search
 
         mock_index = Mock()
         mock_index.search.return_value = [
@@ -794,10 +794,10 @@ class TestRunSearch:
         assert "Episode 25" in output
         assert "1 result(s) found" in output
 
-    @patch("pipeline.runner.EpisodeSearchIndex")
+    @patch("pipeline.search_runner.EpisodeSearchIndex")
     def test_search_no_results(self, mock_index_cls, capsys):
         """Displays 'No results found' when empty."""
-        from pipeline.runner import run_search
+        from pipeline.search_runner import run_search
 
         mock_index = Mock()
         mock_index.search.return_value = []
@@ -815,44 +815,44 @@ class TestRunSearch:
 class TestRunAnalytics:
     """Tests for run_analytics()."""
 
-    @patch("pipeline.runner._collect_episode_analytics")
+    @patch("pipeline.analytics_runner._collect_episode_analytics")
     @patch("analytics.TopicEngagementScorer")
     @patch("analytics.AnalyticsCollector")
     def test_analytics_single_episode(
         self, mock_collector_cls, mock_scorer_cls, mock_collect
     ):
         """Processes a single episode."""
-        from pipeline.runner import run_analytics
+        from pipeline.analytics_runner import run_analytics
 
         run_analytics("ep25")
         mock_collect.assert_called_once()
         args = mock_collect.call_args[0]
         assert args[2] == 25  # episode number
 
-    @patch("pipeline.runner._collect_episode_analytics")
+    @patch("pipeline.analytics_runner._collect_episode_analytics")
     @patch("analytics.TopicEngagementScorer")
     @patch("analytics.AnalyticsCollector")
     def test_analytics_all_episodes(
         self, mock_collector_cls, mock_scorer_cls, mock_collect, tmp_path, monkeypatch
     ):
         """Processes all episodes in output dir."""
-        from pipeline.runner import run_analytics
+        from pipeline.analytics_runner import run_analytics
 
-        monkeypatch.setattr("pipeline.runner.Config.OUTPUT_DIR", tmp_path)
+        monkeypatch.setattr("pipeline.analytics_runner.Config.OUTPUT_DIR", tmp_path)
         (tmp_path / "ep_25").mkdir()
         (tmp_path / "ep_26").mkdir()
 
         run_analytics("all")
         assert mock_collect.call_count == 2
 
-    @patch("pipeline.runner._collect_episode_analytics")
+    @patch("pipeline.analytics_runner._collect_episode_analytics")
     @patch("analytics.TopicEngagementScorer")
     @patch("analytics.AnalyticsCollector")
     def test_analytics_invalid_episode(
         self, mock_collector_cls, mock_scorer_cls, mock_collect, capsys
     ):
         """Prints error for invalid episode arg."""
-        from pipeline.runner import run_analytics
+        from pipeline.analytics_runner import run_analytics
 
         run_analytics("invalid")
         mock_collect.assert_not_called()
@@ -868,7 +868,7 @@ class TestListEpisodes:
     @patch("dropbox_handler.DropboxHandler")
     def test_list_available_no_episodes(self, mock_dbx_cls, capsys):
         """Shows 'No episodes found' when Dropbox is empty."""
-        from pipeline.runner import list_available_episodes
+        from pipeline.search_runner import list_available_episodes
 
         mock_dbx = Mock()
         mock_dbx.list_episodes.return_value = []
@@ -881,7 +881,7 @@ class TestListEpisodes:
     @patch("dropbox_handler.DropboxHandler")
     def test_list_available_with_episodes(self, mock_dbx_cls, capsys):
         """Lists episodes with size and date."""
-        from pipeline.runner import list_available_episodes
+        from pipeline.search_runner import list_available_episodes
 
         mock_dbx = Mock()
         mock_dbx.list_episodes.return_value = [
@@ -903,7 +903,7 @@ class TestListEpisodes:
     @patch("dropbox_handler.DropboxHandler")
     def test_list_by_number_no_episodes(self, mock_dbx_cls, capsys):
         """Shows 'No episodes found' when none exist."""
-        from pipeline.runner import list_episodes_by_number
+        from pipeline.search_runner import list_episodes_by_number
 
         mock_dbx = Mock()
         mock_dbx.list_episodes_with_numbers.return_value = []
@@ -916,7 +916,7 @@ class TestListEpisodes:
     @patch("dropbox_handler.DropboxHandler")
     def test_list_by_number_with_episodes(self, mock_dbx_cls, capsys):
         """Lists episodes sorted by number."""
-        from pipeline.runner import list_episodes_by_number
+        from pipeline.search_runner import list_episodes_by_number
 
         mock_dbx = Mock()
         mock_dbx.list_episodes_with_numbers.return_value = [
@@ -947,7 +947,7 @@ class TestListEpisodes:
 
     def test_list_available_with_components(self):
         """Uses dropbox from components dict when provided."""
-        from pipeline.runner import list_available_episodes
+        from pipeline.search_runner import list_available_episodes
 
         mock_dbx = Mock()
         mock_dbx.list_episodes.return_value = []
@@ -1116,12 +1116,12 @@ class TestInitComponents:
 class TestCollectEpisodeAnalytics:
     """Tests for _collect_episode_analytics()."""
 
-    @patch("pipeline.runner._load_episode_topics", return_value=["Topic A"])
+    @patch("pipeline.analytics_runner._load_episode_topics", return_value=["Topic A"])
     def test_collect_and_display(self, mock_topics, tmp_path, monkeypatch, capsys):
         """Collects analytics, saves, scores, and displays."""
-        from pipeline.runner import _collect_episode_analytics
+        from pipeline.analytics_runner import _collect_episode_analytics
 
-        monkeypatch.setattr("pipeline.runner.Config.OUTPUT_DIR", tmp_path)
+        monkeypatch.setattr("pipeline.analytics_runner.Config.OUTPUT_DIR", tmp_path)
 
         # Create platform_ids.json so it can read mtime
         ep_dir = tmp_path / "ep_25"
@@ -1150,12 +1150,12 @@ class TestCollectEpisodeAnalytics:
         assert "100 views" in output
         assert "500 impressions" in output
 
-    @patch("pipeline.runner._load_episode_topics", return_value=[])
+    @patch("pipeline.analytics_runner._load_episode_topics", return_value=[])
     def test_collect_no_platform_ids(self, mock_topics, tmp_path, monkeypatch, capsys):
         """Uses current timestamp when no platform_ids.json."""
-        from pipeline.runner import _collect_episode_analytics
+        from pipeline.analytics_runner import _collect_episode_analytics
 
-        monkeypatch.setattr("pipeline.runner.Config.OUTPUT_DIR", tmp_path)
+        monkeypatch.setattr("pipeline.analytics_runner.Config.OUTPUT_DIR", tmp_path)
 
         mock_collector = Mock()
         mock_collector._load_platform_ids.return_value = {}
