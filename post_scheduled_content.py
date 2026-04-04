@@ -149,8 +149,19 @@ def _post_slot(slot, uploaders):
                     results["bluesky"] = result
 
             elif platform == "instagram":
+                # Prefer pre-uploaded Dropbox URL (works in CI)
+                ig_video_url = content.get("instagram_video_url", "")
                 clip_path = content.get("clip_path", "")
-                if clip_path and Path(clip_path).exists():
+
+                if ig_video_url:
+                    # Dropbox URL already available — post Reel directly
+                    result = _post_instagram_reel_from_url(
+                        uploaders["instagram"], ig_video_url, text, youtube_url
+                    )
+                    if result:
+                        results["instagram"] = result
+                elif clip_path and Path(clip_path).exists():
+                    # Fall back to local file upload (local runs only)
                     result = _post_instagram_reel(
                         uploaders["instagram"], clip_path, text, youtube_url, slot
                     )
@@ -158,7 +169,7 @@ def _post_slot(slot, uploaders):
                         results["instagram"] = result
                 else:
                     logger.warning(
-                        "[Instagram] Clip file not found: %s", clip_path
+                        "[Instagram] No video URL or local file for Reel"
                     )
 
         except Exception as e:
@@ -166,6 +177,27 @@ def _post_slot(slot, uploaders):
             results[platform] = {"error": str(e)}
 
     return results
+
+
+def _post_instagram_reel_from_url(ig_uploader, video_url, caption_text, youtube_url):
+    """Post an Instagram Reel using a pre-uploaded Dropbox URL.
+
+    Args:
+        ig_uploader: InstagramUploader instance.
+        video_url: Public Dropbox URL for the video.
+        caption_text: Base caption text.
+        youtube_url: YouTube URL for the full episode.
+
+    Returns:
+        Result dict from Instagram upload, or None on failure.
+    """
+    caption = caption_text or "New clip!"
+    if youtube_url:
+        caption += f"\n\nWatch the full episode and find more at {youtube_url}"
+    else:
+        caption += f"\n\nFind all episodes on YouTube: {Config.YOUTUBE_CHANNEL_HANDLE}"
+
+    return ig_uploader.upload_reel(video_url=video_url, caption=caption)
 
 
 def _post_instagram_reel(ig_uploader, clip_path, caption_text, youtube_url, slot):
@@ -209,7 +241,7 @@ def _post_instagram_reel(ig_uploader, clip_path, caption_text, youtube_url, slot
     if youtube_url:
         caption += f"\n\nWatch the full episode and find more at {youtube_url}"
     else:
-        caption += "\n\nFind all episodes on YouTube: @fakeproblemspodcast"
+        caption += f"\n\nFind all episodes on YouTube: {Config.YOUTUBE_CHANNEL_HANDLE}"
 
     return ig_uploader.upload_reel(video_url=video_url, caption=caption)
 

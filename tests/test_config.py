@@ -12,12 +12,9 @@ class TestDetectFfmpeg:
         """Returns FFMPEG_PATH env var when file exists."""
         with patch.dict("os.environ", {"FFMPEG_PATH": "/usr/bin/ffmpeg"}):
             with patch("os.path.exists", return_value=True):
-                from importlib import reload
-                import config
+                from config import _detect_ffmpeg
 
-                reload(config)
-                # Re-call the function directly
-                result = config._detect_ffmpeg()
+                result = _detect_ffmpeg()
                 assert result == "/usr/bin/ffmpeg"
 
     def test_falls_back_to_which(self):

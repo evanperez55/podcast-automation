@@ -43,21 +43,18 @@ class InstagramUploader:
     def _refresh_token_if_needed(self):
         """Refresh the Instagram token if it expires within 7 days.
 
+        Skips refresh in CI environments (no .env to persist to).
+        Only calls the refresh API when the token is near expiry.
         Persists the new token to .env so subsequent runs use it.
         """
-        try:
-            resp = requests.get(
-                f"{self.API_BASE}/me",
-                params={
-                    "fields": "id",
-                    "access_token": self.access_token,
-                },
-            )
-            if resp.status_code != 200:
-                logger.warning("Instagram token validation failed: %s", resp.text)
-                return
+        import os
 
-            # Try refreshing — the refresh endpoint returns expires_in
+        # Skip in CI — can't persist refreshed token to GitHub Secrets
+        if os.getenv("CI"):
+            return
+
+        try:
+            # Check current token expiry without refreshing
             refresh_resp = requests.get(
                 "https://graph.instagram.com/refresh_access_token",
                 params={
@@ -66,7 +63,7 @@ class InstagramUploader:
                 },
             )
             if refresh_resp.status_code != 200:
-                logger.warning("Instagram token refresh failed: %s", refresh_resp.text)
+                logger.warning("Instagram token check failed: %s", refresh_resp.text)
                 return
 
             data = refresh_resp.json()
@@ -77,7 +74,14 @@ class InstagramUploader:
             if not new_token:
                 return
 
-            logger.info("Instagram token expires in %s days", days_left)
+            # Only persist if within refresh threshold
+            if expires_in > self.REFRESH_THRESHOLD:
+                logger.debug("Instagram token OK (%s days left)", days_left)
+                return
+
+            logger.info(
+                "Instagram token expires in %s days — refreshing", days_left
+            )
 
             if new_token != self.access_token:
                 self.access_token = new_token

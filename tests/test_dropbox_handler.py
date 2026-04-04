@@ -1,8 +1,7 @@
 """Tests for dropbox_handler module — DropboxHandler class."""
 
 import pytest
-from unittest.mock import patch, Mock, MagicMock
-from pathlib import Path
+from unittest.mock import patch, MagicMock
 
 from config import Config
 
@@ -42,7 +41,7 @@ class TestDropboxHandlerInit:
                     with patch("dropbox.Dropbox") as mock_cls:
                         from dropbox_handler import DropboxHandler
 
-                        h = DropboxHandler()
+                        DropboxHandler()
                         mock_cls.assert_called_once_with(
                             app_key="key",
                             app_secret="secret",
@@ -58,7 +57,7 @@ class TestDropboxHandlerInit:
                         with patch("dropbox.Dropbox") as mock_cls:
                             from dropbox_handler import DropboxHandler
 
-                            h = DropboxHandler()
+                            DropboxHandler()
                             mock_cls.assert_called_once_with("access-token")
 
     def test_init_raises_without_credentials(self):

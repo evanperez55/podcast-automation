@@ -1,7 +1,7 @@
 """Tests for daily_content_generator module."""
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 class TestDailyContentGeneratorInit:

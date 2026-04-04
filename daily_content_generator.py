@@ -136,7 +136,8 @@ class DailyContentGenerator:
         Returns:
             System prompt string.
         """
-        return f"""You are a comedy writer for the Fake Problems Podcast. Your style is dry, observational humor about relatable everyday absurdity.
+        podcast_name = Config.PODCAST_NAME
+        return f"""You are a comedy writer for {podcast_name}. Your style is dry, observational humor about relatable everyday absurdity.
 
 Examples of the tone:
 - "Fake Problem: My ice cream melted before I finished my existential crisis"

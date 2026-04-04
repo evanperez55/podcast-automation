@@ -253,54 +253,54 @@ def _upload_instagram(
         logger.warning("[Instagram] Dropbox not configured — cannot get public URLs for Reels")
         return {"status": "no_dropbox"}
 
-    # Only post first 2 clips immediately; rest are staggered via content calendar
-    immediate_clips = video_clip_paths[:2]
-    logger.info(
-        "[Instagram] Uploading %d/%d Reels (rest staggered via calendar)",
-        len(immediate_clips),
-        len(video_clip_paths),
-    )
+    # Upload ALL clips to Dropbox (needed for both immediate and staggered posting)
+    # but only post first 2 as Reels immediately
+    logger.info("[Instagram] Uploading %d clips to Dropbox...", len(video_clip_paths))
     best_clips = (analysis or {}).get("best_clips", [])
     results = []
+    dropbox_urls = {}  # clip index -> Dropbox shared URL (for calendar slots)
 
-    for i, clip_path in enumerate(immediate_clips):
+    for i, clip_path in enumerate(video_clip_paths):
         clip_path = Path(clip_path)
         clip_name = clip_path.name
-
-        # Build caption from analysis
-        caption = _build_instagram_caption(
-            i, best_clips, episode_number, analysis, youtube_episode_url
-        )
 
         # Upload clip to Dropbox and get public link
         dbx_dest = f"/podcast/instagram/ep_{episode_number}/{clip_name}"
         upload_result = dropbox.upload_file(str(clip_path), dbx_dest, overwrite=True)
         if not upload_result:
             logger.warning("[Instagram] Failed to upload clip %d to Dropbox", i + 1)
-            results.append({"clip": i + 1, "status": "dropbox_upload_failed"})
             continue
 
         video_url = dropbox.get_shared_link(dbx_dest)
         if not video_url:
             logger.warning("[Instagram] Failed to get shared link for clip %d", i + 1)
-            results.append({"clip": i + 1, "status": "shared_link_failed"})
             continue
 
-        # Upload as Reel
-        reel_result = ig.upload_reel(video_url=video_url, caption=caption)
-        if reel_result:
-            logger.info("[Instagram] Clip %d posted: %s", i + 1, reel_result.get("permalink", ""))
-            results.append({"clip": i + 1, "status": "success", **reel_result})
-        else:
-            logger.warning("[Instagram] Clip %d upload failed", i + 1)
-            results.append({"clip": i + 1, "status": "upload_failed"})
+        dropbox_urls[i] = video_url
+
+        # Only post first 2 clips as Reels immediately; rest staggered via calendar
+        if i < 2:
+            caption = _build_instagram_caption(
+                i, best_clips, episode_number, analysis, youtube_episode_url
+            )
+            reel_result = ig.upload_reel(video_url=video_url, caption=caption)
+            if reel_result:
+                logger.info(
+                    "[Instagram] Clip %d posted: %s",
+                    i + 1,
+                    reel_result.get("permalink", ""),
+                )
+                results.append({"clip": i + 1, "status": "success", **reel_result})
+            else:
+                logger.warning("[Instagram] Clip %d upload failed", i + 1)
+                results.append({"clip": i + 1, "status": "upload_failed"})
 
     successful = sum(1 for r in results if r.get("status") == "success")
-    deferred = len(video_clip_paths) - len(immediate_clips)
+    deferred = max(0, len(video_clip_paths) - 2)
     logger.info(
-        "[Instagram] %d/%d Reels posted, %d deferred to calendar",
+        "[Instagram] %d Reels posted, %d clips pre-uploaded for calendar, %d deferred",
         successful,
-        len(immediate_clips),
+        len(dropbox_urls),
         deferred,
     )
     return {
@@ -308,6 +308,7 @@ def _upload_instagram(
         "results": results,
         "successful": successful,
         "deferred": deferred,
+        "dropbox_urls": dropbox_urls,
     }
 
 
@@ -350,7 +351,7 @@ def _build_instagram_caption(
     if youtube_episode_url:
         caption += f"\n\nWatch the full episode and find more at {youtube_episode_url}"
     else:
-        caption += "\n\nFind all episodes on YouTube: @fakeproblemspodcast"
+        caption += f"\n\nFind all episodes on YouTube: {Config.YOUTUBE_CHANNEL_HANDLE}"
 
     # Append hashtags
     if tags:
@@ -910,6 +911,24 @@ def run_distribute(
                     ep_key,
                     "teaser",
                     {"caption": hot_take},
+                )
+
+            # Instagram Dropbox URLs -> clip slots (for staggered Reel posting from CI)
+            ig_results = social_media_results.get("instagram", {})
+            ig_dropbox_urls = ig_results.get("dropbox_urls", {})
+            for clip_idx, dbx_url in ig_dropbox_urls.items():
+                # clip_idx is 0-based; clips 3+ are in stagger slots
+                clip_num = clip_idx + 1
+                slot_name = f"clip_{clip_num}"
+                calendar.update_slot_content(
+                    ep_key,
+                    slot_name,
+                    {"instagram_video_url": dbx_url},
+                )
+            if ig_dropbox_urls:
+                logger.info(
+                    "Persisted %d Instagram Dropbox URLs to calendar slots",
+                    len(ig_dropbox_urls),
                 )
 
             logger.info("Persisted YouTube URLs to content calendar slots")

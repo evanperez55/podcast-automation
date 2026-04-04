@@ -195,6 +195,7 @@ class Config:
 
     # YouTube Analytics
     YOUTUBE_CHANNEL_ID = os.getenv("YOUTUBE_CHANNEL_ID", "")
+    YOUTUBE_CHANNEL_HANDLE = os.getenv("YOUTUBE_CHANNEL_HANDLE", "@fakeproblemspodcast")
 
     # Daily Content Generator (OpenAI mode)
     DAILY_CONTENT_USE_OPENAI = (

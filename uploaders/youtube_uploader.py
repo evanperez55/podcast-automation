@@ -594,7 +594,7 @@ def create_episode_metadata(
         if full_episode_url:
             description += f"Watch the full episode and find more: {full_episode_url}\n\n"
         else:
-            description += "Find all episodes: youtube.com/@fakeproblemspodcast\n\n"
+            description += f"Find all episodes: youtube.com/{Config.YOUTUBE_CHANNEL_HANDLE}\n\n"
         description += social_captions.get("youtube", episode_summary)
     else:
         # For full episodes

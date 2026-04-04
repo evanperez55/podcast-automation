@@ -239,24 +239,53 @@ class TestUploadInstagram:
         result = _upload_instagram(["/clip.mp4"], components={"uploaders": {}})
         assert result is None
 
-    def test_videos_ready(self):
-        """Returns videos_ready status when clips available."""
+    def test_no_dropbox(self):
+        """Returns no_dropbox when Dropbox not in components."""
         from pipeline.steps.distribute import _upload_instagram
 
-        components = {"uploaders": {"instagram": Mock()}}
+        mock_ig = Mock()
+        mock_ig.functional = True
+        components = {"uploaders": {"instagram": mock_ig}}
         result = _upload_instagram(
             ["/clip1.mp4", "/clip2.mp4"],
             analysis=SAMPLE_ANALYSIS,
             components=components,
         )
-        assert result["status"] == "videos_ready"
-        assert result["clips"] == 2
+        assert result["status"] == "no_dropbox"
+
+    def test_uploads_first_two_clips(self):
+        """Uploads first 2 clips to Dropbox and posts as Reels."""
+        from pipeline.steps.distribute import _upload_instagram
+
+        mock_ig = Mock()
+        mock_ig.functional = True
+        mock_ig.upload_reel.return_value = {"id": "123", "status": "success"}
+
+        mock_dbx = Mock()
+        mock_dbx.upload_file.return_value = True
+        mock_dbx.get_shared_link.return_value = "https://dropbox.com/test.mp4"
+
+        components = {"uploaders": {"instagram": mock_ig}, "dropbox": mock_dbx}
+        result = _upload_instagram(
+            ["/clip1.mp4", "/clip2.mp4", "/clip3.mp4"],
+            episode_number=30,
+            analysis=SAMPLE_ANALYSIS,
+            components=components,
+        )
+        assert result["status"] == "complete"
+        assert result["successful"] == 2
+        assert result["deferred"] == 1
+        # All 3 clips uploaded to Dropbox, but only 2 posted as Reels
+        assert mock_dbx.upload_file.call_count == 3
+        assert mock_ig.upload_reel.call_count == 2
 
     def test_no_videos(self):
         """Returns no_videos when no clips."""
         from pipeline.steps.distribute import _upload_instagram
 
-        components = {"uploaders": {"instagram": Mock()}}
+        mock_ig = Mock()
+        mock_ig.functional = True
+        components = {"uploaders": {"instagram": mock_ig}}
         result = _upload_instagram([], components=components)
         assert result["status"] == "no_videos"
 

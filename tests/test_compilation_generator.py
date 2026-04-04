@@ -1,7 +1,7 @@
 """Tests for compilation_generator module."""
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from compilation_generator import CompilationGenerator
 

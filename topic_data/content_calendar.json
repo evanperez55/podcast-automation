@@ -161,9 +161,11 @@
           "youtube_video_id": "vxc7G-R1mRg",
           "clip_title": "Magnetic home gym sounds cool until you think about it"
         },
-        "status": "pending",
-        "uploaded_at": null,
-        "upload_results": {}
+        "status": "uploaded",
+        "uploaded_at": "2026-04-04T15:10:35.870750",
+        "upload_results": {
+          "instagram": null
+        }
       },
       "clip_5": {
         "slot_type": "clip_5",

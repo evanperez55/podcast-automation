@@ -7,9 +7,7 @@ Usage:
     uv run scripts/setup_instagram_oauth.py
 """
 
-import http.server
 import urllib.parse
-import webbrowser
 import requests
 import sys
 import os
@@ -107,12 +105,12 @@ def main():
             f"&response_type=code"
             f"&scope={SCOPES}"
         )
-        print(f"\nStep 1: Open this URL in your browser:")
+        print("\nStep 1: Open this URL in your browser:")
         print(f"  {auth_url}")
-        print(f"\nStep 2: After authorizing, you'll be redirected to a URL like:")
+        print("\nStep 2: After authorizing, you'll be redirected to a URL like:")
         print(f"  {REDIRECT_URI}?code=AQB...")
-        print(f"\nStep 3: Run this script again with the redirect URL:")
-        print(f"  uv run scripts/setup_instagram_oauth.py \"<paste_redirect_url>\"")
+        print("\nStep 3: Run this script again with the redirect URL:")
+        print("  uv run scripts/setup_instagram_oauth.py \"<paste_redirect_url>\"")
         sys.exit(0)
 
     # Step 2: Exchange code for short-lived token
@@ -132,7 +130,7 @@ def main():
     print("SUCCESS! Add this to your .env file:")
     print("=" * 60)
     print(f"\nINSTAGRAM_ACCESS_TOKEN={long_token}")
-    print(f"\nToken expires in ~60 days. Run this script again to refresh.")
+    print("\nToken expires in ~60 days. Run this script again to refresh.")
 
 
 if __name__ == "__main__":

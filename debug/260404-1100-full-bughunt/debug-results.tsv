@@ -1,0 +1,2 @@
+iteration	type	hypothesis	result	severity	location	description
+1	hypothesis	test_config.py + test_content_calendar.py combo poisons Config.OUTPUT_DIR for test_demo_packager.py	confirmed	MEDIUM	tests/test_config.py + tests/test_content_calendar.py	Config class attribute leaks between test files when run together — 16 test_demo_packager failures
