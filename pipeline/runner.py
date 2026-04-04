@@ -127,7 +127,12 @@ def _init_uploaders():
 
 
 def _init_components(
-    test_mode=False, dry_run=False, auto_approve=False, resume=False, force=False
+    test_mode=False,
+    dry_run=False,
+    auto_approve=False,
+    resume=False,
+    force=False,
+    demo_mode=False,
 ):
     """Initialize all pipeline components.
 
@@ -139,6 +144,7 @@ def _init_components(
         auto_approve: If True, skip interactive clip approval
         resume: If True, resuming from checkpoint (informational only here)
         force: If True, --force flag was passed (bypass compliance upload block)
+        demo_mode: If True, full processing but skip distribution and uploaders
     """
     # Lazy imports — these are heavy (google API 1.4s, scipy 1s, numpy 0.3s)
     from dropbox_handler import DropboxHandler
@@ -155,6 +161,8 @@ def _init_components(
     print(f"{Config.PODCAST_NAME.upper()} AUTOMATION")
     if dry_run:
         print("[DRY RUN] - Validating pipeline with mock data")
+    elif demo_mode:
+        print("[DEMO MODE] - Full processing, no distribution")
     elif test_mode:
         print("[TEST MODE] - Uploads disabled")
     if resume:
@@ -222,7 +230,11 @@ def _init_components(
         video_converter = None
 
     # Initialize social media uploaders (optional)
-    uploaders = _init_uploaders()
+    if demo_mode:
+        uploaders = {}
+        logger.info("Uploaders skipped (demo mode — no distribution)")
+    else:
+        uploaders = _init_uploaders()
 
     # Google Docs topic tracker — disabled (requires Google OAuth credentials
     # in credentials/google_docs_*.json which aren't currently configured)
@@ -359,6 +371,7 @@ def _run_pipeline(args):
         auto_approve = args.get("auto_approve", False)
         resume = args.get("resume", False)
         force = args.get("force", False)
+        demo_mode = args.get("demo_mode", False)
     else:
         episode_number = getattr(args, "episode_number", None)
         dropbox_path = getattr(args, "dropbox_path", None)
@@ -368,6 +381,7 @@ def _run_pipeline(args):
         auto_approve = getattr(args, "auto_approve", False)
         resume = getattr(args, "resume", False)
         force = getattr(args, "force", False)
+        demo_mode = getattr(args, "demo_mode", False)
 
     # Load client config if specified
     client_name = None
@@ -384,9 +398,10 @@ def _run_pipeline(args):
     components = _init_components(
         test_mode=test_mode,
         dry_run=dry_run,
-        auto_approve=auto_approve,
+        auto_approve=auto_approve or demo_mode,
         resume=resume,
         force=force,
+        demo_mode=demo_mode,
     )
 
     print("=" * 60)
@@ -513,7 +528,26 @@ def _run_pipeline(args):
     ctx = run_video(ctx, components, state)
 
     # Steps 7, 7.5, 8, 8.5, 9: Distribution
-    ctx = run_distribute(ctx, components, state)
+    if demo_mode:
+        print("=" * 60)
+        print("[DEMO MODE] Skipping distribution (steps 7-9)")
+        print("=" * 60)
+        print()
+
+        from demo_packager import DemoPackager
+
+        client_for_demo = client_name or "default"
+        demo_path = DemoPackager().package_demo(client_for_demo, ctx.episode_folder)
+
+        print()
+        print("=" * 60)
+        print("DEMO PACKAGE READY")
+        print(f"  Folder: {demo_path}")
+        print()
+        _print_demo_summary(demo_path)
+        print("=" * 60)
+    else:
+        ctx = run_distribute(ctx, components, state)
 
     # Build and save results dict (backward-compatible)
     analysis = ctx.analysis or {}
@@ -573,6 +607,20 @@ def _run_pipeline(args):
         print()
 
     return results
+
+
+def _print_demo_summary(demo_path):
+    """Print contents of a demo folder."""
+    from pathlib import Path
+
+    p = Path(demo_path)
+    if not p.exists():
+        return
+    for item in sorted(p.rglob("*")):
+        if item.is_file():
+            rel = item.relative_to(p)
+            size_kb = item.stat().st_size / 1024
+            print(f"  {rel} ({size_kb:.0f} KB)")
 
 
 def _run_transcribe(ctx, components, state):

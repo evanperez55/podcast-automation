@@ -27,6 +27,7 @@ def _parse_flags():
         "--auto-approve",
         "--force",
         "--ping",
+        "--demo",
     }
     client_name = None
     cleaned = []
@@ -48,6 +49,7 @@ def _parse_flags():
         "auto_approve": "--auto-approve" in raw,
         "force": "--force" in raw,
         "ping": "--ping" in raw,
+        "demo_mode": "--demo" in raw,
         "client_name": client_name,
     }
 
