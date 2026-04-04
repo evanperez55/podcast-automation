@@ -36,6 +36,18 @@ def _init_uploaders():
     except (ValueError, Exception) as e:
         logger.warning("Bluesky not available: %s", str(e).split("\n")[0])
 
+    try:
+        from uploaders.instagram_uploader import InstagramUploader
+
+        ig = InstagramUploader()
+        if ig.functional:
+            uploaders["instagram"] = ig
+            logger.info("Instagram uploader initialized")
+        else:
+            logger.info("Instagram not configured")
+    except (ValueError, Exception) as e:
+        logger.warning("Instagram not available: %s", str(e).split("\n")[0])
+
     return uploaders
 
 
@@ -136,11 +148,70 @@ def _post_slot(slot, uploaders):
                 if result:
                     results["bluesky"] = result
 
+            elif platform == "instagram":
+                clip_path = content.get("clip_path", "")
+                if clip_path and Path(clip_path).exists():
+                    result = _post_instagram_reel(
+                        uploaders["instagram"], clip_path, text, youtube_url, slot
+                    )
+                    if result:
+                        results["instagram"] = result
+                else:
+                    logger.warning(
+                        "[Instagram] Clip file not found: %s", clip_path
+                    )
+
         except Exception as e:
             logger.error("Failed to post %s to %s: %s", slot_type, platform, e)
             results[platform] = {"error": str(e)}
 
     return results
+
+
+def _post_instagram_reel(ig_uploader, clip_path, caption_text, youtube_url, slot):
+    """Upload a clip as an Instagram Reel via Dropbox shared link.
+
+    Args:
+        ig_uploader: InstagramUploader instance.
+        clip_path: Local path to the video clip.
+        caption_text: Base caption text (hook or title).
+        youtube_url: YouTube URL for the full episode.
+        slot: Slot dict with episode metadata.
+
+    Returns:
+        Result dict from Instagram upload, or None on failure.
+    """
+    from dropbox_handler import DropboxHandler
+
+    try:
+        dbx = DropboxHandler()
+    except Exception as e:
+        logger.error("[Instagram] Dropbox not available: %s", e)
+        return None
+
+    # Upload to Dropbox
+    episode_key = slot.get("episode_key", "unknown")
+    clip_name = Path(clip_path).name
+    dbx_dest = f"/podcast/instagram/{episode_key}/{clip_name}"
+
+    upload_result = dbx.upload_file(clip_path, dbx_dest, overwrite=True)
+    if not upload_result:
+        logger.error("[Instagram] Failed to upload clip to Dropbox")
+        return None
+
+    video_url = dbx.get_shared_link(dbx_dest)
+    if not video_url:
+        logger.error("[Instagram] Failed to get Dropbox shared link")
+        return None
+
+    # Build caption with YouTube link
+    caption = caption_text or "New clip!"
+    if youtube_url:
+        caption += f"\n\nWatch the full episode and find more at {youtube_url}"
+    else:
+        caption += "\n\nFind all episodes on YouTube: @fakeproblemspodcast"
+
+    return ig_uploader.upload_reel(video_url=video_url, caption=caption)
 
 
 def post_scheduled(dry_run=False):

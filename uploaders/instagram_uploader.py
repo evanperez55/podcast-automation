@@ -1,8 +1,11 @@
 """Instagram uploader for podcast clips as Reels."""
 
+import os
 import time
-import requests
+from pathlib import Path
 from typing import Optional, Dict, Any
+
+import requests
 
 from config import Config
 from logger import logger
@@ -31,6 +34,80 @@ class InstagramUploader:
         self.account_id = account_id
         # Instagram Login tokens use "me" instead of account ID for API calls
         self.api_user = "me" if token.startswith("IGAA") else account_id
+
+        # Auto-refresh token if expiring within 7 days
+        self._refresh_token_if_needed()
+
+    # Token refresh threshold: 7 days in seconds
+    REFRESH_THRESHOLD = 7 * 86400
+
+    def _refresh_token_if_needed(self):
+        """Refresh the Instagram token if it expires within 7 days.
+
+        Persists the new token to .env so subsequent runs use it.
+        """
+        try:
+            resp = requests.get(
+                f"{self.API_BASE}/me",
+                params={
+                    "fields": "id",
+                    "access_token": self.access_token,
+                },
+            )
+            if resp.status_code != 200:
+                logger.warning("Instagram token validation failed: %s", resp.text)
+                return
+
+            # Try refreshing — the refresh endpoint returns expires_in
+            refresh_resp = requests.get(
+                "https://graph.instagram.com/refresh_access_token",
+                params={
+                    "grant_type": "ig_refresh_token",
+                    "access_token": self.access_token,
+                },
+            )
+            if refresh_resp.status_code != 200:
+                logger.warning("Instagram token refresh failed: %s", refresh_resp.text)
+                return
+
+            data = refresh_resp.json()
+            expires_in = data.get("expires_in", 0)
+            new_token = data.get("access_token")
+            days_left = expires_in // 86400
+
+            if not new_token:
+                return
+
+            logger.info("Instagram token expires in %s days", days_left)
+
+            if new_token != self.access_token:
+                self.access_token = new_token
+                self._persist_token(new_token)
+                logger.info("Instagram token refreshed and saved to .env")
+
+        except requests.exceptions.RequestException as e:
+            logger.warning("Instagram token refresh check failed: %s", e)
+
+    def _persist_token(self, new_token: str):
+        """Update INSTAGRAM_ACCESS_TOKEN in the .env file.
+
+        Args:
+            new_token: The new long-lived access token.
+        """
+        env_path = Path(".env")
+        if not env_path.exists():
+            return
+
+        lines = env_path.read_text().splitlines()
+        updated = False
+        for i, line in enumerate(lines):
+            if line.startswith("INSTAGRAM_ACCESS_TOKEN="):
+                lines[i] = f"INSTAGRAM_ACCESS_TOKEN={new_token}"
+                updated = True
+                break
+
+        if updated:
+            env_path.write_text("\n".join(lines) + "\n")
 
     def upload_reel(
         self,

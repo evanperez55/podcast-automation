@@ -168,6 +168,7 @@ class Config:
         "WEBSITE_GITHUB_REPO", "fakeproblemspodcast/fakeproblemspodcast.github.io"
     )
     WEBSITE_GITHUB_BRANCH = os.getenv("WEBSITE_GITHUB_BRANCH", "main")
+    WEBSITE_URL = os.getenv("WEBSITE_URL", "fakeproblemspodcast.com")
 
     # Episode Webpage Generator (GitHub Pages per-episode pages)
     PAGES_ENABLED = os.getenv("PAGES_ENABLED", "true").lower() == "true"

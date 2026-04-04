@@ -133,7 +133,7 @@ class ContentCalendar:
                 slot_type=slot_name,
                 day_offset=day_offset,
                 release_date=release_date,
-                platforms=["youtube", "twitter", "bluesky"],
+                platforms=["youtube", "twitter", "bluesky", "instagram"],
                 clip_index=clip_idx_in_analysis,
                 content={
                     "caption": caption,

@@ -523,6 +523,7 @@ def create_episode_metadata(
     clip_info: Optional[Dict[str, Any]] = None,
     show_notes: Optional[str] = None,
     chapters: Optional[list] = None,
+    full_episode_url: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Create YouTube metadata from episode analysis.
@@ -534,6 +535,7 @@ def create_episode_metadata(
         clip_info: Information about the clip (for Shorts)
         show_notes: Detailed show notes (used for full episode description)
         chapters: List of chapter marker dicts (used for full episode description)
+        full_episode_url: URL to the full episode on YouTube (for Shorts descriptions)
 
     Returns:
         Dictionary with title, description, and tags
@@ -546,7 +548,11 @@ def create_episode_metadata(
         hook = clip_info.get("hook_caption", "")
         description = f"{hook}\n\n" if hook else ""
         description += f"{clip_info.get('description', '')}\n\n"
-        description += f"From Episode #{episode_number} of {podcast_name}\n\n"
+        description += f"From Episode #{episode_number} of {podcast_name}\n"
+        if full_episode_url:
+            description += f"Watch the full episode and find more: {full_episode_url}\n\n"
+        else:
+            description += "Find all episodes: youtube.com/@fakeproblemspodcast\n\n"
         description += social_captions.get("youtube", episode_summary)
     else:
         # For full episodes

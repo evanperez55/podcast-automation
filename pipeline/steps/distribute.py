@@ -96,11 +96,15 @@ def _upload_youtube(
         for i, video_path in enumerate(video_clip_paths, 1):
             if i - 1 < len(best_clips):
                 clip_info = best_clips[i - 1]
+                yt_full_url = None
+                if youtube_results.get("full_episode"):
+                    yt_full_url = youtube_results["full_episode"].get("video_url")
                 metadata = create_episode_metadata(
                     episode_number=episode_number,
                     episode_summary=episode_summary,
                     social_captions=social_captions,
                     clip_info=clip_info,
+                    full_episode_url=yt_full_url,
                 )
 
                 clip_title = clip_info.get("suggested_title", f"Clip {i}")
@@ -222,39 +226,138 @@ def _upload_twitter(
 
 
 def _upload_instagram(
-    video_clip_paths, episode_number=None, analysis=None, components: dict = None
+    video_clip_paths,
+    episode_number=None,
+    analysis=None,
+    components: dict = None,
+    youtube_episode_url: str = None,
 ):
-    """Upload clips to Instagram as Reels."""
-    uploaders = (components or {}).get("uploaders", {})
-    if "instagram" not in uploaders:
+    """Upload clips to Instagram as Reels via Dropbox shared links.
+
+    Uploads each video clip to Dropbox, gets a public link, then posts as an
+    Instagram Reel with captions from the analysis.
+    """
+    components = components or {}
+    uploaders = components.get("uploaders", {})
+    ig = uploaders.get("instagram")
+    dropbox = components.get("dropbox")
+
+    if not ig or not ig.functional:
         return None
 
-    logger.info("[Instagram] Uploading Reels...")
-    if video_clip_paths:
-        logger.info(
-            "%d vertical videos ready for Instagram Reels", len(video_clip_paths)
-        )
-        logger.info("Instagram requires publicly accessible video URLs")
-        logger.info(
-            "Upload videos to Dropbox and get public links to enable auto-upload"
-        )
-        # Log prepared captions with hook + hashtags
-        if analysis:
-            best_clips = analysis.get("best_clips", [])
-            for i, clip_info in enumerate(best_clips[: len(video_clip_paths)]):
-                hook = clip_info.get("hook_caption", "")
-                tags = clip_info.get("clip_hashtags", [])
-                if hook or tags:
-                    logger.info(
-                        "  Clip %d caption: hook=%r hashtags=%s",
-                        i + 1,
-                        hook,
-                        tags,
-                    )
-        return {"status": "videos_ready", "clips": len(video_clip_paths)}
-    else:
-        logger.info("No video clips available")
+    if not video_clip_paths:
+        logger.info("[Instagram] No video clips available")
         return {"status": "no_videos"}
+
+    if not dropbox:
+        logger.warning("[Instagram] Dropbox not configured — cannot get public URLs for Reels")
+        return {"status": "no_dropbox"}
+
+    # Only post first 2 clips immediately; rest are staggered via content calendar
+    immediate_clips = video_clip_paths[:2]
+    logger.info(
+        "[Instagram] Uploading %d/%d Reels (rest staggered via calendar)",
+        len(immediate_clips),
+        len(video_clip_paths),
+    )
+    best_clips = (analysis or {}).get("best_clips", [])
+    results = []
+
+    for i, clip_path in enumerate(immediate_clips):
+        clip_path = Path(clip_path)
+        clip_name = clip_path.name
+
+        # Build caption from analysis
+        caption = _build_instagram_caption(
+            i, best_clips, episode_number, analysis, youtube_episode_url
+        )
+
+        # Upload clip to Dropbox and get public link
+        dbx_dest = f"/podcast/instagram/ep_{episode_number}/{clip_name}"
+        upload_result = dropbox.upload_file(str(clip_path), dbx_dest, overwrite=True)
+        if not upload_result:
+            logger.warning("[Instagram] Failed to upload clip %d to Dropbox", i + 1)
+            results.append({"clip": i + 1, "status": "dropbox_upload_failed"})
+            continue
+
+        video_url = dropbox.get_shared_link(dbx_dest)
+        if not video_url:
+            logger.warning("[Instagram] Failed to get shared link for clip %d", i + 1)
+            results.append({"clip": i + 1, "status": "shared_link_failed"})
+            continue
+
+        # Upload as Reel
+        reel_result = ig.upload_reel(video_url=video_url, caption=caption)
+        if reel_result:
+            logger.info("[Instagram] Clip %d posted: %s", i + 1, reel_result.get("permalink", ""))
+            results.append({"clip": i + 1, "status": "success", **reel_result})
+        else:
+            logger.warning("[Instagram] Clip %d upload failed", i + 1)
+            results.append({"clip": i + 1, "status": "upload_failed"})
+
+    successful = sum(1 for r in results if r.get("status") == "success")
+    deferred = len(video_clip_paths) - len(immediate_clips)
+    logger.info(
+        "[Instagram] %d/%d Reels posted, %d deferred to calendar",
+        successful,
+        len(immediate_clips),
+        deferred,
+    )
+    return {
+        "status": "complete",
+        "results": results,
+        "successful": successful,
+        "deferred": deferred,
+    }
+
+
+def _build_instagram_caption(
+    clip_index, best_clips, episode_number, analysis, youtube_episode_url=None
+):
+    """Build an Instagram Reel caption from clip analysis data.
+
+    Args:
+        clip_index: Zero-based index of the clip.
+        best_clips: List of clip info dicts from analysis.
+        episode_number: Episode number.
+        analysis: Full analysis dict.
+        youtube_episode_url: URL to the full episode on YouTube.
+
+    Returns:
+        Caption string for the Reel.
+    """
+    # Try to get clip-specific caption from analysis
+    if clip_index < len(best_clips):
+        clip_info = best_clips[clip_index]
+        hook = clip_info.get("hook_caption", "")
+        tags = clip_info.get("clip_hashtags", [])
+    else:
+        hook = ""
+        tags = []
+
+    # Use the Instagram social caption as fallback
+    social_captions = (analysis or {}).get("social_captions", {})
+    ig_caption = social_captions.get("instagram", "")
+
+    if hook:
+        caption = hook
+    elif ig_caption:
+        caption = ig_caption
+    else:
+        caption = f"Episode {episode_number} clip"
+
+    # Append CTA with YouTube link
+    if youtube_episode_url:
+        caption += f"\n\nWatch the full episode and find more at {youtube_episode_url}"
+    else:
+        caption += "\n\nFind all episodes on YouTube: @fakeproblemspodcast"
+
+    # Append hashtags
+    if tags:
+        tag_str = " ".join(f"#{t.lstrip('#')}" for t in tags)
+        caption = f"{caption}\n\n{tag_str}"
+
+    return caption
 
 
 def _upload_to_social_media(
@@ -336,11 +439,15 @@ def _upload_to_social_media(
             logger.info("Saved platform IDs: %s", platform_ids_path)
 
     # Instagram Reels
+    yt_episode_url = None
+    if youtube_results and youtube_results.get("full_episode"):
+        yt_episode_url = youtube_results["full_episode"].get("video_url")
     instagram_results = _upload_instagram(
         video_clip_paths,
         episode_number=episode_number,
         analysis=analysis,
         components=components,
+        youtube_episode_url=yt_episode_url,
     )
     if instagram_results:
         results["instagram"] = instagram_results
@@ -393,8 +500,8 @@ def _upload_to_social_media(
                 if bluesky_result:
                     results["bluesky"] = {"announcement": bluesky_result}
 
-                # Post clips with YouTube Shorts links
-                clip_shorts = (youtube_results or {}).get("clips", [])
+                # Post first 2 clips with YouTube Shorts links (rest staggered via calendar)
+                clip_shorts = (youtube_results or {}).get("clips", [])[:2]
                 best_clips = analysis.get("best_clips", [])
                 clip_posts = []
                 for i, short in enumerate(clip_shorts):
