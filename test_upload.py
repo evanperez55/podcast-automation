@@ -141,7 +141,7 @@ def run_test_upload(keep=False, yes=False):
             tid = tweet_result["tweet_id"]
             results["twitter"] = {"status": "success", "tweet_id": tid}
             print(f"  OK - tweet_id: {tid}")
-            cleanup.append(("Twitter", lambda t=tid: tw.delete_tweet(t)))
+            print("  (manual delete required — Twitter API doesn't support delete at this tier)")
         else:
             results["twitter"] = {"status": "failed", "error": "post returned None"}
             print("  FAILED - post returned None")
@@ -161,11 +161,10 @@ def run_test_upload(keep=False, yes=False):
             )
             if ig_result and ig_result.get("id"):
                 media_id = ig_result["id"]
+                permalink = ig_result.get("permalink", "")
                 results["instagram"] = {"status": "success", "media_id": media_id}
-                print(f"  OK - media_id: {media_id}")
-                cleanup.append(
-                    ("Instagram", lambda m=media_id: ig.delete_media(m))
-                )
+                print(f"  OK - {permalink or media_id}")
+                print("  (manual delete required — Instagram API doesn't support media deletion)")
             else:
                 results["instagram"] = {
                     "status": "failed",
