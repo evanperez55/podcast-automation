@@ -13,7 +13,7 @@ class InstagramUploader:
     """Handle Instagram Reels uploads via Graph API."""
 
     # Instagram Graph API base URL
-    API_BASE = "https://graph.facebook.com/v18.0"
+    API_BASE = "https://graph.instagram.com/v21.0"
 
     def __init__(self):
         """Initialize Instagram uploader."""
@@ -29,6 +29,8 @@ class InstagramUploader:
             return
         self.access_token = token
         self.account_id = account_id
+        # Instagram Login tokens use "me" instead of account ID for API calls
+        self.api_user = "me" if token.startswith("IGAA") else account_id
 
     def upload_reel(
         self,
@@ -122,7 +124,7 @@ class InstagramUploader:
         Returns:
             Container ID if successful, None otherwise
         """
-        endpoint = f"{self.API_BASE}/{self.account_id}/media"
+        endpoint = f"{self.API_BASE}/{self.api_user}/media"
 
         params = {
             "media_type": "REELS",
@@ -222,7 +224,7 @@ class InstagramUploader:
         Returns:
             Dictionary with Reel ID and permalink, or None if failed
         """
-        endpoint = f"{self.API_BASE}/{self.account_id}/media_publish"
+        endpoint = f"{self.API_BASE}/{self.api_user}/media_publish"
         params = {"creation_id": container_id, "access_token": self.access_token}
 
         try:
@@ -301,9 +303,9 @@ class InstagramUploader:
         """
         if not self.functional:
             return None
-        endpoint = f"{self.API_BASE}/{self.account_id}"
+        endpoint = f"{self.API_BASE}/{self.api_user}"
         params = {
-            "fields": "id,username,name,profile_picture_url,followers_count,media_count",
+            "fields": "id,username,followers_count,media_count",
             "access_token": self.access_token,
         }
 
