@@ -1,6 +1,6 @@
 # Podcast Automation -- Project Overview
 
-Automated production pipeline for the **Fake Problems Podcast**. Takes raw audio from Dropbox and produces a fully distributed episode: transcribed, analyzed, censored, clipped, converted to video, uploaded to YouTube/Twitter/Bluesky, and indexed for search. The podcast website at [fakeproblemspodcast.com](https://fakeproblemspodcast.com) is auto-updated via GitHub Pages on every processed episode.
+Automated production pipeline for the **Fake Problems Podcast**. Takes raw audio from Dropbox and produces a fully distributed episode: transcribed, analyzed, censored, clipped, converted to video, uploaded to YouTube/Twitter/Bluesky/Instagram, and indexed for search. The podcast website at [fakeproblemspodcast.com](https://fakeproblemspodcast.com) is auto-updated via GitHub Pages on every processed episode.
 
 ## Quick Start
 
@@ -71,17 +71,18 @@ uv run main.py --dry-run latest
 - MP3 export with configurable bitrate
 
 **Distribution:**
-- YouTube uploads (full episode + Shorts)
-- Twitter/X posting with media
-- Bluesky cross-posting
-- Instagram Reels
+- YouTube uploads (full episode + Shorts) with delete capability
+- Twitter/X posting with media and delete capability
+- Bluesky cross-posting with delete capability
+- Instagram Reels via Dropbox shared links (fully integrated, token auto-refresh)
 - TikTok uploads
 - Spotify via RSS feed
-- Dropbox upload of finished files
+- Dropbox upload of finished files with delete capability
 - Website landing page auto-update (GitHub Pages)
+- `test-upload` command: uploads a test clip to all configured platforms, verifies, auto-deletes
 
 **Content Marketing:**
-- 2-week content calendar with staggered Shorts release
+- 2-week content calendar with staggered Shorts release (YouTube, Instagram, Bluesky)
 - Quote card image generation
 - Blog post generation from transcript (HTML sanitized for security)
 - Discord notifications for pipeline events
@@ -97,6 +98,7 @@ uv run main.py --dry-run latest
 - Pipeline checkpoint/resume (crash recovery)
 - PID-based pipeline lock (`output/.pipeline_lock`) prevents concurrent runs
 - Credential health check (`health-check` command) for all connected services
+- Platform ping tests (`validate-client --ping`) for YouTube, Twitter, Instagram, Bluesky, Discord, Dropbox, OpenAI
 - Full-text episode search (SQLite FTS5)
 - YouTube/Twitter engagement analytics
 - Content compliance checking
@@ -165,6 +167,7 @@ Each step checkpoints its output. If the pipeline crashes, re-running the same e
 | `uv run main.py gen-pitch <slug>` | Generate a pitch for a prospect |
 | `uv run main.py outreach <action>` | Manage prospect outreach |
 | `uv run main.py health-check` | Validate all API credentials (YouTube, Twitter, Bluesky, Discord, Dropbox, OpenAI) |
+| `uv run main.py test-upload` | Upload test clip to all platforms, verify, auto-delete |
 
 **Flags:**
 
@@ -174,7 +177,9 @@ Each step checkpoints its output. If the pipeline crashes, re-running the same e
 | `--test` | Use test/mock data |
 | `--auto-approve` | Skip interactive clip approval |
 | `--client <name>` | Target a specific client configuration |
-| `--ping` | Test API connectivity during validation |
+| `--ping` | Test API connectivity during validation (YouTube, Twitter, Instagram, Bluesky, Discord) |
+| `--keep` | Keep test uploads (don't auto-delete) with `test-upload` |
+| `--yes` | Skip confirmation prompts |
 
 ## Project Structure
 
@@ -186,7 +191,7 @@ podcast-automation/
         runner.py           Step orchestration
         steps/              Individual pipeline steps
     uploaders/              Platform-specific upload clients
-    tests/                  54 test files, 1,262+ tests
+    tests/                  58 test files, 1,300+ tests
     output/                 Processed episode artifacts
     clips/                  Generated short clips
     downloads/              Raw audio staging

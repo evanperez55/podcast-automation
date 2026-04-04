@@ -27,10 +27,10 @@ uv run pytest tests/test_analytics.py::TestFetchYouTubeAnalytics::test_fetch_you
 
 ## Current Stats
 
-- **Test files:** 54 files in `tests/`
-- **Total tests:** 1,262+
+- **Test files:** 58 files in `tests/`
+- **Total tests:** 1,300+
 - **Coverage:** ~94% (notable: `bluesky_uploader` 100%, `video_converter` 99%)
-- **Lines of test code:** ~25,500
+- **Lines of test code:** ~26,500
 
 ## Pre-Commit Hook
 
@@ -310,6 +310,45 @@ assert delays[0] == pytest.approx(1.0)
 - SQLite operations -- use `tmp_path` with a real database file
 - File persistence round-trips -- use `tmp_path` for actual read/write
 - Pure computation (engagement scores, string formatting, duration calculations)
+
+## Integration Testing with test-upload
+
+The `test-upload` command provides end-to-end integration testing against real platform APIs:
+
+```bash
+# Upload test clip to all configured platforms, verify, then auto-delete
+uv run main.py test-upload
+
+# Test for a specific client
+uv run main.py test-upload --client my-podcast
+
+# Keep test uploads (don't auto-delete)
+uv run main.py test-upload --keep
+
+# Skip confirmation prompt
+uv run main.py test-upload --yes
+```
+
+This uploads a short test clip to Dropbox, YouTube, Twitter, Instagram, Bluesky, and Discord, verifies each upload succeeded, then deletes the test content. All delete methods include `[TEST]` safety guards -- they only delete content whose title or text contains "[TEST]".
+
+## Delete Method Safety Pattern
+
+All uploaders implement delete methods with a `[TEST]` guard to prevent accidental deletion of real content:
+
+```python
+def delete_video(self, video_id: str, title: str = "") -> bool:
+    """Delete a video. Only deletes if title contains [TEST]."""
+    if "[TEST]" not in title:
+        logger.warning("Refusing to delete non-test content")
+        return False
+    # actual deletion logic
+```
+
+This pattern is consistent across `YouTubeUploader.delete_video`, `TwitterUploader.delete_tweet`, `InstagramUploader.delete_media`, `BlueskyUploader.delete_post`, and `DropboxHandler.delete_file`.
+
+## Config Isolation in Tests
+
+Tests must not use `importlib.reload()` on modules that read `Config` at import time. This was a source of 26 test failures caused by Config attribute pollution across test runs. Instead, use `@patch.object(Config, ...)` or `monkeypatch.setattr(Config, ...)` to override specific attributes without reloading the module.
 
 ## Adding Tests for New Features
 

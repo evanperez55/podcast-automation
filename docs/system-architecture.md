@@ -119,7 +119,7 @@ flowchart TD
 | `uploaders/youtube_uploader.py` | YouTube Data API v3 (OAuth2) |
 | `uploaders/twitter_uploader.py` | Twitter/X API v2 (tweepy) |
 | `uploaders/bluesky_uploader.py` | Bluesky AT Protocol |
-| `uploaders/instagram_uploader.py` | Instagram Graph API |
+| `uploaders/instagram_uploader.py` | Instagram Graph API (Reels via Dropbox shared links, token auto-refresh) |
 | `uploaders/tiktok_uploader.py` | TikTok API |
 | `uploaders/spotify_uploader.py` | Spotify RSS submission |
 | `uploaders/reddit_uploader.py` | Reddit posting (PRAW) |
@@ -271,17 +271,19 @@ This pattern ensures missing credentials or disabled features never crash the pi
 
 ### Uploaders Package
 
-Each platform uploader in `uploaders/` handles its own OAuth2 authentication and raises `ValueError` on missing credentials. The orchestrator catches these during initialization and excludes unconfigured platforms.
+Each platform uploader in `uploaders/` handles its own OAuth2 authentication and raises `ValueError` on missing credentials. The orchestrator catches these during initialization and excludes unconfigured platforms. All uploaders now include `delete_*` methods with `[TEST]` safety guards (only delete content whose title/text contains "[TEST]") to support the `test-upload` verification workflow.
 
-Available uploaders: YouTube, Twitter/X, Bluesky, Instagram, TikTok, Reddit, Spotify (RSS).
+Available uploaders: YouTube, Twitter/X, Bluesky, Instagram, TikTok, Reddit, Spotify (RSS). All seven are fully functional (Instagram was previously a stub, now fully integrated via Dropbox shared links).
 
 ## Distribution Layer
 
 ### Content Calendar
 
-`content_calendar.py` manages a 2-week content calendar that staggers YouTube Shorts releases across 14 days. Rather than posting all clips on day one, it distributes them for sustained engagement.
+`content_calendar.py` manages a 2-week content calendar that staggers clip releases across 14 days to YouTube, Instagram, and Bluesky. Rather than posting all clips on day one, it distributes them for sustained engagement. The first 2 clips are posted immediately; the rest are deferred via the calendar.
 
 Key behaviors:
+- **Staggered posting:** First 2 clips posted immediately to YouTube/Instagram/Bluesky; remaining clips distributed across 2-week calendar
+- **Instagram Reels flow:** All clips are pre-uploaded to Dropbox at episode processing time; Dropbox shared links are stored in calendar slots so CI can post Reels without local video files
 - **Retry logic:** Failed slots retry up to 3 times (tracked via `retry_count`)
 - **Per-platform tracking:** Each platform records success/failure independently; partial success marks the slot as uploaded
 - **Scheduling tolerance:** 5-minute grace window on slot scheduling times
@@ -311,6 +313,10 @@ Two GitHub Actions workflows automate content distribution:
 | Daily Fake Problem | `.github/workflows/daily-content.yml` | Daily 12 PM ET | Generates and posts daily content via OpenAI + Twitter |
 
 Both workflows support `workflow_dispatch` for manual triggering and upload run artifacts for debugging.
+
+### Test Upload Command
+
+`uv run main.py test-upload` is an integration verification tool that uploads a short test clip to all configured platforms (Dropbox, YouTube, Twitter, Instagram, Bluesky, Discord), verifies the upload succeeded, then auto-deletes the test content. Supports `--client <name>` for multi-client testing, `--keep` to skip deletion, and `--yes` to skip confirmation. Delete methods on all uploaders include `[TEST]` safety guards -- they only delete content whose title or text contains "[TEST]".
 
 ### Website Generator
 

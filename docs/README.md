@@ -5,7 +5,7 @@ Automated production pipeline for podcast episodes. Handles the full workflow fr
 Built for the **Fake Problems Podcast**, with multi-client support for additional podcasts via YAML configuration.
 
 <!-- Badges -->
-<!-- ![Tests](https://img.shields.io/badge/tests-1262%2B-green) -->
+<!-- ![Tests](https://img.shields.io/badge/tests-1300%2B-green) -->
 <!-- ![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen) -->
 
 ## Quick Start
@@ -60,9 +60,10 @@ uv run main.py search "keyword"    # Full-text search
 uv run main.py analytics all       # View engagement analytics
 uv run main.py --client foo latest # Process for a specific client
 uv run main.py health-check        # Validate all API credentials
+uv run main.py test-upload         # Test upload to all platforms (verify + auto-delete)
 ```
 
-**Flags:** `--dry-run`, `--test`, `--auto-approve`, `--client <name>`
+**Flags:** `--dry-run`, `--test`, `--auto-approve`, `--client <name>`, `--keep`, `--yes`
 
 ## Tech Stack
 
@@ -77,7 +78,7 @@ uv run main.py health-check        # Validate all API credentials
 | Website | GitHub Pages (auto-deployed via GitHub API) |
 | Storage | Dropbox API, SQLite FTS5 |
 | CI/CD | GitHub Actions (scheduled content posting, daily content) |
-| Testing | pytest (1,262+ tests, ~94% coverage) |
+| Testing | pytest (1,300+ tests, ~94% coverage) |
 | Linting | ruff (lint + format, pre-commit enforced) |
 | Package Mgr | uv |
 
@@ -88,7 +89,7 @@ main.py                  CLI entry point + orchestration
 config.py                Central configuration (env vars)
 pipeline/                Pipeline runner + step modules
 uploaders/               Platform upload clients (7 platforms)
-tests/                   54 test files, 1,262+ tests
+tests/                   58 test files, 1,300+ tests
 output/                  Processed episode artifacts
 clips/                   Generated short clips
 ```

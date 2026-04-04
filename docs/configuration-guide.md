@@ -37,6 +37,7 @@ All configuration is centralized in `config.py` via the `Config` class. Values a
 |----------|---------|-------------|
 | `YOUTUBE_CLIENT_ID` | *(none)* | Google OAuth client ID |
 | `YOUTUBE_CLIENT_SECRET` | *(none)* | Google OAuth client secret |
+| `YOUTUBE_CHANNEL_HANDLE` | `"@fakeproblemspodcast"` | YouTube @handle for captions and links |
 
 ### Twitter/X
 
@@ -59,8 +60,9 @@ All configuration is centralized in `config.py` via the `Config` class. Values a
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `INSTAGRAM_ACCESS_TOKEN` | *(none)* | Instagram Graph API long-lived access token |
+| `INSTAGRAM_ACCESS_TOKEN` | *(none)* | Instagram Graph API long-lived access token (auto-refreshed when near expiry) |
 | `INSTAGRAM_ACCOUNT_ID` | *(none)* | Instagram business account ID |
+| `INSTAGRAM_APP_SECRET` | *(none)* | Instagram app secret (required for token auto-refresh) |
 
 ### TikTok
 
@@ -105,6 +107,12 @@ All configuration is centralized in `config.py` via the `Config` class. Values a
 | `SCHEDULE_TWITTER_POSTING_HOUR` | `10` | Optimal posting hour for Twitter (24h) |
 | `SCHEDULE_INSTAGRAM_POSTING_HOUR` | `12` | Optimal posting hour for Instagram (24h) |
 | `SCHEDULE_TIKTOK_POSTING_HOUR` | `12` | Optimal posting hour for TikTok (24h) |
+
+### Website
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WEBSITE_URL` | `"fakeproblemspodcast.com"` | Website domain used in social captions and links |
 
 ### Website / GitHub Pages
 
@@ -219,6 +227,21 @@ FFmpeg detection order: `FFMPEG_PATH` env var > `shutil.which("ffmpeg")` (PATH) 
    BLUESKY_HANDLE=yourpodcast.bsky.social
    BLUESKY_APP_PASSWORD=your_app_password
    ```
+
+### Instagram (Graph API)
+
+1. Create a Meta app at [Meta Developer Dashboard](https://developers.facebook.com/)
+2. Add the Instagram Graph API product
+3. Connect your Instagram Business or Creator account
+4. Generate a long-lived access token via the Token Generator tool
+5. Set in `.env`:
+   ```
+   INSTAGRAM_ACCESS_TOKEN=your_long_lived_token
+   INSTAGRAM_ACCOUNT_ID=your_business_account_id
+   INSTAGRAM_APP_SECRET=your_app_secret
+   ```
+6. **Token auto-refresh:** The uploader automatically refreshes the access token when it is within 7 days of expiry. The refreshed token is persisted back to `.env`. Token refresh is skipped in CI environments (`CI=true`).
+7. Instagram Reels are uploaded via Dropbox shared links -- the video is uploaded to Dropbox first, then the shared link is passed to Instagram's container API
 
 ### Dropbox OAuth2
 
