@@ -55,11 +55,12 @@ def _parse_flags():
 
 
 def _activate_client(client_name):
-    """Apply client config if specified."""
-    if client_name:
-        from client_config import activate_client
+    """Apply client config — defaults to 'fake-problems' when no client specified."""
+    if not client_name:
+        client_name = "fake-problems"
+    from client_config import activate_client
 
-        activate_client(client_name)
+    activate_client(client_name)
 
 
 def _handle_client_command(cmd, args):

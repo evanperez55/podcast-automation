@@ -1,8 +1,0 @@
-iteration	commit	metric	status	description
-0	baseline	1.19	baseline	Original thumbnail_generator.py
-1	ad592a6	3.63	keep	Add dark overlay behind text (alpha=160)
-2	a219cbe	7.63	keep	Increase overlay opacity to 220
-3	881ff89	7.63	keep	Use Impact font at 72pt
-4	6db39db	10.01	keep	Move title to upper 15%
-5	-	5.61	discard	Gradient overlay weaker than solid overlay
-6	c7e6f12	14.54	keep	Extend overlay to full top 45% at alpha 240

@@ -13,6 +13,12 @@ rss_source:
   feed_url: "https://www.spreaker.com/show/5917958/episodes/feed"
   episode_index: 0  # 0 = latest episode
 
+# YouTube video source — downloads video for stacked speaker view clips
+# layout: split (side-by-side speakers like Zoom) or auto (blurred background)
+video_source:
+  youtube_channel: null  # No confirmed YouTube channel — audio-only clips for now
+  layout: "auto"
+
 dropbox:
   folder_path: null
   finished_folder: null
@@ -91,7 +97,7 @@ rss:
   description: "Practical advice for solopreneurs who want to achieve more by doing less."
   author: "Charles Alexander"
   email: "charles@yourcharlesalexander.com"
-  website_url: null
+  website_url: "https://www.yourcharlesalexander.com"
   artwork_url: null
   language: "en-us"
   explicit: false

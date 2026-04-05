@@ -1,6 +1,0 @@
-iteration	type	hypothesis	result	severity	location	description
-1	hypothesis	Only first 3 clips uploaded as YouTube Shorts — clips 4-8 never uploaded	confirmed	HIGH	distribute.py:96	video_clip_paths[:3] limits to 3 clips but calendar expects 8. Also off-by-one: only clip 1 is public (i<2 when i starts at 1)
-2	hypothesis	Calendar slot YouTube URLs never persisted — key mismatch clips vs shorts	confirmed	CRITICAL	distribute.py:778	yt_results.get('shorts') but YouTube returns 'clips' — calendar slots never get video IDs
-3	hypothesis	Bluesky clip posts never fire — same shorts vs clips key mismatch	confirmed	HIGH	distribute.py:397	clip_shorts = youtube_results.get('shorts') always empty — same bug as #2
-4	hypothesis	Off-by-one in clip privacy — only clip 1 public instead of clips 1-2	confirmed	MEDIUM	distribute.py:118	i<2 when i starts at 1 means only i=1 is public. Should be i<=2
-5	hypothesis	Blog save_blog_post not passing analysis for SEO frontmatter	confirmed	MEDIUM	distribute.py:683	save_blog_post called without analysis param — SEO frontmatter never generated in pipeline
