@@ -291,9 +291,23 @@
           "quote_text": "A dropped wrench almost nuked half the country and no one even knew about it.",
           "timestamp": "00:06:20"
         },
-        "status": "pending",
-        "uploaded_at": null,
-        "upload_results": {}
+        "status": "uploaded",
+        "uploaded_at": "2026-04-05T15:32:29.168302",
+        "upload_results": {
+          "twitter": {
+            "tweet_id": "2040875237646991827",
+            "tweet_url": "https://twitter.com/i/web/status/2040875237646991827",
+            "text": "A dropped wrench almost nuked half the country and no one even knew about it.",
+            "media_count": 0,
+            "status": "success"
+          },
+          "bluesky": {
+            "post_uri": "at://did:plc:tqwk5oc74cw7yqcqfsbpuirf/app.bsky.feed.post/3mirii7mbue2w",
+            "post_url": "https://bsky.app/profile/fakeproblemspod.bsky.social/post/3mirii7mbue2w",
+            "text": "A dropped wrench almost nuked half the country and no one even knew about it.",
+            "status": "success"
+          }
+        }
       },
       "quote_3": {
         "slot_type": "quote_3",
