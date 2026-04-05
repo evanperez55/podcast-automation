@@ -74,6 +74,35 @@ class BlueskyUploader:
             return None
         return {"Authorization": f"Bearer {self.session['accessJwt']}"}
 
+    def _is_recent_duplicate(self, text: str) -> bool:
+        """Check if text matches any of the last 20 posts on this account.
+
+        Args:
+            text: The post text to check.
+
+        Returns:
+            True if a recent post has the same text (after truncation).
+        """
+        try:
+            response = requests.get(
+                f"{self.API_BASE}/app.bsky.feed.getAuthorFeed",
+                headers=self._get_headers(),
+                params={"actor": self.session["did"], "limit": 20},
+                timeout=10,
+            )
+            response.raise_for_status()
+            feed = response.json().get("feed", [])
+            for item in feed:
+                post_text = item.get("post", {}).get("record", {}).get("text", "")
+                if post_text.strip() == text.strip():
+                    logger.warning(
+                        "Duplicate detected — already posted: %s...", text[:60]
+                    )
+                    return True
+        except requests.RequestException as e:
+            logger.warning("Could not check for duplicates: %s", e)
+        return False
+
     @retry_with_backoff(
         max_retries=3,
         base_delay=2.0,
@@ -109,6 +138,13 @@ class BlueskyUploader:
         headers = self._get_headers()
         # Conservative: Bluesky limits 300 graphemes; truncate to 280 chars for safety
         text = text[:280]
+
+        if self._is_recent_duplicate(text):
+            return {
+                "status": "skipped_duplicate",
+                "text": text,
+                "post_url": None,
+            }
 
         # Build the record
         record = {
@@ -319,6 +355,14 @@ class BlueskyUploader:
 
         # Conservative: Bluesky limits 300 graphemes; truncate to 280 chars for safety
         text = text[:280]
+
+        if self._is_recent_duplicate(text):
+            return {
+                "status": "skipped_duplicate",
+                "text": text,
+                "post_url": None,
+            }
+
         record = {
             "$type": "app.bsky.feed.post",
             "text": text,

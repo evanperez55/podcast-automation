@@ -64,7 +64,14 @@ def _post_slot(slot, uploaders):
     slot_type = slot.get("slot_type", "")
     content = slot.get("content", {})
     platforms = slot.get("platforms", [])
+    prior_results = slot.get("upload_results", {})
     results = {}
+
+    # Carry forward prior successes and skip those platforms
+    for platform, prior in prior_results.items():
+        if isinstance(prior, dict) and "error" not in prior and prior.get("status") != "error":
+            results[platform] = prior
+            logger.info("Skipping %s for %s — already posted", platform, slot_type)
 
     caption = content.get("caption", "")
     youtube_url = content.get("youtube_url", "")
@@ -102,6 +109,8 @@ def _post_slot(slot, uploaders):
             results["youtube"] = {"error": str(e)}
 
     for platform in platforms:
+        if platform in results:
+            continue  # already succeeded (from prior attempt or YouTube above)
         if platform not in uploaders:
             continue
         if platform == "youtube":
