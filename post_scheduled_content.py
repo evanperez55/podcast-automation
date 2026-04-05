@@ -127,6 +127,9 @@ def _post_slot(slot, uploaders):
                 )
                 if result:
                     results["twitter"] = result
+                else:
+                    logger.warning("Twitter post_tweet returned None for %s", slot_type)
+                    results["twitter"] = {"error": "post_tweet returned None"}
 
             elif platform == "bluesky":
                 uploader = uploaders["bluesky"]
@@ -147,6 +150,9 @@ def _post_slot(slot, uploaders):
                     )
                 if result:
                     results["bluesky"] = result
+                else:
+                    logger.warning("Bluesky post returned None for %s", slot_type)
+                    results["bluesky"] = {"error": "post returned None"}
 
             elif platform == "instagram":
                 # Prefer pre-uploaded Dropbox URL (works in CI)
@@ -293,7 +299,17 @@ def post_scheduled(dry_run=False):
 
         results = _post_slot(slot, uploaders)
 
-        if results:
+        if not results:
+            # No platform returned a result — all returned None silently
+            expected = [p for p in slot.get("platforms", []) if p in uploaders]
+            error_msg = (
+                f"All platforms returned empty results (expected: {', '.join(expected)})"
+                if expected
+                else "No matching uploaders available"
+            )
+            calendar.mark_slot_failed(ep_key, slot_name, error_msg)
+            logger.warning("Marked %s/%s as failed: %s", ep_key, slot_name, error_msg)
+        else:
             has_errors = any(
                 "error" in v for v in results.values() if isinstance(v, dict)
             )
@@ -318,13 +334,13 @@ def post_scheduled(dry_run=False):
                 else:
                     logger.info("Marked %s/%s as uploaded", ep_key, slot_name)
             else:
-                # All failed
+                # All platforms returned error dicts
                 errors = "; ".join(
                     f"{k}: {v.get('error', '?')}"
                     for k, v in results.items()
                     if isinstance(v, dict) and "error" in v
                 )
-                calendar.mark_slot_failed(ep_key, slot_name, errors)
+                calendar.mark_slot_failed(ep_key, slot_name, errors or "Unknown error")
                 logger.warning("Marked %s/%s as failed: %s", ep_key, slot_name, errors)
 
         all_results.append(
