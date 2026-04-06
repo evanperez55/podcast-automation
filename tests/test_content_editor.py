@@ -55,14 +55,14 @@ class TestExtractTargetWord:
 
     def test_finds_configured_name_in_reason(self, content_editor):
         """Test finding configured names in reason text."""
-        # Joey is in Config.NAMES_TO_REMOVE
-        result = content_editor._extract_target_word("mentions joey's name", "")
-        assert result == "Joey"
+        # Host1 is in Config.NAMES_TO_REMOVE
+        result = content_editor._extract_target_word("mentions host1's name", "")
+        assert result == "Host1"
 
     def test_finds_name_in_context(self, content_editor):
         """Test finding configured names in context."""
-        result = content_editor._extract_target_word("some reason", "then Joey said...")
-        assert result == "Joey"
+        result = content_editor._extract_target_word("some reason", "then Host1 said...")
+        assert result == "Host1"
 
     def test_returns_none_for_unknown(self, content_editor):
         """Test returning None when no target can be determined."""

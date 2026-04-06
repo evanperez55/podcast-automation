@@ -778,7 +778,7 @@ Please respond with ONLY valid JSON in this exact format:
         found = []
         found_ranges = set()  # Track already-found time ranges to avoid duplicates
 
-        # Search for multi-word names first (e.g., "Evan Perez")
+        # Search for multi-word names first (e.g., "John Smith")
         for i, word_data in enumerate(words):
             for name_parts in multi_word_names:
                 if i + len(name_parts) <= len(words):

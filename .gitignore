@@ -50,6 +50,9 @@ credentials/
 
 # Per-client credential directories (keep .yaml templates tracked)
 clients/*/
+clients/*.yaml
+clients/*.yml
+!clients/example-client.yaml
 
 # Test/coverage artifacts
 .coverage

@@ -23,6 +23,7 @@ def run_ingest(
     """
     timestamp = ctx.timestamp
     episode_source = getattr(Config, "EPISODE_SOURCE", "dropbox")
+    rss_episode_title = None  # Track RSS title for YouTube video matching
 
     # Step 1: Determine audio source and download/locate file
     if ctx.audio_file and ctx.audio_file.exists():
@@ -42,6 +43,7 @@ def run_ingest(
         if not audio_file:
             raise Exception("Failed to download episode from RSS feed")
         logger.info("Downloaded RSS episode: %s", audio_file)
+        rss_episode_title = meta.title
         # Use episode number from feed metadata, fallback to filename
         episode_number = meta.episode_number or extract_episode_number_from_filename(
             audio_file.name
@@ -72,6 +74,23 @@ def run_ingest(
 
     # Check if input is a video file — extract audio for transcription pipeline
     from video_utils import is_video_file, probe_video, extract_audio
+
+    # If input is audio-only but a YouTube channel is configured, download video
+    youtube_channel = getattr(Config, "VIDEO_SOURCE_YOUTUBE_CHANNEL", None)
+    if not is_video_file(audio_file) and youtube_channel:
+        logger.info("YouTube video source configured: %s", youtube_channel)
+        from youtube_video_downloader import YouTubeVideoDownloader
+
+        yt_downloader = YouTubeVideoDownloader()
+        if yt_downloader.enabled:
+            # Try to match by episode title from RSS metadata if available
+            match_title = rss_episode_title
+            video_path = yt_downloader.download_latest(
+                youtube_channel, Config.DOWNLOAD_DIR, match_title=match_title
+            )
+            if video_path:
+                logger.info("Downloaded YouTube video: %s", video_path.name)
+                audio_file = video_path
 
     if is_video_file(audio_file):
         logger.info("Video input detected: %s", audio_file.name)

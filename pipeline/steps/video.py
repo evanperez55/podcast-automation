@@ -338,6 +338,29 @@ def run_video(
     ctx.video_clip_paths = video_clip_paths
     ctx.full_episode_video_path = full_episode_video_path
 
+    # Copy final clip videos into clips/final/ for easy discovery
+    if video_clip_paths:
+        import shutil
+
+        final_dir = clip_dir / "final"
+        final_dir.mkdir(exist_ok=True)
+        best_clips = analysis.get("best_clips", [])
+        for i, vpath in enumerate(video_clip_paths):
+            if not Path(vpath).exists():
+                continue
+            title = "clip"
+            if i < len(best_clips):
+                title = best_clips[i].get("suggested_title", "clip")
+            # Sanitize title for filename
+            import re
+
+            safe_title = re.sub(r"[^\w\s-]", "", title).strip()
+            safe_title = re.sub(r"[\s]+", "_", safe_title).lower()[:50]
+            dest = final_dir / f"clip_{i + 1:02d}_{safe_title}.mp4"
+            shutil.copy2(str(vpath), str(dest))
+            logger.info("Final clip: %s", dest.name)
+        logger.info("Final clips copied to: %s", final_dir)
+
     # Step 5.6: Generate thumbnail
     print("STEP 5.6: GENERATING THUMBNAIL")
     print("-" * 60)

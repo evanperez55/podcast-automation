@@ -73,6 +73,16 @@ class Config:
     RSS_FEED_URL = os.getenv("RSS_FEED_URL", None)
     RSS_EPISODE_INDEX = int(os.getenv("RSS_EPISODE_INDEX", "0"))
 
+    # Video source — YouTube channel URL for downloading episode video
+    # When set, ingest downloads video from YouTube for stacked speaker clips
+    VIDEO_SOURCE_YOUTUBE_CHANNEL = os.getenv("VIDEO_SOURCE_YOUTUBE_CHANNEL", None)
+
+    # Video layout for vertical clip generation (auto | split | blurred)
+    # split: stacked left/right halves (for side-by-side speaker videos like Zoom)
+    # blurred: full video on blurred background (default, works for any video)
+    # auto: same as blurred
+    VIDEO_LAYOUT = os.getenv("VIDEO_LAYOUT", "auto")
+
     # Dropbox - Short-lived access token (deprecated)
     DROPBOX_ACCESS_TOKEN = os.getenv("DROPBOX_ACCESS_TOKEN")
 
@@ -246,19 +256,10 @@ class Config:
     # Content Filtering Rules
     # First names and full names of hosts to censor
     NAMES_TO_REMOVE = [
-        # First names
-        "Joey",
-        "Evan",
-        "Dom",
-        "Dominique",
-        # Full names (for enhanced detection)
-        "Evan Perez",
-        "Joey Gross",
-        "Dominique Karolczak",
-        # Common variations
-        "Perez",
-        "Gross",
-        "Karolczak",
+        # Default host names — override per client in clients/*.yaml
+        "Host1",
+        "Host2",
+        "Host3",
     ]
 
     # Words to censor - use ACTUAL spellings so they match the transcript

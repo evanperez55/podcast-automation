@@ -482,10 +482,13 @@ class DemoPackager:
             if existing:
                 return existing
 
-        # Fallback: glob subtitle clip MP4s
+        # Fallback: glob clip MP4s (subtitle clips or video-source clips)
         if not clips_source_dir.exists():
             return []
-        return sorted(clips_source_dir.glob("*_subtitle.mp4"))
+        clips = sorted(clips_source_dir.glob("*_subtitle.mp4"))
+        if not clips:
+            clips = sorted(clips_source_dir.glob("*_video.mp4"))
+        return clips
 
     # ------------------------------------------------------------------
     # Content generation helpers

@@ -716,10 +716,9 @@ class TestBackwardCompatibility:
     """Verify no-client mode preserves default Fake Problems config."""
 
     def test_defaults_unchanged_without_client(self):
-        """Without --client, Config keeps Fake Problems defaults."""
+        """Without --client, Config keeps generic defaults."""
         assert Config.PODCAST_NAME == "Fake Problems Podcast"
-        assert "Joey" in Config.NAMES_TO_REMOVE
-        assert "Evan" in Config.NAMES_TO_REMOVE
+        assert isinstance(Config.NAMES_TO_REMOVE, list)
         assert Config.OUTPUT_DIR == Config.BASE_DIR / "output"
         assert Config.CLIPS_DIR == Config.BASE_DIR / "clips"
         assert Config.DOWNLOAD_DIR == Config.BASE_DIR / "downloads"

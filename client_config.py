@@ -52,6 +52,10 @@ _YAML_TO_CONFIG = {
     "episode_source": "EPISODE_SOURCE",
     "rss_source.feed_url": "RSS_FEED_URL",
     "rss_source.episode_index": "RSS_EPISODE_INDEX",
+    # Video source (YouTube channel for downloading episode video)
+    "video_source.youtube_channel": "VIDEO_SOURCE_YOUTUBE_CHANNEL",
+    # Video layout (auto | split | blurred)
+    "video_source.layout": "VIDEO_LAYOUT",
     # RSS / podcast metadata
     "rss.description": "RSS_DESCRIPTION",
     "rss.author": "RSS_AUTHOR",

@@ -263,12 +263,12 @@ class TestCutVideoClip:
         assert result == "/clip.mp4"
         cmd = mock_run.call_args[0][0]
         # Probe fails in test → defaults to 1280x720 (horizontal) → uses -filter_complex
-        # with stacked split layout; vertical sources would use -vf with crop/scale
+        # with blurred background layout (default); split layout requires VIDEO_LAYOUT=split
         if "-filter_complex" in cmd:
             fc_idx = cmd.index("-filter_complex")
             fc_value = cmd[fc_idx + 1]
-            assert "crop=" in fc_value
             assert "scale=720" in fc_value
+            assert "gblur" in fc_value or "crop=" in fc_value
         else:
             vf_idx = cmd.index("-vf")
             vf_value = cmd[vf_idx + 1]

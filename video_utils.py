@@ -251,18 +251,48 @@ def cut_video_clip(
         src_w = meta["width"] if meta else 1280
         src_h = meta["height"] if meta else 720
 
-        if src_w > src_h:
-            # Horizontal source: stacked split layout
-            # Splits source into left/right halves (assumes side-by-side speakers),
-            # scales each to fill 720 wide, crops to 520px tall, stacks vertically
-            # with a 10px gap, and pads to 720x1280 with subtitle space at bottom.
+        # Check if client config requests split layout (side-by-side speakers)
+        video_layout = getattr(Config, "VIDEO_LAYOUT", "auto")
+
+        if src_w > src_h and video_layout == "split":
+            # Stacked split layout for side-by-side speaker videos (e.g., Zoom)
+            # 1. Remove black letterbox bars via fillborders detection
+            # 2. Split into left/right halves
+            # 3. Scale each to 720 wide (no speaker crop)
+            # 4. Stack vertically, pad to 720x1280 for subtitles
             fc = (
-                "[0:v]split=2[left_src][right_src];"
-                "[left_src]crop=iw/2:ih:0:0,scale=720:-2,"
-                "crop=720:520:0:(ih-520)/2,pad=720:530:0:0:black[left];"
-                "[right_src]crop=iw/2:ih:iw/2:0,scale=720:-2,"
-                "crop=720:520:0:(ih-520)/2[right];"
-                "[left][right]vstack=inputs=2,pad=720:1280:0:0:black"
+                "[0:v]scale=720:1280,gblur=sigma=50,setsar=1[bg];"
+                "[0:v]crop=iw:in_h*0.5:0:(in_h*0.25),"
+                "split=2[left_src][right_src];"
+                "[left_src]crop=iw/2:ih:0:0,"
+                "scale=720:600,setsar=1[left];"
+                "[right_src]crop=iw/2:ih:iw/2:0,"
+                "scale=720:600,setsar=1[right];"
+                "[left][right]vstack=inputs=2,setsar=1[fg];"
+                "[bg][fg]overlay=0:0"
+            )
+            if ass_path:
+                from subtitle_clip_generator import SubtitleClipGenerator
+
+                escaped_ass = SubtitleClipGenerator._escape_ffmpeg_filter_path(ass_path)
+                fonts_dir = str(Path(Config.ASSETS_DIR) / "fonts")
+                escaped_fonts = SubtitleClipGenerator._escape_ffmpeg_filter_path(
+                    fonts_dir
+                )
+                fc += (
+                    f"[composed];"
+                    f"[composed]subtitles='{escaped_ass}':"
+                    f"fontsdir='{escaped_fonts}'"
+                )
+            cmd.extend(["-filter_complex", fc, "-map", "0:a"])
+        elif src_w > src_h:
+            # Blurred background layout for any horizontal source
+            # Full video scaled to fit width, overlaid on blurred+zoomed copy
+            # that fills the 720x1280 canvas. Keeps all content visible.
+            fc = (
+                "[0:v]scale=720:-2[fg];"
+                "[0:v]scale=720:1280,gblur=sigma=40[bg];"
+                "[bg][fg]overlay=(W-w)/2:(H-h)/2"
             )
             if ass_path:
                 from subtitle_clip_generator import SubtitleClipGenerator
