@@ -170,7 +170,10 @@ Plans:
   1. ONBOARDING.md exists and lists every piece of client-supplied information required (show name, RSS feed, genre, voice persona, censorship words, social credentials) with field-level descriptions
   2. A client YAML template file exists with inline comments on every field, including valid options for enum fields (genre, compliance_style, clip_mode)
   3. A developer can hand ONBOARDING.md and the YAML template to a new client and set them up without a call
-**Plans**: TBD
+**Plans**: 1 plans
+
+Plans:
+- [ ] 24-01-PLAN.md — ONBOARDING.md checklist and annotated client-template.yaml
 
 ### Phase 25: Composite Clip Scoring
 **Goal**: Clips are ranked by a multi-signal quality score and the scorer's weights are tunable per client without code changes
@@ -181,7 +184,10 @@ Plans:
   2. The three scoring weights (energy_weight, content_weight, hook_weight) can be set in a client's YAML config and override the defaults
   3. When weights are omitted from YAML, the scorer uses hardcoded defaults that produce the same behavior as before this phase
   4. Running `python main.py ep29 --auto-approve` with a modified client YAML selects clips in a different order reflecting the new weights
-**Plans**: TBD
+**Plans**: 1 plans
+
+Plans:
+- [ ] 24-01-PLAN.md — ONBOARDING.md checklist and annotated client-template.yaml
 **UI hint**: no
 
 ### Phase 26: Demo Output Optimization
@@ -193,7 +199,10 @@ Plans:
   2. Thumbnails use a color palette and text placement rule appropriate to the client's genre (verified by visual inspection of packaged demo output)
   3. Style parameters for subtitles and thumbnails are defined in one place (config or per-genre defaults) and can be overridden per client YAML
   4. Autoresearch optimization runs produce measurably different style configurations and a record of which iteration scored highest
-**Plans**: TBD
+**Plans**: 1 plans
+
+Plans:
+- [ ] 24-01-PLAN.md — ONBOARDING.md checklist and annotated client-template.yaml
 **UI hint**: yes
 
 ### Phase 27: Clip Weight Optimization
@@ -204,7 +213,10 @@ Plans:
   1. For clients with sufficient engagement history (15+ episodes), autoresearch iterations produce a recommended weight configuration (energy_weight, content_weight, hook_weight) that improves the correlation between clip scores and engagement metrics
   2. The optimized weights are written to the client YAML (or a companion override file) so future pipeline runs use the tuned configuration automatically
   3. A run log documents the baseline score, each iteration's score, and the final accepted configuration
-**Plans**: TBD
+**Plans**: 1 plans
+
+Plans:
+- [ ] 24-01-PLAN.md — ONBOARDING.md checklist and annotated client-template.yaml
 **UI hint**: no
 
 ## Progress
