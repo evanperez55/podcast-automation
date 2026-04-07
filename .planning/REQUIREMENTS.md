@@ -27,6 +27,31 @@ Requirements for First Paying Client milestone.
 
 - [x] **DEMO-04**: User can process a consented prospect's episode and package the demo in one workflow
 
+## v1.6 Requirements
+
+Requirements for Production Quality & Operations milestone.
+
+### Demo Output Quality
+
+- [ ] **DEMO-05**: Pipeline produces clips ranked by a composite quality score (audio energy + content relevance + hook strength)
+- [ ] **DEMO-06**: Subtitle clips use genre-appropriate styling (font size, color, animation timing) tuned via autoresearch
+- [ ] **DEMO-07**: Thumbnails use contrast-optimized text placement and genre-appropriate color palettes
+
+### Monitoring & Alerting
+
+- [ ] **MON-01**: Pipeline sends Discord alert with error details when any step fails
+- [ ] **MON-02**: Pipeline sends Discord summary notification after each successful run (episode name, duration, clip count, platforms uploaded)
+
+### Client Onboarding
+
+- [ ] **ONBOARD-01**: ONBOARDING.md checklist documents every piece of info needed from a new client
+- [ ] **ONBOARD-02**: Example client YAML template with inline comments explaining every field
+
+### Clip Selection Optimization
+
+- [ ] **CLIP-05**: AudioClipScorer weights are tunable via client YAML config (energy_weight, content_weight, hook_weight)
+- [ ] **CLIP-06**: Scorer weights optimized against historical engagement data using autoresearch iteration
+
 ## Future Requirements
 
 ### Distribution Expansion
