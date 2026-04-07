@@ -397,6 +397,7 @@ def _run_pipeline(args):
             if notifier and notifier.enabled:
                 ep_info = components.get("_episode_info", "unknown")
                 notifier.notify_failure(ep_info, e, step=step_name)
+            e._step_notified = True
             raise
 
     # Load client config if specified
@@ -1136,7 +1137,9 @@ def run_with_notification(
             notifier.notify_success(results)
         return results
     except Exception as e:
-        if notifier and notifier.enabled:
+        # Per-step notifications are already sent by _run_step inside run().
+        # Only notify here for failures during setup (before any step ran).
+        if not getattr(e, "_step_notified", False) and notifier and notifier.enabled:
             ep_info = episode_number or dropbox_path or local_audio_path or "latest"
             notifier.notify_failure(ep_info, e, step="pipeline_setup")
         raise
