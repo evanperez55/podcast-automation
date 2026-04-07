@@ -82,7 +82,7 @@ One command produces professional-quality, platform-ready podcast content with g
 
 - [ ] Iteratively improve demo output quality (clip selection, subtitle styling, thumbnails)
 - [ ] Client onboarding documentation (ONBOARDING.md checklist)
-- [ ] Pipeline monitoring and alerting (Discord webhook on errors)
+- [x] Pipeline monitoring and alerting (Discord webhook on errors) — Phase 23
 - [ ] Tune AudioClipScorer weights against engagement analytics data
 
 ### Future
@@ -175,4 +175,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-06 after v1.6 milestone start*
+*Last updated: 2026-04-07 after Phase 23 completion*
