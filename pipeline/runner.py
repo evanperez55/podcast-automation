@@ -607,7 +607,10 @@ def _run_pipeline(args):
         "best_clips_info": analysis.get("best_clips"),
         "censor_count": len(analysis.get("censor_timestamps", [])),
         "thumbnail_path": str(ctx.thumbnail_path) if ctx.thumbnail_path else None,
-        "duration_seconds": elapsed,
+        "pipeline_duration_seconds": elapsed,
+        "duration_seconds": ctx.transcript_data.get("duration")
+        if ctx.transcript_data
+        else None,
     }
 
     print("=" * 60)
