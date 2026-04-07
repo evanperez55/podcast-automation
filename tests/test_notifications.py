@@ -200,3 +200,80 @@ class TestDiscordNotifier:
         assert field_map["Episode #"] == "?"
         assert field_map["Clips"] == "0"
         assert field_map["Platforms"] == "None"
+
+
+class TestNotifySuccessDuration:
+    """Tests for duration field in notify_success."""
+
+    @patch("notifications.requests.post")
+    def test_notify_success_with_duration(self, mock_post):
+        """notify_success with duration_seconds=754 produces Duration field '12m 34s'."""
+        mock_response = Mock()
+        mock_response.raise_for_status = Mock()
+        mock_post.return_value = mock_response
+
+        results = {
+            "episode_title": "Ep 42: The Answer",
+            "episode_number": 42,
+            "clips": ["clip1.mp4", "clip2.mp4"],
+            "social_media_results": {"youtube": True},
+            "duration_seconds": 754,
+        }
+        notifier = DiscordNotifier(webhook_url="https://discord.com/api/webhooks/test")
+        result = notifier.notify_success(results)
+
+        assert result is True
+        embed = mock_post.call_args.kwargs["json"]["embeds"][0]
+        field_map = {f["name"]: f["value"] for f in embed["fields"]}
+        assert "Duration" in field_map
+        assert field_map["Duration"] == "12m 34s"
+
+    @patch("notifications.requests.post")
+    def test_notify_success_without_duration(self, mock_post):
+        """notify_success without duration_seconds key produces no Duration field."""
+        mock_response = Mock()
+        mock_response.raise_for_status = Mock()
+        mock_post.return_value = mock_response
+
+        results = {
+            "episode_title": "Ep 42: The Answer",
+            "episode_number": 42,
+            "clips": ["clip1.mp4"],
+            "social_media_results": {"youtube": True},
+        }
+        notifier = DiscordNotifier(webhook_url="https://discord.com/api/webhooks/test")
+        result = notifier.notify_success(results)
+
+        assert result is True
+        embed = mock_post.call_args.kwargs["json"]["embeds"][0]
+        field_names = [f["name"] for f in embed["fields"]]
+        assert "Duration" not in field_names
+
+    @patch("notifications.requests.post")
+    def test_notify_success_zero_duration(self, mock_post):
+        """notify_success with duration_seconds=0 shows '0m 0s'."""
+        mock_response = Mock()
+        mock_response.raise_for_status = Mock()
+        mock_post.return_value = mock_response
+
+        results = {
+            "episode_title": "Ep 1: Pilot",
+            "episode_number": 1,
+            "clips": [],
+            "social_media_results": {},
+            "duration_seconds": 0,
+        }
+        notifier = DiscordNotifier(webhook_url="https://discord.com/api/webhooks/test")
+        result = notifier.notify_success(results)
+
+        assert result is True
+        embed = mock_post.call_args.kwargs["json"]["embeds"][0]
+        field_map = {f["name"]: f["value"] for f in embed["fields"]}
+        assert "Duration" in field_map
+        assert field_map["Duration"] == "0m 0s"
+
+
+if __name__ == "__main__":
+    import pytest
+
+    pytest.main([__file__, "-v"])

@@ -5,6 +5,7 @@ Called by the thin main.py CLI shim.
 """
 
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -383,6 +384,21 @@ def _run_pipeline(args):
         force = getattr(args, "force", False)
         demo_mode = getattr(args, "demo_mode", False)
 
+    def _run_step(step_name, fn, *step_args):
+        """Wrap a pipeline step call with per-step failure notification.
+
+        On exception: notifies Discord with step name and error, then re-raises.
+        Returns the function result on success.
+        """
+        try:
+            return fn(*step_args)
+        except Exception as e:
+            notifier = components.get("notifier")
+            if notifier and notifier.enabled:
+                ep_info = components.get("_episode_info", "unknown")
+                notifier.notify_failure(ep_info, e, step=step_name)
+            raise
+
     # Load client config if specified
     client_name = None
     if isinstance(args, dict):
@@ -403,6 +419,8 @@ def _run_pipeline(args):
         force=force,
         demo_mode=demo_mode,
     )
+
+    start_time = time.time()
 
     print("=" * 60)
     print("STARTING EPISODE PROCESSING")
@@ -458,7 +476,10 @@ def _run_pipeline(args):
     state = PipelineState(placeholder_folder) if resume else None
 
     # Step 1: Ingest (download/find audio, resolve episode folder)
-    ctx = run_ingest(ctx, components, state)
+    ctx = _run_step("ingest", run_ingest, ctx, components, state)
+
+    # Store episode info for per-step notifications (resolved after ingest)
+    components["_episode_info"] = ctx.episode_number or ctx.episode_folder or "unknown"
 
     # Update state folder if episode number was discovered during ingest
     if resume and state and ctx.episode_folder != placeholder_folder:
@@ -491,41 +512,48 @@ def _run_pipeline(args):
     # the internal steps directly.
 
     # Step 2: Transcribe only
-    ctx = _run_transcribe(ctx, components, state)
+    ctx = _run_step("transcribe", _run_transcribe, ctx, components, state)
 
     # Step 3 + 3.5: Analysis
-    ctx = run_analysis(ctx, components, state)
+    ctx = _run_step("analysis", run_analysis, ctx, components, state)
 
     # Step 3.6: Content compliance check
-    print("STEP 3.6: CONTENT COMPLIANCE CHECK")
-    print("-" * 60)
-    compliance_checker = components.get("compliance_checker")
-    if compliance_checker and compliance_checker.enabled:
-        compliance_result = compliance_checker.check_transcript(
-            transcript_data=ctx.transcript_data,
-            episode_output_dir=ctx.episode_output_dir,
-            episode_number=ctx.episode_number,
-            timestamp=ctx.timestamp,
-        )
-        ctx.compliance_result = compliance_result
-        # Merge flagged segments into censor_timestamps for auto-muting (SAFE-03)
-        if compliance_result.get("flagged"):
-            existing = (ctx.analysis or {}).get("censor_timestamps", [])
-            new_entries = compliance_checker.get_censor_entries(compliance_result)
-            existing.extend(new_entries)
-            if ctx.analysis is None:
-                ctx.analysis = {}
-            ctx.analysis["censor_timestamps"] = existing
-            logger.info("Merged %d compliance flags into censor list", len(new_entries))
-    else:
-        logger.info("Content compliance check skipped (disabled)")
-    print()
+    def _run_compliance_check(ctx, components, state):
+        """Run compliance check step and merge flagged segments into censor list."""
+        print("STEP 3.6: CONTENT COMPLIANCE CHECK")
+        print("-" * 60)
+        compliance_checker = components.get("compliance_checker")
+        if compliance_checker and compliance_checker.enabled:
+            compliance_result = compliance_checker.check_transcript(
+                transcript_data=ctx.transcript_data,
+                episode_output_dir=ctx.episode_output_dir,
+                episode_number=ctx.episode_number,
+                timestamp=ctx.timestamp,
+            )
+            ctx.compliance_result = compliance_result
+            # Merge flagged segments into censor_timestamps for auto-muting (SAFE-03)
+            if compliance_result.get("flagged"):
+                existing = (ctx.analysis or {}).get("censor_timestamps", [])
+                new_entries = compliance_checker.get_censor_entries(compliance_result)
+                existing.extend(new_entries)
+                if ctx.analysis is None:
+                    ctx.analysis = {}
+                ctx.analysis["censor_timestamps"] = existing
+                logger.info(
+                    "Merged %d compliance flags into censor list", len(new_entries)
+                )
+        else:
+            logger.info("Content compliance check skipped (disabled)")
+        print()
+        return ctx
+
+    ctx = _run_step("compliance_check", _run_compliance_check, ctx, components, state)
 
     # Steps 4, 4.5, 6: Censor + normalize + MP3
-    ctx = _run_process_audio(ctx, components, state)
+    ctx = _run_step("audio_processing", _run_process_audio, ctx, components, state)
 
     # Steps 5, 5.1, 5.4, 5.5, 5.6: Video, clips, etc.
-    ctx = run_video(ctx, components, state)
+    ctx = _run_step("video", run_video, ctx, components, state)
 
     # Steps 7, 7.5, 8, 8.5, 9: Distribution
     if demo_mode:
@@ -547,7 +575,9 @@ def _run_pipeline(args):
         _print_demo_summary(demo_path)
         print("=" * 60)
     else:
-        ctx = run_distribute(ctx, components, state)
+        ctx = _run_step("distribute", run_distribute, ctx, components, state)
+
+    elapsed = time.time() - start_time
 
     # Build and save results dict (backward-compatible)
     analysis = ctx.analysis or {}
@@ -577,6 +607,7 @@ def _run_pipeline(args):
         "best_clips_info": analysis.get("best_clips"),
         "censor_count": len(analysis.get("censor_timestamps", [])),
         "thumbnail_path": str(ctx.thumbnail_path) if ctx.thumbnail_path else None,
+        "duration_seconds": elapsed,
     }
 
     print("=" * 60)
@@ -1104,7 +1135,7 @@ def run_with_notification(
     except Exception as e:
         if notifier and notifier.enabled:
             ep_info = episode_number or dropbox_path or local_audio_path or "latest"
-            notifier.notify_failure(ep_info, e, step="process_episode")
+            notifier.notify_failure(ep_info, e, step="pipeline_setup")
         raise
 
 

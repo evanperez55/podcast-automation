@@ -73,13 +73,26 @@ class DiscordNotifier:
                 "value": str(results.get("episode_number", "?")),
                 "inline": True,
             },
+        ]
+        duration_secs = results.get("duration_seconds")
+        if duration_secs is not None:
+            minutes = int(duration_secs // 60)
+            seconds = int(duration_secs % 60)
+            fields.append(
+                {
+                    "name": "Duration",
+                    "value": f"{minutes}m {seconds}s",
+                    "inline": True,
+                }
+            )
+        fields.append(
             {
                 "name": "Clips",
                 "value": str(len(results.get("clips", []))),
                 "inline": True,
-            },
-            {"name": "Platforms", "value": platforms, "inline": False},
-        ]
+            }
+        )
+        fields.append({"name": "Platforms", "value": platforms, "inline": False})
         return self.send_notification(
             title="Episode Processing Complete",
             description="The episode was processed and distributed successfully.",
@@ -95,14 +108,16 @@ class DiscordNotifier:
             error: The error message or exception.
             step: Pipeline step where the failure occurred.
         """
+        # Truncate error text to limit information disclosure (T-23-01)
+        error_text = str(error)[:500]
         fields = [
             {"name": "Step", "value": step, "inline": True},
-            {"name": "Error", "value": str(error), "inline": False},
+            {"name": "Error", "value": error_text, "inline": False},
             {"name": "Episode", "value": str(episode_info), "inline": True},
         ]
         return self.send_notification(
             title="Episode Processing Failed",
-            description=f"Processing failed during **{step}** step: {error}",
+            description=f"Processing failed during **{step}** step: {error_text}",
             color=0xFF0000,
             fields=fields,
         )
