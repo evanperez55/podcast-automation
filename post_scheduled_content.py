@@ -168,6 +168,10 @@ def _post_slot(slot, uploaders):
                 ig_video_url = content.get("instagram_video_url", "")
                 clip_path = content.get("clip_path", "")
 
+                # Fallback: derive Dropbox shared link from clips folder
+                if not ig_video_url and slot_type.startswith("clip_"):
+                    ig_video_url = _resolve_clip_dropbox_url(slot)
+
                 if ig_video_url:
                     # Dropbox URL already available — post Reel directly
                     result = _post_instagram_reel_from_url(
@@ -175,6 +179,14 @@ def _post_slot(slot, uploaders):
                     )
                     if result:
                         results["instagram"] = result
+                    else:
+                        logger.warning(
+                            "Instagram reel post returned None for %s",
+                            slot_type,
+                        )
+                        results["instagram"] = {
+                            "error": "reel post returned None"
+                        }
                 elif clip_path and Path(clip_path).exists():
                     # Fall back to local file upload (local runs only)
                     result = _post_instagram_reel(
@@ -182,10 +194,21 @@ def _post_slot(slot, uploaders):
                     )
                     if result:
                         results["instagram"] = result
+                    else:
+                        logger.warning(
+                            "Instagram reel post returned None for %s",
+                            slot_type,
+                        )
+                        results["instagram"] = {
+                            "error": "reel post returned None"
+                        }
                 else:
                     logger.warning(
                         "[Instagram] No video URL or local file for Reel"
                     )
+                    results["instagram"] = {
+                        "error": "no video URL or local file available"
+                    }
 
         except Exception as e:
             logger.error("Failed to post %s to %s: %s", slot_type, platform, e)
@@ -213,6 +236,76 @@ def _post_instagram_reel_from_url(ig_uploader, video_url, caption_text, youtube_
         caption += f"\n\nFind all episodes on YouTube: {Config.YOUTUBE_CHANNEL_HANDLE}"
 
     return ig_uploader.upload_reel(video_url=video_url, caption=caption)
+
+
+def _resolve_clip_dropbox_url(slot):
+    """Try to find a Dropbox shared link for a clip from the standard clips folder.
+
+    Falls back to listing the clips folder and matching by clip index when
+    instagram_video_url was never populated (e.g., episodes processed before
+    Instagram integration).
+
+    Returns:
+        Shared link URL string, or empty string if not found.
+    """
+    import re
+
+    episode_key = slot.get("episode_key", "")
+    slot_type = slot.get("slot_type", "")
+    match = re.search(r"clip_(\d+)", slot_type)
+    if not match or not episode_key:
+        return ""
+
+    clip_num = int(match.group(1))
+    clips_folder = f"/podcast/clips/{episode_key}"
+
+    try:
+        from dropbox_handler import DropboxHandler
+
+        dbx = DropboxHandler()
+        if not dbx.enabled:
+            return ""
+
+        import dropbox as dropbox_sdk
+
+        result = dbx.dbx.files_list_folder(clips_folder)
+        mp4_files = sorted(
+            entry.path_display
+            for entry in result.entries
+            if hasattr(entry, "name") and entry.name.lower().endswith(".mp4")
+        )
+
+        if not mp4_files:
+            logger.warning("[Instagram] No mp4 files in %s", clips_folder)
+            return ""
+
+        # Match by clip index (1-based) into sorted file list
+        idx = clip_num - 1
+        if idx < 0 or idx >= len(mp4_files):
+            logger.warning(
+                "[Instagram] Clip %d out of range (%d files in %s)",
+                clip_num,
+                len(mp4_files),
+                clips_folder,
+            )
+            return ""
+
+        clip_dbx_path = mp4_files[idx]
+        url = dbx.get_shared_link(clip_dbx_path)
+        if url:
+            logger.info(
+                "[Instagram] Resolved Dropbox URL for clip_%d from %s",
+                clip_num,
+                clip_dbx_path,
+            )
+        return url or ""
+
+    except dropbox_sdk.exceptions.ApiError as e:
+        logger.warning("[Instagram] Could not list clips folder %s: %s", clips_folder, e)
+        return ""
+    except Exception as e:
+        logger.warning("[Instagram] Dropbox fallback failed: %s", e)
+        return ""
 
 
 def _post_instagram_reel(ig_uploader, clip_path, caption_text, youtube_url, slot):
