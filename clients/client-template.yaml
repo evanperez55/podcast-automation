@@ -1,0 +1,365 @@
+# ============================================================
+# Client Configuration Template
+# ============================================================
+# Copy this file to clients/<your-client-slug>.yaml
+# Fill in required fields, leave optional ones as null or remove them.
+# Validate with: uv run main.py validate-client <your-client-slug>
+# Full setup docs: see ONBOARDING.md in project root
+# ============================================================
+
+# REQUIRED: Unique identifier for this client.
+# Lowercase letters, numbers, and hyphens only. No spaces.
+# Must match the YAML filename: "my-podcast" -> clients/my-podcast.yaml
+# Used as the --client flag: uv run main.py --client my-podcast latest
+client_name: "your-client-slug"
+
+# REQUIRED: Display name of the podcast.
+# Used in RSS feed titles, AI-generated content, and Discord notifications.
+podcast_name: "Your Podcast Name"
+
+# ============================================================
+# Branding
+# ============================================================
+
+branding:
+  # OPTIONAL: Path to the podcast logo PNG file.
+  # Used as the background image for thumbnails and audiogram videos.
+  # Recommended size: 1280x720px or larger.
+  # If null or omitted, falls back to assets/podcast_logo.png.
+  logo_path: null
+  # Example: logo_path: "clients/your-client-slug/logo.png"
+
+# ============================================================
+# Episode Source
+# ============================================================
+
+# REQUIRED: Where to download audio from.
+# Options:
+#   "dropbox" - Download raw audio from a Dropbox folder (default)
+#   "rss"     - Download latest episode from a public RSS/podcast feed
+#   "local"   - Use a local audio file path (for manual processing)
+episode_source: "dropbox"
+
+# OPTIONAL: RSS source settings.
+# Only used when episode_source is "rss".
+# rss_source:
+#   # REQUIRED if episode_source=rss: Full URL to the public RSS feed.
+#   feed_url: "https://feeds.example.com/your-show.xml"
+#
+#   # OPTIONAL: Which episode to process.
+#   # 0 = latest episode (default), 1 = second newest, 2 = third newest, etc.
+#   episode_index: 0
+
+# ============================================================
+# Dropbox
+# ============================================================
+# Only required when episode_source is "dropbox".
+# Credentials can be set here (as strings) or as environment variables.
+# Environment variables take precedence if both are set.
+
+dropbox:
+  # OPTIONAL (required if source=dropbox): Dropbox folder path for raw audio files.
+  # This is the folder where unedited episode audio is uploaded.
+  folder_path: null
+  # Example: folder_path: "/My Podcast/raw_files"
+
+  # OPTIONAL (required if source=dropbox): Dropbox folder path for finished MP3s.
+  # The pipeline uploads the normalized master MP3 here after processing.
+  finished_folder: null
+  # Example: finished_folder: "/My Podcast/finished_files"
+
+  # OPTIONAL (required if source=dropbox): Dropbox folder path for edited source audio.
+  # Edited files are looked up here before falling back to folder_path.
+  edited_folder: null
+  # Example: edited_folder: "/My Podcast/edited_files"
+
+  # OPTIONAL: Dropbox app key.
+  # Falls back to DROPBOX_APP_KEY environment variable if null.
+  app_key: null
+
+  # OPTIONAL: Dropbox app secret.
+  # Falls back to DROPBOX_APP_SECRET environment variable if null.
+  app_secret: null
+
+  # OPTIONAL: Dropbox OAuth2 refresh token.
+  # Falls back to DROPBOX_REFRESH_TOKEN environment variable if null.
+  # Generate via the Dropbox OAuth2 flow at https://www.dropbox.com/developers
+  refresh_token: null
+
+# ============================================================
+# YouTube
+# ============================================================
+# Required for YouTube upload (full episode video + Shorts clips).
+# Skip this section or set all fields to null to disable YouTube uploads.
+# Run the OAuth setup flow: uv run main.py setup-client <slug> youtube
+
+youtube:
+  # OPTIONAL: Google OAuth2 client ID.
+  # Falls back to YOUTUBE_CLIENT_ID environment variable if null.
+  # Create at https://console.cloud.google.com/ > APIs & Services > Credentials
+  client_id: null
+
+  # OPTIONAL: Google OAuth2 client secret.
+  # Falls back to YOUTUBE_CLIENT_SECRET environment variable if null.
+  client_secret: null
+
+  # OPTIONAL: Path where the OAuth token pickle file will be stored.
+  # Generated automatically by: uv run main.py setup-client <slug> youtube
+  # Default path shown below — change only if you have a reason to.
+  token_pickle: "clients/your-client-slug/youtube_token.pickle"
+
+# ============================================================
+# Twitter / X
+# ============================================================
+# Required for Twitter thread posting (episode summary + clip links).
+# Skip this section or set all fields to null to disable Twitter posts.
+# All four fields are required together — partial credentials are ignored.
+
+twitter:
+  # OPTIONAL: Twitter API v2 key.
+  # Falls back to TWITTER_API_KEY environment variable if null.
+  api_key: null
+
+  # OPTIONAL: Twitter API v2 secret.
+  # Falls back to TWITTER_API_SECRET environment variable if null.
+  api_secret: null
+
+  # OPTIONAL: Access token for the Twitter account to post as.
+  # Falls back to TWITTER_ACCESS_TOKEN environment variable if null.
+  access_token: null
+
+  # OPTIONAL: Access token secret.
+  # Falls back to TWITTER_ACCESS_SECRET environment variable if null.
+  access_secret: null
+
+# ============================================================
+# Instagram
+# ============================================================
+# Required for Instagram Reels/clips posting.
+# Uses the Meta Graph API — requires a Business or Creator account.
+# Skip or set null to disable Instagram uploads.
+
+instagram:
+  # OPTIONAL: Meta/Instagram Graph API access token.
+  # Long-lived token (60-day expiry) from https://developers.facebook.com/
+  # Falls back to INSTAGRAM_ACCESS_TOKEN environment variable if null.
+  access_token: null
+
+  # OPTIONAL: Instagram Business Account ID (numeric string).
+  # Found in Instagram > Settings > Account > Professional Account > Account ID.
+  # Falls back to INSTAGRAM_ACCOUNT_ID environment variable if null.
+  account_id: null
+
+# ============================================================
+# TikTok
+# ============================================================
+# Required for TikTok video posting.
+# Skip or set null to disable TikTok uploads.
+
+tiktok:
+  # OPTIONAL: TikTok app client key.
+  # Falls back to TIKTOK_CLIENT_KEY environment variable if null.
+  client_key: null
+
+  # OPTIONAL: TikTok app client secret.
+  # Falls back to TIKTOK_CLIENT_SECRET environment variable if null.
+  client_secret: null
+
+  # OPTIONAL: TikTok access token for the creator account.
+  # Falls back to TIKTOK_ACCESS_TOKEN environment variable if null.
+  access_token: null
+
+# ============================================================
+# Discord
+# ============================================================
+# Optional: pipeline sends rich embed notifications at key milestones.
+# Notifications include: step completions, upload links, errors.
+
+discord:
+  # OPTIONAL: Discord incoming webhook URL.
+  # Create at: Server Settings > Integrations > Webhooks > New Webhook
+  # Falls back to DISCORD_WEBHOOK_URL environment variable if null.
+  webhook_url: null
+  # Example: webhook_url: "https://discord.com/api/webhooks/123456789/your-token"
+
+# ============================================================
+# Content Settings
+# ============================================================
+# Controls how the pipeline processes and generates content for this client.
+# All fields are optional with sensible defaults — start with defaults
+# and tune from there after reviewing the first episode output.
+
+content:
+  # OPTIONAL: Number of highlight clips to extract per episode.
+  # Default: 3
+  num_clips: 3
+
+  # OPTIONAL: Minimum clip length in seconds.
+  # Clips shorter than this are discarded during selection.
+  # Default: 15
+  clip_min_duration: 15
+
+  # OPTIONAL: Maximum clip length in seconds.
+  # Longer clips are trimmed to this length.
+  # Default: 30
+  # Tip: Use 60 for interview shows where insights take longer to land.
+  clip_max_duration: 30
+
+  # OPTIONAL: Whisper transcription model size.
+  # Options (smaller = faster, less accurate; larger = slower, more accurate):
+  #   "tiny"   - Fastest, lowest accuracy. Good for rough drafts.
+  #   "base"   - Fast, basic accuracy.
+  #   "small"  - Balanced. Good for non-American accents.
+  #   "medium" - Good accuracy. Default.
+  #   "large"  - Best accuracy. Slowest (GPU recommended).
+  # Default: "medium" (omit this field to use the default)
+  # whisper_model: "medium"
+
+  # OPTIONAL: How highlight clips are selected.
+  # Options:
+  #   "content" - AI evaluates transcript for insight, narrative, or emotional weight.
+  #               Best for: interview shows, true crime, business podcasts.
+  #   (omit)    - Energy-based selection using RMS audio peaks.
+  #               Best for: comedy shows with loud reactions and big moments.
+  # Default: energy-based (omit this field or set to null)
+  clip_selection_mode: null
+  # Example for interview/true crime: clip_selection_mode: "content"
+
+  # OPTIONAL: How aggressively to flag YouTube community guideline violations.
+  # Options:
+  #   "strict"   - Flags conservatively. Recommended for: true crime, news.
+  #   "standard" - Normal YouTube guidelines. Recommended for: general shows.
+  #   (omit)     - Permissive. Comedy-aware: dark humor and profanity are NOT violations.
+  # Default: permissive comedy mode (omit this field or set to null)
+  compliance_style: null
+  # Example for true crime: compliance_style: "strict"
+  # Example for general shows: compliance_style: "standard"
+
+  # OPTIONAL: Host names to audio-censor (volume duck) in the episode.
+  # Matched case-insensitively against the transcript. Include first names
+  # and full names you want removed from the audio.
+  # Use when clients want host names kept private in distribution.
+  # Default: [] (no censorship)
+  names_to_remove: []
+  # Example: names_to_remove: ["Jane", "John Smith"]
+
+  # OPTIONAL: Words or slurs to audio-censor (volume duck) in the episode.
+  # Matched case-insensitively against the transcript.
+  # Default: [] (no censorship)
+  words_to_censor: []
+  # Example: words_to_censor: ["badword", "slur"]
+
+  # OPTIONAL: Multi-line prompt telling GPT-4o how to write for this show.
+  # This is the most impactful setting — it controls the tone and voice
+  # of ALL AI-generated content: clips, captions, blog posts, social posts.
+  # If null, uses the default comedy/edgy voice persona.
+  # Include: show description, hosts, tone, audience, dos and don'ts.
+  voice_persona: null
+  # Example for a business interview show:
+  # voice_persona: |
+  #   You write for Founders in the Field — a business interview podcast
+  #   where entrepreneurs share real stories from building companies.
+  #   Your output is direct, substantive, and professional without being
+  #   corporate. Highlight concrete lessons, hard decisions, and numbers.
+  #   Never use hype language or exclamation points for enthusiasm.
+  #   Write for operators who want signal, not inspiration porn.
+
+  # OPTIONAL: Multi-line prompt for blog post writing style.
+  # Controls the voice of the auto-generated episode blog post.
+  # Include BAD/GOOD examples for contrast — they significantly improve output.
+  # If omitted, uses the voice_persona prompt for blog posts too.
+  blog_voice: null
+  # Example:
+  # blog_voice: |
+  #   Write this blog post for a professional audience interested in entrepreneurship.
+  #   BAD: "In this inspiring episode, our guest shares their amazing journey..."
+  #   GOOD: "Mira Chen built a $4M bootstrapped business in 18 months. Here's
+  #   what she learned about pricing, retention, and when to say no to investors."
+
+  # OPTIONAL: Custom topic scoring criteria for the topic engine.
+  # The topic engine scores potential discussion topics before each episode
+  # to suggest what the show should cover. If omitted, uses comedy defaults.
+  # Structure:
+  #   description: One-sentence description of the show for scoring context.
+  #   criteria:   List of scoring dimensions (each 1-3 points max, total ~10).
+  #   style:      List of strings describing the show's editorial voice.
+  #   high_examples: Example topic titles that should score HIGH.
+  #   low_examples:  Example topic titles that should score LOW.
+  #   categories: List of topic category tags the show cares about.
+  # scoring_profile:
+  #   description: "a true crime podcast focused on cold cases and wrongful convictions"
+  #   criteria:
+  #     - name: "Case Significance"
+  #       key: "case_significance"
+  #       max: 3
+  #       description: "How significant or newsworthy is this case?"
+  #     - name: "New Evidence"
+  #       key: "new_evidence"
+  #       max: 3
+  #       description: "Is there recent development, new evidence, or exoneration?"
+  #     - name: "Victim Centered"
+  #       key: "victim_centered"
+  #       max: 2
+  #       description: "Is the framing respectful to victims and families?"
+  #     - name: "Accessible"
+  #       key: "accessible"
+  #       max: 2
+  #       description: "Can a general audience follow without prior case knowledge?"
+  #   style:
+  #     - "Evidence-based analysis over speculation"
+  #     - "Respectful to victims and families at all times"
+  #   high_examples:
+  #     - '"New DNA evidence exonerates man convicted in 1992 murder"'
+  #   low_examples:
+  #     - "Celebrity gossip repackaged as true crime"
+  #   categories: ["cold_case", "wrongful_conviction", "forensic_science", "missing_person"]
+
+# ============================================================
+# RSS Feed Metadata
+# ============================================================
+# Used when generating or updating the podcast RSS feed (Podcasting 2.0).
+# Required for Spotify compatibility and podcast directory submissions.
+
+rss:
+  # OPTIONAL: Podcast description shown in podcast apps (Apple Podcasts, Spotify, etc.).
+  # If null, RSS feed description field is left blank.
+  description: null
+  # Example: description: "Cold Case Chronicles examines unsolved mysteries. New episodes every two weeks."
+
+  # OPTIONAL: Author name in the RSS feed.
+  # If null, defaults to the podcast_name value.
+  author: null
+  # Example: author: "Angela Hollowell"
+
+  # OPTIONAL: Contact email address in the RSS feed.
+  # Required for some podcast directory submissions (Apple Podcasts).
+  email: null
+  # Example: email: "host@mypodcast.com"
+
+  # OPTIONAL: Podcast website URL.
+  # Linked from the RSS feed and episode pages.
+  website_url: null
+  # Example: website_url: "https://www.mypodcast.com/"
+
+  # OPTIONAL: Cover art URL. Must be 1400x1400px minimum (iTunes requirement).
+  # Use a stable public URL — podcast apps cache this aggressively.
+  artwork_url: null
+  # Example: artwork_url: "https://example.com/cover-art-1400.jpg"
+
+  # OPTIONAL: BCP 47 language code for the podcast.
+  # Default: "en-us"
+  language: "en-us"
+
+  # OPTIONAL: Explicit content flag for iTunes/Apple Podcasts.
+  # Set to true if the show contains profanity or mature themes.
+  # Default: false
+  explicit: false
+
+  # OPTIONAL: iTunes podcast categories list.
+  # Full list at: https://podcasters.apple.com/support/1691-apple-podcasts-categories
+  # Default: ["Society & Culture"]
+  categories: ["Society & Culture"]
+  # Examples:
+  #   categories: ["Business", "Entrepreneurship"]
+  #   categories: ["True Crime"]
+  #   categories: ["Comedy", "Comedy Interviews"]

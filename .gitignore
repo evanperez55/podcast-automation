@@ -53,6 +53,7 @@ clients/*/
 clients/*.yaml
 clients/*.yml
 !clients/example-client.yaml
+!clients/client-template.yaml
 
 # Test/coverage artifacts
 .coverage
