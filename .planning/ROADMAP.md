@@ -157,8 +157,10 @@ Plans:
   2. When a pipeline run completes successfully, a Discord summary message shows episode name, total duration, number of clips produced, and which platforms received uploads
   3. Alerts fire for all clients (multi-client runs each send their own notification)
   4. When DISCORD_WEBHOOK_URL is not set, both alert behaviors disable silently without affecting pipeline execution
-**Plans**: TBD
-**UI hint**: no
+**Plans**: 1 plans
+
+Plans:
+- [ ] 23-01-PLAN.md — Per-step failure alerts, success summaries with duration, and tests
 
 ### Phase 24: Client Onboarding Docs
 **Goal**: A new client can be onboarded without the developer needing to explain anything verbally — all required info is documented
@@ -229,7 +231,7 @@ Plans:
 | 20. Prospect Finder | v1.5 | 2/2 | Complete | 2026-03-29 |
 | 21. Pitch Generator | v1.5 | 1/1 | Complete | 2026-03-29 |
 | 22. Outreach Execution | v1.5 | 2/2 | Complete | 2026-04-06 |
-| 23. Monitoring & Alerting | v1.6 | 0/? | Not started | - |
+| 23. Monitoring & Alerting | v1.6 | 0/1 | Planning | - |
 | 24. Client Onboarding Docs | v1.6 | 0/? | Not started | - |
 | 25. Composite Clip Scoring | v1.6 | 0/? | Not started | - |
 | 26. Demo Output Optimization | v1.6 | 0/? | Not started | - |
