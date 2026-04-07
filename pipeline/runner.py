@@ -1226,6 +1226,53 @@ def _dispatch_calendar_slot(uploader_instance, platform, slot):
     return None
 
 
+@retry_with_backoff(
+    max_retries=3,
+    base_delay=2.0,
+    max_delay=30.0,
+    backoff_factor=2.0,
+)
+def _execute_scheduled_upload(uploader_instance, upload_item, platform):
+    """Execute a single scheduled upload with retry logic.
+
+    Extracted from the per-loop closure to avoid redefining a decorated function
+    on every iteration and to make the platform parameter explicit rather than
+    captured by closure reference.
+
+    Args:
+        uploader_instance: Uploader object for the platform.
+        upload_item: Upload item dict from the schedule.
+        platform: Platform string ('youtube', 'twitter', 'instagram', 'tiktok').
+
+    Returns:
+        Upload result or None.
+    """
+    if platform == "youtube":
+        return uploader_instance.upload_episode(
+            video_path=upload_item.get("full_episode_video_path", ""),
+            title=upload_item.get("episode_title", ""),
+            description=upload_item.get("episode_summary", ""),
+        )
+    elif platform == "twitter":
+        return uploader_instance.post_tweet(
+            text=upload_item.get("social_captions", ""),
+            media_paths=upload_item.get("video_clip_paths"),
+        )
+    elif platform == "instagram":
+        return uploader_instance.upload_reel(
+            video_url=upload_item.get("video_clip_paths", [""])[0],
+            caption=upload_item.get("social_captions", ""),
+        )
+    elif platform == "tiktok":
+        clip_paths = upload_item.get("video_clip_paths") or []
+        return uploader_instance.upload_video(
+            video_path=clip_paths[0] if clip_paths else "",
+            title=upload_item.get("episode_title", ""),
+            description=upload_item.get("social_captions"),
+        )
+    return None
+
+
 def run_upload_scheduled():
     """Scan output folders for pending scheduled uploads and execute them."""
     from notifications import DiscordNotifier
@@ -1280,41 +1327,9 @@ def run_upload_scheduled():
 
             logger.info("Uploading to %s...", platform)
 
-            @retry_with_backoff(
-                max_retries=3,
-                base_delay=2.0,
-                max_delay=30.0,
-                backoff_factor=2.0,
-            )
-            def _do_upload(uploader_instance, upload_item):
-                if platform == "youtube":
-                    return uploader_instance.upload_episode(
-                        video_path=upload_item.get("full_episode_video_path", ""),
-                        title=upload_item.get("episode_title", ""),
-                        description=upload_item.get("episode_summary", ""),
-                    )
-                elif platform == "twitter":
-                    return uploader_instance.post_tweet(
-                        text=upload_item.get("social_captions", ""),
-                        media_paths=upload_item.get("video_clip_paths"),
-                    )
-                elif platform == "instagram":
-                    return uploader_instance.upload_reel(
-                        video_url=upload_item.get("video_clip_paths", [""])[0],
-                        caption=upload_item.get("social_captions", ""),
-                    )
-                elif platform == "tiktok":
-                    clip_paths = upload_item.get("video_clip_paths") or []
-                    return uploader_instance.upload_video(
-                        video_path=clip_paths[0] if clip_paths else "",
-                        title=upload_item.get("episode_title", ""),
-                        description=upload_item.get("social_captions"),
-                    )
-                return None
-
             try:
                 uploader_instance = uploader_cls()
-                result = _do_upload(uploader_instance, item)
+                result = _execute_scheduled_upload(uploader_instance, item, platform)
                 schedule = scheduler.mark_uploaded(schedule, platform, result)
                 logger.info("Successfully uploaded to %s", platform)
             except Exception as e:
