@@ -87,12 +87,24 @@ Requirements for Production Quality & Operations milestone.
 | PITCH-01 | Phase 21 | Complete |
 | PITCH-02 | Phase 21 | Complete |
 | DEMO-04 | Phase 22 | Complete |
+| MON-01 | Phase 23 | Pending |
+| MON-02 | Phase 23 | Pending |
+| ONBOARD-01 | Phase 24 | Pending |
+| ONBOARD-02 | Phase 24 | Pending |
+| DEMO-05 | Phase 25 | Pending |
+| CLIP-05 | Phase 25 | Pending |
+| DEMO-06 | Phase 26 | Pending |
+| DEMO-07 | Phase 26 | Pending |
+| CLIP-06 | Phase 27 | Pending |
 
 **Coverage:**
 - v1.5 requirements: 8 total
-- Mapped to phases: 8
-- Unmapped: 0
+- v1.5 mapped to phases: 8
+- v1.5 unmapped: 0
+- v1.6 requirements: 9 total
+- v1.6 mapped to phases: 9
+- v1.6 unmapped: 0
 
 ---
 *Requirements defined: 2026-03-29*
-*Last updated: 2026-03-29 — traceability updated after roadmap creation*
+*Last updated: 2026-04-06 — v1.6 traceability added after roadmap creation*
