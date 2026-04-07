@@ -84,7 +84,7 @@ See: .planning/milestones/v1.5-ROADMAP.md for full details.
 
 **Milestone Goal:** Make the pipeline operationally ready for paying clients — add failure visibility, reduce onboarding friction, polish demo output quality, and optimize clip selection using engagement data.
 
-- [ ] **Phase 23: Monitoring & Alerting** - Discord notifications for pipeline failures and successful run summaries
+- [x] **Phase 23: Monitoring & Alerting** - Discord notifications for pipeline failures and successful run summaries (completed 2026-04-07)
 - [ ] **Phase 24: Client Onboarding Docs** - ONBOARDING.md checklist and annotated client YAML template
 - [ ] **Phase 25: Composite Clip Scoring** - Multi-signal clip ranking and tunable AudioClipScorer weights
 - [ ] **Phase 26: Demo Output Optimization** - Autoresearch-driven subtitle styling and thumbnail contrast tuning
@@ -160,7 +160,7 @@ Plans:
 **Plans**: 1 plans
 
 Plans:
-- [ ] 23-01-PLAN.md — Per-step failure alerts, success summaries with duration, and tests
+- [x] 23-01-PLAN.md — Per-step failure alerts, success summaries with duration, and tests
 
 ### Phase 24: Client Onboarding Docs
 **Goal**: A new client can be onboarded without the developer needing to explain anything verbally — all required info is documented
@@ -231,7 +231,7 @@ Plans:
 | 20. Prospect Finder | v1.5 | 2/2 | Complete | 2026-03-29 |
 | 21. Pitch Generator | v1.5 | 1/1 | Complete | 2026-03-29 |
 | 22. Outreach Execution | v1.5 | 2/2 | Complete | 2026-04-06 |
-| 23. Monitoring & Alerting | v1.6 | 0/1 | Planning | - |
+| 23. Monitoring & Alerting | v1.6 | 1/1 | Complete    | 2026-04-07 |
 | 24. Client Onboarding Docs | v1.6 | 0/? | Not started | - |
 | 25. Composite Clip Scoring | v1.6 | 0/? | Not started | - |
 | 26. Demo Output Optimization | v1.6 | 0/? | Not started | - |
