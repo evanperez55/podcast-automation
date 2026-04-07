@@ -185,9 +185,12 @@
           "clip_title": "Jiu-jitsu looks brutal and I don't want any part of it"
         },
         "status": "partial",
-        "uploaded_at": "2026-04-06T18:55:08.156763",
+        "uploaded_at": "2026-04-07T15:56:04.746072",
         "upload_results": {
-          "youtube": "<MagicMock name='YouTubeUploader().upload_short()' id='2758272998080'>",
+          "youtube": {
+            "status": "made_public",
+            "video_id": "XctNIGgFvcI"
+          },
           "twitter": {
             "tweet_id": "2041303718386151531",
             "tweet_url": "https://twitter.com/i/web/status/2041303718386151531",
@@ -195,7 +198,14 @@
             "media_count": 0,
             "status": "success"
           },
-          "instagram": null
+          "instagram": {
+            "error": "cannot access local variable 'dropbox_sdk' where it is not associated with a value"
+          },
+          "bluesky": {
+            "status": "skipped_duplicate",
+            "text": "Jiu-jitsu looks brutal and I don't want any part of it",
+            "post_url": null
+          }
         }
       },
       "clip_6": {
@@ -301,11 +311,15 @@
           "quote_text": "A dropped wrench almost nuked half the country and no one even knew about it.",
           "timestamp": "00:06:20"
         },
-        "status": "partial",
-        "uploaded_at": "2026-04-05T16:57:08.342885",
+        "status": "uploaded",
+        "uploaded_at": "2026-04-07T15:56:04.941373",
         "upload_results": {
           "twitter": {
-            "error": "post_tweet returned None"
+            "tweet_id": "2041605952143610181",
+            "tweet_url": "https://twitter.com/i/web/status/2041605952143610181",
+            "text": "A dropped wrench almost nuked half the country and no one even knew about it.",
+            "media_count": 0,
+            "status": "success"
           },
           "bluesky": {
             "post_uri": "at://did:plc:tqwk5oc74cw7yqcqfsbpuirf/app.bsky.feed.post/3mirqkv3m4y2w",
@@ -330,9 +344,23 @@
           "quote_text": "It's the most inclusive execution \u2014 everyone gets to throw a rock.",
           "timestamp": "00:20:12"
         },
-        "status": "pending",
-        "uploaded_at": null,
-        "upload_results": {}
+        "status": "uploaded",
+        "uploaded_at": "2026-04-07T15:56:07.387217",
+        "upload_results": {
+          "twitter": {
+            "tweet_id": "2041605961480073706",
+            "tweet_url": "https://twitter.com/i/web/status/2041605961480073706",
+            "text": "It's the most inclusive execution \u2014 everyone gets to throw a rock.",
+            "media_count": 0,
+            "status": "success"
+          },
+          "bluesky": {
+            "post_uri": "at://did:plc:tqwk5oc74cw7yqcqfsbpuirf/app.bsky.feed.post/3miwkqd2r4i2h",
+            "post_url": "https://bsky.app/profile/fakeproblemspod.bsky.social/post/3miwkqd2r4i2h",
+            "text": "It's the most inclusive execution \u2014 everyone gets to throw a rock.",
+            "status": "success"
+          }
+        }
       }
     }
   }
