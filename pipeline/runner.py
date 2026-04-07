@@ -300,6 +300,32 @@ def _load_scored_topics():
     return _load()
 
 
+def _pid_is_running(pid):
+    """Return True if a process with the given PID is currently running.
+
+    Uses platform-appropriate method: ctypes on Windows (os.kill with signal 0
+    always raises OSError on Windows regardless of whether the process exists),
+    and os.kill(pid, 0) on POSIX.
+    """
+    import sys
+
+    if sys.platform == "win32":
+        import ctypes
+
+        PROCESS_QUERY_INFORMATION = 0x0400
+        handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_INFORMATION, False, pid)
+        if not handle:
+            return False
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return True
+    else:
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+
+
 def _acquire_pipeline_lock():
     """Acquire exclusive pipeline lock. Returns True if acquired, False if another run is active."""
     lock_path = Config.OUTPUT_DIR / ".pipeline_lock"
@@ -307,13 +333,11 @@ def _acquire_pipeline_lock():
     if lock_path.exists():
         try:
             old_pid = int(lock_path.read_text().strip())
-            try:
-                os.kill(old_pid, 0)  # signal 0 = check existence
+            if _pid_is_running(old_pid):
                 return False  # process is still running
-            except OSError:
-                logger.warning(
-                    "Stale lock file found (PID %d not running), removing", old_pid
-                )
+            logger.warning(
+                "Stale lock file found (PID %d not running), removing", old_pid
+            )
         except (ValueError, OSError):
             logger.warning("Invalid lock file, removing")
     lock_path.write_text(str(os.getpid()))
