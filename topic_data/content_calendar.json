@@ -185,25 +185,17 @@
           "clip_title": "Jiu-jitsu looks brutal and I don't want any part of it"
         },
         "status": "partial",
-        "uploaded_at": "2026-04-06T15:52:15.325292",
+        "uploaded_at": "2026-04-06T18:55:08.156763",
         "upload_results": {
-          "youtube": {
-            "status": "made_public",
-            "video_id": "XctNIGgFvcI"
-          },
+          "youtube": "<MagicMock name='YouTubeUploader().upload_short()' id='2758272998080'>",
           "twitter": {
-            "tweet_id": "2041242599550263372",
-            "tweet_url": "https://twitter.com/i/web/status/2041242599550263372",
-            "text": "Jiu-jitsu looks brutal and I don't want any part of it\n\nhttps://www.youtube.com/watch?v=XctNIGgFvcI",
+            "tweet_id": "2041303718386151531",
+            "tweet_url": "https://twitter.com/i/web/status/2041303718386151531",
+            "text": "Jiu-jitsu looks brutal and I don't want any part of it",
             "media_count": 0,
             "status": "success"
           },
-          "bluesky": {
-            "post_uri": "at://did:plc:tqwk5oc74cw7yqcqfsbpuirf/app.bsky.feed.post/3miu22ibkbh2w",
-            "post_url": "https://bsky.app/profile/fakeproblemspod.bsky.social/post/3miu22ibkbh2w",
-            "text": "Jiu-jitsu looks brutal and I don't want any part of it",
-            "status": "success"
-          }
+          "instagram": null
         }
       },
       "clip_6": {
@@ -309,15 +301,11 @@
           "quote_text": "A dropped wrench almost nuked half the country and no one even knew about it.",
           "timestamp": "00:06:20"
         },
-        "status": "uploaded",
-        "uploaded_at": "2026-04-06T15:52:16.885414",
+        "status": "partial",
+        "uploaded_at": "2026-04-05T16:57:08.342885",
         "upload_results": {
           "twitter": {
-            "tweet_id": "2041242607724954024",
-            "tweet_url": "https://twitter.com/i/web/status/2041242607724954024",
-            "text": "A dropped wrench almost nuked half the country and no one even knew about it.",
-            "media_count": 0,
-            "status": "success"
+            "error": "post_tweet returned None"
           },
           "bluesky": {
             "post_uri": "at://did:plc:tqwk5oc74cw7yqcqfsbpuirf/app.bsky.feed.post/3mirqkv3m4y2w",
