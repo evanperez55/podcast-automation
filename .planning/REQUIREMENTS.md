@@ -27,31 +27,6 @@ Requirements for First Paying Client milestone.
 
 - [x] **DEMO-04**: User can process a consented prospect's episode and package the demo in one workflow
 
-## v1.6 Requirements
-
-Requirements for Production Quality & Operations milestone.
-
-### Demo Output Quality
-
-- [ ] **DEMO-05**: Pipeline produces clips ranked by a composite quality score (audio energy + content relevance + hook strength)
-- [ ] **DEMO-06**: Subtitle clips use genre-appropriate styling (font size, color, animation timing) tuned via autoresearch
-- [ ] **DEMO-07**: Thumbnails use contrast-optimized text placement and genre-appropriate color palettes
-
-### Monitoring & Alerting
-
-- [ ] **MON-01**: Pipeline sends Discord alert with error details when any step fails
-- [ ] **MON-02**: Pipeline sends Discord summary notification after each successful run (episode name, duration, clip count, platforms uploaded)
-
-### Client Onboarding
-
-- [ ] **ONBOARD-01**: ONBOARDING.md checklist documents every piece of info needed from a new client
-- [ ] **ONBOARD-02**: Example client YAML template with inline comments explaining every field
-
-### Clip Selection Optimization
-
-- [ ] **CLIP-05**: AudioClipScorer weights are tunable via client YAML config (energy_weight, content_weight, hook_weight)
-- [ ] **CLIP-06**: Scorer weights optimized against historical engagement data using autoresearch iteration
-
 ## Future Requirements
 
 ### Distribution Expansion
@@ -87,24 +62,12 @@ Requirements for Production Quality & Operations milestone.
 | PITCH-01 | Phase 21 | Complete |
 | PITCH-02 | Phase 21 | Complete |
 | DEMO-04 | Phase 22 | Complete |
-| MON-01 | Phase 23 | Pending |
-| MON-02 | Phase 23 | Pending |
-| ONBOARD-01 | Phase 24 | Pending |
-| ONBOARD-02 | Phase 24 | Pending |
-| DEMO-05 | Phase 25 | Pending |
-| CLIP-05 | Phase 25 | Pending |
-| DEMO-06 | Phase 26 | Pending |
-| DEMO-07 | Phase 26 | Pending |
-| CLIP-06 | Phase 27 | Pending |
 
 **Coverage:**
 - v1.5 requirements: 8 total
-- v1.5 mapped to phases: 8
-- v1.5 unmapped: 0
-- v1.6 requirements: 9 total
-- v1.6 mapped to phases: 9
-- v1.6 unmapped: 0
+- Mapped to phases: 8
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-29*
-*Last updated: 2026-04-06 — v1.6 traceability added after roadmap creation*
+*Last updated: 2026-03-29 — traceability updated after roadmap creation*

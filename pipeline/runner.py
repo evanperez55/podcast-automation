@@ -5,7 +5,6 @@ Called by the thin main.py CLI shim.
 """
 
 import os
-import time
 from datetime import datetime
 from pathlib import Path
 
@@ -300,32 +299,6 @@ def _load_scored_topics():
     return _load()
 
 
-def _pid_is_running(pid):
-    """Return True if a process with the given PID is currently running.
-
-    Uses platform-appropriate method: ctypes on Windows (os.kill with signal 0
-    always raises OSError on Windows regardless of whether the process exists),
-    and os.kill(pid, 0) on POSIX.
-    """
-    import sys
-
-    if sys.platform == "win32":
-        import ctypes
-
-        PROCESS_QUERY_INFORMATION = 0x0400
-        handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_INFORMATION, False, pid)
-        if not handle:
-            return False
-        ctypes.windll.kernel32.CloseHandle(handle)
-        return True
-    else:
-        try:
-            os.kill(pid, 0)
-            return True
-        except OSError:
-            return False
-
-
 def _acquire_pipeline_lock():
     """Acquire exclusive pipeline lock. Returns True if acquired, False if another run is active."""
     lock_path = Config.OUTPUT_DIR / ".pipeline_lock"
@@ -333,11 +306,13 @@ def _acquire_pipeline_lock():
     if lock_path.exists():
         try:
             old_pid = int(lock_path.read_text().strip())
-            if _pid_is_running(old_pid):
+            try:
+                os.kill(old_pid, 0)  # signal 0 = check existence
                 return False  # process is still running
-            logger.warning(
-                "Stale lock file found (PID %d not running), removing", old_pid
-            )
+            except OSError:
+                logger.warning(
+                    "Stale lock file found (PID %d not running), removing", old_pid
+                )
         except (ValueError, OSError):
             logger.warning("Invalid lock file, removing")
     lock_path.write_text(str(os.getpid()))
@@ -408,22 +383,6 @@ def _run_pipeline(args):
         force = getattr(args, "force", False)
         demo_mode = getattr(args, "demo_mode", False)
 
-    def _run_step(step_name, fn, *step_args):
-        """Wrap a pipeline step call with per-step failure notification.
-
-        On exception: notifies Discord with step name and error, then re-raises.
-        Returns the function result on success.
-        """
-        try:
-            return fn(*step_args)
-        except Exception as e:
-            notifier = components.get("notifier")
-            if notifier and notifier.enabled:
-                ep_info = components.get("_episode_info", "unknown")
-                notifier.notify_failure(ep_info, e, step=step_name)
-            e._step_notified = True
-            raise
-
     # Load client config if specified
     client_name = None
     if isinstance(args, dict):
@@ -444,8 +403,6 @@ def _run_pipeline(args):
         force=force,
         demo_mode=demo_mode,
     )
-
-    start_time = time.time()
 
     print("=" * 60)
     print("STARTING EPISODE PROCESSING")
@@ -501,10 +458,7 @@ def _run_pipeline(args):
     state = PipelineState(placeholder_folder) if resume else None
 
     # Step 1: Ingest (download/find audio, resolve episode folder)
-    ctx = _run_step("ingest", run_ingest, ctx, components, state)
-
-    # Store episode info for per-step notifications (resolved after ingest)
-    components["_episode_info"] = ctx.episode_number or ctx.episode_folder or "unknown"
+    ctx = run_ingest(ctx, components, state)
 
     # Update state folder if episode number was discovered during ingest
     if resume and state and ctx.episode_folder != placeholder_folder:
@@ -537,48 +491,41 @@ def _run_pipeline(args):
     # the internal steps directly.
 
     # Step 2: Transcribe only
-    ctx = _run_step("transcribe", _run_transcribe, ctx, components, state)
+    ctx = _run_transcribe(ctx, components, state)
 
     # Step 3 + 3.5: Analysis
-    ctx = _run_step("analysis", run_analysis, ctx, components, state)
+    ctx = run_analysis(ctx, components, state)
 
     # Step 3.6: Content compliance check
-    def _run_compliance_check(ctx, components, state):
-        """Run compliance check step and merge flagged segments into censor list."""
-        print("STEP 3.6: CONTENT COMPLIANCE CHECK")
-        print("-" * 60)
-        compliance_checker = components.get("compliance_checker")
-        if compliance_checker and compliance_checker.enabled:
-            compliance_result = compliance_checker.check_transcript(
-                transcript_data=ctx.transcript_data,
-                episode_output_dir=ctx.episode_output_dir,
-                episode_number=ctx.episode_number,
-                timestamp=ctx.timestamp,
-            )
-            ctx.compliance_result = compliance_result
-            # Merge flagged segments into censor_timestamps for auto-muting (SAFE-03)
-            if compliance_result.get("flagged"):
-                existing = (ctx.analysis or {}).get("censor_timestamps", [])
-                new_entries = compliance_checker.get_censor_entries(compliance_result)
-                existing.extend(new_entries)
-                if ctx.analysis is None:
-                    ctx.analysis = {}
-                ctx.analysis["censor_timestamps"] = existing
-                logger.info(
-                    "Merged %d compliance flags into censor list", len(new_entries)
-                )
-        else:
-            logger.info("Content compliance check skipped (disabled)")
-        print()
-        return ctx
-
-    ctx = _run_step("compliance_check", _run_compliance_check, ctx, components, state)
+    print("STEP 3.6: CONTENT COMPLIANCE CHECK")
+    print("-" * 60)
+    compliance_checker = components.get("compliance_checker")
+    if compliance_checker and compliance_checker.enabled:
+        compliance_result = compliance_checker.check_transcript(
+            transcript_data=ctx.transcript_data,
+            episode_output_dir=ctx.episode_output_dir,
+            episode_number=ctx.episode_number,
+            timestamp=ctx.timestamp,
+        )
+        ctx.compliance_result = compliance_result
+        # Merge flagged segments into censor_timestamps for auto-muting (SAFE-03)
+        if compliance_result.get("flagged"):
+            existing = (ctx.analysis or {}).get("censor_timestamps", [])
+            new_entries = compliance_checker.get_censor_entries(compliance_result)
+            existing.extend(new_entries)
+            if ctx.analysis is None:
+                ctx.analysis = {}
+            ctx.analysis["censor_timestamps"] = existing
+            logger.info("Merged %d compliance flags into censor list", len(new_entries))
+    else:
+        logger.info("Content compliance check skipped (disabled)")
+    print()
 
     # Steps 4, 4.5, 6: Censor + normalize + MP3
-    ctx = _run_step("audio_processing", _run_process_audio, ctx, components, state)
+    ctx = _run_process_audio(ctx, components, state)
 
     # Steps 5, 5.1, 5.4, 5.5, 5.6: Video, clips, etc.
-    ctx = _run_step("video", run_video, ctx, components, state)
+    ctx = run_video(ctx, components, state)
 
     # Steps 7, 7.5, 8, 8.5, 9: Distribution
     if demo_mode:
@@ -600,9 +547,7 @@ def _run_pipeline(args):
         _print_demo_summary(demo_path)
         print("=" * 60)
     else:
-        ctx = _run_step("distribute", run_distribute, ctx, components, state)
-
-    elapsed = time.time() - start_time
+        ctx = run_distribute(ctx, components, state)
 
     # Build and save results dict (backward-compatible)
     analysis = ctx.analysis or {}
@@ -632,10 +577,6 @@ def _run_pipeline(args):
         "best_clips_info": analysis.get("best_clips"),
         "censor_count": len(analysis.get("censor_timestamps", [])),
         "thumbnail_path": str(ctx.thumbnail_path) if ctx.thumbnail_path else None,
-        "pipeline_duration_seconds": elapsed,
-        "duration_seconds": ctx.transcript_data.get("duration")
-        if ctx.transcript_data
-        else None,
     }
 
     print("=" * 60)
@@ -1161,11 +1102,9 @@ def run_with_notification(
             notifier.notify_success(results)
         return results
     except Exception as e:
-        # Per-step notifications are already sent by _run_step inside run().
-        # Only notify here for failures during setup (before any step ran).
-        if not getattr(e, "_step_notified", False) and notifier and notifier.enabled:
+        if notifier and notifier.enabled:
             ep_info = episode_number or dropbox_path or local_audio_path or "latest"
-            notifier.notify_failure(ep_info, e, step="pipeline_setup")
+            notifier.notify_failure(ep_info, e, step="process_episode")
         raise
 
 
@@ -1226,53 +1165,6 @@ def _dispatch_calendar_slot(uploader_instance, platform, slot):
     return None
 
 
-@retry_with_backoff(
-    max_retries=3,
-    base_delay=2.0,
-    max_delay=30.0,
-    backoff_factor=2.0,
-)
-def _execute_scheduled_upload(uploader_instance, upload_item, platform):
-    """Execute a single scheduled upload with retry logic.
-
-    Extracted from the per-loop closure to avoid redefining a decorated function
-    on every iteration and to make the platform parameter explicit rather than
-    captured by closure reference.
-
-    Args:
-        uploader_instance: Uploader object for the platform.
-        upload_item: Upload item dict from the schedule.
-        platform: Platform string ('youtube', 'twitter', 'instagram', 'tiktok').
-
-    Returns:
-        Upload result or None.
-    """
-    if platform == "youtube":
-        return uploader_instance.upload_episode(
-            video_path=upload_item.get("full_episode_video_path", ""),
-            title=upload_item.get("episode_title", ""),
-            description=upload_item.get("episode_summary", ""),
-        )
-    elif platform == "twitter":
-        return uploader_instance.post_tweet(
-            text=upload_item.get("social_captions", ""),
-            media_paths=upload_item.get("video_clip_paths"),
-        )
-    elif platform == "instagram":
-        return uploader_instance.upload_reel(
-            video_url=upload_item.get("video_clip_paths", [""])[0],
-            caption=upload_item.get("social_captions", ""),
-        )
-    elif platform == "tiktok":
-        clip_paths = upload_item.get("video_clip_paths") or []
-        return uploader_instance.upload_video(
-            video_path=clip_paths[0] if clip_paths else "",
-            title=upload_item.get("episode_title", ""),
-            description=upload_item.get("social_captions"),
-        )
-    return None
-
-
 def run_upload_scheduled():
     """Scan output folders for pending scheduled uploads and execute them."""
     from notifications import DiscordNotifier
@@ -1327,9 +1219,41 @@ def run_upload_scheduled():
 
             logger.info("Uploading to %s...", platform)
 
+            @retry_with_backoff(
+                max_retries=3,
+                base_delay=2.0,
+                max_delay=30.0,
+                backoff_factor=2.0,
+            )
+            def _do_upload(uploader_instance, upload_item):
+                if platform == "youtube":
+                    return uploader_instance.upload_episode(
+                        video_path=upload_item.get("full_episode_video_path", ""),
+                        title=upload_item.get("episode_title", ""),
+                        description=upload_item.get("episode_summary", ""),
+                    )
+                elif platform == "twitter":
+                    return uploader_instance.post_tweet(
+                        text=upload_item.get("social_captions", ""),
+                        media_paths=upload_item.get("video_clip_paths"),
+                    )
+                elif platform == "instagram":
+                    return uploader_instance.upload_reel(
+                        video_url=upload_item.get("video_clip_paths", [""])[0],
+                        caption=upload_item.get("social_captions", ""),
+                    )
+                elif platform == "tiktok":
+                    clip_paths = upload_item.get("video_clip_paths") or []
+                    return uploader_instance.upload_video(
+                        video_path=clip_paths[0] if clip_paths else "",
+                        title=upload_item.get("episode_title", ""),
+                        description=upload_item.get("social_captions"),
+                    )
+                return None
+
             try:
                 uploader_instance = uploader_cls()
-                result = _execute_scheduled_upload(uploader_instance, item, platform)
+                result = _do_upload(uploader_instance, item)
                 schedule = scheduler.mark_uploaded(schedule, platform, result)
                 logger.info("Successfully uploaded to %s", platform)
             except Exception as e:

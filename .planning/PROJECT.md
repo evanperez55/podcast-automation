@@ -78,12 +78,11 @@ One command produces professional-quality, platform-ready podcast content with g
 - ✓ Raw audio snapshot before censorship for before/after comparison — v1.4
 - ✓ PyTorch CUDA 12.4 configured for GPU acceleration — v1.4
 
-### Active (v1.6 — Production Quality & Operations)
+### Active (v1.5 — First Paying Client)
 
-- [ ] Iteratively improve demo output quality (clip selection, subtitle styling, thumbnails)
-- [ ] Client onboarding documentation (ONBOARDING.md checklist)
-- [x] Pipeline monitoring and alerting (Discord webhook on errors) — Phase 23
-- [ ] Tune AudioClipScorer weights against engagement analytics data
+- [ ] Research and identify 3-5 small independent podcast prospects across genres
+- [ ] Process a real episode per prospect and package sales demos
+- [ ] Build outreach templates and tracking for email/DM campaigns
 
 ### Future
 
@@ -147,32 +146,14 @@ One command produces professional-quality, platform-ready podcast content with g
 | rss_source YAML key (not rss) | Existing `rss` key maps to output feed metadata; collision risk | ✓ Good — clean separation of input vs output config |
 | PyTorch CUDA index in pyproject.toml | uv sync was installing CPU-only build; needed explicit cu124 index | ✓ Good — 7 min transcription vs 30+ on CPU |
 
-## Current Milestone: v1.6 Production Quality & Operations
+## Current Milestone: v1.5 First Paying Client
 
-**Goal:** Make the pipeline operationally ready for paying clients — polish output quality, add monitoring, and reduce per-client overhead.
+**Goal:** Find 3-5 real podcast prospects across genres, process one of their episodes as a sales demo, and build outreach tooling to pitch them. Land the first paying client.
 
 **Target features:**
-- Demo output polish: iteratively improve clip selection, subtitle styling, and thumbnail quality using autoresearch
-- Client onboarding documentation: ONBOARDING.md checklist for smooth prospect-to-client handoff
-- Pipeline monitoring & alerting: Discord webhook on pipeline errors so failures don't go silent with multiple clients
-- Clip selection optimization: tune AudioClipScorer weights against engagement analytics data using autoresearch
-
-## Evolution
-
-This document evolves at phase transitions and milestone boundaries.
-
-**After each phase transition** (via `/gsd-transition`):
-1. Requirements invalidated? → Move to Out of Scope with reason
-2. Requirements validated? → Move to Validated with phase reference
-3. New requirements emerged? → Add to Active
-4. Decisions to log? → Add to Key Decisions
-5. "What This Is" still accurate? → Update if drifted
-
-**After each milestone** (via `/gsd-complete-milestone`):
-1. Full review of all sections
-2. Core Value check — still the right priority?
-3. Audit Out of Scope — reasons still valid?
-4. Update Context with current state
+- Prospect research: find small independent shows (<50K subs) that need production help
+- Demo production: process a real episode per prospect, package with `package-demo`
+- Outreach tooling: email/DM templates, pitch generator from demo metadata, contact tracking
 
 ---
-*Last updated: 2026-04-07 after Phase 23 completion*
+*Last updated: 2026-03-29 after v1.5 milestone start*
