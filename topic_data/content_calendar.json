@@ -227,9 +227,30 @@
           "youtube_video_id": "qLwpSz2UUAU",
           "clip_title": "What do you do when kids break into your house?"
         },
-        "status": "pending",
-        "uploaded_at": null,
-        "upload_results": {}
+        "status": "partial",
+        "uploaded_at": "2026-04-08T16:03:09.094565",
+        "upload_results": {
+          "youtube": {
+            "status": "made_public",
+            "video_id": "qLwpSz2UUAU"
+          },
+          "twitter": {
+            "tweet_id": "2041970113616744880",
+            "tweet_url": "https://twitter.com/i/web/status/2041970113616744880",
+            "text": "What do you do when kids break into your house?\n\nhttps://www.youtube.com/watch?v=qLwpSz2UUAU",
+            "media_count": 0,
+            "status": "success"
+          },
+          "bluesky": {
+            "post_uri": "at://did:plc:tqwk5oc74cw7yqcqfsbpuirf/app.bsky.feed.post/3miz3lrwjpi2l",
+            "post_url": "https://bsky.app/profile/fakeproblemspod.bsky.social/post/3miz3lrwjpi2l",
+            "text": "What do you do when kids break into your house?",
+            "status": "success"
+          },
+          "instagram": {
+            "error": "no video URL or local file available"
+          }
+        }
       },
       "clip_7": {
         "slot_type": "clip_7",
