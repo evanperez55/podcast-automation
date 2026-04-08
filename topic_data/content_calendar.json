@@ -227,8 +227,8 @@
           "youtube_video_id": "qLwpSz2UUAU",
           "clip_title": "What do you do when kids break into your house?"
         },
-        "status": "partial",
-        "uploaded_at": "2026-04-08T18:33:13.170732",
+        "status": "uploaded",
+        "uploaded_at": "2026-04-08T18:36:23.911021",
         "upload_results": {
           "youtube": {
             "status": "made_public",
@@ -248,7 +248,9 @@
             "status": "success"
           },
           "instagram": {
-            "error": "no video URL or local file available"
+            "id": "17987810075794769",
+            "permalink": "https://www.instagram.com/reel/DW4z2Z-F7OB/",
+            "status": "success"
           }
         }
       },
