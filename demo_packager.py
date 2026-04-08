@@ -155,6 +155,8 @@ class DemoPackager:
         compliance_data, compliance_path = self._find_compliance(ep_dir)
         raw_snapshot_path = self._find_raw_snapshot(ep_dir, state)
         clip_paths = self._find_clips(clips_source_dir, state)
+        if not clip_paths:
+            clip_paths = self._find_clips(ep_dir / "clips", state)
 
         # --- Copy artifacts ---
         skipped = []
