@@ -475,40 +475,64 @@ def _send_discord_summary(results):
         if not notifier.enabled:
             return
 
-        succeeded = [
-            r
-            for r in results
-            if not any(
-                "error" in v
-                for v in (r.get("results") or {}).values()
-                if isinstance(v, dict)
-            )
-        ]
-        failed = [r for r in results if r not in succeeded]
+        full_success = []
+        partial_success = []
+        full_failure = []
 
-        description = ""
-        for r in succeeded:
-            slot_type = r.get("slot_type", "")
-            content = ""
-            platforms = []
-            res = r.get("results", {})
+        for r in results:
+            res = r.get("results") or {}
+            ok_platforms = []
+            failed_platforms = []
             for platform, data in res.items():
-                if isinstance(data, dict) and data.get("status") != "error":
-                    platforms.append(platform)
-            if slot_type.startswith("clip_"):
-                content = f"Clip → {', '.join(platforms)}"
-            elif slot_type.startswith("quote_"):
-                content = f"Quote card → {', '.join(platforms)}"
+                if isinstance(data, dict) and "error" in data:
+                    failed_platforms.append(platform)
+                elif isinstance(data, dict):
+                    ok_platforms.append(platform)
+            if not ok_platforms and failed_platforms:
+                full_failure.append(r)
+            elif failed_platforms:
+                partial_success.append((r, ok_platforms, failed_platforms))
             else:
-                content = f"{slot_type} → {', '.join(platforms)}"
-            description += f"**{r['episode_key']}/{r['slot_name']}**: {content}\n"
+                full_success.append((r, ok_platforms))
 
-        if failed:
-            description += f"\n{len(failed)} slot(s) failed"
+        posted_count = len(full_success) + len(partial_success)
+        description = ""
 
-        color = 0x00FF00 if not failed else 0xFF9900
+        for r, platforms in full_success:
+            slot_type = r.get("slot_type", "")
+            if slot_type.startswith("clip_"):
+                label = "Clip"
+            elif slot_type.startswith("quote_"):
+                label = "Quote card"
+            else:
+                label = slot_type
+            description += f"**{r['episode_key']}/{r['slot_name']}**: {label} → {', '.join(platforms)}\n"
+
+        for r, ok_platforms, bad_platforms in partial_success:
+            slot_type = r.get("slot_type", "")
+            if slot_type.startswith("clip_"):
+                label = "Clip"
+            elif slot_type.startswith("quote_"):
+                label = "Quote card"
+            else:
+                label = slot_type
+            description += (
+                f"**{r['episode_key']}/{r['slot_name']}**: {label} → {', '.join(ok_platforms)}"
+                f" (failed: {', '.join(bad_platforms)})\n"
+            )
+
+        if full_failure:
+            description += f"\n{len(full_failure)} slot(s) fully failed"
+
+        if full_failure:
+            color = 0xFF0000
+        elif partial_success:
+            color = 0xFF9900
+        else:
+            color = 0x00FF00
+
         notifier.send_notification(
-            title=f"Scheduled Content Posted ({len(succeeded)}/{len(results)})",
+            title=f"Scheduled Content Posted ({posted_count}/{len(results)})",
             description=description.strip(),
             color=color,
         )
