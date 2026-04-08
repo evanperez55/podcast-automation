@@ -184,8 +184,8 @@
           "youtube_video_id": "XctNIGgFvcI",
           "clip_title": "Jiu-jitsu looks brutal and I don't want any part of it"
         },
-        "status": "partial",
-        "uploaded_at": "2026-04-07T15:56:04.746072",
+        "status": "uploaded",
+        "uploaded_at": "2026-04-07T22:24:19.601981",
         "upload_results": {
           "youtube": {
             "status": "made_public",
@@ -198,13 +198,15 @@
             "media_count": 0,
             "status": "success"
           },
-          "instagram": {
-            "error": "cannot access local variable 'dropbox_sdk' where it is not associated with a value"
-          },
           "bluesky": {
             "status": "skipped_duplicate",
             "text": "Jiu-jitsu looks brutal and I don't want any part of it",
             "post_url": null
+          },
+          "instagram": {
+            "id": "18117080860637271",
+            "permalink": "https://www.instagram.com/reel/DW2v-d5FeED/",
+            "status": "success"
           }
         }
       },

@@ -69,7 +69,11 @@ def _post_slot(slot, uploaders):
 
     # Carry forward prior successes and skip those platforms
     for platform, prior in prior_results.items():
-        if isinstance(prior, dict) and "error" not in prior and prior.get("status") != "error":
+        if (
+            isinstance(prior, dict)
+            and "error" not in prior
+            and prior.get("status") != "error"
+        ):
             results[platform] = prior
             logger.info("Skipping %s for %s — already posted", platform, slot_type)
 
@@ -184,9 +188,7 @@ def _post_slot(slot, uploaders):
                             "Instagram reel post returned None for %s",
                             slot_type,
                         )
-                        results["instagram"] = {
-                            "error": "reel post returned None"
-                        }
+                        results["instagram"] = {"error": "reel post returned None"}
                 elif clip_path and Path(clip_path).exists():
                     # Fall back to local file upload (local runs only)
                     result = _post_instagram_reel(
@@ -199,13 +201,9 @@ def _post_slot(slot, uploaders):
                             "Instagram reel post returned None for %s",
                             slot_type,
                         )
-                        results["instagram"] = {
-                            "error": "reel post returned None"
-                        }
+                        results["instagram"] = {"error": "reel post returned None"}
                 else:
-                    logger.warning(
-                        "[Instagram] No video URL or local file for Reel"
-                    )
+                    logger.warning("[Instagram] No video URL or local file for Reel")
                     results["instagram"] = {
                         "error": "no video URL or local file available"
                     }
@@ -260,13 +258,14 @@ def _resolve_clip_dropbox_url(slot):
     clips_folder = f"/podcast/clips/{episode_key}"
 
     try:
+        import dropbox as dropbox_sdk
+    except ImportError:
+        dropbox_sdk = None
+
+    try:
         from dropbox_handler import DropboxHandler
 
         dbx = DropboxHandler()
-        if not dbx.enabled:
-            return ""
-
-        import dropbox as dropbox_sdk
 
         result = dbx.dbx.files_list_folder(clips_folder)
         mp4_files = sorted(
@@ -300,10 +299,12 @@ def _resolve_clip_dropbox_url(slot):
             )
         return url or ""
 
-    except dropbox_sdk.exceptions.ApiError as e:
-        logger.warning("[Instagram] Could not list clips folder %s: %s", clips_folder, e)
-        return ""
     except Exception as e:
+        if dropbox_sdk and isinstance(e, dropbox_sdk.exceptions.ApiError):
+            logger.warning(
+                "[Instagram] Could not list clips folder %s: %s", clips_folder, e
+            )
+            return ""
         logger.warning("[Instagram] Dropbox fallback failed: %s", e)
         return ""
 
