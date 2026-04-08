@@ -250,7 +250,9 @@ def _upload_instagram(
         return {"status": "no_videos"}
 
     if not dropbox:
-        logger.warning("[Instagram] Dropbox not configured — cannot get public URLs for Reels")
+        logger.warning(
+            "[Instagram] Dropbox not configured — cannot get public URLs for Reels"
+        )
         return {"status": "no_dropbox"}
 
     # Upload ALL clips to Dropbox (needed for both immediate and staggered posting)
@@ -664,18 +666,29 @@ def run_distribute(
             # Fail-fast: skip social media if Dropbox upload fails
             finished_path = None
 
-        # Upload clips to clips folder
+        # Upload audio clips to clips folder
         logger.info("Uploading clips to Dropbox...")
         uploaded_clip_paths = dropbox.upload_clips(
             clip_paths, episode_folder_name=episode_folder
         )
 
         if uploaded_clip_paths:
-            logger.info("Uploaded %d clips", len(uploaded_clip_paths))
+            logger.info("Uploaded %d audio clips", len(uploaded_clip_paths))
             for clip_path in uploaded_clip_paths:
                 logger.debug("  - %s", clip_path)
         else:
             logger.warning("Failed to upload clips")
+
+        # Upload video clips (mp4) so scheduled Instagram posting can find them
+        if video_clip_paths:
+            logger.info("Uploading %d video clips to Dropbox...", len(video_clip_paths))
+            uploaded_video_paths = dropbox.upload_clips(
+                video_clip_paths, episode_folder_name=episode_folder
+            )
+            if uploaded_video_paths:
+                logger.info("Uploaded %d video clips", len(uploaded_video_paths))
+            else:
+                logger.warning("Failed to upload video clips")
 
     ctx.finished_path = finished_path
     ctx.uploaded_clip_paths = uploaded_clip_paths
