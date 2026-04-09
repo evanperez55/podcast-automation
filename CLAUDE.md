@@ -54,3 +54,18 @@ See @.planning/codebase/TESTING.md for test patterns and mocking strategy.
 - Google Docs credential files are in credentials/ directory (credentials/google_docs_credentials.json, credentials/google_docs_token.json)
 - requirements.txt is kept as fallback; pyproject.toml is the primary dependency source (managed by uv)
 - `assets/podcast_logo.png` is untracked (8.6MB) -- needs Git LFS or compression before committing
+
+## Podcast Growth Data (for content generation, clip selection, marketing)
+- Clips → 65% audience reach growth. Aim for 3-5 clips per episode, 30-60s sweet spot
+- Hook in first 2-3 seconds is critical (question, bold claim, surprising fact)
+- Subtitles mandatory — most social users scroll with sound off
+- Transcripts → 7.2x organic traffic vs audio-only pages
+- Show notes → 20% more organic traffic when 300+ words with timestamps
+- Audio normalization is table stakes — 78% of listeners leave over bad audio
+- YouTube Shorts have longest shelf life (months of views via search)
+- TikTok has highest engagement (3.15%), Instagram Reels best for shares
+- Apple ranks on subscriber growth VELOCITY (last 24-72 hrs), not total count
+- Spotify rewards 15-day release cycles with ~5 position chart boost
+- Clip distribution across episode timeline matters — represent beginning, middle, end
+- One episode should generate 15+ content pieces (clips, blog, captions, quotes)
+- See `output/podcast_growth_research.md` for full data with sources
