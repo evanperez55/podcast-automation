@@ -282,6 +282,303 @@ class ProspectFinder:
         logger.info("Saved prospect: %s -> %s", slug, yaml_path)
         return yaml_path
 
+    def research_prospect(self, slug: str) -> dict:
+        """Research a prospect's full digital presence and save a report.
+
+        Checks iTunes, RSS feed, YouTube, website, and podcast directories
+        for the prospect's online footprint. Downloads artwork and saves
+        a prospect_research.md file.
+
+        Args:
+            slug: Client slug matching a YAML config in clients/.
+
+        Returns:
+            Dict with platform presence, contact info, and assessment.
+        """
+        clients_dir = Config.BASE_DIR / "clients"
+        yaml_path = clients_dir / f"{slug}.yaml"
+        if not yaml_path.exists():
+            logger.warning("No client config for %s", slug)
+            return {}
+
+        data = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
+        prospect = data.get("prospect", {})
+        show_name = data.get("podcast_name", slug)
+        feed_url = prospect.get("feed_url") or (data.get("rss_source") or {}).get(
+            "feed_url", ""
+        )
+
+        result = {
+            "show_name": show_name,
+            "slug": slug,
+            "genre": prospect.get("genre", ""),
+            "feed_url": feed_url,
+            "platforms": {},
+            "host_name": None,
+            "contact_email": prospect.get("contact_email"),
+            "website": prospect.get("website"),
+            "artwork_url": None,
+        }
+
+        # --- RSS feed enrichment ---
+        if feed_url:
+            rss = self._research_rss(feed_url)
+            result.update(rss)
+
+        # --- iTunes lookup ---
+        itunes_id = prospect.get("itunes_id")
+        if itunes_id:
+            itunes = self._research_itunes(itunes_id)
+            result.update(itunes)
+
+        # --- YouTube search ---
+        yt = self._search_youtube(show_name)
+        if yt:
+            result["platforms"]["youtube"] = yt
+
+        # --- Website scan for socials ---
+        website = result.get("website") or ""
+        if website:
+            socials = self._scan_website_for_socials(website)
+            for platform, url in socials.items():
+                if platform not in result["platforms"]:
+                    result["platforms"][platform] = {"url": url, "source": "website"}
+
+        # --- Download artwork ---
+        if result.get("artwork_url"):
+            art_path = self._download_artwork(slug, result["artwork_url"])
+            if art_path:
+                result["artwork_path"] = str(art_path)
+                # Update YAML with branding
+                if "branding" not in data:
+                    data["branding"] = {}
+                data["branding"]["logo_path"] = str(art_path)
+                yaml_path.write_text(
+                    yaml.dump(data, default_flow_style=False, allow_unicode=True),
+                    encoding="utf-8",
+                )
+                logger.info("Set logo_path for %s: %s", slug, art_path)
+
+        # --- Save research report ---
+        self._save_research_report(slug, result)
+
+        return result
+
+    def _research_rss(self, feed_url: str) -> dict:
+        """Extract detailed info from RSS feed."""
+        try:
+            feed = feedparser.parse(feed_url)
+        except Exception as e:
+            logger.warning("RSS parse failed: %s", e)
+            return {}
+
+        info = {}
+
+        # Artwork
+        img = feed.feed.get("image", {})
+        itunes_img = feed.feed.get("itunes_image", {})
+        info["artwork_url"] = (
+            itunes_img.get("href") or img.get("href") or img.get("url")
+        )
+
+        # Host name
+        author = feed.feed.get("author") or feed.feed.get("itunes_author", "")
+        if author:
+            info["host_name"] = author
+
+        # Email from multiple sources
+        owner = feed.feed.get("itunes_owner", {}) or {}
+        email = (
+            owner.get("email")
+            or feed.feed.get("itunes_email")
+            or (feed.feed.get("author_detail") or {}).get("email")
+        )
+        if email:
+            info["contact_email"] = email
+
+        # Website
+        link = feed.feed.get("link", "")
+        if link:
+            info["website"] = link
+
+        # Episode count and last pub date
+        info["episode_count"] = len(feed.entries)
+        if feed.entries:
+            published = getattr(feed.entries[0], "published_parsed", None)
+            if published:
+                try:
+                    info["last_pub_date"] = datetime(*published[:6]).date().isoformat()
+                except Exception:
+                    pass
+
+        # Social links from description
+        desc = feed.feed.get("description", "") or ""
+        for pattern, key in [
+            (r"twitter\.com/(\w+)", "twitter"),
+            (r"x\.com/(\w+)", "twitter"),
+            (r"instagram\.com/([\w.]+)", "instagram"),
+            (r"tiktok\.com/@([\w.]+)", "tiktok"),
+            (r"youtube\.com/(@?[\w-]+)", "youtube"),
+            (r"facebook\.com/([\w.-]+)", "facebook"),
+            (r"patreon\.com/([\w-]+)", "patreon"),
+        ]:
+            m = re.search(pattern, desc, re.I)
+            if m:
+                info.setdefault("platforms", {})
+                info["platforms"][key] = {
+                    "handle": m.group(1),
+                    "source": "rss_description",
+                }
+
+        return info
+
+    def _research_itunes(self, itunes_id: str) -> dict:
+        """Look up show details via iTunes API."""
+        try:
+            resp = requests.get(
+                "https://itunes.apple.com/lookup",
+                params={"id": itunes_id, "entity": "podcast"},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            results = resp.json().get("results", [])
+            if results:
+                r = results[0]
+                return {
+                    "itunes_rating": r.get("averageUserRating"),
+                    "itunes_rating_count": r.get("userRatingCount"),
+                    "artwork_url": r.get("artworkUrl600")
+                    or r.get("artworkUrl100"),
+                }
+        except Exception as e:
+            logger.warning("iTunes lookup failed for %s: %s", itunes_id, e)
+        return {}
+
+    def _search_youtube(self, show_name: str) -> Optional[dict]:
+        """Search YouTube for a podcast channel (no API key needed)."""
+        search_term = f"{show_name} podcast"
+        try:
+            resp = requests.get(
+                "https://www.youtube.com/results",
+                params={"search_query": search_term},
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                # Check if there's a channel result
+                text = resp.text
+                has_channel = "channel" in text.lower() and show_name.lower().replace(
+                    " ", ""
+                ) in text.lower().replace(" ", "")
+                return {
+                    "likely_exists": has_channel,
+                    "search_url": f"https://www.youtube.com/results?search_query={search_term.replace(' ', '+')}",
+                    "source": "youtube_search",
+                }
+        except Exception as e:
+            logger.warning("YouTube search failed: %s", e)
+        return None
+
+    def _scan_website_for_socials(self, url: str) -> dict:
+        """Scrape a website for social media links."""
+        socials = {}
+        try:
+            resp = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+            if resp.status_code != 200:
+                return socials
+            text = resp.text
+            patterns = {
+                "youtube": r"(?:youtube\.com|youtu\.be)/([@\w-]+)",
+                "instagram": r"instagram\.com/([\w.]+)",
+                "twitter": r"(?:twitter|x)\.com/([\w]+)",
+                "tiktok": r"tiktok\.com/@([\w.]+)",
+                "facebook": r"facebook\.com/([\w.-]+)",
+                "patreon": r"patreon\.com/([\w-]+)",
+                "bluesky": r"bsky\.app/profile/([\w.-]+)",
+            }
+            for platform, pattern in patterns.items():
+                m = re.search(pattern, text, re.I)
+                if m:
+                    socials[platform] = m.group(0)
+
+            # Also look for email addresses on the page
+            email_match = re.search(
+                r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", text
+            )
+            if email_match:
+                socials["_email"] = email_match.group(0)
+        except Exception as e:
+            logger.warning("Website scan failed for %s: %s", url, e)
+        return socials
+
+    def _download_artwork(self, slug: str, artwork_url: str) -> Optional[Path]:
+        """Download podcast artwork and save to clients/<slug>/."""
+        try:
+            resp = requests.get(artwork_url, timeout=15)
+            if resp.status_code != 200:
+                return None
+            ext = artwork_url.rsplit(".", 1)[-1].split("?")[0][:4]
+            if ext not in ("jpg", "jpeg", "png", "webp"):
+                ext = "jpg"
+            client_dir = Config.BASE_DIR / "clients" / slug
+            client_dir.mkdir(exist_ok=True)
+            path = client_dir / f"logo.{ext}"
+            path.write_bytes(resp.content)
+            logger.info("Downloaded artwork for %s: %s (%dKB)", slug, path, len(resp.content) // 1024)
+            return path.relative_to(Config.BASE_DIR)
+        except Exception as e:
+            logger.warning("Artwork download failed for %s: %s", slug, e)
+            return None
+
+    def _save_research_report(self, slug: str, research: dict) -> Path:
+        """Save a prospect_research.md file to output/<slug>/."""
+        output_dir = Path(Config.OUTPUT_DIR) / slug
+        output_dir.mkdir(parents=True, exist_ok=True)
+        report_path = output_dir / "prospect_research.md"
+
+        platforms = research.get("platforms", {})
+        show_name = research.get("show_name", slug)
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        lines = [
+            f"# Prospect Research: {show_name}\n",
+            f"**Researched:** {today}\n",
+            "## Show Info",
+            f"- **Host:** {research.get('host_name', 'Unknown')}",
+            f"- **Genre:** {research.get('genre', 'Unknown')}",
+            f"- **Episodes:** {research.get('episode_count', '?')}",
+            f"- **Last Published:** {research.get('last_pub_date', 'Unknown')}",
+            f"- **Email:** {research.get('contact_email') or 'NOT FOUND'}",
+            f"- **Website:** {research.get('website') or 'None'}",
+            "",
+            "## Platform Presence",
+            "| Platform | Status | Details |",
+            "|---|---|---|",
+        ]
+
+        for platform in ["youtube", "instagram", "tiktok", "twitter", "facebook", "patreon", "bluesky"]:
+            if platform in platforms:
+                info = platforms[platform]
+                if isinstance(info, dict):
+                    detail = info.get("handle") or info.get("url") or info.get("search_url", "")
+                    lines.append(f"| {platform.title()} | Found | {detail} |")
+                else:
+                    lines.append(f"| {platform.title()} | Found | {info} |")
+            else:
+                lines.append(f"| {platform.title()} | Not found | |")
+
+        lines.extend([
+            "",
+            "## Artwork",
+            f"- **Downloaded:** {'Yes — ' + research.get('artwork_path', '') if research.get('artwork_path') else 'No'}",
+            "",
+            f"---\n*Auto-generated by prospect research pipeline*\n",
+        ])
+
+        report_path.write_text("\n".join(lines), encoding="utf-8")
+        logger.info("Research report saved: %s", report_path)
+        return report_path
+
     def _genre_key_from_name(self, genre_name: str) -> Optional[str]:
         """Map an iTunes primaryGenreName to a GENRE_DEFAULTS key.
 

@@ -120,6 +120,30 @@ def _handle_client_command(cmd, args):
         from prospect_finder import run_find_prospects_cli
 
         run_find_prospects_cli(sys.argv)
+    elif cmd == "research-prospect":
+        from prospect_finder import ProspectFinder
+
+        slug = sys.argv[2] if len(sys.argv) > 2 else None
+        if not slug:
+            print("Usage: research-prospect <slug>")
+        else:
+            finder = ProspectFinder()
+            result = finder.research_prospect(slug)
+            if result:
+                platforms = result.get("platforms", {})
+                print(f"\n{'=' * 50}")
+                print(f"Research: {result.get('show_name', slug)}")
+                print(f"{'=' * 50}")
+                print(f"Host: {result.get('host_name', 'Unknown')}")
+                print(f"Email: {result.get('contact_email') or 'NOT FOUND'}")
+                print(f"Episodes: {result.get('episode_count', '?')}")
+                print(f"Last Published: {result.get('last_pub_date', 'Unknown')}")
+                print(f"\nPlatforms found: {', '.join(platforms.keys()) or 'None'}")
+                if result.get("artwork_path"):
+                    print(f"Artwork: {result['artwork_path']}")
+                print(f"\nFull report: output/{slug}/prospect_research.md")
+            else:
+                print(f"Research failed for {slug}")
     elif cmd == "gen-pitch":
         from pitch_generator import run_gen_pitch_cli
 
@@ -191,13 +215,18 @@ def main():
     """Main entry point."""
     args = _parse_flags()
     client_name = args["client_name"]
-    _activate_client(client_name)
 
+    # Handle commands that don't need client activation first
     if len(sys.argv) > 1:
         cmd = sys.argv[1].lower()
 
         if _handle_client_command(cmd, args):
             return
+
+    _activate_client(client_name)
+
+    if len(sys.argv) > 1:
+        cmd = sys.argv[1].lower()
 
         if cmd == "health-check":
             health_check()
