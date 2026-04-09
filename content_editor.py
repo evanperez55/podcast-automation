@@ -482,6 +482,15 @@ GOOD: "turns out immortality is real, it just only applies to lobsters. link in 
    Find {Config.NUM_CLIPS} compelling moments that would make great YouTube Shorts.
    PREFER 20-30 SECOND CLIPS — this is the sweet spot for YouTube Shorts virality.
    Shorter, punchier clips outperform longer ones. Only go above 30s if the moment truly requires it.
+
+   **CRITICAL — SPREAD CLIPS ACROSS THE EPISODE:**
+   Clips MUST be distributed across the full episode timeline. Divide the episode into
+   {Config.NUM_CLIPS} equal time segments and pick ONE clip from each segment.
+   For example, in a 30-minute episode with 3 clips: one from 0-10min, one from 10-20min, one from 20-30min.
+   NEVER cluster multiple clips within the same 5-minute window. The goal is to represent
+   the full arc of the episode — beginning, middle, and end — so short-form viewers get a
+   real taste of the whole show.
+
    Each segment includes a WPM (words-per-minute) indicator — use this to identify delivery changes:
    - High WPM (180+) = excited/fast speech, high energy moments
    - Low WPM (80-120) = deliberate/dramatic delivery, emphasis
