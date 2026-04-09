@@ -31,6 +31,8 @@ class EpisodePageGenerator:
         transcript_data: dict,
         show_notes: str = "",
         youtube_id: Optional[str] = None,
+        prev_ep: Optional[dict] = None,
+        next_ep: Optional[dict] = None,
     ) -> Optional[Path]:
         """Generate a full episode HTML page with transcript and show notes.
 
@@ -76,6 +78,8 @@ class EpisodePageGenerator:
             quotes=quotes,
             youtube_id=youtube_id,
             word_count=word_count,
+            prev_ep=prev_ep,
+            next_ep=next_ep,
         )
 
         # Save
@@ -165,6 +169,8 @@ class EpisodePageGenerator:
         quotes: list,
         youtube_id: Optional[str],
         word_count: int,
+        prev_ep: Optional[dict] = None,
+        next_ep: Optional[dict] = None,
     ) -> str:
         """Build the full HTML page."""
         now = datetime.now().strftime("%Y-%m-%d")
@@ -208,6 +214,28 @@ class EpisodePageGenerator:
             },
             indent=2,
         )
+
+        # Build episode navigation
+        nav_prev = ""
+        nav_next = ""
+        if prev_ep:
+            nav_prev = (
+                f'<a href="{prev_ep["filename"]}" class="prev">'
+                f'<span class="label">&larr; Previous</span>'
+                f'Ep. {prev_ep["num"]}: {prev_ep["title"][:40]}</a>'
+            )
+        if next_ep:
+            nav_next = (
+                f'<a href="{next_ep["filename"]}" class="next">'
+                f'<span class="label">Next &rarr;</span>'
+                f'Ep. {next_ep["num"]}: {next_ep["title"][:40]}</a>'
+            )
+        ep_nav = f"""
+        <nav class="ep-nav">
+            {nav_prev}
+            <a href="/episodes/" class="all">All Episodes</a>
+            {nav_next}
+        </nav>"""
 
         return f"""<!DOCTYPE html>
 <html lang="en">
@@ -383,6 +411,39 @@ class EpisodePageGenerator:
             margin-top: 3rem;
         }}
         footer a {{ color: var(--accent); text-decoration: none; }}
+        .ep-nav {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 0;
+            margin: 2rem 0;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }}
+        .ep-nav a {{
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.9rem;
+            max-width: 40%;
+        }}
+        .ep-nav a:hover {{ text-decoration: underline; }}
+        .ep-nav .prev {{ text-align: left; }}
+        .ep-nav .next {{ text-align: right; }}
+        .ep-nav .all {{
+            font-family: var(--mono);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }}
+        .ep-nav .label {{
+            display: block;
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+        }}
         @media (max-width: 600px) {{
             h1 {{ font-size: 1.5rem; }}
             .container {{ padding: 1rem; }}
@@ -419,6 +480,8 @@ class EpisodePageGenerator:
         <div class="transcript">
             {transcript_html}
         </div>
+
+        {ep_nav}
     </div>
 
     <footer>
