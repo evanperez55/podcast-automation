@@ -359,6 +359,9 @@ class ProspectFinder:
                 )
                 logger.info("Set logo_path for %s: %s", slug, art_path)
 
+        # --- Score prospect fit ---
+        result["score"] = self._score_prospect(result)
+
         # --- Save research report ---
         self._save_research_report(slug, result)
 
@@ -530,6 +533,143 @@ class ProspectFinder:
             logger.warning("Artwork download failed for %s: %s", slug, e)
             return None
 
+    def _score_prospect(self, research: dict) -> dict:
+        """Score how good a fit this prospect is for our service.
+
+        Ideal client: has content (episodes), has audience, but lacks
+        short-form clips, video presence, and social distribution.
+        We want to fill gaps, not compete with what they already do.
+
+        Returns:
+            Dict with total score (0-100), rating, and breakdown.
+        """
+        platforms = research.get("platforms", {})
+        episode_count = research.get("episode_count", 0)
+        last_pub = research.get("last_pub_date")
+        has_email = bool(research.get("contact_email"))
+
+        score = 0
+        reasons = []
+
+        # --- Content volume (max 20pts) ---
+        # More episodes = bigger backlog we can clip from
+        if episode_count >= 100:
+            score += 20
+            reasons.append("+20 Large episode backlog (100+)")
+        elif episode_count >= 50:
+            score += 15
+            reasons.append(f"+15 Good episode backlog ({episode_count})")
+        elif episode_count >= 20:
+            score += 10
+            reasons.append(f"+10 Moderate episode count ({episode_count})")
+        else:
+            reasons.append(f"+0 Few episodes ({episode_count})")
+
+        # --- Activity (max 15pts) ---
+        if last_pub:
+            from datetime import date
+
+            try:
+                pub_date = date.fromisoformat(last_pub)
+                days_ago = (date.today() - pub_date).days
+                if days_ago <= 30:
+                    score += 15
+                    reasons.append("+15 Active (posted within 30 days)")
+                elif days_ago <= 90:
+                    score += 10
+                    reasons.append(f"+10 Recently active ({days_ago} days ago)")
+                elif days_ago <= 180:
+                    score += 5
+                    reasons.append(f"+5 Possibly on hiatus ({days_ago} days ago)")
+                else:
+                    reasons.append(f"+0 Likely dormant ({days_ago} days ago)")
+            except (ValueError, TypeError):
+                reasons.append("+0 Unknown activity status")
+        else:
+            reasons.append("+0 Unknown last publish date")
+
+        # --- Contactability (max 10pts) ---
+        if has_email:
+            score += 10
+            reasons.append("+10 Contact email available")
+        else:
+            reasons.append("+0 No contact email found")
+
+        # --- Video gap (max 25pts) ---
+        # NO video/YouTube = best fit. They need us most.
+        yt = platforms.get("youtube", {})
+        if not yt:
+            score += 25
+            reasons.append("+25 No YouTube presence — we fill this gap")
+        elif isinstance(yt, dict) and not yt.get("likely_exists", True):
+            score += 25
+            reasons.append("+25 YouTube not confirmed — likely no channel")
+        elif isinstance(yt, dict) and yt.get("likely_exists"):
+            # They have YouTube — check if it's just a listing or active
+            score += 5
+            reasons.append("+5 Has YouTube but may lack clips/Shorts (verify manually)")
+        else:
+            score += 5
+            reasons.append("+5 Has YouTube (verify Shorts manually)")
+
+        # --- Social gaps (max 15pts) ---
+        # Fewer social platforms = more we can help with distribution
+        social_count = sum(
+            1 for p in ["instagram", "tiktok", "twitter", "facebook"]
+            if p in platforms
+        )
+        if social_count == 0:
+            score += 15
+            reasons.append("+15 No social media presence — full distribution gap")
+        elif social_count == 1:
+            score += 10
+            reasons.append(f"+10 Minimal social presence ({social_count} platform)")
+        elif social_count <= 2:
+            score += 5
+            reasons.append(f"+5 Some social presence ({social_count} platforms)")
+        else:
+            reasons.append(f"+0 Strong social presence ({social_count} platforms)")
+
+        # --- Solo producer bonus (max 10pts) ---
+        # Solo hosts benefit most — no team to delegate to
+        host = research.get("host_name", "")
+        website = research.get("website", "")
+        has_patreon = "patreon" in platforms
+        # Podbean/Anchor/RSS.com = indie hosting = likely solo
+        indie_hosts = ["podbean", "anchor", "rss.com", "spreaker", "buzzsprout"]
+        is_indie = any(h in (website or "").lower() for h in indie_hosts)
+        if is_indie:
+            score += 10
+            reasons.append("+10 Indie-hosted (likely solo producer)")
+        elif not has_patreon:
+            score += 5
+            reasons.append("+5 No team indicators")
+
+        # --- Penalty: already has clips/Shorts ---
+        # If they're already doing what we offer, lower priority
+        if isinstance(yt, dict) and yt.get("likely_exists"):
+            score -= 5
+            reasons.append("-5 May already produce clips (verify)")
+
+        # Clamp score
+        score = max(0, min(100, score))
+
+        # Rating
+        if score >= 75:
+            rating = "EXCELLENT"
+        elif score >= 55:
+            rating = "GOOD"
+        elif score >= 35:
+            rating = "FAIR"
+        else:
+            rating = "POOR"
+
+        return {
+            "total": score,
+            "rating": rating,
+            "reasons": reasons,
+        }
+
     def _save_research_report(self, slug: str, research: dict) -> Path:
         """Save a prospect_research.md file to output/<slug>/."""
         output_dir = Path(Config.OUTPUT_DIR) / slug
@@ -567,8 +707,21 @@ class ProspectFinder:
             else:
                 lines.append(f"| {platform.title()} | Not found | |")
 
+        # Score
+        score = research.get("score", {})
+        if score:
+            lines.extend([
+                "",
+                f"## Fit Score: {score.get('total', 0)}/100 ({score.get('rating', '?')})",
+                "",
+                "| Factor | Points |",
+                "|---|---|",
+            ])
+            for reason in score.get("reasons", []):
+                lines.append(f"| {reason} |")
+            lines.append("")
+
         lines.extend([
-            "",
             "## Artwork",
             f"- **Downloaded:** {'Yes — ' + research.get('artwork_path', '') if research.get('artwork_path') else 'No'}",
             "",

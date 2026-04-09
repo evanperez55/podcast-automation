@@ -141,6 +141,11 @@ def _handle_client_command(cmd, args):
                 print(f"\nPlatforms found: {', '.join(platforms.keys()) or 'None'}")
                 if result.get("artwork_path"):
                     print(f"Artwork: {result['artwork_path']}")
+                score = result.get("score", {})
+                if score:
+                    print(f"\nFit Score: {score['total']}/100 ({score['rating']})")
+                    for reason in score.get("reasons", []):
+                        print(f"  {reason}")
                 print(f"\nFull report: output/{slug}/prospect_research.md")
             else:
                 print(f"Research failed for {slug}")
