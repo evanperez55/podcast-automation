@@ -331,18 +331,82 @@ class ProspectFinder:
             itunes = self._research_itunes(itunes_id)
             result.update(itunes)
 
-        # --- YouTube search ---
-        yt = self._search_youtube(show_name)
-        if yt:
-            result["platforms"]["youtube"] = yt
-
-        # --- Website scan for socials ---
+        # --- Scan ALL websites for socials ---
+        # Check both the podcast host URL and the show's own website
+        websites_to_scan = set()
         website = result.get("website") or ""
         if website:
-            socials = self._scan_website_for_socials(website)
+            websites_to_scan.add(website)
+        show_website = prospect.get("website") or ""
+        if show_website and show_website != website:
+            websites_to_scan.add(show_website)
+
+        # Derive likely show website from slug/name (e.g. kccpod.com)
+        slug_clean = slug.replace("-", "")
+        for domain in [f"https://{slug}.com", f"https://www.{slug}.com"]:
+            websites_to_scan.add(domain)
+
+        for site_url in websites_to_scan:
+            socials = self._scan_website_for_socials(site_url)
             for platform, url in socials.items():
                 if platform not in result["platforms"]:
-                    result["platforms"][platform] = {"url": url, "source": "website"}
+                    result["platforms"][platform] = {"url": url, "source": site_url}
+            # Pick up email from website if we don't have one
+            if not result.get("contact_email") and socials.get("_email"):
+                result["contact_email"] = socials["_email"]
+
+        # --- Direct platform handle checks ---
+        # Try the slug and common handle patterns directly on each platform
+        handles_to_try = [slug]
+        # Also try podcast name compressed (e.g. "keystone-cold-cases" -> "keystonecoldcases")
+        handles_to_try.append(slug.replace("-", ""))
+
+        # Extract handle from podcast hosting URL (e.g. kccpod.podbean.com -> kccpod)
+        for url_field in [feed_url, website, show_website]:
+            if not url_field:
+                continue
+            # Match subdomain-based hosts: kccpod.podbean.com, show.spreaker.com
+            import urllib.parse
+
+            parsed = urllib.parse.urlparse(url_field)
+            hostname = parsed.hostname or ""
+            for host_domain in [
+                "podbean.com", "spreaker.com", "buzzsprout.com",
+                "anchor.fm", "transistor.fm", "libsyn.com",
+            ]:
+                if hostname.endswith(host_domain):
+                    # Try subdomain first (e.g. kccpod.podbean.com)
+                    subdomain = hostname.replace(f".{host_domain}", "").replace("feed.", "")
+                    if subdomain and subdomain not in handles_to_try and subdomain != "www":
+                        handles_to_try.append(subdomain)
+                    # Also try path-based handle (e.g. feed.podbean.com/kccpod/feed.xml)
+                    path_parts = parsed.path.strip("/").split("/")
+                    if path_parts and path_parts[0] not in ("feed.xml", "rss", ""):
+                        path_handle = path_parts[0]
+                        if path_handle not in handles_to_try:
+                            handles_to_try.append(path_handle)
+            # Match path-based hosts: rss.com/podcasts/showname/
+            if "rss.com/podcasts/" in url_field:
+                path_handle = url_field.split("rss.com/podcasts/")[1].strip("/").split("/")[0]
+                if path_handle and path_handle not in handles_to_try:
+                    handles_to_try.append(path_handle)
+
+        # Extract handles already found by website scanning and check them
+        # across ALL platforms (a handle found on IG might also be on TikTok)
+        for _platform, info in result.get("platforms", {}).items():
+            if isinstance(info, dict):
+                handle = info.get("handle", "")
+                if handle and handle not in handles_to_try:
+                    handles_to_try.append(handle)
+            elif isinstance(info, str):
+                # Extract handle from URL like "instagram.com/kccpod"
+                parts = info.rstrip("/").rsplit("/", 1)
+                if len(parts) == 2:
+                    extracted = parts[1].lstrip("@")
+                    if extracted and extracted not in handles_to_try:
+                        handles_to_try.append(extracted)
+
+        self._check_platform_handles(result, handles_to_try)
 
         # --- Download artwork ---
         if result.get("artwork_url"):
@@ -457,30 +521,73 @@ class ProspectFinder:
             logger.warning("iTunes lookup failed for %s: %s", itunes_id, e)
         return {}
 
-    def _search_youtube(self, show_name: str) -> Optional[dict]:
-        """Search YouTube for a podcast channel (no API key needed)."""
-        search_term = f"{show_name} podcast"
-        try:
-            resp = requests.get(
-                "https://www.youtube.com/results",
-                params={"search_query": search_term},
-                headers={"User-Agent": "Mozilla/5.0"},
-                timeout=10,
+    def _check_platform_handles(self, result: dict, handles: List[str]) -> None:
+        """Directly check if handles exist on TikTok, Instagram, YouTube, and Twitter.
+
+        This is more reliable than scraping websites because it checks the
+        platforms directly. A 200 response means the account exists.
+
+        Args:
+            result: Research result dict to update with platform findings.
+            handles: List of handle strings to check (e.g. ["kccpod"]).
+        """
+        platforms_to_check = {
+            "tiktok": "https://www.tiktok.com/@{handle}",
+            "instagram": "https://www.instagram.com/{handle}/",
+            "youtube": "https://www.youtube.com/@{handle}",
+            "twitter": "https://x.com/{handle}",
+        }
+
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
             )
-            if resp.status_code == 200:
-                # Check if there's a channel result
-                text = resp.text
-                has_channel = "channel" in text.lower() and show_name.lower().replace(
-                    " ", ""
-                ) in text.lower().replace(" ", "")
-                return {
-                    "likely_exists": has_channel,
-                    "search_url": f"https://www.youtube.com/results?search_query={search_term.replace(' ', '+')}",
-                    "source": "youtube_search",
-                }
-        except Exception as e:
-            logger.warning("YouTube search failed: %s", e)
-        return None
+        }
+
+        for handle in handles:
+            for platform, url_template in platforms_to_check.items():
+                # Skip if we already confirmed this platform exists
+                existing = result.get("platforms", {}).get(platform, {})
+                if isinstance(existing, dict) and existing.get("confirmed"):
+                    continue
+
+                url = url_template.format(handle=handle)
+                try:
+                    # TikTok blocks HEAD requests with 403, use GET for it
+                    if platform == "tiktok":
+                        resp = requests.get(
+                            url,
+                            headers=headers,
+                            timeout=8,
+                            allow_redirects=True,
+                        )
+                    else:
+                        resp = requests.head(
+                            url,
+                            headers=headers,
+                            timeout=8,
+                            allow_redirects=True,
+                        )
+                    # 200 = account exists. TikTok also returns 200 for
+                    # existing accounts (after GET). 404 = doesn't exist.
+                    if resp.status_code == 200:
+                        final_url = resp.url if hasattr(resp, "url") else url
+                        # Filter out redirects to generic/login pages
+                        if handle.lower() in final_url.lower():
+                            result.setdefault("platforms", {})
+                            result["platforms"][platform] = {
+                                "handle": handle,
+                                "url": url,
+                                "confirmed": True,
+                                "source": "direct_check",
+                            }
+                            logger.info(
+                                "Confirmed %s account: @%s", platform, handle
+                            )
+                except Exception:
+                    pass  # Connection errors are expected for non-existent handles
 
     def _scan_website_for_socials(self, url: str) -> dict:
         """Scrape a website for social media links."""
@@ -595,47 +702,54 @@ class ProspectFinder:
         else:
             reasons.append("+0 No contact email found")
 
-        # --- Video gap (max 25pts) ---
-        # NO video/YouTube = best fit. They need us most.
-        yt = platforms.get("youtube", {})
-        if not yt:
-            score += 25
-            reasons.append("+25 No YouTube presence — we fill this gap")
-        elif isinstance(yt, dict) and not yt.get("likely_exists", True):
-            score += 25
-            reasons.append("+25 YouTube not confirmed — likely no channel")
-        elif isinstance(yt, dict) and yt.get("likely_exists"):
-            # They have YouTube — check if it's just a listing or active
-            score += 5
-            reasons.append("+5 Has YouTube but may lack clips/Shorts (verify manually)")
-        else:
-            score += 5
-            reasons.append("+5 Has YouTube (verify Shorts manually)")
+        # --- Video/clip presence (max 25pts for gap, penalty for existing) ---
+        # Count CONFIRMED platform accounts (direct handle check)
+        confirmed_platforms = []
+        unconfirmed_platforms = []
+        for p in ["youtube", "tiktok", "instagram", "twitter"]:
+            info = platforms.get(p, {})
+            if isinstance(info, dict) and info.get("confirmed"):
+                confirmed_platforms.append(p)
+            elif p in platforms:
+                unconfirmed_platforms.append(p)
 
-        # --- Social gaps (max 15pts) ---
-        # Fewer social platforms = more we can help with distribution
-        social_count = sum(
-            1 for p in ["instagram", "tiktok", "twitter", "facebook"]
-            if p in platforms
-        )
-        if social_count == 0:
-            score += 15
-            reasons.append("+15 No social media presence — full distribution gap")
-        elif social_count == 1:
+        # TikTok is the strongest signal they already make clips
+        has_tiktok = "tiktok" in confirmed_platforms
+        has_youtube = "youtube" in confirmed_platforms
+        has_instagram = "instagram" in confirmed_platforms
+
+        if has_tiktok:
+            score -= 15
+            reasons.append("-15 CONFIRMED TikTok account — already makes clips")
+        elif has_youtube:
+            score -= 5
+            reasons.append("-5 CONFIRMED YouTube channel — may already make Shorts")
+
+        if not has_youtube and not has_tiktok:
+            score += 25
+            reasons.append("+25 No YouTube or TikTok — we fill the video gap")
+        elif has_youtube and not has_tiktok:
             score += 10
-            reasons.append(f"+10 Minimal social presence ({social_count} platform)")
-        elif social_count <= 2:
+            reasons.append("+10 Has YouTube but no TikTok — partial gap")
+
+        # --- Social distribution gap (max 15pts) ---
+        confirmed_social_count = len(confirmed_platforms)
+        if confirmed_social_count == 0:
+            score += 15
+            reasons.append("+15 No confirmed social accounts — full distribution gap")
+        elif confirmed_social_count == 1:
+            score += 10
+            reasons.append(f"+10 Minimal confirmed social ({confirmed_social_count} platform)")
+        elif confirmed_social_count == 2:
             score += 5
-            reasons.append(f"+5 Some social presence ({social_count} platforms)")
+            reasons.append(f"+5 Some social presence ({confirmed_social_count} confirmed)")
         else:
-            reasons.append(f"+0 Strong social presence ({social_count} platforms)")
+            score -= 5
+            reasons.append(f"-5 Strong social presence ({confirmed_social_count} confirmed platforms)")
 
         # --- Solo producer bonus (max 10pts) ---
-        # Solo hosts benefit most — no team to delegate to
-        host = research.get("host_name", "")
         website = research.get("website", "")
         has_patreon = "patreon" in platforms
-        # Podbean/Anchor/RSS.com = indie hosting = likely solo
         indie_hosts = ["podbean", "anchor", "rss.com", "spreaker", "buzzsprout"]
         is_indie = any(h in (website or "").lower() for h in indie_hosts)
         if is_indie:
@@ -644,12 +758,6 @@ class ProspectFinder:
         elif not has_patreon:
             score += 5
             reasons.append("+5 No team indicators")
-
-        # --- Penalty: already has clips/Shorts ---
-        # If they're already doing what we offer, lower priority
-        if isinstance(yt, dict) and yt.get("likely_exists"):
-            score -= 5
-            reasons.append("-5 May already produce clips (verify)")
 
         # Clamp score
         score = max(0, min(100, score))
