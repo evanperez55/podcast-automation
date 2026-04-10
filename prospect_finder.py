@@ -356,10 +356,31 @@ class ProspectFinder:
                 result["contact_email"] = socials["_email"]
 
         # --- Direct platform handle checks ---
-        # Try the slug and common handle patterns directly on each platform
-        handles_to_try = [slug]
-        # Also try podcast name compressed (e.g. "keystone-cold-cases" -> "keystonecoldcases")
-        handles_to_try.append(slug.replace("-", ""))
+        # Build handles from show name and host name, NOT the slug
+        handles_to_try = []
+
+        # From show name: "The Dr Pompa Podcast" -> "drpompapodcast", "thedrpompapodcast"
+        name_clean = re.sub(r"[^a-z0-9 ]", "", show_name.lower()).strip()
+        name_no_spaces = name_clean.replace(" ", "")
+        # Without common prefixes (the, a)
+        name_no_prefix = re.sub(r"^(the|a) ", "", name_clean).replace(" ", "")
+        for h in [name_no_spaces, name_no_prefix]:
+            if h and h not in handles_to_try:
+                handles_to_try.append(h)
+
+        # From host name: "Dr. Daniel Pompa" -> "danielpompa", "drpompa", "drdanielpompa"
+        host = result.get("host_name") or ""
+        if host:
+            host_clean = re.sub(r"[^a-z0-9 ]", "", host.lower()).strip()
+            host_no_spaces = host_clean.replace(" ", "")
+            if host_no_spaces and host_no_spaces not in handles_to_try:
+                handles_to_try.append(host_no_spaces)
+            # Try last name only (common handle pattern)
+            host_parts = host_clean.split()
+            if len(host_parts) >= 2:
+                last = host_parts[-1]
+                if last not in handles_to_try:
+                    handles_to_try.append(last)
 
         # Extract handle from podcast hosting URL (e.g. kccpod.podbean.com -> kccpod)
         for url_field in [feed_url, website, show_website]:
@@ -555,27 +576,31 @@ class ProspectFinder:
 
                 url = url_template.format(handle=handle)
                 try:
-                    # TikTok blocks HEAD requests with 403, use GET for it
-                    if platform == "tiktok":
-                        resp = requests.get(
-                            url,
-                            headers=headers,
-                            timeout=8,
-                            allow_redirects=True,
-                        )
-                    else:
-                        resp = requests.head(
-                            url,
-                            headers=headers,
-                            timeout=8,
-                            allow_redirects=True,
-                        )
-                    # 200 = account exists. TikTok also returns 200 for
-                    # existing accounts (after GET). 404 = doesn't exist.
+                    # Always use GET — HEAD is unreliable for platform checks
+                    resp = requests.get(
+                        url,
+                        headers=headers,
+                        timeout=8,
+                        allow_redirects=True,
+                    )
                     if resp.status_code == 200:
                         final_url = resp.url if hasattr(resp, "url") else url
-                        # Filter out redirects to generic/login pages
-                        if handle.lower() in final_url.lower():
+                        body = resp.text[:5000].lower()
+
+                        # Filter out false positives: pages that say account not found
+                        not_found_signals = [
+                            "couldn't find this account",
+                            "this account doesn't exist",
+                            "page not found",
+                            "user not found",
+                            "sorry, this page isn",
+                            "this page is not available",
+                            '"statuscode":10202',  # TikTok API "user not found"
+                        ]
+                        is_fake = any(sig in body for sig in not_found_signals)
+
+                        # Also filter redirects to generic/login pages
+                        if not is_fake and handle.lower() in final_url.lower():
                             result.setdefault("platforms", {})
                             result["platforms"][platform] = {
                                 "handle": handle,
@@ -641,11 +666,12 @@ class ProspectFinder:
             return None
 
     def _score_prospect(self, research: dict) -> dict:
-        """Score how good a fit this prospect is for our service.
+        """Score how good a fit this prospect is for full automation service.
 
-        Ideal client: has content (episodes), has audience, but lacks
-        short-form clips, video presence, and social distribution.
-        We want to fill gaps, not compete with what they already do.
+        Ideal client: active show with content, reachable host, indie
+        producer who'd benefit from automated transcription, clips, blog
+        posts, social posting, and scheduling. Social presence is neutral
+        — we automate the workflow, not fill a gap.
 
         Returns:
             Dict with total score (0-100), rating, and breakdown.
@@ -659,7 +685,6 @@ class ProspectFinder:
         reasons = []
 
         # --- Content volume (max 20pts) ---
-        # More episodes = bigger backlog we can clip from
         if episode_count >= 100:
             score += 20
             reasons.append("+20 Large episode backlog (100+)")
@@ -672,14 +697,17 @@ class ProspectFinder:
         else:
             reasons.append(f"+0 Few episodes ({episode_count})")
 
-        # --- Activity (max 15pts) ---
+        # --- Activity (max 20pts) ---
         if last_pub:
             from datetime import date
 
             try:
                 pub_date = date.fromisoformat(last_pub)
                 days_ago = (date.today() - pub_date).days
-                if days_ago <= 30:
+                if days_ago <= 14:
+                    score += 20
+                    reasons.append("+20 Very active (posted within 2 weeks)")
+                elif days_ago <= 30:
                     score += 15
                     reasons.append("+15 Active (posted within 30 days)")
                 elif days_ago <= 90:
@@ -695,69 +723,87 @@ class ProspectFinder:
         else:
             reasons.append("+0 Unknown last publish date")
 
-        # --- Contactability (max 10pts) ---
+        # --- Contactability (max 15pts) ---
         if has_email:
-            score += 10
-            reasons.append("+10 Contact email available")
+            # Personal email is better than generic support@
+            email = research.get("contact_email", "")
+            generic = ["support@", "info@", "podcast@", "hello@", "contact@"]
+            if any(email.lower().startswith(g) for g in generic):
+                score += 10
+                reasons.append("+10 Generic contact email available")
+            else:
+                score += 15
+                reasons.append("+15 Personal contact email available")
         else:
             reasons.append("+0 No contact email found")
 
-        # --- Video/clip presence (max 25pts for gap, penalty for existing) ---
-        # Count CONFIRMED platform accounts (direct handle check)
+        # --- Social presence (max 15pts) ---
+        # Having social accounts is GOOD — means they care about distribution
+        # and would value automating it. No social = may not care.
         confirmed_platforms = []
-        unconfirmed_platforms = []
         for p in ["youtube", "tiktok", "instagram", "twitter"]:
             info = platforms.get(p, {})
             if isinstance(info, dict) and info.get("confirmed"):
                 confirmed_platforms.append(p)
-            elif p in platforms:
-                unconfirmed_platforms.append(p)
 
-        # TikTok is the strongest signal they already make clips
-        has_tiktok = "tiktok" in confirmed_platforms
-        has_youtube = "youtube" in confirmed_platforms
-        has_instagram = "instagram" in confirmed_platforms
-
-        if has_tiktok:
-            score -= 15
-            reasons.append("-15 CONFIRMED TikTok account — already makes clips")
-        elif has_youtube:
-            score -= 5
-            reasons.append("-5 CONFIRMED YouTube channel — may already make Shorts")
-
-        if not has_youtube and not has_tiktok:
-            score += 25
-            reasons.append("+25 No YouTube or TikTok — we fill the video gap")
-        elif has_youtube and not has_tiktok:
-            score += 10
-            reasons.append("+10 Has YouTube but no TikTok — partial gap")
-
-        # --- Social distribution gap (max 15pts) ---
-        confirmed_social_count = len(confirmed_platforms)
-        if confirmed_social_count == 0:
+        confirmed_count = len(confirmed_platforms)
+        if confirmed_count >= 3:
             score += 15
-            reasons.append("+15 No confirmed social accounts — full distribution gap")
-        elif confirmed_social_count == 1:
+            reasons.append(f"+15 Active on {confirmed_count} platforms — values distribution")
+        elif confirmed_count >= 1:
             score += 10
-            reasons.append(f"+10 Minimal confirmed social ({confirmed_social_count} platform)")
-        elif confirmed_social_count == 2:
-            score += 5
-            reasons.append(f"+5 Some social presence ({confirmed_social_count} confirmed)")
+            reasons.append(f"+10 On {confirmed_count} platform(s) — some distribution effort")
         else:
-            score -= 5
-            reasons.append(f"-5 Strong social presence ({confirmed_social_count} confirmed platforms)")
-
-        # --- Solo producer bonus (max 10pts) ---
-        website = research.get("website", "")
-        has_patreon = "patreon" in platforms
-        indie_hosts = ["podbean", "anchor", "rss.com", "spreaker", "buzzsprout"]
-        is_indie = any(h in (website or "").lower() for h in indie_hosts)
-        if is_indie:
-            score += 10
-            reasons.append("+10 Indie-hosted (likely solo producer)")
-        elif not has_patreon:
             score += 5
-            reasons.append("+5 No team indicators")
+            reasons.append("+5 No confirmed social — may not prioritize distribution")
+
+        # --- Solo/indie producer (max 20pts) ---
+        # Indie hosts are more likely to need automation than network shows
+        website = research.get("website", "")
+        host_name = research.get("host_name", "")
+        has_patreon = "patreon" in platforms
+
+        network_signals = [
+            "iheartpodcasts", "pushkin", "megaphone", "vox media",
+            "audible", "wondery", "npr", "bbc", "fox news",
+            "wall street journal", "wsj", "lemonada", "earwolf",
+            "comedy central", "simplecast", "smartless",
+        ]
+        is_network = any(
+            sig in (host_name or "").lower() or sig in (website or "").lower()
+            for sig in network_signals
+        )
+
+        indie_hosts = ["podbean", "anchor", "rss.com", "spreaker", "buzzsprout"]
+        is_indie = any(h in (research.get("feed_url") or "").lower() for h in indie_hosts)
+
+        if is_network:
+            score -= 10
+            reasons.append("-10 Network/studio-backed show — unlikely to need us")
+        elif is_indie:
+            score += 20
+            reasons.append("+20 Indie-hosted — likely solo producer")
+        elif has_patreon:
+            score += 15
+            reasons.append("+15 Has Patreon — monetizing independently")
+        else:
+            score += 10
+            reasons.append("+10 No network indicators")
+
+        # --- Release cadence bonus (max 10pts) ---
+        # Regular releasers benefit most from automation
+        if episode_count >= 20 and last_pub:
+            try:
+                pub_date = date.fromisoformat(last_pub)
+                days_ago = (date.today() - pub_date).days
+                if days_ago <= 14 and episode_count >= 40:
+                    score += 10
+                    reasons.append("+10 High-volume active show — automation saves real time")
+                elif days_ago <= 30:
+                    score += 5
+                    reasons.append("+5 Regular release cadence")
+            except (ValueError, TypeError):
+                pass
 
         # Clamp score
         score = max(0, min(100, score))
@@ -865,6 +911,7 @@ def run_find_prospects_cli(argv: list) -> None:
     genre = None
     min_ep, max_ep, limit = 20, 500, 20
     save_flag = False
+    save_all = False
     i = 2
     while i < len(argv):
         if argv[i] == "--genre" and i + 1 < len(argv):
@@ -881,6 +928,9 @@ def run_find_prospects_cli(argv: list) -> None:
             i += 2
         elif argv[i] == "--save":
             save_flag = True
+            i += 1
+        elif argv[i] == "--save-all":
+            save_all = True
             i += 1
         else:
             i += 1
@@ -903,28 +953,46 @@ def run_find_prospects_cli(argv: list) -> None:
     print(hdr.format("#", "Show Name", "Host", "Episodes", "Genre", "Feed URL"))
     print("-" * 145)
     for idx, r in enumerate(results, 1):
-        print(
-            hdr.format(
-                idx,
-                r.get("collectionName", "")[:40],
-                r.get("artistName", "")[:25],
-                r.get("trackCount", 0),
-                r.get("primaryGenreName", "")[:15],
-                r.get("feedUrl", "")[:50],
-            )
+        line = hdr.format(
+            idx,
+            r.get("collectionName", "")[:40],
+            r.get("artistName", "")[:25],
+            r.get("trackCount", 0),
+            r.get("primaryGenreName", "")[:15],
+            r.get("feedUrl", "")[:50],
         )
+        print(line.encode("ascii", errors="replace").decode("ascii"))
 
-    if save_flag or results:
+    def _make_slug(name: str) -> str:
+        """Create a slug from a podcast name, max 40 chars."""
+        raw = re.sub(r"[^a-z0-9-]", "", name.lower().replace(" ", "-"))
+        raw = re.sub(r"-{2,}", "-", raw).strip("-")
+        if len(raw) > 40:
+            raw = raw[:40].rstrip("-")
+        return raw
+
+    if save_all:
+        for idx, itunes_data in enumerate(results):
+            slug = _make_slug(itunes_data.get("collectionName", ""))
+            feed_url = itunes_data.get("feedUrl", "")
+            print(f"\n[{idx + 1}/{len(results)}] Enriching {slug} from RSS...")
+            rss_data = finder.enrich_from_rss(feed_url) if feed_url else {}
+            genre_key = finder._genre_key_from_name(
+                itunes_data.get("primaryGenreName", "")
+            )
+            yaml_path = finder.save_prospect(slug, itunes_data, rss_data, genre_key)
+            email = rss_data.get("contact_email", "")
+            print(f"  Saved: {yaml_path}")
+            if email:
+                print(f"  Contact: {email}")
+        print(f"\nSaved {len(results)} prospects.")
+    elif save_flag or results:
         choice = input("\nSave prospect? Enter number (or 'q' to quit): ").strip()
         if choice.lower() != "q" and choice.isdigit():
             idx = int(choice) - 1
             if 0 <= idx < len(results):
                 itunes_data = results[idx]
-                slug = re.sub(
-                    r"[^a-z0-9-]",
-                    "",
-                    itunes_data.get("collectionName", "").lower().replace(" ", "-"),
-                )
+                slug = _make_slug(itunes_data.get("collectionName", ""))
                 feed_url = itunes_data.get("feedUrl", "")
                 print(f"Enriching from RSS: {feed_url}")
                 rss_data = finder.enrich_from_rss(feed_url) if feed_url else {}

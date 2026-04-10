@@ -21,7 +21,14 @@ from config import Config
 from logger import logger
 
 _SYSTEM_PROMPT = (
-    "You write cold outreach for a podcast production service. "
+    "You write cold outreach for a podcast automation service called Neurova. "
+    "We automate the ENTIRE post-production and social media workflow: "
+    "transcription, audio normalization, AI-selected clips with subtitles, "
+    "vertical video, thumbnails, blog posts with full transcripts, show notes, "
+    "social captions, and scheduled posting to YouTube/Instagram/Twitter/TikTok/Bluesky. "
+    "One episode in, 15+ content pieces out — automatically. "
+    "The pitch is NOT about filling gaps. It's about saving hours of manual work "
+    "they're already doing (or should be doing but don't have time for). "
     "The email must be under 200 words, show-specific, and outcome-focused. "
     "Never start with 'I'. Lead with their show. "
     "Never use hype or filler phrases. Write like you'd say it to a friend. "
@@ -62,16 +69,27 @@ class PitchGenerator:
         podcast_name = prospect_data["podcast_name"]
         prospect = prospect_data["prospect"]
 
+        # Load research report if available for richer context
+        research_path = Config.BASE_DIR / "output" / client_slug / "prospect_research.md"
+        research_excerpt = ""
+        if research_path.exists():
+            research_excerpt = research_path.read_text(encoding="utf-8")[:500]
+
         user_message = (
             f"Podcast: {podcast_name}\n"
             f"Genre: {prospect.get('genre', 'unknown')}\n"
             f"Episode count: {prospect.get('episode_count', 'unknown')}\n"
-            f"Host email: {prospect.get('host_email', 'unknown')}\n"
-            f"Social: {prospect.get('social_links', {})}\n\n"
+            f"Host: {prospect.get('host_name', 'unknown')}\n"
+            f"Social platforms: {prospect.get('social_links', {})}\n"
+            f"Research: {research_excerpt}\n\n"
             "Write an intro pitch for this podcast host. "
-            "The service automates production: transcription, audio mastering, "
-            "clip extraction, captions, thumbnails, and show notes — all from one command. "
-            "Typically saves 6-11 hours per episode at $1-2 in AI costs."
+            "The service fully automates episode post-production AND social media: "
+            "transcription, audio normalization, AI clip selection, subtitled vertical video, "
+            "thumbnails, blog post with full transcript, show notes, social captions, "
+            "and scheduled posting across YouTube, Instagram, Twitter, TikTok, and Bluesky. "
+            "One episode becomes 15+ pieces of content automatically. "
+            "Offer to process their next 4 episodes free so they can see the full output. "
+            "Emphasize time savings — this replaces hours of manual editing and posting work."
         )
 
         try:
