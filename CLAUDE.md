@@ -18,7 +18,7 @@ Automated production pipeline: transcription, AI content analysis, auto-censorsh
 - Validate client: `uv run main.py validate-client <name> [--ping]`
 - Setup credentials: `uv run main.py setup-client <name> youtube`
 - Client status: `uv run main.py status <name>`
-- Find prospects: `uv run main.py find-prospects --genre comedy --min-episodes 20 --max-episodes 500`
+- Find prospects: `uv run main.py find-prospects --genre business --min-episodes 20 --max-episodes 80 --save-all`
 - Gen pitch: `uv run main.py gen-pitch <slug> [ep_id]`
 - Outreach tracker: `uv run main.py outreach <add|list|update|status> ...`
   - Add prospect: `uv run main.py outreach add <slug> <show_name> [email]`
@@ -30,16 +30,25 @@ Automated production pipeline: transcription, AI content analysis, auto-censorsh
 ## Pipeline Step Order
 1 Download -> 2 Transcribe -> 3 Analyze -> 3.5 Topic tracker -> 4 Censor -> 4.5 Normalize -> 5 Clips -> 5.1 Clip approval -> 5.4 Subtitles -> 5.5 Video/Audiogram -> 5.6 Thumbnail -> 6 MP3 -> 7 Dropbox -> 7.5 RSS -> 8 Social media -> 8.5 Blog post -> 9 Search index
 
-## Architecture
-See @.planning/codebase/ARCHITECTURE.md for full component map.
-See @.planning/codebase/CONVENTIONS.md for code patterns and style.
-See @.planning/codebase/TESTING.md for test patterns and mocking strategy.
-
+## Architecture (summary — read .planning/codebase/ for full docs)
 - main.py (thin CLI) → pipeline/runner.py → pipeline/steps/ (ingest, audio, analysis, video, distribute)
 - Flat module structure (all top-level .py files, no src/ directory)
 - Each module has a `self.enabled` pattern gated by env vars in config.py
+- Config via class attributes: `from config import Config; Config.ATTR`
+- Logging via `from logger import logger` singleton (never print())
+- Tests: `tests/test_<module>.py`, `class Test<ClassName>`, `unittest.mock.patch` for external deps
 - Tech: Python 3.12+, Whisper/WhisperX, pydub + FFmpeg, Ollama (Llama 3.1), Pillow
 - APIs: Dropbox, YouTube, Twitter (tweepy), Reddit (PRAW)
+
+## Decisions (do not revisit without discussion)
+- Filler words KEPT in transcripts — removing kills comedy timing
+- Twitter API is pay-per-use ~$0.01/tweet, NOT $100/mo subscription
+- No CI/CD pipeline — manual GitHub Actions only
+- Pitch angle is FULL AUTOMATION (not "you don't have clips") — one episode in, 15+ content pieces out
+- Episode source for prospects is RSS, not Dropbox
+- NEVER run multiple episode pipelines simultaneously — kills GPU/RAM
+- Website is org-based GitHub Pages (fakeproblemspodcast org, not personal account)
+- cuDNN DLLs manually copied — may break on venv rebuild
 
 ## Testing
 - 518+ tests, shared fixtures in `tests/conftest.py`
