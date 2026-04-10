@@ -271,9 +271,31 @@
           "youtube_video_id": "Q8SeD33qz9M",
           "clip_title": "They ate their dead friends to survive a mountain crash"
         },
-        "status": "pending",
-        "uploaded_at": null,
-        "upload_results": {}
+        "status": "partial",
+        "uploaded_at": "2026-04-10T15:43:08.763125",
+        "upload_results": {
+          "youtube": {
+            "error": "could not locate runnable browser"
+          },
+          "twitter": {
+            "tweet_id": "2042689643926426095",
+            "tweet_url": "https://twitter.com/i/web/status/2042689643926426095",
+            "text": "They ate their dead friends to survive a mountain crash\n\nhttps://www.youtube.com/watch?v=Q8SeD33qz9M",
+            "media_count": 0,
+            "status": "success"
+          },
+          "bluesky": {
+            "post_uri": "at://did:plc:tqwk5oc74cw7yqcqfsbpuirf/app.bsky.feed.post/3mj63eekj3m2m",
+            "post_url": "https://bsky.app/profile/fakeproblemspod.bsky.social/post/3mj63eekj3m2m",
+            "text": "They ate their dead friends to survive a mountain crash",
+            "status": "success"
+          },
+          "instagram": {
+            "id": "18399611152146597",
+            "permalink": "https://www.instagram.com/reel/DW9pmuFE5Fg/",
+            "status": "success"
+          }
+        }
       },
       "clip_8": {
         "slot_type": "clip_8",
