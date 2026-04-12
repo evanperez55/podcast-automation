@@ -349,6 +349,27 @@ class TestBuildAnalysisPrompt:
         assert "hook_caption" in prompt
         assert "clip_hashtags" in prompt
 
+    def test_custom_clip_criteria_overrides_default(self, content_editor, monkeypatch):
+        """When CLIP_CRITERIA is set in Config, it replaces the default clip criteria."""
+        from config import Config as RealConfig
+
+        church_criteria = (
+            "   - Powerful scripture quotes and references\n"
+            "   - Key sermon points and teachings\n"
+            "   - Emotionally moving moments of worship or testimony"
+        )
+        monkeypatch.setattr(RealConfig, "CLIP_CRITERIA", church_criteria, raising=False)
+        monkeypatch.setattr(
+            RealConfig, "VOICE_PERSONA", "You write for a church.", raising=False
+        )
+
+        prompt = content_editor._build_analysis_prompt("transcript")
+        assert "scripture quotes" in prompt
+        assert "Key sermon points" in prompt
+        # Should NOT contain the generic defaults
+        assert "quotable insight or revelation" not in prompt
+        assert "Funny or entertaining" not in prompt
+
 
 class TestAnalyzeContentSignature:
     """Tests for analyze_content topic_context parameter."""

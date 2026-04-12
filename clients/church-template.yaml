@@ -1,0 +1,126 @@
+# Church client config template
+# Copy this file and rename to your-church-name.yaml
+# Usage: uv run main.py --client your-church-name latest
+#
+# This template is tuned for sermon/church content:
+# - Clip selection focuses on powerful teachings and scripture
+# - Blog posts become devotional-style summaries with scripture references
+# - Show notes include sermon points and key scriptures
+# - Social captions use a warm, faith-based tone
+
+client_name: "your-church-name"
+podcast_name: "Your Church Name"
+
+# Most churches have YouTube or podcast RSS — use RSS for easiest setup
+episode_source: rss
+rss_source:
+  feed_url: "https://feeds.example.com/your-church-sermons.xml"
+  episode_index: 0  # 0 = latest sermon
+
+# --- Platform credentials (all null = disabled until configured) ---
+youtube:
+  client_id: null
+  client_secret: null
+  token_pickle: "clients/your-church-name/youtube_token.pickle"
+
+twitter:
+  api_key: null
+  api_secret: null
+  access_token: null
+  access_secret: null
+
+instagram:
+  access_token: null
+  account_id: null
+
+tiktok:
+  client_key: null
+  client_secret: null
+  access_token: null
+
+discord:
+  webhook_url: null
+
+# --- Content settings tuned for sermons ---
+content:
+  num_clips: 5
+  clip_min_duration: 20
+  clip_max_duration: 45
+  clip_selection_mode: content  # Use transcript content, not audio energy
+  names_to_remove: []  # Add pastor names if they shouldn't appear in clips
+  words_to_censor: []
+
+  voice_persona: |
+    You write content for a church that wants to extend the reach of their
+    weekly sermons. Your tone is warm, reverent, and encouraging — never
+    preachy or judgmental. You speak to both longtime members and people
+    discovering this church for the first time.
+
+    You treat sermon content with respect — these are teachings that matter
+    deeply to the congregation. When summarizing, preserve the pastor's
+    key points and the scripture they reference. Never trivialize the message.
+
+    Your writing is clear and accessible. Avoid church jargon that outsiders
+    wouldn't understand (explain terms like "sanctification" if you use them).
+    Think of it as: how would you explain this sermon to a thoughtful friend
+    over coffee?
+
+    For social media: be genuine, not performative. No "🙏🔥 THIS MESSAGE
+    CHANGED MY LIFE" energy. Instead: "This week's sermon on forgiveness
+    hit different. Here's the part that stuck with me."
+
+  clip_criteria: |
+       - Powerful scripture quotes read or explained by the pastor
+       - Key sermon points — the "if you remember one thing" moments
+       - Personal stories or illustrations that make the teaching real
+       - Moments of conviction, encouragement, or challenge
+       - Clear, quotable statements of faith that stand alone
+       - Practical application — "here's what this means for your week"
+
+  blog_voice: |
+    Write this as a devotional-style blog post based on the sermon.
+    Structure it as:
+    1. Opening hook — a relatable situation or question the sermon addresses
+    2. Key scripture(s) referenced, quoted in full
+    3. The pastor's main teaching points, in your own words
+    4. A practical takeaway — what can the reader do this week?
+    5. A brief closing prayer or reflection prompt
+
+    Tone: warm, thoughtful, accessible. Not academic theology — this is
+    for someone reading on their phone between meetings. Use short paragraphs.
+    Include the full scripture references (e.g., "Romans 8:28, NIV") so
+    readers can look them up.
+
+    Do NOT use churchy cliches like "unpack this passage" or "let's dive in."
+    Just write naturally.
+
+  # scoring_profile:  # Uncomment and customize for topic scoring
+  #   description: "a church sermon series"
+  #   criteria:
+  #     - name: "Scripture Depth"
+  #       key: "scripture_depth"
+  #       max: 3
+  #       description: "How deeply does this explore scripture?"
+  #     - name: "Practical Application"
+  #       key: "practical_application"
+  #       max: 3
+  #       description: "Does this give actionable life guidance?"
+  #     - name: "Emotional Impact"
+  #       key: "emotional_impact"
+  #       max: 2
+  #       description: "How moving or convicting is this teaching?"
+  #     - name: "Shareability"
+  #       key: "shareability"
+  #       max: 2
+  #       description: "Would someone share this with a friend who doesn't attend?"
+  #   categories: ["faith", "family", "community", "scripture", "testimony"]
+
+rss:
+  description: null  # "Weekly sermons from Your Church Name"
+  author: null       # "Pastor Name"
+  email: null
+  website_url: null  # "https://yourchurch.com"
+  artwork_url: null
+  language: "en-us"
+  explicit: false
+  categories: ["Religion & Spirituality", "Christianity"]

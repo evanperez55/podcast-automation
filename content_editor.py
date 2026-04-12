@@ -408,9 +408,12 @@ class ContentEditor:
                 + "\n"
             )
 
-        # Build clip criteria based on genre (VOICE_PERSONA presence indicates non-comedy client)
+        # Build clip criteria: explicit config > genre-based defaults
+        custom_criteria = getattr(Config, "CLIP_CRITERIA", None)
         custom_persona = getattr(Config, "VOICE_PERSONA", None)
-        if not custom_persona:
+        if custom_criteria:
+            clip_criteria = custom_criteria
+        elif not custom_persona:
             clip_criteria = (
                 "   - Funny or entertaining moments\n"
                 "   - Controversial or thought-provoking statements\n"
