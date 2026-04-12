@@ -272,10 +272,10 @@
           "clip_title": "They ate their dead friends to survive a mountain crash"
         },
         "status": "partial",
-        "uploaded_at": "2026-04-12T11:14:52.636660",
+        "uploaded_at": "2026-04-12T15:39:46.654815",
         "upload_results": {
           "youtube": {
-            "error": "prior empty result cleared for retry"
+            "error": "could not locate runnable browser"
           },
           "twitter": {
             "tweet_id": "2043362215781154884",
@@ -284,7 +284,16 @@
             "media_count": 0,
             "status": "success"
           },
-          "instagram": null
+          "instagram": {
+            "id": "18003218294730256",
+            "permalink": "https://www.instagram.com/reel/DXCyw4wIEVf/",
+            "status": "success"
+          },
+          "bluesky": {
+            "status": "skipped_duplicate",
+            "text": "They ate their dead friends to survive a mountain crash",
+            "post_url": null
+          }
         }
       },
       "clip_8": {
@@ -304,9 +313,31 @@
           "youtube_video_id": "-WhM61KyIZQ",
           "youtube_url": "https://www.youtube.com/watch?v=-WhM61KyIZQ"
         },
-        "status": "pending",
-        "uploaded_at": null,
-        "upload_results": {}
+        "status": "partial",
+        "uploaded_at": "2026-04-12T15:40:35.073220",
+        "upload_results": {
+          "youtube": {
+            "error": "could not locate runnable browser"
+          },
+          "twitter": {
+            "tweet_id": "2043413789622546469",
+            "tweet_url": "https://twitter.com/i/web/status/2043413789622546469",
+            "text": "What if you could pet any animal into a pet?\n\nhttps://www.youtube.com/watch?v=-WhM61KyIZQ",
+            "media_count": 0,
+            "status": "success"
+          },
+          "bluesky": {
+            "post_uri": "at://did:plc:tqwk5oc74cw7yqcqfsbpuirf/app.bsky.feed.post/3mjd45pmgfx2m",
+            "post_url": "https://bsky.app/profile/fakeproblemspod.bsky.social/post/3mjd45pmgfx2m",
+            "text": "What if you could pet any animal into a pet?",
+            "status": "success"
+          },
+          "instagram": {
+            "id": "18115358425663594",
+            "permalink": "https://www.instagram.com/reel/DXCy6ujDEVB/",
+            "status": "success"
+          }
+        }
       },
       "quote_1": {
         "slot_type": "quote_1",
