@@ -56,6 +56,15 @@ _YAML_TO_CONFIG = {
     "video_source.youtube_channel": "VIDEO_SOURCE_YOUTUBE_CHANNEL",
     # Video layout (auto | split | blurred)
     "video_source.layout": "VIDEO_LAYOUT",
+    # Website / GitHub Pages
+    "website.github_repo": "WEBSITE_GITHUB_REPO",
+    "website.github_branch": "WEBSITE_GITHUB_BRANCH",
+    "website.url": "WEBSITE_URL",
+    "website.pages_repo": "GITHUB_PAGES_REPO",
+    "website.pages_branch": "GITHUB_PAGES_BRANCH",
+    "website.site_base_url": "SITE_BASE_URL",
+    # YouTube channel handle (for captions/links — distinct from API credentials)
+    "youtube.channel_handle": "YOUTUBE_CHANNEL_HANDLE",
     # RSS / podcast metadata
     "rss.description": "RSS_DESCRIPTION",
     "rss.author": "RSS_AUTHOR",
@@ -169,6 +178,15 @@ def load_client_config(client_name: str) -> dict:
     if scoring is not None and isinstance(scoring, dict):
         overrides["SCORING_PROFILE"] = scoring
 
+    # Special handling: website.enabled and website.pages_enabled are booleans
+    website_enabled = _get_nested(data, "website.enabled")
+    if website_enabled is not None:
+        overrides["WEBSITE_ENABLED"] = bool(website_enabled)
+
+    pages_enabled = _get_nested(data, "website.pages_enabled")
+    if pages_enabled is not None:
+        overrides["PAGES_ENABLED"] = bool(pages_enabled)
+
     # Special handling: RSS_EPISODE_INDEX must be int
     if "RSS_EPISODE_INDEX" in overrides:
         overrides["RSS_EPISODE_INDEX"] = int(overrides["RSS_EPISODE_INDEX"])
@@ -208,6 +226,58 @@ def activate_client(client_name: str) -> dict:
     """
     overrides = load_client_config(client_name)
     apply_client_config(overrides)
+
+    # --- Client isolation: disable Fake Problems infrastructure ---
+    # Unless the client YAML explicitly provides its own config for each
+    # resource, forcibly disable/clear it to prevent client runs from
+    # touching the Fake Problems podcast's accounts and infrastructure.
+    _ISOLATION_DEFAULTS = {
+        # Website / GitHub Pages
+        "WEBSITE_ENABLED": False,
+        "PAGES_ENABLED": False,
+        "WEBSITE_GITHUB_REPO": "",
+        "GITHUB_PAGES_REPO": "",
+        "SITE_BASE_URL": "",
+        "WEBSITE_URL": "",
+        # YouTube channel handle (for captions/links)
+        "YOUTUBE_CHANNEL_HANDLE": "",
+        # Discord notifications
+        "DISCORD_WEBHOOK_URL": "",
+        # Dropbox credentials and paths
+        "DROPBOX_ACCESS_TOKEN": None,
+        "DROPBOX_APP_KEY": None,
+        "DROPBOX_APP_SECRET": None,
+        "DROPBOX_REFRESH_TOKEN": None,
+        "DROPBOX_FOLDER_PATH": "",
+        "DROPBOX_FINISHED_FOLDER": "",
+        "DROPBOX_EDITED_FOLDER": "",
+        # YouTube API credentials
+        "YOUTUBE_CLIENT_ID": None,
+        "YOUTUBE_CLIENT_SECRET": None,
+        # Twitter credentials
+        "TWITTER_API_KEY": None,
+        "TWITTER_API_SECRET": None,
+        "TWITTER_ACCESS_TOKEN": None,
+        "TWITTER_ACCESS_SECRET": None,
+        # Instagram credentials
+        "INSTAGRAM_ACCESS_TOKEN": None,
+        "INSTAGRAM_ACCOUNT_ID": None,
+        # TikTok credentials
+        "TIKTOK_CLIENT_KEY": None,
+        "TIKTOK_CLIENT_SECRET": None,
+        "TIKTOK_ACCESS_TOKEN": None,
+        # Bluesky credentials
+        "BLUESKY_HANDLE": None,
+        "BLUESKY_APP_PASSWORD": None,
+        # Reddit credentials
+        "REDDIT_CLIENT_ID": None,
+        "REDDIT_CLIENT_SECRET": None,
+        "REDDIT_USERNAME": None,
+        "REDDIT_PASSWORD": None,
+    }
+    for attr, safe_default in _ISOLATION_DEFAULTS.items():
+        if attr not in overrides:
+            setattr(Config, attr, safe_default)
 
     # Auto-isolate output directories per client (unless explicitly set in YAML)
     if "OUTPUT_DIR" not in overrides:

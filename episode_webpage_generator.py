@@ -32,12 +32,12 @@ class EpisodeWebpageGenerator:
     """Generate static HTML episode pages with SEO metadata and transcript content."""
 
     def __init__(self) -> None:
-        """Initialise with configuration from environment variables."""
-        self.enabled = os.getenv("PAGES_ENABLED", "true").lower() == "true"
-        self.github_token = os.getenv("GITHUB_TOKEN", "")
-        self.github_pages_repo = os.getenv("GITHUB_PAGES_REPO", "")
-        self.site_base_url = os.getenv("SITE_BASE_URL", "").rstrip("/")
-        self.github_pages_branch = os.getenv("GITHUB_PAGES_BRANCH", "main")
+        """Initialise with configuration from Config (respects client overrides)."""
+        self.enabled = Config.PAGES_ENABLED
+        self.github_token = Config.GITHUB_TOKEN
+        self.github_pages_repo = Config.GITHUB_PAGES_REPO
+        self.site_base_url = Config.SITE_BASE_URL.rstrip("/")
+        self.github_pages_branch = Config.GITHUB_PAGES_BRANCH
 
         # Jinja2 environment with autoescaping for XSS protection
         templates_dir = Path(__file__).parent / "templates"

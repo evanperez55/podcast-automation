@@ -11,6 +11,7 @@ import unittest
 import xml.etree.ElementTree as ET
 from unittest.mock import patch
 
+from config import Config
 from episode_webpage_generator import EpisodeWebpageGenerator
 
 SAMPLE_ANALYSIS = {
@@ -341,7 +342,7 @@ class TestBuildEpisodeUrl(unittest.TestCase):
 
     def test_episode_url_format(self):
         """URL follows expected pattern: {SITE_BASE_URL}/episodes/ep{N}.html."""
-        with patch.dict("os.environ", {"SITE_BASE_URL": "https://example.com"}):
+        with patch.object(Config, "SITE_BASE_URL", "https://example.com"):
             gen = EpisodeWebpageGenerator()
         url = gen._build_episode_url(42)
         self.assertEqual(url, "https://example.com/episodes/ep42.html")
@@ -356,21 +357,16 @@ class TestDeploy(unittest.TestCase):
         repo="owner/pages-repo",
         base_url="https://example.com",
     ):
-        env = {}
-        if token is not None:
-            env["GITHUB_TOKEN"] = token
-        else:
-            env.pop("GITHUB_TOKEN", None)
-        if repo is not None:
-            env["GITHUB_PAGES_REPO"] = repo
-        else:
-            env.pop("GITHUB_PAGES_REPO", None)
-        env["SITE_BASE_URL"] = base_url
-        # Ensure None values are removed from the environment override
-        patch_env = {k: v for k, v in env.items()}
-        with patch.dict("os.environ", patch_env, clear=False):
+        patches = {
+            "GITHUB_TOKEN": token or "",
+            "GITHUB_PAGES_REPO": repo or "",
+            "SITE_BASE_URL": base_url,
+            "PAGES_ENABLED": True,
+            "GITHUB_PAGES_BRANCH": "main",
+        }
+        with patch.multiple(Config, **patches):
             gen = EpisodeWebpageGenerator()
-        # Force None for missing values (env may inherit from real environment)
+        # Force None for missing values
         if token is None:
             gen.github_token = None
         if repo is None:

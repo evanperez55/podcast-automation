@@ -24,12 +24,10 @@ class WebsiteGenerator:
     """Generate and deploy the podcast landing page."""
 
     def __init__(self):
-        self.enabled = os.getenv("WEBSITE_ENABLED", "true").lower() == "true"
-        self.github_token = os.getenv("GITHUB_TOKEN", "")
-        self.github_repo = os.getenv(
-            "WEBSITE_GITHUB_REPO", "fakeproblemspodcast/fakeproblemspodcast.github.io"
-        )
-        self.github_branch = os.getenv("WEBSITE_GITHUB_BRANCH", "main")
+        self.enabled = Config.WEBSITE_ENABLED
+        self.github_token = Config.GITHUB_TOKEN
+        self.github_repo = Config.WEBSITE_GITHUB_REPO
+        self.github_branch = Config.WEBSITE_GITHUB_BRANCH
         self.template_path = Path(__file__).parent / "templates" / "website_index.html"
         self.output_dir = Path(Config.OUTPUT_DIR)
 

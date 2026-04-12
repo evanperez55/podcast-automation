@@ -1405,5 +1405,395 @@ class TestSetupYouTubeEdgeCases:
         assert "auth failed" in output
 
 
+class TestClientIsolation:
+    """Tests that client runs cannot touch Fake Problems infrastructure.
+
+    When a client is activated, shared infrastructure (website deploy,
+    GitHub Pages, YouTube channel handle) must be disabled unless the
+    client YAML explicitly provides its own values.
+    """
+
+    # Attributes that activate_client mutates via setattr — must be
+    # saved/restored so one test doesn't pollute the next.
+    _SAVED_ATTRS = [
+        "PODCAST_NAME", "WEBSITE_ENABLED", "PAGES_ENABLED",
+        "WEBSITE_GITHUB_REPO", "GITHUB_PAGES_REPO", "SITE_BASE_URL",
+        "WEBSITE_URL", "YOUTUBE_CHANNEL_HANDLE", "DISCORD_WEBHOOK_URL",
+        "NAMES_TO_REMOVE", "WORDS_TO_CENSOR", "EPISODE_SOURCE",
+        "RSS_FEED_URL", "RSS_EPISODE_INDEX", "OUTPUT_DIR", "DOWNLOAD_DIR",
+        "CLIPS_DIR", "TOPIC_DATA_DIR", "GITHUB_TOKEN",
+        "GITHUB_PAGES_BRANCH", "WEBSITE_GITHUB_BRANCH",
+        # Dropbox credentials
+        "DROPBOX_ACCESS_TOKEN", "DROPBOX_APP_KEY", "DROPBOX_APP_SECRET",
+        "DROPBOX_REFRESH_TOKEN", "DROPBOX_FOLDER_PATH",
+        "DROPBOX_FINISHED_FOLDER", "DROPBOX_EDITED_FOLDER",
+        # Social media credentials
+        "YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET",
+        "TWITTER_API_KEY", "TWITTER_API_SECRET",
+        "TWITTER_ACCESS_TOKEN", "TWITTER_ACCESS_SECRET",
+        "INSTAGRAM_ACCESS_TOKEN", "INSTAGRAM_ACCOUNT_ID",
+        "TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET", "TIKTOK_ACCESS_TOKEN",
+        "BLUESKY_HANDLE", "BLUESKY_APP_PASSWORD",
+        "REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET",
+        "REDDIT_USERNAME", "REDDIT_PASSWORD",
+    ]
+
+    @pytest.fixture(autouse=True)
+    def _save_restore_config(self):
+        """Save Config state before each test, restore after."""
+        saved = {attr: getattr(Config, attr) for attr in self._SAVED_ATTRS}
+        yield
+        for attr, val in saved.items():
+            setattr(Config, attr, val)
+
+    ISOLATION_CLIENT_YAML = """
+client_name: "isolation-test"
+podcast_name: "Isolation Test Podcast"
+episode_source: rss
+rss_source:
+  feed_url: "https://example.com/feed.xml"
+content:
+  names_to_remove: []
+"""
+
+    ISOLATION_CLIENT_WITH_WEBSITE_YAML = """
+client_name: "has-website"
+podcast_name: "Has Website Podcast"
+episode_source: rss
+rss_source:
+  feed_url: "https://example.com/feed.xml"
+content:
+  names_to_remove: []
+website:
+  enabled: true
+  github_repo: "clientorg/clientorg.github.io"
+  github_branch: "main"
+  url: "clientsite.com"
+  pages_enabled: true
+  pages_repo: "clientorg/clientorg.github.io"
+  site_base_url: "https://clientsite.com"
+"""
+
+    def _setup_client(self, tmp_path, monkeypatch, yaml_content, name):
+        """Helper: write client YAML, set BASE_DIR, return path."""
+        monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
+        clients_dir = tmp_path / "clients"
+        clients_dir.mkdir(exist_ok=True)
+        (clients_dir / f"{name}.yaml").write_text(yaml_content)
+
+    def test_activate_client_disables_website(self, tmp_path, monkeypatch):
+        """Activating a client without website config disables WEBSITE_ENABLED."""
+        self._setup_client(
+            tmp_path, monkeypatch, self.ISOLATION_CLIENT_YAML, "isolation-test"
+        )
+        # Set globals to Fake Problems defaults (simulating real env)
+        monkeypatch.setattr(Config, "WEBSITE_ENABLED", True)
+        monkeypatch.setattr(
+            Config,
+            "WEBSITE_GITHUB_REPO",
+            "fakeproblemspodcast/fakeproblemspodcast.github.io",
+        )
+
+        from client_config import activate_client
+
+        activate_client("isolation-test")
+
+        assert Config.WEBSITE_ENABLED is False
+
+    def test_activate_client_disables_pages(self, tmp_path, monkeypatch):
+        """Activating a client without pages config disables PAGES_ENABLED."""
+        self._setup_client(
+            tmp_path, monkeypatch, self.ISOLATION_CLIENT_YAML, "isolation-test"
+        )
+        monkeypatch.setattr(Config, "PAGES_ENABLED", True)
+        monkeypatch.setattr(
+            Config, "GITHUB_PAGES_REPO", "fakeproblemspodcast/fakeproblemspodcast.github.io"
+        )
+
+        from client_config import activate_client
+
+        activate_client("isolation-test")
+
+        assert Config.PAGES_ENABLED is False
+
+    def test_activate_client_clears_website_repo(self, tmp_path, monkeypatch):
+        """Activating a client clears WEBSITE_GITHUB_REPO to prevent deploying to FP site."""
+        self._setup_client(
+            tmp_path, monkeypatch, self.ISOLATION_CLIENT_YAML, "isolation-test"
+        )
+        monkeypatch.setattr(
+            Config,
+            "WEBSITE_GITHUB_REPO",
+            "fakeproblemspodcast/fakeproblemspodcast.github.io",
+        )
+
+        from client_config import activate_client
+
+        activate_client("isolation-test")
+
+        assert Config.WEBSITE_GITHUB_REPO == ""
+
+    def test_activate_client_clears_pages_repo(self, tmp_path, monkeypatch):
+        """Activating a client clears GITHUB_PAGES_REPO to prevent deploying to FP site."""
+        self._setup_client(
+            tmp_path, monkeypatch, self.ISOLATION_CLIENT_YAML, "isolation-test"
+        )
+        monkeypatch.setattr(
+            Config, "GITHUB_PAGES_REPO", "fakeproblemspodcast/fakeproblemspodcast.github.io"
+        )
+
+        from client_config import activate_client
+
+        activate_client("isolation-test")
+
+        assert Config.GITHUB_PAGES_REPO == ""
+
+    def test_activate_client_clears_youtube_channel_handle(self, tmp_path, monkeypatch):
+        """Activating a client clears YOUTUBE_CHANNEL_HANDLE."""
+        self._setup_client(
+            tmp_path, monkeypatch, self.ISOLATION_CLIENT_YAML, "isolation-test"
+        )
+        monkeypatch.setattr(Config, "YOUTUBE_CHANNEL_HANDLE", "@fakeproblemspodcast")
+
+        from client_config import activate_client
+
+        activate_client("isolation-test")
+
+        assert Config.YOUTUBE_CHANNEL_HANDLE == ""
+
+    def test_activate_client_clears_site_base_url(self, tmp_path, monkeypatch):
+        """Activating a client clears SITE_BASE_URL."""
+        self._setup_client(
+            tmp_path, monkeypatch, self.ISOLATION_CLIENT_YAML, "isolation-test"
+        )
+        monkeypatch.setattr(Config, "SITE_BASE_URL", "https://fakeproblemspodcast.com")
+
+        from client_config import activate_client
+
+        activate_client("isolation-test")
+
+        assert Config.SITE_BASE_URL == ""
+
+    def test_activate_client_clears_website_url(self, tmp_path, monkeypatch):
+        """Activating a client clears WEBSITE_URL."""
+        self._setup_client(
+            tmp_path, monkeypatch, self.ISOLATION_CLIENT_YAML, "isolation-test"
+        )
+        monkeypatch.setattr(Config, "WEBSITE_URL", "fakeproblemspodcast.com")
+
+        from client_config import activate_client
+
+        activate_client("isolation-test")
+
+        assert Config.WEBSITE_URL == ""
+
+    def test_client_with_own_website_keeps_it_enabled(self, tmp_path, monkeypatch):
+        """A client that provides its own website config keeps it enabled."""
+        self._setup_client(
+            tmp_path,
+            monkeypatch,
+            self.ISOLATION_CLIENT_WITH_WEBSITE_YAML,
+            "has-website",
+        )
+        monkeypatch.setattr(Config, "WEBSITE_ENABLED", True)
+        monkeypatch.setattr(
+            Config,
+            "WEBSITE_GITHUB_REPO",
+            "fakeproblemspodcast/fakeproblemspodcast.github.io",
+        )
+
+        from client_config import activate_client
+
+        activate_client("has-website")
+
+        assert Config.WEBSITE_ENABLED is True
+        assert Config.WEBSITE_GITHUB_REPO == "clientorg/clientorg.github.io"
+        assert Config.PAGES_ENABLED is True
+        assert Config.GITHUB_PAGES_REPO == "clientorg/clientorg.github.io"
+        assert Config.SITE_BASE_URL == "https://clientsite.com"
+        assert Config.WEBSITE_URL == "clientsite.com"
+
+    def test_activate_client_clears_discord_webhook(self, tmp_path, monkeypatch):
+        """Activating a client clears DISCORD_WEBHOOK_URL."""
+        self._setup_client(
+            tmp_path, monkeypatch, self.ISOLATION_CLIENT_YAML, "isolation-test"
+        )
+        monkeypatch.setattr(
+            Config, "DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/FP-hook"
+        )
+
+        from client_config import activate_client
+
+        activate_client("isolation-test")
+
+        assert Config.DISCORD_WEBHOOK_URL == ""
+
+    def test_website_generator_reads_config_not_env(self, tmp_path, monkeypatch):
+        """WebsiteGenerator must use Config attributes, not os.getenv().
+
+        This ensures activate_client() overrides actually take effect.
+        """
+        self._setup_client(
+            tmp_path, monkeypatch, self.ISOLATION_CLIENT_YAML, "isolation-test"
+        )
+        # Simulate env var still set to FP values (as it would be in real env)
+        monkeypatch.setenv(
+            "WEBSITE_GITHUB_REPO", "fakeproblemspodcast/fakeproblemspodcast.github.io"
+        )
+        monkeypatch.setenv("WEBSITE_ENABLED", "true")
+        # But Config is overridden by client activation
+        monkeypatch.setattr(Config, "WEBSITE_ENABLED", False)
+        monkeypatch.setattr(Config, "WEBSITE_GITHUB_REPO", "")
+
+        from website_generator import WebsiteGenerator
+
+        gen = WebsiteGenerator()
+
+        assert gen.enabled is False
+        assert gen.github_repo == ""
+
+    def test_episode_webpage_generator_reads_config_not_env(
+        self, tmp_path, monkeypatch
+    ):
+        """EpisodeWebpageGenerator must use Config attributes, not os.getenv().
+
+        This ensures activate_client() overrides actually take effect.
+        """
+        self._setup_client(
+            tmp_path, monkeypatch, self.ISOLATION_CLIENT_YAML, "isolation-test"
+        )
+        monkeypatch.setenv("PAGES_ENABLED", "true")
+        monkeypatch.setenv(
+            "GITHUB_PAGES_REPO", "fakeproblemspodcast/fakeproblemspodcast.github.io"
+        )
+        monkeypatch.setattr(Config, "PAGES_ENABLED", False)
+        monkeypatch.setattr(Config, "GITHUB_PAGES_REPO", "")
+
+        from episode_webpage_generator import EpisodeWebpageGenerator
+
+        gen = EpisodeWebpageGenerator()
+
+        assert gen.enabled is False
+        assert gen.github_pages_repo == ""
+
+    def test_activate_client_clears_dropbox_credentials(self, tmp_path, monkeypatch):
+        """Activating a client clears Fake Problems Dropbox credentials."""
+        self._setup_client(
+            tmp_path, monkeypatch, self.ISOLATION_CLIENT_YAML, "isolation-test"
+        )
+        monkeypatch.setattr(Config, "DROPBOX_APP_KEY", "fp-app-key")
+        monkeypatch.setattr(Config, "DROPBOX_APP_SECRET", "fp-app-secret")
+        monkeypatch.setattr(Config, "DROPBOX_REFRESH_TOKEN", "fp-refresh-token")
+        monkeypatch.setattr(Config, "DROPBOX_ACCESS_TOKEN", "fp-access-token")
+        monkeypatch.setattr(
+            Config, "DROPBOX_FOLDER_PATH", "/Fake Problems Podcast/new_raw_files"
+        )
+        monkeypatch.setattr(
+            Config, "DROPBOX_FINISHED_FOLDER", "/Fake Problems Podcast/finished_files"
+        )
+        monkeypatch.setattr(
+            Config, "DROPBOX_EDITED_FOLDER", "/Fake Problems Podcast/edited_files"
+        )
+
+        from client_config import activate_client
+
+        activate_client("isolation-test")
+
+        assert Config.DROPBOX_APP_KEY is None
+        assert Config.DROPBOX_APP_SECRET is None
+        assert Config.DROPBOX_REFRESH_TOKEN is None
+        assert Config.DROPBOX_ACCESS_TOKEN is None
+        assert Config.DROPBOX_FOLDER_PATH == ""
+        assert Config.DROPBOX_FINISHED_FOLDER == ""
+        assert Config.DROPBOX_EDITED_FOLDER == ""
+
+    def test_activate_client_clears_social_media_credentials(
+        self, tmp_path, monkeypatch
+    ):
+        """Activating a client clears all Fake Problems social media credentials."""
+        self._setup_client(
+            tmp_path, monkeypatch, self.ISOLATION_CLIENT_YAML, "isolation-test"
+        )
+        # Set FP credentials
+        monkeypatch.setattr(Config, "YOUTUBE_CLIENT_ID", "fp-yt-id")
+        monkeypatch.setattr(Config, "YOUTUBE_CLIENT_SECRET", "fp-yt-secret")
+        monkeypatch.setattr(Config, "TWITTER_API_KEY", "fp-tw-key")
+        monkeypatch.setattr(Config, "TWITTER_ACCESS_TOKEN", "fp-tw-token")
+        monkeypatch.setattr(Config, "INSTAGRAM_ACCESS_TOKEN", "fp-ig-token")
+        monkeypatch.setattr(Config, "INSTAGRAM_ACCOUNT_ID", "fp-ig-id")
+        monkeypatch.setattr(Config, "TIKTOK_CLIENT_KEY", "fp-tt-key")
+        monkeypatch.setattr(Config, "TIKTOK_ACCESS_TOKEN", "fp-tt-token")
+        monkeypatch.setattr(Config, "BLUESKY_HANDLE", "fp-bsky-handle")
+        monkeypatch.setattr(Config, "BLUESKY_APP_PASSWORD", "fp-bsky-pw")
+        monkeypatch.setattr(Config, "REDDIT_CLIENT_ID", "fp-reddit-id")
+        monkeypatch.setattr(Config, "REDDIT_CLIENT_SECRET", "fp-reddit-secret")
+
+        from client_config import activate_client
+
+        activate_client("isolation-test")
+
+        assert Config.YOUTUBE_CLIENT_ID is None
+        assert Config.YOUTUBE_CLIENT_SECRET is None
+        assert Config.TWITTER_API_KEY is None
+        assert Config.TWITTER_ACCESS_TOKEN is None
+        assert Config.INSTAGRAM_ACCESS_TOKEN is None
+        assert Config.INSTAGRAM_ACCOUNT_ID is None
+        assert Config.TIKTOK_CLIENT_KEY is None
+        assert Config.TIKTOK_ACCESS_TOKEN is None
+        assert Config.BLUESKY_HANDLE is None
+        assert Config.BLUESKY_APP_PASSWORD is None
+        assert Config.REDDIT_CLIENT_ID is None
+        assert Config.REDDIT_CLIENT_SECRET is None
+
+    ISOLATION_CLIENT_WITH_DROPBOX_YAML = """
+client_name: "has-dropbox"
+podcast_name: "Has Dropbox Podcast"
+episode_source: dropbox
+dropbox:
+  app_key: "client-app-key"
+  app_secret: "client-app-secret"
+  refresh_token: "client-refresh-token"
+  folder_path: "/Client Podcast/raw"
+  finished_folder: "/Client Podcast/finished"
+  edited_folder: "/Client Podcast/edited"
+youtube:
+  client_id: "client-yt-id"
+  client_secret: "client-yt-secret"
+twitter:
+  api_key: "client-tw-key"
+  api_secret: "client-tw-secret"
+  access_token: "client-tw-token"
+  access_secret: "client-tw-access-secret"
+content:
+  names_to_remove: []
+"""
+
+    def test_client_with_own_credentials_keeps_them(self, tmp_path, monkeypatch):
+        """A client that provides its own Dropbox/social creds keeps them."""
+        self._setup_client(
+            tmp_path,
+            monkeypatch,
+            self.ISOLATION_CLIENT_WITH_DROPBOX_YAML,
+            "has-dropbox",
+        )
+        # Set FP defaults that should be overridden
+        monkeypatch.setattr(Config, "DROPBOX_APP_KEY", "fp-app-key")
+        monkeypatch.setattr(Config, "YOUTUBE_CLIENT_ID", "fp-yt-id")
+        monkeypatch.setattr(Config, "TWITTER_API_KEY", "fp-tw-key")
+
+        from client_config import activate_client
+
+        activate_client("has-dropbox")
+
+        # Client's own credentials should be used
+        assert Config.DROPBOX_APP_KEY == "client-app-key"
+        assert Config.DROPBOX_APP_SECRET == "client-app-secret"
+        assert Config.DROPBOX_REFRESH_TOKEN == "client-refresh-token"
+        assert Config.DROPBOX_FOLDER_PATH == "/Client Podcast/raw"
+        assert Config.YOUTUBE_CLIENT_ID == "client-yt-id"
+        assert Config.YOUTUBE_CLIENT_SECRET == "client-yt-secret"
+        assert Config.TWITTER_API_KEY == "client-tw-key"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
