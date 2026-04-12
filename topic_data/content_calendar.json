@@ -274,7 +274,9 @@
         "status": "partial",
         "uploaded_at": "2026-04-12T11:14:52.636660",
         "upload_results": {
-          "youtube": {},
+          "youtube": {
+            "error": "prior empty result cleared for retry"
+          },
           "twitter": {
             "tweet_id": "2043362215781154884",
             "tweet_url": "https://twitter.com/i/web/status/2043362215781154884",

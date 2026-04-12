@@ -67,10 +67,13 @@ def _post_slot(slot, uploaders):
     prior_results = slot.get("upload_results", {})
     results = {}
 
-    # Carry forward prior successes and skip those platforms
+    # Carry forward prior successes and skip those platforms.
+    # A result must have actual content (not empty dict) and no error
+    # to be considered a success worth skipping on retry.
     for platform, prior in prior_results.items():
         if (
             isinstance(prior, dict)
+            and prior  # empty dict {} is not a success
             and "error" not in prior
             and prior.get("status") != "error"
         ):

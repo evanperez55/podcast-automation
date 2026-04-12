@@ -155,6 +155,74 @@ class TestPostSlot:
         mock_bsky.post.assert_called_once()
 
 
+class TestCarryForwardLogic:
+    """Tests for prior result carry-forward in _post_slot."""
+
+    def test_empty_dict_not_carried_forward(self):
+        """An empty dict {} from a prior YouTube attempt must NOT be treated as success.
+
+        This was the root cause of clip_7 failing to retry YouTube — the
+        empty dict had no 'error' key so it was carried forward as a success.
+        """
+        mock_twitter = MagicMock()
+        mock_twitter.post_tweet.return_value = {"tweet_id": "789", "status": "success"}
+
+        slot = {
+            "slot_type": "clip_7",
+            "content": {
+                "caption": "They ate their dead friends",
+                "youtube_video_id": "Q8SeD33qz9M",
+                "youtube_url": "https://youtube.com/watch?v=Q8SeD33qz9M",
+            },
+            "platforms": ["twitter", "youtube"],
+            "upload_results": {
+                "youtube": {},  # empty dict from prior failed attempt
+                "twitter": {
+                    "tweet_id": "123",
+                    "status": "success",
+                },
+            },
+        }
+        results = _post_slot(slot, {"twitter": mock_twitter})
+        # Twitter should be carried forward (real success)
+        assert results["twitter"]["tweet_id"] == "123"
+        # YouTube should NOT be carried forward — {} is not a success
+        # It should have been retried (will fail here since no YouTube uploader,
+        # but the key point is it wasn't carried forward as success)
+        yt_result = results.get("youtube", {})
+        assert yt_result != {}  # must not be the empty dict carried forward
+
+    def test_none_result_not_carried_forward(self):
+        """A None prior result should not be carried forward."""
+        slot = {
+            "slot_type": "clip_1",
+            "content": {"caption": "test"},
+            "platforms": ["instagram"],
+            "upload_results": {
+                "instagram": None,
+            },
+        }
+        results = _post_slot(slot, {})
+        assert "instagram" not in results
+
+    def test_real_success_is_carried_forward(self):
+        """A prior result with actual data IS carried forward."""
+        slot = {
+            "slot_type": "clip_1",
+            "content": {"caption": "test"},
+            "platforms": ["twitter"],
+            "upload_results": {
+                "twitter": {
+                    "tweet_id": "123",
+                    "tweet_url": "https://twitter.com/...",
+                    "status": "success",
+                },
+            },
+        }
+        results = _post_slot(slot, {})
+        assert results["twitter"]["tweet_id"] == "123"
+
+
 class TestContentCalendarNewMethods:
     """Tests for update_slot_content and get_all_pending_slots."""
 
