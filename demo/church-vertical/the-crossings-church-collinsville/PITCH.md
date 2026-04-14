@@ -2,7 +2,8 @@
 
 **Prospect:** The Crossings Church
 **Slug:** the-crossings-church-collinsville
-**Contact:** Pastor / **EMAIL: TBD** - check: crossingscollinsville.com (verify currently active) or Apple Podcasts listing contact
+**Contact:** Pastor / Admin team / **EMAIL: admin@crossingscollinsville.com**
+**Contact notes:** Site appears active despite Oct 2025 stale feed — restart angle is live. Phone: 636-442-2778.
 **Episode referenced:** "{{SERMON_TITLE}}" *(processed TBD)*
 **Drive folder:** Upload from `output/the-crossings-church-collinsville/{{EP_DIR}}/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
@@ -76,7 +77,7 @@ Evan
 - [ ] Process latest episode: `uv run main.py --client the-crossings-church-collinsville latest --auto-approve`
 - [ ] Read `output/the-crossings-church-collinsville/<ep_dir>/*_analysis.json` and pick lead clip
 - [ ] Fill in all `{{}}` placeholders above using analysis output
-- [ ] Find Pastor contact email (crossingscollinsville.com (verify currently active) or Apple Podcasts listing contact)
+- [x] Contact email resolved: admin@crossingscollinsville.com or Apple Podcasts listing contact)
 - [ ] Upload clip `*_subtitle.mp4` files + blog post + thumbnail + quote cards to Google Drive
 - [ ] Get shareable Drive link, replace `[GOOGLE DRIVE LINK]` above
 - [ ] Get per-clip direct links, replace `[direct link]` entries in follow-up

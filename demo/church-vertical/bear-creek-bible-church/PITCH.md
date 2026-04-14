@@ -2,7 +2,8 @@
 
 **Prospect:** Bear Creek Bible Church
 **Slug:** bear-creek-bible-church
-**Contact:** Pastor John Salvesen / **EMAIL: TBD** (phone: (817) 479-0217, website: https://bcbc.org)
+**Contact:** John Salvesen (Senior Pastor) / **EMAIL: john@bcbc.org**
+**Contact notes:** DIRECT — pastor's personal staff email from bcbc.org/about-us/staff-leadership
 **Episode referenced:** "Why Leaders Should Lead Like Sand Hill Cranes" (processed 2026-04-12)
 **Drive folder:** Upload from `output/bear-creek-bible-church/ep_20260412_20260412_130406/`
 **Status:** Draft — needs contact email + Drive link before sending
@@ -75,7 +76,7 @@ Evan
 
 ## Pre-Send Checklist
 
-- [ ] Find John Salvesen's contact email (try: check bcbc.org staff page, LinkedIn, or call (817) 479-0217 and ask for comms/pastor email)
+- [x] Contact email resolved: john@bcbc.org (Pastor John Salvesen direct, from bcbc.org staff page)
 - [ ] Upload clip 1-5 MP4s from `output/bear-creek-bible-church/ep_20260412_20260412_130406/clips/` to Google Drive
 - [ ] Also upload: blog post (`epNone_20260412_130406_blog_post.md`), show notes, thumbnail, 3 quote cards
 - [ ] Get shareable Drive folder link, replace `[GOOGLE DRIVE LINK]` above

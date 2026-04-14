@@ -2,7 +2,8 @@
 
 **Prospect:** Christ Community Church
 **Slug:** christ-community-church-columbus
-**Contact:** Kelli Wommack / **EMAIL: TBD** - check: ccclive.org staff page, or Buzzsprout contact at buzzsprout.com/25550
+**Contact:** Kelli Wommack (via comms team) / **EMAIL: communications@ccclive.org**
+**Contact notes:** Communications inbox — IDEAL target for this pitch. Phone: 706-565-7240.
 **Episode referenced:** "{{SERMON_TITLE}}" *(processed TBD)*
 **Drive folder:** Upload from `output/christ-community-church-columbus/{{EP_DIR}}/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
@@ -75,7 +76,7 @@ Evan
 - [ ] Process latest episode: `uv run main.py --client christ-community-church-columbus latest --auto-approve`
 - [ ] Read `output/christ-community-church-columbus/<ep_dir>/*_analysis.json` and pick lead clip
 - [ ] Fill in all `{{}}` placeholders above using analysis output
-- [ ] Find Kelli Wommack contact email (ccclive.org staff page, or Buzzsprout contact at buzzsprout.com/25550)
+- [x] Contact email resolved: communications@ccclive.org (ccclive.org staff page, or Buzzsprout contact at buzzsprout.com/25550)
 - [ ] Upload clip `*_subtitle.mp4` files + blog post + thumbnail + quote cards to Google Drive
 - [ ] Get shareable Drive link, replace `[GOOGLE DRIVE LINK]` above
 - [ ] Get per-clip direct links, replace `[direct link]` entries in follow-up

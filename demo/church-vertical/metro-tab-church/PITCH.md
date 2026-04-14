@@ -2,7 +2,8 @@
 
 **Prospect:** Metro Tab Church
 **Slug:** metro-tab-church
-**Contact:** Dr. Steve Ball / **EMAIL: TBD** - check: metrotab.net staff page or phone (423) 894-3377
+**Contact:** Dr. Steve Ball (via info) / **EMAIL: info@metrotab.net**
+**Contact notes:** General info inbox. Phone: 423-894-3377. May need to ask for comms director by name in the email.
 **Episode referenced:** "{{SERMON_TITLE}}" *(processed TBD)*
 **Drive folder:** Upload from `output/metro-tab-church/{{EP_DIR}}/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
@@ -75,7 +76,7 @@ Evan
 - [ ] Process latest episode: `uv run main.py --client metro-tab-church latest --auto-approve`
 - [ ] Read `output/metro-tab-church/<ep_dir>/*_analysis.json` and pick lead clip
 - [ ] Fill in all `{{}}` placeholders above using analysis output
-- [ ] Find Dr. Steve Ball contact email (metrotab.net staff page or phone (423) 894-3377)
+- [x] Contact email resolved: info@metrotab.net (metrotab.net staff page or phone (423) 894-3377)
 - [ ] Upload clip `*_subtitle.mp4` files + blog post + thumbnail + quote cards to Google Drive
 - [ ] Get shareable Drive link, replace `[GOOGLE DRIVE LINK]` above
 - [ ] Get per-clip direct links, replace `[direct link]` entries in follow-up

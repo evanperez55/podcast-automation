@@ -2,7 +2,8 @@
 
 **Prospect:** Faith Bible Church
 **Slug:** faith-bible-church-edmond
-**Contact:** Pastor / **EMAIL: TBD** - check: Subsplash app, church website, or Apple Podcasts listing
+**Contact:** Dr. Mark Hitchcock (Senior Pastor, via general church inbox) / **EMAIL: fbc@faithbibleok.com**
+**Contact notes:** Pastor is Mark Hitchcock — notable prophecy teacher + DTS faculty. Staff pages at /our-staff and /our-elders may have direct addresses. Phone: 405-340-1000.
 **Episode referenced:** "{{SERMON_TITLE}}" *(processed TBD)*
 **Drive folder:** Upload from `output/faith-bible-church-edmond/{{EP_DIR}}/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
@@ -76,7 +77,7 @@ Evan
 - [ ] Process latest episode: `uv run main.py --client faith-bible-church-edmond latest --auto-approve`
 - [ ] Read `output/faith-bible-church-edmond/<ep_dir>/*_analysis.json` and pick lead clip
 - [ ] Fill in all `{{}}` placeholders above using analysis output
-- [ ] Find Pastor contact email (Subsplash app, church website, or Apple Podcasts listing)
+- [x] Contact email resolved: fbc@faithbibleok.com
 - [ ] Upload clip `*_subtitle.mp4` files + blog post + thumbnail + quote cards to Google Drive
 - [ ] Get shareable Drive link, replace `[GOOGLE DRIVE LINK]` above
 - [ ] Get per-clip direct links, replace `[direct link]` entries in follow-up

@@ -2,7 +2,8 @@
 
 **Prospect:** Mercy Village Church
 **Slug:** mercy-village-church
-**Contact:** Pastor / **EMAIL: TBD** - check: church website or Apple Podcasts listing
+**Contact:** Pastor (via general info) / **EMAIL: info@mercyvillage.church**
+**Contact notes:** Small-town church, stewardship angle still applies. Phone: 304-410-0371.
 **Episode referenced:** "{{SERMON_TITLE}}" *(processed TBD)*
 **Drive folder:** Upload from `output/mercy-village-church/{{EP_DIR}}/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
@@ -76,7 +77,7 @@ Evan
 - [ ] Process latest episode: `uv run main.py --client mercy-village-church latest --auto-approve`
 - [ ] Read `output/mercy-village-church/<ep_dir>/*_analysis.json` and pick lead clip
 - [ ] Fill in all `{{}}` placeholders above using analysis output
-- [ ] Find Pastor contact email (church website or Apple Podcasts listing)
+- [x] Contact email resolved: info@mercyvillage.church (church website or Apple Podcasts listing)
 - [ ] Upload clip `*_subtitle.mp4` files + blog post + thumbnail + quote cards to Google Drive
 - [ ] Get shareable Drive link, replace `[GOOGLE DRIVE LINK]` above
 - [ ] Get per-clip direct links, replace `[direct link]` entries in follow-up

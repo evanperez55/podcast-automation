@@ -2,7 +2,8 @@
 
 **Prospect:** Cottonwood Church
 **Slug:** cottonwood-church
-**Contact:** Pastor / **EMAIL: TBD** - check: church website or Apple Podcasts listing
+**Contact:** Pastor (via guest services — weak) / **EMAIL: guestservices@cottonwood.org**
+**Contact notes:** RESIZE FLAG: Cottonwood hosts 'Answers with Bayless Conley' broadcast — this is a LARGE church/media operation, not mid-size ICP. They likely already have professional media staff and Pulpit AI. Consider deprioritizing or pitching at a higher price tier. Phone: 714-947-5300.
 **Episode referenced:** "{{SERMON_TITLE}}" *(processed TBD)*
 **Drive folder:** Upload from `output/cottonwood-church/{{EP_DIR}}/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
@@ -76,7 +77,7 @@ Evan
 - [ ] Process latest episode: `uv run main.py --client cottonwood-church latest --auto-approve`
 - [ ] Read `output/cottonwood-church/<ep_dir>/*_analysis.json` and pick lead clip
 - [ ] Fill in all `{{}}` placeholders above using analysis output
-- [ ] Find Pastor contact email (church website or Apple Podcasts listing)
+- [x] Contact email resolved: guestservices@cottonwood.org (church website or Apple Podcasts listing)
 - [ ] Upload clip `*_subtitle.mp4` files + blog post + thumbnail + quote cards to Google Drive
 - [ ] Get shareable Drive link, replace `[GOOGLE DRIVE LINK]` above
 - [ ] Get per-clip direct links, replace `[direct link]` entries in follow-up

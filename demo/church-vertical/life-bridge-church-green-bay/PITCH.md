@@ -2,7 +2,8 @@
 
 **Prospect:** Life Bridge Church
 **Slug:** life-bridge-church-green-bay
-**Contact:** Pastor / **EMAIL: TBD** - check: Apple Podcasts listing or church website
+**Contact:** Pastor (via general) / **EMAIL: lbccgb@gmail.com**
+**Contact notes:** VERIFY podcast match: search result was for 'Life Bridge Christian Church Green Bay' (lifebridgegb.org) — iTunes feed is 'Life Bridge Sermons Podcast' by 'Life Bridge Studios'. Likely same entity; confirm before sending. Phone: 920-494-4042.
 **Episode referenced:** "{{SERMON_TITLE}}" *(processed TBD)*
 **Drive folder:** Upload from `output/life-bridge-church-green-bay/{{EP_DIR}}/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
@@ -75,7 +76,7 @@ Evan
 - [ ] Process latest episode: `uv run main.py --client life-bridge-church-green-bay latest --auto-approve`
 - [ ] Read `output/life-bridge-church-green-bay/<ep_dir>/*_analysis.json` and pick lead clip
 - [ ] Fill in all `{{}}` placeholders above using analysis output
-- [ ] Find Pastor contact email (Apple Podcasts listing or church website)
+- [x] Contact email resolved: lbccgb@gmail.com (Apple Podcasts listing or church website)
 - [ ] Upload clip `*_subtitle.mp4` files + blog post + thumbnail + quote cards to Google Drive
 - [ ] Get shareable Drive link, replace `[GOOGLE DRIVE LINK]` above
 - [ ] Get per-clip direct links, replace `[direct link]` entries in follow-up

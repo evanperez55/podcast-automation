@@ -2,7 +2,8 @@
 
 **Prospect:** Redeemer City Church
 **Slug:** redeemer-city-church-tampa
-**Contact:** Mitch Kuhn / **EMAIL: TBD** - check: sermon.net profile, LinkedIn, or redeemertampa.com contact page
+**Contact:** Mitch Kuhn (via office) / **EMAIL: office@redeemertampa.com**
+**Contact notes:** General office — no direct pastor email found. Phone: 813-355-9475. CC a follow-up via the contact form on redeemertampa.com/contact if no reply in 1 week.
 **Episode referenced:** "{{SERMON_TITLE}}" *(processed TBD)*
 **Drive folder:** Upload from `output/redeemer-city-church-tampa/{{EP_DIR}}/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
@@ -75,7 +76,7 @@ Evan
 - [ ] Process latest episode: `uv run main.py --client redeemer-city-church-tampa latest --auto-approve`
 - [ ] Read `output/redeemer-city-church-tampa/<ep_dir>/*_analysis.json` and pick lead clip
 - [ ] Fill in all `{{}}` placeholders above using analysis output
-- [ ] Find Mitch Kuhn contact email (sermon.net profile, LinkedIn, or redeemertampa.com contact page)
+- [x] Contact email resolved: office@redeemertampa.com (sermon.net profile, LinkedIn, or redeemertampa.com contact page)
 - [ ] Upload clip `*_subtitle.mp4` files + blog post + thumbnail + quote cards to Google Drive
 - [ ] Get shareable Drive link, replace `[GOOGLE DRIVE LINK]` above
 - [ ] Get per-clip direct links, replace `[direct link]` entries in follow-up

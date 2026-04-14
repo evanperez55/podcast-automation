@@ -2,7 +2,8 @@
 
 **Prospect:** Christ Community Church *(Tier 2)*
 **Slug:** christ-community-church-johnson-city
-**Contact:** Pastor / **EMAIL: TBD** - check: Apple Podcasts listing or church website search
+**Contact:** Elders team (Jim Powell, Bill Leuzinger, AJ Babel) / **EMAIL: office@christcommunityjc.com**
+**Contact notes:** Church is elder-led (no single senior pastor). Teaching elders: Jim Powell, Bill Leuzinger, AJ Babel. Alternate address: elders@christcommunityjc.com for direct pastoral contact.
 **Episode referenced:** "{{SERMON_TITLE}}" *(processed TBD)*
 **Drive folder:** Upload from `output/christ-community-church-johnson-city/{{EP_DIR}}/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
@@ -75,7 +76,7 @@ Evan
 - [ ] Process latest episode: `uv run main.py --client christ-community-church-johnson-city latest --auto-approve`
 - [ ] Read `output/christ-community-church-johnson-city/<ep_dir>/*_analysis.json` and pick lead clip
 - [ ] Fill in all `{{}}` placeholders above using analysis output
-- [ ] Find Pastor contact email (Apple Podcasts listing or church website search)
+- [x] Contact email resolved: office@christcommunityjc.com
 - [ ] Upload clip `*_subtitle.mp4` files + blog post + thumbnail + quote cards to Google Drive
 - [ ] Get shareable Drive link, replace `[GOOGLE DRIVE LINK]` above
 - [ ] Get per-clip direct links, replace `[direct link]` entries in follow-up

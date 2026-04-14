@@ -2,7 +2,8 @@
 
 **Prospect:** Harbor Rock Tabernacle
 **Slug:** harbor-rock-tabernacle
-**Contact:** Pastor / **EMAIL: TBD** - check: Apple Podcasts listing or church website
+**Contact:** Pastor Paul Rhoads (Lead Pastor) / **EMAIL: paul@harborrock.org**
+**Contact notes:** DIRECT — lead pastor's email. Phone: 262-633-3206. Also info@harborrock.org available as fallback.
 **Episode referenced:** "{{SERMON_TITLE}}" *(processed TBD)*
 **Drive folder:** Upload from `output/harbor-rock-tabernacle/{{EP_DIR}}/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
@@ -75,7 +76,7 @@ Evan
 - [ ] Process latest episode: `uv run main.py --client harbor-rock-tabernacle latest --auto-approve`
 - [ ] Read `output/harbor-rock-tabernacle/<ep_dir>/*_analysis.json` and pick lead clip
 - [ ] Fill in all `{{}}` placeholders above using analysis output
-- [ ] Find Pastor contact email (Apple Podcasts listing or church website)
+- [x] Contact email resolved: paul@harborrock.org
 - [ ] Upload clip `*_subtitle.mp4` files + blog post + thumbnail + quote cards to Google Drive
 - [ ] Get shareable Drive link, replace `[GOOGLE DRIVE LINK]` above
 - [ ] Get per-clip direct links, replace `[direct link]` entries in follow-up
