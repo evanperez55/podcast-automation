@@ -187,6 +187,55 @@ class TestMain:
         # Default hot_take fallback not used
         assert "Testing is holy" not in pitch
 
+    def test_picks_most_recent_analysis_file_in_same_ep_dir(
+        self, fake_prospect, monkeypatch
+    ):
+        """If the pipeline has been re-run, the same ep_dir holds multiple
+        <name>_analysis.json files with different timestamps. Fill must use
+        the NEWEST one — using the first glob() result returns whatever the
+        Windows filesystem lists first, which is usually the oldest.
+        Regression: the three B011 reruns landed stale sermon titles in
+        PITCH.md because the script picked the pre-crash analysis file."""
+        import os
+        import time
+
+        slug = fake_prospect["slug"]
+        ep_dir = fake_prospect["ep_dir"]
+
+        stale_analysis_path = ep_dir / "aaa_old_analysis.json"
+        stale_analysis_path.write_text(
+            json.dumps(
+                {
+                    "episode_title": "STALE Sermon",
+                    "best_clips": [
+                        {
+                            "start": "00:00:01",
+                            "end": "00:00:05",
+                            "duration_seconds": 4,
+                            "suggested_title": "Stale Clip",
+                            "description": "stale",
+                            "why_interesting": "stale",
+                            "hook_caption": "stale",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        # Force the stale file to be older than the fixture's analysis.
+        old_time = time.time() - 10000
+        os.utime(stale_analysis_path, (old_time, old_time))
+
+        monkeypatch.setattr(sys, "argv", ["fill", slug])
+        rc = fcp.main()
+        assert rc == 0
+
+        pitch = (fake_prospect["pitch_dir"] / "PITCH.md").read_text(encoding="utf-8")
+        assert "The Test Sermon" in pitch, (
+            "should use the newest analysis, not the stale one"
+        )
+        assert "STALE Sermon" not in pitch
+
     def test_picks_most_recent_episode_dir(self, fake_prospect, monkeypatch):
         """If multiple ep_* dirs exist, pick the most recently modified one."""
         import time

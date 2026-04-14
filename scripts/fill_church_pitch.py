@@ -82,7 +82,11 @@ def main() -> int:
     ep_dir = ep_dirs[0]
     print(f"Using episode dir: {ep_dir}")
 
-    analysis_files = list(ep_dir.glob("*_analysis.json"))
+    analysis_files = sorted(
+        ep_dir.glob("*_analysis.json"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
     if not analysis_files:
         print(f"ERROR: No analysis.json in {ep_dir}", file=sys.stderr)
         return 1
