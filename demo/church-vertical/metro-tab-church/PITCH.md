@@ -4,8 +4,8 @@
 **Slug:** metro-tab-church
 **Contact:** Dr. Steve Ball (via info) / **EMAIL: info@metrotab.net**
 **Contact notes:** General info inbox. Phone: 423-894-3377. May need to ask for comms director by name in the email.
-**Episode referenced:** "{{SERMON_TITLE}}" *(processed TBD)*
-**Drive folder:** Upload from `output/metro-tab-church/{{EP_DIR}}/`
+**Episode referenced:** "Why Your Prayer Might Be the Ultimate Power Move" *(processed TBD)*
+**Drive folder:** Upload from `output/metro-tab-church/ep_342/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
 **Angle chosen:** growth_seo
 
@@ -14,25 +14,25 @@
 
 ## Email
 
-**Subject:** Made these from your "{{SERMON_TITLE}}" sermon - took 5 minutes
+**Subject:** Made these from your "Why Your Prayer Might Be the Ultimate Power Move" sermon - took 5 minutes
 
 Hey Steve,
 
-I listened to "{{SERMON_TITLE}}" this week - {{SPECIFIC_MOMENT_REFERENCE}}. That's the kind of teaching that deserves to reach people beyond Sunday morning at Metro Tab Church.
+I listened to "Why Your Prayer Might Be the Ultimate Power Move" this week - the pivot to 'can prayer beat anxiety? yes' — anxiety is one of the most-searched topics on the internet, and you answer it head-on with scripture instead of hedging. That's the kind of teaching that deserves to reach people beyond Sunday morning at Metro Tab Church.
 
 I ran it through my automation pipeline and here's what came out in about 5 minutes - no manual editing:
 
 [GOOGLE DRIVE LINK]
 
 Inside you'll find:
-- {{NUM_CLIPS}} vertical clips with burned-in subtitles (ready for YouTube Shorts / Instagram Reels)
+- 5 vertical clips with burned-in subtitles (ready for YouTube Shorts / Instagram Reels)
 - A devotional-style blog post with full scripture references
 - Social captions written per platform (YouTube, Instagram, Facebook, Twitter)
 - Chapter markers for the full sermon
 - A complete searchable transcript
 - Thumbnail and quote cards ready to post
 
-The clip I'd lead with is "{{BEST_CLIP_TITLE}}" ({{CLIP_TIMESTAMP}}). {{WHY_THIS_CLIP_WORKS}}.
+The clip I'd lead with is "Prayer That Conquers Fear and Anxiety" (30:10-31:20). It's topical (anxiety is the #2 Google search for 'how do I deal with...'), it has a question-as-hook that drives search clicks, and 70s is long enough to deliver real substance without losing a Shorts viewer.
 
 Here's why this matters for Metro Tab Church: Metro Tab has 315 sermons on Podbean - that is a massive content library that no one in Chattanooga knows they can search. Transcripts would turn every one of those into a Google-indexable page. YouTube Shorts from your existing library = months of new discovery with zero new recording work.
 
@@ -49,17 +49,17 @@ https://neurovai.org | evan@neurovai.org
 
 ## Follow-Up Email (send 4-5 days later if no response)
 
-**Subject:** Re: Made these from your "{{SERMON_TITLE}}" sermon
+**Subject:** Re: Made these from your "Why Your Prayer Might Be the Ultimate Power Move" sermon
 
 Hey Steve,
 
 Quick follow-up - I know church weeks are busy. Here are the clips in case the link got buried:
 
-1. {{CLIP_1_TITLE}} ({{CLIP_1_DURATION}}): [direct link]
-2. {{CLIP_2_TITLE}} ({{CLIP_2_DURATION}}): [direct link]
-3. {{CLIP_3_TITLE}} ({{CLIP_3_DURATION}}): [direct link]
-4. {{CLIP_4_TITLE}} ({{CLIP_4_DURATION}}): [direct link]
-5. {{CLIP_5_TITLE}} ({{CLIP_5_DURATION}}): [direct link]
+1. If You Can Talk, You Can Pray (1:02): [direct link]
+2. When Prayer Brings Bread (Literally) (1:23): [direct link]
+3. Freedom from Your Struggles Is Possible (2:09): [direct link]
+4. Prayer That Conquers Fear and Anxiety (1:10): [direct link]
+5. This Is the Moment for Your Breakthrough (1:58): [direct link]
 
 These are ready to post - just download and upload to YouTube Shorts or Instagram Reels. No editing needed.
 
@@ -73,7 +73,7 @@ Evan
 
 ## Pre-Send Checklist
 
-- [ ] Process latest episode: `uv run main.py --client metro-tab-church latest --auto-approve`
+- [x] Episode processed: ep_342
 - [ ] Read `output/metro-tab-church/<ep_dir>/*_analysis.json` and pick lead clip
 - [ ] Fill in all `{{}}` placeholders above using analysis output
 - [x] Contact email resolved: info@metrotab.net (metrotab.net staff page or phone (423) 894-3377)
