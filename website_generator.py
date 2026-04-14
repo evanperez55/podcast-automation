@@ -108,7 +108,7 @@ class WebsiteGenerator:
                 # Also check upload_results for episode-level YouTube
                 upload_results = slot.get("upload_results", {})
                 yt_result = upload_results.get("youtube", {})
-                if yt_result.get("video_id"):
+                if isinstance(yt_result, dict) and yt_result.get("video_id"):
                     ids[slot_key] = yt_result["video_id"]
             if ids:
                 result[ep_id] = ids
