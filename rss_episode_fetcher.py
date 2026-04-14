@@ -153,10 +153,13 @@ class RSSEpisodeFetcher:
         if not feed.entries:
             raise ValueError(f"No entries found in RSS feed: {rss_url}")
 
-        # Sort newest-first (entries with no published_parsed sort last)
+        # Sort newest-first. Use getattr — feedparser entries raise
+        # AttributeError on missing keys rather than returning None, so a
+        # direct truthiness check would crash on feeds that omit pub dates
+        # (e.g. Subsplash).
         sorted_entries = sorted(
             feed.entries,
-            key=lambda e: e.published_parsed if e.published_parsed else (0,) * 9,
+            key=lambda e: getattr(e, "published_parsed", None) or (0,) * 9,
             reverse=True,
         )
 

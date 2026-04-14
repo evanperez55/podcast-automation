@@ -193,6 +193,30 @@ class TestFetchLatest:
             meta = fetcher.fetch_latest("https://example.com/feed.xml")
         assert meta.episode_number == 43
 
+    def test_entry_without_published_parsed_does_not_crash(self, fetcher, entry_43):
+        """Some feeds (e.g. Subsplash) return entries where published_parsed is
+        missing. Accessing it on a real feedparser FeedParserDict raises
+        AttributeError, not a falsy value — sorting must handle this via
+        getattr, not truthiness."""
+        from feedparser.util import FeedParserDict
+
+        # Real feedparser entry: AttributeError on missing keys
+        broken = FeedParserDict(
+            title="Missing pub_parsed",
+            enclosures=[{"url": "https://example.com/audio/x.mp3"}],
+        )
+        # No 'published_parsed' attribute — accessing raises AttributeError
+        broken.get = lambda key, default=None: {
+            "itunes_episode": "99",
+            "itunes_duration": "00:10:00",
+        }.get(key, default)
+
+        feed = _make_parsed_feed([broken, entry_43])
+        with patch("rss_episode_fetcher.feedparser.parse", return_value=feed):
+            # Should not raise — the missing-pub entry should sort last
+            meta = fetcher.fetch_episode("https://example.com/feed.xml", index=0)
+        assert meta.episode_number == 43  # The one with a real date wins
+
 
 # ---------------------------------------------------------------------------
 # TestFetchEpisode
