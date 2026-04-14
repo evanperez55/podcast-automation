@@ -606,6 +606,13 @@ def _run_pipeline(args):
                 )
         print()
 
+    # Release GPU resources before returning so the interpreter shutdown
+    # path doesn't have to clean up a live Whisper model — avoids cuDNN
+    # destructor stack corruption seen on Windows batch runs.
+    from pipeline.cleanup import release_gpu_resources
+
+    release_gpu_resources(components)
+
     return results
 
 

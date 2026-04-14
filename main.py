@@ -197,3 +197,15 @@ if __name__ == "__main__":
         # Propagate failure to the shell — batch runners and CI rely on
         # a non-zero exit code to detect pipeline crashes.
         sys.exit(1)
+    else:
+        # Successful exit: bypass Python interpreter shutdown to avoid
+        # cuDNN/ctranslate2 destructor stack corruption on Windows (B010).
+        # pipeline/cleanup.py already released GPU resources, but the
+        # os._exit(0) is the belt-and-suspenders that guarantees no native
+        # destructor can turn a clean run into a failed subprocess.
+        # All disk I/O has been flushed by the pipeline itself.
+        import os
+
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(0)
