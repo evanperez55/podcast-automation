@@ -4,8 +4,8 @@
 **Slug:** the-crossings-church-collinsville
 **Contact:** Pastor / Admin team / **EMAIL: admin@crossingscollinsville.com**
 **Contact notes:** Site appears active despite Oct 2025 stale feed — restart angle is live. Phone: 636-442-2778.
-**Episode referenced:** "{{SERMON_TITLE}}" *(processed TBD)*
-**Drive folder:** Upload from `output/the-crossings-church-collinsville/{{EP_DIR}}/`
+**Episode referenced:** "Why Your Faith Can't Be Just a Feeling" *(processed TBD)*
+**Drive folder:** Upload from `output/the-crossings-church-collinsville/ep_2025/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
 **Angle chosen:** restart
 **Flags:**
@@ -15,25 +15,25 @@
 
 ## Email
 
-**Subject:** Made these from your "{{SERMON_TITLE}}" sermon - took 5 minutes
+**Subject:** Made these from your "Why Your Faith Can't Be Just a Feeling" sermon - took 5 minutes
 
 Hey there,
 
-I listened to "{{SERMON_TITLE}}" this week - {{SPECIFIC_MOMENT_REFERENCE}}. That's the kind of teaching that deserves to reach people beyond Sunday morning at The Crossings Church.
+I listened to "Why Your Faith Can't Be Just a Feeling" this week - the reframe that faith isn't a feeling, it's loyalty — that lands harder than 90% of the James chapter 2 teaching that's out there. That's the kind of teaching that deserves to reach people beyond Sunday morning at The Crossings Church.
 
 I ran it through my automation pipeline and here's what came out in about 5 minutes - no manual editing:
 
 [GOOGLE DRIVE LINK]
 
 Inside you'll find:
-- {{NUM_CLIPS}} vertical clips with burned-in subtitles (ready for YouTube Shorts / Instagram Reels)
+- 5 vertical clips with burned-in subtitles (ready for YouTube Shorts / Instagram Reels)
 - A devotional-style blog post with full scripture references
 - Social captions written per platform (YouTube, Instagram, Facebook, Twitter)
 - Chapter markers for the full sermon
 - A complete searchable transcript
 - Thumbnail and quote cards ready to post
 
-The clip I'd lead with is "{{BEST_CLIP_TITLE}}" ({{CLIP_TIMESTAMP}}). {{WHY_THIS_CLIP_WORKS}}.
+The clip I'd lead with is "Faith Isn't What You Think It Is" (8:00-8:30). It's 30 seconds, self-contained, and flips a cliché ('faith is just a feeling') into a Biblical counter-thesis. Perfect Shorts material — hook in the first word, payoff in under 30 seconds.
 
 Here's why this matters for The Crossings Church: I noticed your podcast feed has not published since October 2025 - I do not know if that is an intentional pause or a capacity issue, but either way this might land at a useful moment. The reason churches stop publishing is almost never lack of sermons; it is the hours of post-production work that piles up until no one has time. My pipeline makes that 5 minutes instead of 4-6 hours - so if you want to restart, the bottleneck goes away.
 
@@ -50,17 +50,17 @@ https://neurovai.org | evan@neurovai.org
 
 ## Follow-Up Email (send 4-5 days later if no response)
 
-**Subject:** Re: Made these from your "{{SERMON_TITLE}}" sermon
+**Subject:** Re: Made these from your "Why Your Faith Can't Be Just a Feeling" sermon
 
 Hey there,
 
 Quick follow-up - I know church weeks are busy. Here are the clips in case the link got buried:
 
-1. {{CLIP_1_TITLE}} ({{CLIP_1_DURATION}}): [direct link]
-2. {{CLIP_2_TITLE}} ({{CLIP_2_DURATION}}): [direct link]
-3. {{CLIP_3_TITLE}} ({{CLIP_3_DURATION}}): [direct link]
-4. {{CLIP_4_TITLE}} ({{CLIP_4_DURATION}}): [direct link]
-5. {{CLIP_5_TITLE}} ({{CLIP_5_DURATION}}): [direct link]
+1. Faith Isn't What You Think It Is (0:30): [direct link]
+2. You Can't Serve Two Masters (0:45): [direct link]
+3. Faith and Works: Both Matter (0:30): [direct link]
+4. Faith Is Not Meant To Be Private (0:30): [direct link]
+5. Why You Need To Focus On The Eternal (0:30): [direct link]
 
 These are ready to post - just download and upload to YouTube Shorts or Instagram Reels. No editing needed.
 
@@ -74,7 +74,7 @@ Evan
 
 ## Pre-Send Checklist
 
-- [ ] Process latest episode: `uv run main.py --client the-crossings-church-collinsville latest --auto-approve`
+- [x] Episode processed: ep_2025
 - [ ] Read `output/the-crossings-church-collinsville/<ep_dir>/*_analysis.json` and pick lead clip
 - [ ] Fill in all `{{}}` placeholders above using analysis output
 - [x] Contact email resolved: admin@crossingscollinsville.com or Apple Podcasts listing contact)
