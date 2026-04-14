@@ -194,3 +194,6 @@ if __name__ == "__main__":
         import traceback
 
         traceback.print_exc()
+        # Propagate failure to the shell — batch runners and CI rely on
+        # a non-zero exit code to detect pipeline crashes.
+        sys.exit(1)
