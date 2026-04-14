@@ -10,6 +10,24 @@ from __future__ import annotations
 import sys
 
 
+def _make_console_unicode_safe() -> None:
+    """Let CLI prints survive characters outside the console's native codec.
+
+    Why: Windows consoles default to cp1252; prospect DB rows routinely
+    contain CJK show names and accented Latin. Strict encoding would
+    crash `outreach list` / `outreach status` on such rows.
+    """
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(errors="backslashreplace")
+        except (OSError, ValueError):
+            pass
+
+
 def activate_client(client_name: str | None) -> None:
     """Apply client config — defaults to 'fake-problems' when no client specified."""
     if not client_name:
@@ -21,6 +39,7 @@ def activate_client(client_name: str | None) -> None:
 
 def handle_client_command(cmd: str, args: dict) -> bool:
     """Handle client management commands. Returns True if handled."""
+    _make_console_unicode_safe()
     name = args["client_name"]
     if cmd == "init-client" and len(sys.argv) > 2:
         from client_config import init_client
