@@ -275,7 +275,10 @@ class TestBuildFfmpegCommand:
         filter_str = cmd[fc_idx + 1]
         assert "fontsdir=" in filter_str
 
-    def test_audio_copy_not_reencode(self):
+    def test_audio_reencoded_as_aac(self):
+        """Audio must be re-encoded to AAC — raw PCM (WAV) cannot be stream-copied
+        into an MP4 container. Regression test for commit 5d9ec24.
+        """
         gen = SubtitleClipGenerator()
         cmd = gen._build_ffmpeg_command(
             audio_path="/path/audio.wav",
@@ -286,7 +289,7 @@ class TestBuildFfmpegCommand:
         )
         assert "-c:a" in cmd
         ca_idx = cmd.index("-c:a")
-        assert cmd[ca_idx + 1] == "copy"
+        assert cmd[ca_idx + 1] == "aac"
 
     def test_vertical_dimensions_720x1280(self):
         gen = SubtitleClipGenerator()
