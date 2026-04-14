@@ -4,8 +4,8 @@
 **Slug:** mercy-village-church
 **Contact:** Pastor (via general info) / **EMAIL: info@mercyvillage.church**
 **Contact notes:** Small-town church, stewardship angle still applies. Phone: 304-410-0371.
-**Episode referenced:** "{{SERMON_TITLE}}" *(processed TBD)*
-**Drive folder:** Upload from `output/mercy-village-church/{{EP_DIR}}/`
+**Episode referenced:** "Why Your Heart Sometimes Just Won't Burn for Scripture" *(processed TBD)*
+**Drive folder:** Upload from `output/mercy-village-church/ep_aHR0cHM6Ly9jZG4uc3Vic3BsYXNoLmNvbS9hdWRpb3MvQkIyTVY3LzcyNDcwMGYxLWNjNzYtNDVjOC05MjFkLTc1ZGNiY2M2YzY0ZS9hdWRpby5tcDM_20260413_205016/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
 **Angle chosen:** stewardship_subsplash
 **Flags:**
@@ -15,25 +15,25 @@
 
 ## Email
 
-**Subject:** Made these from your "{{SERMON_TITLE}}" sermon - took 5 minutes
+**Subject:** Made these from your "Why Your Heart Sometimes Just Won't Burn for Scripture" sermon - took 5 minutes
 
 Hey there,
 
-I listened to "{{SERMON_TITLE}}" this week - {{SPECIFIC_MOMENT_REFERENCE}}. That's the kind of teaching that deserves to reach people beyond Sunday morning at Mercy Village Church.
+I listened to "Why Your Heart Sometimes Just Won't Burn for Scripture" this week - the part that grabbed me was "Most of us read the Bible like it’s a textbook, but it’s actually one epic story — stop treating it like facts and start living it like a movie.". That's the kind of teaching that deserves to reach people beyond Sunday morning at Mercy Village Church.
 
 I ran it through my automation pipeline and here's what came out in about 5 minutes - no manual editing:
 
 [GOOGLE DRIVE LINK]
 
 Inside you'll find:
-- {{NUM_CLIPS}} vertical clips with burned-in subtitles (ready for YouTube Shorts / Instagram Reels)
+- 5 vertical clips with burned-in subtitles (ready for YouTube Shorts / Instagram Reels)
 - A devotional-style blog post with full scripture references
 - Social captions written per platform (YouTube, Instagram, Facebook, Twitter)
 - Chapter markers for the full sermon
 - A complete searchable transcript
 - Thumbnail and quote cards ready to post
 
-The clip I'd lead with is "{{BEST_CLIP_TITLE}}" ({{CLIP_TIMESTAMP}}). {{WHY_THIS_CLIP_WORKS}}.
+The clip I'd lead with is "Why Your Heart Feels Cold Reading the Bible" (8:59-10:38). This clip reveals the core problem many face with scripture — distance and discouragement — framed through a relatable biblical story, making it accessible and impactful. The hook "Why doesn’t your heart burn reading the Bible?" works in the first 2 seconds.
 
 Here's why this matters for Mercy Village Church: Mercy Village describes itself as a small-town church - and small-town churches almost never have a dedicated media team, even when they have 267 sermons worth of teaching sitting on Subsplash. You are already recording every sermon and paying for Subsplash hosting; right now that investment produces one podcast episode per week. This pipeline turns the same recording into 5+ clips, a devotional blog post, a searchable transcript, and per-platform social captions - same input, 15x the output.
 
@@ -50,17 +50,17 @@ https://neurovai.org | evan@neurovai.org
 
 ## Follow-Up Email (send 4-5 days later if no response)
 
-**Subject:** Re: Made these from your "{{SERMON_TITLE}}" sermon
+**Subject:** Re: Made these from your "Why Your Heart Sometimes Just Won't Burn for Scripture" sermon
 
 Hey there,
 
 Quick follow-up - I know church weeks are busy. Here are the clips in case the link got buried:
 
-1. {{CLIP_1_TITLE}} ({{CLIP_1_DURATION}}): [direct link]
-2. {{CLIP_2_TITLE}} ({{CLIP_2_DURATION}}): [direct link]
-3. {{CLIP_3_TITLE}} ({{CLIP_3_DURATION}}): [direct link]
-4. {{CLIP_4_TITLE}} ({{CLIP_4_DURATION}}): [direct link]
-5. {{CLIP_5_TITLE}} ({{CLIP_5_DURATION}}): [direct link]
+1. Why Your Heart Feels Cold Reading the Bible (1:39): [direct link]
+2. 5 Reasons Your Heart Isn’t Burning for God’s Word (2:22): [direct link]
+3. The Bible’s Story Arc Explained Like a Movie (3:17): [direct link]
+4. What Lion King Teaches Us About the Bible’s Ending (3:43): [direct link]
+5. How to Get Your Heart to Burn for God (5:06): [direct link]
 
 These are ready to post - just download and upload to YouTube Shorts or Instagram Reels. No editing needed.
 
@@ -74,7 +74,7 @@ Evan
 
 ## Pre-Send Checklist
 
-- [ ] Process latest episode: `uv run main.py --client mercy-village-church latest --auto-approve`
+- [x] Episode processed: ep_aHR0cHM6Ly9jZG4uc3Vic3BsYXNoLmNvbS9hdWRpb3MvQkIyTVY3LzcyNDcwMGYxLWNjNzYtNDVjOC05MjFkLTc1ZGNiY2M2YzY0ZS9hdWRpby5tcDM_20260413_205016
 - [ ] Read `output/mercy-village-church/<ep_dir>/*_analysis.json` and pick lead clip
 - [ ] Fill in all `{{}}` placeholders above using analysis output
 - [x] Contact email resolved: info@mercyvillage.church (church website or Apple Podcasts listing)

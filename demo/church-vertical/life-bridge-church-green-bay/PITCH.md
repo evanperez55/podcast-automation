@@ -4,8 +4,8 @@
 **Slug:** life-bridge-church-green-bay
 **Contact:** Pastor (via general) / **EMAIL: lbccgb@gmail.com**
 **Contact notes:** VERIFY podcast match: search result was for 'Life Bridge Christian Church Green Bay' (lifebridgegb.org) — iTunes feed is 'Life Bridge Sermons Podcast' by 'Life Bridge Studios'. Likely same entity; confirm before sending. Phone: 920-494-4042.
-**Episode referenced:** "{{SERMON_TITLE}}" *(processed TBD)*
-**Drive folder:** Upload from `output/life-bridge-church-green-bay/{{EP_DIR}}/`
+**Episode referenced:** "Why Resurrected Life Means Slowing Down Your Anger" *(processed TBD)*
+**Drive folder:** Upload from `output/life-bridge-church-green-bay/ep_117/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
 **Angle chosen:** time_saving
 
@@ -14,25 +14,25 @@
 
 ## Email
 
-**Subject:** Made these from your "{{SERMON_TITLE}}" sermon - took 5 minutes
+**Subject:** Made these from your "Why Resurrected Life Means Slowing Down Your Anger" sermon - took 5 minutes
 
 Hey there,
 
-I listened to "{{SERMON_TITLE}}" this week - {{SPECIFIC_MOMENT_REFERENCE}}. That's the kind of teaching that deserves to reach people beyond Sunday morning at Life Bridge Church.
+I listened to "Why Resurrected Life Means Slowing Down Your Anger" this week - the part that grabbed me was "Your anger isn’t just a feeling — it’s the boss of you until faith fires it.". That's the kind of teaching that deserves to reach people beyond Sunday morning at Life Bridge Church.
 
 I ran it through my automation pipeline and here's what came out in about 5 minutes - no manual editing:
 
 [GOOGLE DRIVE LINK]
 
 Inside you'll find:
-- {{NUM_CLIPS}} vertical clips with burned-in subtitles (ready for YouTube Shorts / Instagram Reels)
+- 5 vertical clips with burned-in subtitles (ready for YouTube Shorts / Instagram Reels)
 - A devotional-style blog post with full scripture references
 - Social captions written per platform (YouTube, Instagram, Facebook, Twitter)
 - Chapter markers for the full sermon
 - A complete searchable transcript
 - Thumbnail and quote cards ready to post
 
-The clip I'd lead with is "{{BEST_CLIP_TITLE}}" ({{CLIP_TIMESTAMP}}). {{WHY_THIS_CLIP_WORKS}}.
+The clip I'd lead with is "Why Your Anger Is Holding You Back" (5:30-7:30). The clip challenges listeners to reflect on their anger and speech, offering a profound and practical biblical insight that resonates with everyday struggles. The hook "Human anger breaks more than it fixes" works in the first 2 seconds.
 
 Here's why this matters for Life Bridge Church: Life Bridge launched the sermon podcast in 2024 - you are at the right stage to build a content system instead of doing this by hand. If you are like most churches this size, the social media is handled by a volunteer or the comms person as part of 10 other jobs. This pipeline takes the 4-6 hours per sermon down to 5 minutes - so no one has to choose between content and the other 10 jobs.
 
@@ -49,17 +49,17 @@ https://neurovai.org | evan@neurovai.org
 
 ## Follow-Up Email (send 4-5 days later if no response)
 
-**Subject:** Re: Made these from your "{{SERMON_TITLE}}" sermon
+**Subject:** Re: Made these from your "Why Resurrected Life Means Slowing Down Your Anger" sermon
 
 Hey there,
 
 Quick follow-up - I know church weeks are busy. Here are the clips in case the link got buried:
 
-1. {{CLIP_1_TITLE}} ({{CLIP_1_DURATION}}): [direct link]
-2. {{CLIP_2_TITLE}} ({{CLIP_2_DURATION}}): [direct link]
-3. {{CLIP_3_TITLE}} ({{CLIP_3_DURATION}}): [direct link]
-4. {{CLIP_4_TITLE}} ({{CLIP_4_DURATION}}): [direct link]
-5. {{CLIP_5_TITLE}} ({{CLIP_5_DURATION}}): [direct link]
+1. Faith Alone Saves But Is Never Alone (1:20): [direct link]
+2. Why Your Anger Is Holding You Back (2:00): [direct link]
+3. Listen More Than You Speak (1:20): [direct link]
+4. From Lukewarmness to On Fire for God (1:00): [direct link]
+5. Live a Resurrected Life of Active Obedience (1:20): [direct link]
 
 These are ready to post - just download and upload to YouTube Shorts or Instagram Reels. No editing needed.
 
@@ -73,7 +73,7 @@ Evan
 
 ## Pre-Send Checklist
 
-- [ ] Process latest episode: `uv run main.py --client life-bridge-church-green-bay latest --auto-approve`
+- [x] Episode processed: ep_117
 - [ ] Read `output/life-bridge-church-green-bay/<ep_dir>/*_analysis.json` and pick lead clip
 - [ ] Fill in all `{{}}` placeholders above using analysis output
 - [x] Contact email resolved: lbccgb@gmail.com (Apple Podcasts listing or church website)
