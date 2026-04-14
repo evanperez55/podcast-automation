@@ -26,14 +26,20 @@ def fmt_mmss(seconds: float) -> str:
 
 
 def fmt_timestamp_range(start: str, end: str) -> str:
-    """Convert '00:45:12' → '45:12' and build a range."""
-    def strip_hour(t: str) -> str:
+    """Convert 'HH:MM:SS' timestamps to a compact range for email pitches.
+
+    Drops the hour component when it is 00 and strips leading zeros from
+    the resulting minute field so '00:05:30' renders as '5:30', not '05:30'.
+    Keeps the hour when non-zero ('01:05:30' → '01:05:30').
+    """
+    def compact(t: str) -> str:
         parts = t.split(":")
         if len(parts) == 3 and parts[0] == "00":
-            return ":".join(parts[1:])
+            mm, ss = parts[1], parts[2]
+            return f"{int(mm)}:{ss}"
         return t
 
-    return f"{strip_hour(start)}-{strip_hour(end)}"
+    return f"{compact(start)}-{compact(end)}"
 
 
 def main() -> int:
