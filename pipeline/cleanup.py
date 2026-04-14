@@ -1,15 +1,19 @@
-"""GPU resource cleanup for pipeline runs.
+"""GPU resource cleanup — library/test use only.
 
-Why this exists: on Windows, ctranslate2/cuDNN destructors can trigger
-STATUS_STACK_BUFFER_OVERRUN (exit code 3221226505) during Python
-interpreter shutdown after long pipelines that have loaded a Whisper
-model. Explicit teardown BEFORE the interpreter starts shutting down
-gives the native libraries a clean window to release GPU state while
-Python bookkeeping is still intact.
+History (B011, re-diagnosed): this helper originally ran at the end of
+every pipeline as a "clean window" for ctranslate2 to release CUDA
+state before interpreter shutdown. In practice, calling `del
+transcriber.model` here IS what triggered STATUS_STACK_BUFFER_OVERRUN
+(exit code 3221226505) on a subset of Windows runs — faulthandler
+caught the crash inside the ctranslate2 C++ destructor invoked by that
+del. Python `try/except` cannot catch native stack corruption, so the
+"swallow errors" comments below give false safety for the real hazard.
 
-Every call swallows its own errors — cleanup running after a
-successful pipeline run must never be what makes that run look like
-a failure.
+Current strategy: main.py flushes stdout then calls os._exit(0),
+which terminates the process without running any destructors. The OS
+reclaims GPU state, CUDA handles, and open files. No manual teardown
+is needed on the success path, and the pipeline no longer calls this
+function. It is retained for library callers and tests.
 """
 
 from __future__ import annotations

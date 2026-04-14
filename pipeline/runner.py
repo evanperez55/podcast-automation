@@ -40,6 +40,16 @@ from pipeline.steps.analysis import run_analysis
 from pipeline.steps.video import run_video
 from pipeline.steps.distribute import run_distribute
 
+# B011: keep a process-lifetime reference to the transcriber components on
+# the CLI success path. When `components` goes out of scope at the end of
+# _run_pipeline(), Python GC drops its last reference to the faster-whisper
+# model, which invokes the ctranslate2 C++ destructor — and that destructor
+# has been observed to STATUS_STACK_BUFFER_OVERRUN on certain Windows runs
+# (deterministic repro on christ-community-columbus). Parking the dict here
+# keeps the refs alive until main.py calls os._exit(0), which terminates
+# the process without running any destructors at all.
+_KEEP_ALIVE_COMPONENTS: list[dict] = []
+
 
 def _init_uploaders():
     """Initialize social media uploaders if credentials are configured.
@@ -606,13 +616,18 @@ def _run_pipeline(args):
                 )
         print()
 
-    # Release GPU resources before returning so the interpreter shutdown
-    # path doesn't have to clean up a live Whisper model — avoids cuDNN
-    # destructor stack corruption seen on Windows batch runs.
-    from pipeline.cleanup import release_gpu_resources
-
-    release_gpu_resources(components)
-
+    # Do NOT manually release GPU resources here — triggering ctranslate2's
+    # C++ destructor via `del transcriber.model` is itself what caused
+    # STATUS_STACK_BUFFER_OVERRUN on Windows (B011 root cause, confirmed by
+    # faulthandler stack at cleanup.py:38 on christ-community-columbus).
+    #
+    # We ALSO have to prevent implicit GC of the transcriber when
+    # `components` goes out of scope on the next line — the C++ destructor
+    # fires there too (second faulthandler repro showed the crash at the
+    # return statement). Parking the dict in a module-level list keeps its
+    # refcount above zero. main.py's os._exit(0) then terminates the
+    # process without running any destructors.
+    _KEEP_ALIVE_COMPONENTS.append(components)
     return results
 
 

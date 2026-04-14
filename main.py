@@ -1,5 +1,6 @@
 """CLI entry point for podcast automation — thin shim that delegates to pipeline/."""
 
+import faulthandler
 import re
 import sys
 
@@ -16,6 +17,12 @@ from pipeline import (
     list_episodes_by_number,
     list_available_episodes,
 )
+
+# Enable faulthandler so native crashes (cuDNN/ctranslate2/ffmpeg SIGSEGV,
+# Windows STATUS_STACK_BUFFER_OVERRUN, etc.) dump Python tracebacks to
+# stderr before the process dies. Without this, those crashes produce
+# only an opaque Windows exit code and the log ends mid-step.
+faulthandler.enable()
 
 
 def _parse_flags():
