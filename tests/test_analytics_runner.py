@@ -1,8 +1,8 @@
 """Tests for pipeline/analytics_runner.py — analytics CLI + backfill commands."""
+
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -48,9 +48,13 @@ def fake_scorer():
 
 
 class TestRunAnalytics:
-    def test_single_episode_by_number(self, mock_output_dir, fake_collector, fake_scorer, capsys):
-        with patch("analytics.AnalyticsCollector", return_value=fake_collector), \
-             patch("analytics.TopicEngagementScorer", return_value=fake_scorer):
+    def test_single_episode_by_number(
+        self, mock_output_dir, fake_collector, fake_scorer, capsys
+    ):
+        with (
+            patch("analytics.AnalyticsCollector", return_value=fake_collector),
+            patch("analytics.TopicEngagementScorer", return_value=fake_scorer),
+        ):
             ar.run_analytics("25")
 
         out = capsys.readouterr().out
@@ -59,19 +63,29 @@ class TestRunAnalytics:
         fake_collector.collect_analytics.assert_called_once()
         # episode_number arg should be 25, video_id picked up from platform_ids
         call_kwargs = fake_collector.collect_analytics.call_args
-        assert call_kwargs.args[0] == 25 or call_kwargs.kwargs.get("episode_number") == 25
+        assert (
+            call_kwargs.args[0] == 25 or call_kwargs.kwargs.get("episode_number") == 25
+        )
 
-    def test_accepts_ep_prefixed_arg(self, mock_output_dir, fake_collector, fake_scorer, capsys):
+    def test_accepts_ep_prefixed_arg(
+        self, mock_output_dir, fake_collector, fake_scorer, capsys
+    ):
         """'ep25' and '25' should both resolve to episode 25."""
-        with patch("analytics.AnalyticsCollector", return_value=fake_collector), \
-             patch("analytics.TopicEngagementScorer", return_value=fake_scorer):
+        with (
+            patch("analytics.AnalyticsCollector", return_value=fake_collector),
+            patch("analytics.TopicEngagementScorer", return_value=fake_scorer),
+        ):
             ar.run_analytics("ep25")
         # Collector was called once with 25
         fake_collector.collect_analytics.assert_called_once()
 
-    def test_invalid_episode_arg(self, mock_output_dir, fake_collector, fake_scorer, capsys):
-        with patch("analytics.AnalyticsCollector", return_value=fake_collector), \
-             patch("analytics.TopicEngagementScorer", return_value=fake_scorer):
+    def test_invalid_episode_arg(
+        self, mock_output_dir, fake_collector, fake_scorer, capsys
+    ):
+        with (
+            patch("analytics.AnalyticsCollector", return_value=fake_collector),
+            patch("analytics.TopicEngagementScorer", return_value=fake_scorer),
+        ):
             ar.run_analytics("not-a-number")
         out = capsys.readouterr().out
         assert "Invalid episode" in out
@@ -84,15 +98,21 @@ class TestRunAnalytics:
         (mock_output_dir / "ep_30").mkdir()
         (mock_output_dir / "unrelated").mkdir()  # should NOT be processed
 
-        with patch("analytics.AnalyticsCollector", return_value=fake_collector), \
-             patch("analytics.TopicEngagementScorer", return_value=fake_scorer):
+        with (
+            patch("analytics.AnalyticsCollector", return_value=fake_collector),
+            patch("analytics.TopicEngagementScorer", return_value=fake_scorer),
+        ):
             ar.run_analytics("all")
 
         assert fake_collector.collect_analytics.call_count == 3
 
-    def test_prints_platform_metrics(self, mock_output_dir, fake_collector, fake_scorer, capsys):
-        with patch("analytics.AnalyticsCollector", return_value=fake_collector), \
-             patch("analytics.TopicEngagementScorer", return_value=fake_scorer):
+    def test_prints_platform_metrics(
+        self, mock_output_dir, fake_collector, fake_scorer, capsys
+    ):
+        with (
+            patch("analytics.AnalyticsCollector", return_value=fake_collector),
+            patch("analytics.TopicEngagementScorer", return_value=fake_scorer),
+        ):
             ar.run_analytics("5")
         out = capsys.readouterr().out
         assert "YouTube: 100 views" in out
@@ -124,21 +144,29 @@ class TestLoadEpisodeTopics:
                 {"suggested_title": "Clip C"},
             ]
         }
-        (ep_dir / "foo_analysis.json").write_text(json.dumps(analysis), encoding="utf-8")
+        (ep_dir / "foo_analysis.json").write_text(
+            json.dumps(analysis), encoding="utf-8"
+        )
         assert ar._load_episode_topics(5) == ["Clip A", "Clip B", "Clip C"]
 
     def test_falls_back_to_title_key(self, mock_output_dir):
         ep_dir = mock_output_dir / "ep_7"
         ep_dir.mkdir()
         analysis = {"best_clips": [{"title": "Fallback Title"}]}
-        (ep_dir / "foo_analysis.json").write_text(json.dumps(analysis), encoding="utf-8")
+        (ep_dir / "foo_analysis.json").write_text(
+            json.dumps(analysis), encoding="utf-8"
+        )
         assert ar._load_episode_topics(7) == ["Fallback Title"]
 
     def test_skips_clips_without_title(self, mock_output_dir):
         ep_dir = mock_output_dir / "ep_8"
         ep_dir.mkdir()
-        analysis = {"best_clips": [{"suggested_title": ""}, {"suggested_title": "Real"}]}
-        (ep_dir / "foo_analysis.json").write_text(json.dumps(analysis), encoding="utf-8")
+        analysis = {
+            "best_clips": [{"suggested_title": ""}, {"suggested_title": "Real"}]
+        }
+        (ep_dir / "foo_analysis.json").write_text(
+            json.dumps(analysis), encoding="utf-8"
+        )
         assert ar._load_episode_topics(8) == ["Real"]
 
     def test_malformed_json_returns_empty(self, mock_output_dir):
@@ -205,15 +233,19 @@ class TestRunBackfillIds:
         fake_yt = MagicMock()
         fake_collector = MagicMock()
         fake_collector._build_youtube_client.return_value = fake_yt
-        with patch("analytics.AnalyticsCollector", return_value=fake_collector), \
-             patch("time.sleep"):  # skip the 1.5s rate-limit in tests
+        with (
+            patch("analytics.AnalyticsCollector", return_value=fake_collector),
+            patch("time.sleep"),
+        ):  # skip the 1.5s rate-limit in tests
             ar.run_backfill_ids()
 
         out = capsys.readouterr().out
         assert "[SKIP] ep_5" in out
         fake_yt.search.assert_not_called()
 
-    def test_writes_platform_ids_from_search(self, mock_output_dir, capsys, monkeypatch):
+    def test_writes_platform_ids_from_search(
+        self, mock_output_dir, capsys, monkeypatch
+    ):
         monkeypatch.setenv("YOUTUBE_CHANNEL_ID", "UCtestchannel")
         (mock_output_dir / "ep_7").mkdir()
 
@@ -224,8 +256,10 @@ class TestRunBackfillIds:
         fake_collector = MagicMock()
         fake_collector._build_youtube_client.return_value = fake_yt
 
-        with patch("analytics.AnalyticsCollector", return_value=fake_collector), \
-             patch("time.sleep"):
+        with (
+            patch("analytics.AnalyticsCollector", return_value=fake_collector),
+            patch("time.sleep"),
+        ):
             ar.run_backfill_ids()
 
         platform_ids = json.loads(
@@ -242,8 +276,10 @@ class TestRunBackfillIds:
         fake_collector = MagicMock()
         fake_collector._build_youtube_client.return_value = fake_yt
 
-        with patch("analytics.AnalyticsCollector", return_value=fake_collector), \
-             patch("time.sleep"):
+        with (
+            patch("analytics.AnalyticsCollector", return_value=fake_collector),
+            patch("time.sleep"),
+        ):
             ar.run_backfill_ids()
 
         platform_ids = json.loads(
@@ -251,7 +287,9 @@ class TestRunBackfillIds:
         )
         assert platform_ids == {"youtube": None, "twitter": None}
 
-    def test_api_exception_does_not_abort_backfill(self, mock_output_dir, monkeypatch, capsys):
+    def test_api_exception_does_not_abort_backfill(
+        self, mock_output_dir, monkeypatch, capsys
+    ):
         """One episode's API failure shouldn't prevent others from processing."""
         monkeypatch.setenv("YOUTUBE_CHANNEL_ID", "UCx")
         (mock_output_dir / "ep_10").mkdir()
@@ -276,11 +314,12 @@ class TestRunBackfillIds:
         fake_collector = MagicMock()
         fake_collector._build_youtube_client.return_value = fake_yt
 
-        with patch("analytics.AnalyticsCollector", return_value=fake_collector), \
-             patch("time.sleep"):
+        with (
+            patch("analytics.AnalyticsCollector", return_value=fake_collector),
+            patch("time.sleep"),
+        ):
             ar.run_backfill_ids()
 
-        out = capsys.readouterr().out
         # Both episodes produced a platform_ids.json
         assert (mock_output_dir / "ep_10" / "platform_ids.json").exists()
         assert (mock_output_dir / "ep_11" / "platform_ids.json").exists()

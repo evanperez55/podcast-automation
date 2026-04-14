@@ -1,8 +1,7 @@
 """Tests for TopicScraper class in topic_scraper.py."""
 
-import json
 import pytest
-from unittest.mock import patch, Mock, MagicMock, mock_open
+from unittest.mock import patch, Mock, mock_open
 from pathlib import Path
 
 from topic_scraper import TopicScraper
@@ -25,7 +24,9 @@ def _make_mock_post(title="Test Post", score=500, num_comments=50, selftext="bod
 class TestTopicScraperInit:
     """Tests for TopicScraper initialization."""
 
-    @patch.dict("os.environ", {"REDDIT_CLIENT_ID": "id", "REDDIT_CLIENT_SECRET": "secret"})
+    @patch.dict(
+        "os.environ", {"REDDIT_CLIENT_ID": "id", "REDDIT_CLIENT_SECRET": "secret"}
+    )
     @patch("topic_scraper.praw.Reddit")
     def test_init_with_reddit_credentials(self, mock_reddit_cls):
         """Initializes PRAW Reddit client when credentials are set."""
@@ -40,7 +41,9 @@ class TestTopicScraperInit:
         scraper = TopicScraper()
         assert scraper.reddit is None
 
-    @patch.dict("os.environ", {"REDDIT_CLIENT_ID": "id", "REDDIT_CLIENT_SECRET": "secret"})
+    @patch.dict(
+        "os.environ", {"REDDIT_CLIENT_ID": "id", "REDDIT_CLIENT_SECRET": "secret"}
+    )
     @patch("topic_scraper.praw.Reddit", side_effect=Exception("auth failed"))
     def test_init_reddit_failure(self, mock_reddit_cls):
         """Reddit client is None when PRAW initialization fails."""
@@ -83,7 +86,9 @@ class TestScrapeRedditSubreddit:
         assert topics[0]["source"] == "r/nottheonion"
         assert topics[0]["source_type"] == "reddit"
 
-    @patch.dict("os.environ", {"REDDIT_CLIENT_ID": "id", "REDDIT_CLIENT_SECRET": "secret"})
+    @patch.dict(
+        "os.environ", {"REDDIT_CLIENT_ID": "id", "REDDIT_CLIENT_SECRET": "secret"}
+    )
     @patch("topic_scraper.praw.Reddit")
     def test_scrape_praw_api_success(self, mock_reddit_cls):
         """Scrapes via PRAW when authenticated."""

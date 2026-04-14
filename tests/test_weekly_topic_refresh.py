@@ -14,7 +14,9 @@ class TestRunWeeklyRefreshAllSteps:
     @patch("weekly_topic_refresh.TopicScorer")
     @patch("weekly_topic_refresh.TopicScraper")
     @patch("weekly_topic_refresh.Path.mkdir")
-    def test_all_steps_success(self, mock_mkdir, mock_scraper_cls, mock_scorer_cls, mock_curator_cls):
+    def test_all_steps_success(
+        self, mock_mkdir, mock_scraper_cls, mock_scorer_cls, mock_curator_cls
+    ):
         """All four steps succeed and results dict has all step keys."""
         from weekly_topic_refresh import run_weekly_refresh
 
@@ -22,7 +24,10 @@ class TestRunWeeklyRefreshAllSteps:
         mock_scraper = mock_scraper_cls.return_value
         mock_scraper.scrape_multiple_subreddits.return_value = [{"title": "t1"}]
         mock_scraper.scrape_trending_topics.return_value = [{"title": "t2"}]
-        mock_scraper.deduplicate_topics.return_value = [{"title": "t1"}, {"title": "t2"}]
+        mock_scraper.deduplicate_topics.return_value = [
+            {"title": "t1"},
+            {"title": "t2"},
+        ]
         mock_scraper.filter_by_score.return_value = [{"title": "t1"}]
         mock_scraper.save_scraped_topics.return_value = Path("topic_data/scraped.json")
 
@@ -51,7 +56,9 @@ class TestRunWeeklyRefreshAllSteps:
         with patch("weekly_topic_refresh.Path.glob", return_value=[mock_scraped_file]):
             with patch("builtins.open", return_value=mock_file_read):
                 with patch("json.load", return_value={"topics": [{"title": "t1"}]}):
-                    result = run_weekly_refresh(scrape=True, score=True, curate=True, plan_episode=True)
+                    result = run_weekly_refresh(
+                        scrape=True, score=True, curate=True, plan_episode=True
+                    )
 
         assert result["steps"]["scrape"]["success"] is True
         assert result["steps"]["score"]["success"] is True
@@ -61,13 +68,17 @@ class TestRunWeeklyRefreshAllSteps:
     @patch("weekly_topic_refresh.TopicScraper")
     @patch("weekly_topic_refresh.Path.mkdir")
     @patch("builtins.open", new_callable=MagicMock)
-    def test_scrape_failure_stops_pipeline(self, mock_open, mock_mkdir, mock_scraper_cls):
+    def test_scrape_failure_stops_pipeline(
+        self, mock_open, mock_mkdir, mock_scraper_cls
+    ):
         """When scraping fails, pipeline returns early without scoring."""
         from weekly_topic_refresh import run_weekly_refresh
 
         mock_scraper_cls.side_effect = Exception("Reddit API down")
 
-        result = run_weekly_refresh(scrape=True, score=True, curate=True, plan_episode=True)
+        result = run_weekly_refresh(
+            scrape=True, score=True, curate=True, plan_episode=True
+        )
 
         assert result["steps"]["scrape"]["success"] is False
         assert "score" not in result["steps"]
@@ -88,7 +99,9 @@ class TestRunWeeklyRefreshSelectiveSteps:
         mock_curator.restructure_google_doc.return_value = True
         mock_curator.plan_next_episode.return_value = {"total_topics": 3}
 
-        result = run_weekly_refresh(scrape=False, score=False, curate=True, plan_episode=True)
+        result = run_weekly_refresh(
+            scrape=False, score=False, curate=True, plan_episode=True
+        )
 
         assert "scrape" not in result["steps"]
         assert "score" not in result["steps"]
@@ -97,7 +110,9 @@ class TestRunWeeklyRefreshSelectiveSteps:
     @patch("weekly_topic_refresh.TopicCurator")
     @patch("weekly_topic_refresh.Path.mkdir")
     @patch("builtins.open", new_callable=MagicMock)
-    def test_plan_failure_does_not_block_curate(self, mock_open, mock_mkdir, mock_curator_cls):
+    def test_plan_failure_does_not_block_curate(
+        self, mock_open, mock_mkdir, mock_curator_cls
+    ):
         """Planning failure is non-fatal — curate result is preserved."""
         from weekly_topic_refresh import run_weekly_refresh
 
@@ -107,7 +122,9 @@ class TestRunWeeklyRefreshSelectiveSteps:
         # Second call for plan_episode raises
         mock_curator.plan_next_episode.side_effect = Exception("Ollama offline")
 
-        result = run_weekly_refresh(scrape=False, score=False, curate=True, plan_episode=True)
+        result = run_weekly_refresh(
+            scrape=False, score=False, curate=True, plan_episode=True
+        )
 
         assert result["steps"]["curate"]["success"] is True
         assert result["steps"]["plan"]["success"] is False
@@ -119,7 +136,9 @@ class TestRunWeeklyRefreshSelectiveSteps:
         """Running with all steps disabled returns results with no step entries."""
         from weekly_topic_refresh import run_weekly_refresh
 
-        result = run_weekly_refresh(scrape=False, score=False, curate=False, plan_episode=False)
+        result = run_weekly_refresh(
+            scrape=False, score=False, curate=False, plan_episode=False
+        )
 
         assert result["steps"] == {}
         assert "started_at" in result
@@ -136,7 +155,9 @@ class TestRunWeeklyRefreshScoring:
         from weekly_topic_refresh import run_weekly_refresh
 
         with patch("weekly_topic_refresh.Path.glob", return_value=[]):
-            result = run_weekly_refresh(scrape=False, score=True, curate=False, plan_episode=False)
+            result = run_weekly_refresh(
+                scrape=False, score=True, curate=False, plan_episode=False
+            )
 
         assert result["steps"]["score"]["success"] is False
         assert "No scraped topics found" in result["steps"]["score"]["error"]
@@ -165,7 +186,9 @@ class TestRunWeeklyRefreshScoring:
         with patch("weekly_topic_refresh.Path.glob", return_value=[mock_file]):
             with patch("builtins.open", return_value=mock_file_ctx):
                 with patch("json.load", return_value={"topics": [{"t": 1}]}):
-                    result = run_weekly_refresh(scrape=False, score=True, curate=False, plan_episode=False)
+                    result = run_weekly_refresh(
+                        scrape=False, score=True, curate=False, plan_episode=False
+                    )
 
         assert result["steps"]["score"]["success"] is True
         assert result["steps"]["score"]["topics_scored"] == 2

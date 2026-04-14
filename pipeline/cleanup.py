@@ -11,6 +11,7 @@ Every call swallows its own errors — cleanup running after a
 successful pipeline run must never be what makes that run look like
 a failure.
 """
+
 from __future__ import annotations
 
 import gc

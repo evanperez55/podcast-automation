@@ -11,6 +11,7 @@ Placeholders filled:
     {{BEST_CLIP_TITLE}}, {{CLIP_TIMESTAMP}}, {{WHY_THIS_CLIP_WORKS}},
     {{CLIP_N_TITLE}}, {{CLIP_N_DURATION}} for N in 1..5
 """
+
 from __future__ import annotations
 
 import argparse
@@ -32,6 +33,7 @@ def fmt_timestamp_range(start: str, end: str) -> str:
     the resulting minute field so '00:05:30' renders as '5:30', not '05:30'.
     Keeps the hour when non-zero ('01:05:30' → '01:05:30').
     """
+
     def compact(t: str) -> str:
         parts = t.split(":")
         if len(parts) == 3 and parts[0] == "00":
@@ -94,17 +96,20 @@ def main() -> int:
 
     lead_idx = args.lead_clip - 1
     if lead_idx < 0 or lead_idx >= len(clips):
-        print(f"ERROR: --lead-clip {args.lead_clip} out of range 1..{len(clips)}", file=sys.stderr)
+        print(
+            f"ERROR: --lead-clip {args.lead_clip} out of range 1..{len(clips)}",
+            file=sys.stderr,
+        )
         return 1
     lead = clips[lead_idx]
 
     moment = args.moment or (
-        f"the part that grabbed me was \"{analysis.get('hot_take', '').strip()}\""
+        f'the part that grabbed me was "{analysis.get("hot_take", "").strip()}"'
         if analysis.get("hot_take")
         else f"the {lead.get('description', '').lower().rstrip('.')} section landed especially well"
     )
     why_clip = args.why or (
-        f"{lead.get('why_interesting', '').rstrip('.')}. The hook \"{lead.get('hook_caption', '')}\" works in the first 2 seconds"
+        f'{lead.get("why_interesting", "").rstrip(".")}. The hook "{lead.get("hook_caption", "")}" works in the first 2 seconds'
         if lead.get("why_interesting")
         else "strong hook + clear payoff, works as a Short on its own"
     )
@@ -128,7 +133,9 @@ def main() -> int:
     # Per-clip entries (N=1..5)
     for i, clip in enumerate(clips[:5], start=1):
         replacements[f"{{{{CLIP_{i}_TITLE}}}}"] = clip.get("suggested_title", "")
-        replacements[f"{{{{CLIP_{i}_DURATION}}}}"] = fmt_mmss(clip.get("duration_seconds", 0))
+        replacements[f"{{{{CLIP_{i}_DURATION}}}}"] = fmt_mmss(
+            clip.get("duration_seconds", 0)
+        )
 
     # If fewer than 5 clips, clear unused lines
     for i in range(len(clips) + 1, 6):

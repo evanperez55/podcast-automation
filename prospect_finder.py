@@ -341,8 +341,7 @@ class ProspectFinder:
         if show_website and show_website != website:
             websites_to_scan.add(show_website)
 
-        # Derive likely show website from slug/name (e.g. kccpod.com)
-        slug_clean = slug.replace("-", "")
+        # Derive likely show website from slug (e.g. kccpod.com)
         for domain in [f"https://{slug}.com", f"https://www.{slug}.com"]:
             websites_to_scan.add(domain)
 
@@ -392,13 +391,23 @@ class ProspectFinder:
             parsed = urllib.parse.urlparse(url_field)
             hostname = parsed.hostname or ""
             for host_domain in [
-                "podbean.com", "spreaker.com", "buzzsprout.com",
-                "anchor.fm", "transistor.fm", "libsyn.com",
+                "podbean.com",
+                "spreaker.com",
+                "buzzsprout.com",
+                "anchor.fm",
+                "transistor.fm",
+                "libsyn.com",
             ]:
                 if hostname.endswith(host_domain):
                     # Try subdomain first (e.g. kccpod.podbean.com)
-                    subdomain = hostname.replace(f".{host_domain}", "").replace("feed.", "")
-                    if subdomain and subdomain not in handles_to_try and subdomain != "www":
+                    subdomain = hostname.replace(f".{host_domain}", "").replace(
+                        "feed.", ""
+                    )
+                    if (
+                        subdomain
+                        and subdomain not in handles_to_try
+                        and subdomain != "www"
+                    ):
                         handles_to_try.append(subdomain)
                     # Also try path-based handle (e.g. feed.podbean.com/kccpod/feed.xml)
                     path_parts = parsed.path.strip("/").split("/")
@@ -408,7 +417,9 @@ class ProspectFinder:
                             handles_to_try.append(path_handle)
             # Match path-based hosts: rss.com/podcasts/showname/
             if "rss.com/podcasts/" in url_field:
-                path_handle = url_field.split("rss.com/podcasts/")[1].strip("/").split("/")[0]
+                path_handle = (
+                    url_field.split("rss.com/podcasts/")[1].strip("/").split("/")[0]
+                )
                 if path_handle and path_handle not in handles_to_try:
                     handles_to_try.append(path_handle)
 
@@ -535,8 +546,7 @@ class ProspectFinder:
                 return {
                     "itunes_rating": r.get("averageUserRating"),
                     "itunes_rating_count": r.get("userRatingCount"),
-                    "artwork_url": r.get("artworkUrl600")
-                    or r.get("artworkUrl100"),
+                    "artwork_url": r.get("artworkUrl600") or r.get("artworkUrl100"),
                 }
         except Exception as e:
             logger.warning("iTunes lookup failed for %s: %s", itunes_id, e)
@@ -608,9 +618,7 @@ class ProspectFinder:
                                 "confirmed": True,
                                 "source": "direct_check",
                             }
-                            logger.info(
-                                "Confirmed %s account: @%s", platform, handle
-                            )
+                            logger.info("Confirmed %s account: @%s", platform, handle)
                 except Exception:
                     pass  # Connection errors are expected for non-existent handles
 
@@ -659,7 +667,12 @@ class ProspectFinder:
             client_dir.mkdir(exist_ok=True)
             path = client_dir / f"logo.{ext}"
             path.write_bytes(resp.content)
-            logger.info("Downloaded artwork for %s: %s (%dKB)", slug, path, len(resp.content) // 1024)
+            logger.info(
+                "Downloaded artwork for %s: %s (%dKB)",
+                slug,
+                path,
+                len(resp.content) // 1024,
+            )
             return path.relative_to(Config.BASE_DIR)
         except Exception as e:
             logger.warning("Artwork download failed for %s: %s", slug, e)
@@ -749,10 +762,14 @@ class ProspectFinder:
         confirmed_count = len(confirmed_platforms)
         if confirmed_count >= 3:
             score += 15
-            reasons.append(f"+15 Active on {confirmed_count} platforms — values distribution")
+            reasons.append(
+                f"+15 Active on {confirmed_count} platforms — values distribution"
+            )
         elif confirmed_count >= 1:
             score += 10
-            reasons.append(f"+10 On {confirmed_count} platform(s) — some distribution effort")
+            reasons.append(
+                f"+10 On {confirmed_count} platform(s) — some distribution effort"
+            )
         else:
             score += 5
             reasons.append("+5 No confirmed social — may not prioritize distribution")
@@ -764,10 +781,22 @@ class ProspectFinder:
         has_patreon = "patreon" in platforms
 
         network_signals = [
-            "iheartpodcasts", "pushkin", "megaphone", "vox media",
-            "audible", "wondery", "npr", "bbc", "fox news",
-            "wall street journal", "wsj", "lemonada", "earwolf",
-            "comedy central", "simplecast", "smartless",
+            "iheartpodcasts",
+            "pushkin",
+            "megaphone",
+            "vox media",
+            "audible",
+            "wondery",
+            "npr",
+            "bbc",
+            "fox news",
+            "wall street journal",
+            "wsj",
+            "lemonada",
+            "earwolf",
+            "comedy central",
+            "simplecast",
+            "smartless",
         ]
         is_network = any(
             sig in (host_name or "").lower() or sig in (website or "").lower()
@@ -775,7 +804,9 @@ class ProspectFinder:
         )
 
         indie_hosts = ["podbean", "anchor", "rss.com", "spreaker", "buzzsprout"]
-        is_indie = any(h in (research.get("feed_url") or "").lower() for h in indie_hosts)
+        is_indie = any(
+            h in (research.get("feed_url") or "").lower() for h in indie_hosts
+        )
 
         if is_network:
             score -= 10
@@ -798,7 +829,9 @@ class ProspectFinder:
                 days_ago = (date.today() - pub_date).days
                 if days_ago <= 14 and episode_count >= 40:
                     score += 10
-                    reasons.append("+10 High-volume active show — automation saves real time")
+                    reasons.append(
+                        "+10 High-volume active show — automation saves real time"
+                    )
                 elif days_ago <= 30:
                     score += 5
                     reasons.append("+5 Regular release cadence")
@@ -850,11 +883,23 @@ class ProspectFinder:
             "|---|---|---|",
         ]
 
-        for platform in ["youtube", "instagram", "tiktok", "twitter", "facebook", "patreon", "bluesky"]:
+        for platform in [
+            "youtube",
+            "instagram",
+            "tiktok",
+            "twitter",
+            "facebook",
+            "patreon",
+            "bluesky",
+        ]:
             if platform in platforms:
                 info = platforms[platform]
                 if isinstance(info, dict):
-                    detail = info.get("handle") or info.get("url") or info.get("search_url", "")
+                    detail = (
+                        info.get("handle")
+                        or info.get("url")
+                        or info.get("search_url", "")
+                    )
                     lines.append(f"| {platform.title()} | Found | {detail} |")
                 else:
                     lines.append(f"| {platform.title()} | Found | {info} |")
@@ -864,23 +909,27 @@ class ProspectFinder:
         # Score
         score = research.get("score", {})
         if score:
-            lines.extend([
-                "",
-                f"## Fit Score: {score.get('total', 0)}/100 ({score.get('rating', '?')})",
-                "",
-                "| Factor | Points |",
-                "|---|---|",
-            ])
+            lines.extend(
+                [
+                    "",
+                    f"## Fit Score: {score.get('total', 0)}/100 ({score.get('rating', '?')})",
+                    "",
+                    "| Factor | Points |",
+                    "|---|---|",
+                ]
+            )
             for reason in score.get("reasons", []):
                 lines.append(f"| {reason} |")
             lines.append("")
 
-        lines.extend([
-            "## Artwork",
-            f"- **Downloaded:** {'Yes — ' + research.get('artwork_path', '') if research.get('artwork_path') else 'No'}",
-            "",
-            f"---\n*Auto-generated by prospect research pipeline*\n",
-        ])
+        lines.extend(
+            [
+                "## Artwork",
+                f"- **Downloaded:** {'Yes — ' + research.get('artwork_path', '') if research.get('artwork_path') else 'No'}",
+                "",
+                "---\n*Auto-generated by prospect research pipeline*\n",
+            ]
+        )
 
         report_path.write_text("\n".join(lines), encoding="utf-8")
         logger.info("Research report saved: %s", report_path)

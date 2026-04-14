@@ -3,6 +3,7 @@
 Reads from hardcoded PROSPECTS list and writes templated PITCH.md files.
 Safe to re-run — overwrites existing skeletons.
 """
+
 from pathlib import Path
 
 PROSPECTS = [
@@ -56,7 +57,9 @@ PROSPECTS = [
         "angle": "restart",
         "positioning": "I noticed your podcast feed has not published since October 2025 - I do not know if that is an intentional pause or a capacity issue, but either way this might land at a useful moment. The reason churches stop publishing is almost never lack of sermons; it is the hours of post-production work that piles up until no one has time. My pipeline makes that 5 minutes instead of 4-6 hours - so if you want to restart, the bottleneck goes away.",
         "tier": 1,
-        "flags": ["STALE_FEED: last episode Oct 2025 - verify church is still active before sending"],
+        "flags": [
+            "STALE_FEED: last episode Oct 2025 - verify church is still active before sending"
+        ],
     },
     {
         "slug": "faith-bible-church-edmond",
@@ -69,7 +72,9 @@ PROSPECTS = [
         "angle": "seo_vs_pulpit",
         "positioning": "Faith Bible has 1,091 sermons on Subsplash - that is one of the deepest podcast archives of any church in Oklahoma. If you are already using Pulpit AI (Subsplash's clip tool), great - I am not here to replace it. What I do that Pulpit does not: searchable transcript pages on your website. Every sermon becomes a Google-indexable piece of content answering the exact question someone in Edmond is searching at 2am.",
         "tier": 1,
-        "flags": ["SUBSPLASH_HOST: may already use Pulpit AI - position as complement (SEO/transcript), not replacement"],
+        "flags": [
+            "SUBSPLASH_HOST: may already use Pulpit AI - position as complement (SEO/transcript), not replacement"
+        ],
     },
     {
         "slug": "life-bridge-church-green-bay",

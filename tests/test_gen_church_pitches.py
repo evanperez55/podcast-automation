@@ -1,8 +1,7 @@
 """Tests for scripts/gen_church_pitches.py — pitch skeleton generator."""
+
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -83,39 +82,21 @@ class TestMain:
     def test_pitch_contains_church_name(self, run_in_tmp):
         gcp.main()
         prospect = gcp.PROSPECTS[0]
-        out = (
-            run_in_tmp
-            / "demo"
-            / "church-vertical"
-            / prospect["slug"]
-            / "PITCH.md"
-        )
+        out = run_in_tmp / "demo" / "church-vertical" / prospect["slug"] / "PITCH.md"
         content = out.read_text(encoding="utf-8")
         assert prospect["church_name"] in content
 
     def test_pitch_contains_first_name_in_greeting(self, run_in_tmp):
         gcp.main()
         prospect = gcp.PROSPECTS[0]
-        out = (
-            run_in_tmp
-            / "demo"
-            / "church-vertical"
-            / prospect["slug"]
-            / "PITCH.md"
-        )
+        out = run_in_tmp / "demo" / "church-vertical" / prospect["slug"] / "PITCH.md"
         content = out.read_text(encoding="utf-8")
         assert f"Hey {prospect['first_name']}" in content
 
     def test_pitch_contains_positioning_paragraph(self, run_in_tmp):
         gcp.main()
         prospect = gcp.PROSPECTS[0]
-        out = (
-            run_in_tmp
-            / "demo"
-            / "church-vertical"
-            / prospect["slug"]
-            / "PITCH.md"
-        )
+        out = run_in_tmp / "demo" / "church-vertical" / prospect["slug"] / "PITCH.md"
         content = out.read_text(encoding="utf-8")
         # Positioning text is prospect-specific — must show up verbatim
         assert prospect["positioning"][:50] in content
@@ -126,13 +107,7 @@ class TestMain:
         flagged = [p for p in gcp.PROSPECTS if p["flags"]]
         assert flagged, "test setup requires at least one prospect with flags"
         prospect = flagged[0]
-        out = (
-            run_in_tmp
-            / "demo"
-            / "church-vertical"
-            / prospect["slug"]
-            / "PITCH.md"
-        )
+        out = run_in_tmp / "demo" / "church-vertical" / prospect["slug"] / "PITCH.md"
         content = out.read_text(encoding="utf-8")
         assert "**Flags:**" in content
         for flag in prospect["flags"]:
@@ -143,13 +118,7 @@ class TestMain:
         unflagged = [p for p in gcp.PROSPECTS if not p["flags"]]
         assert unflagged
         prospect = unflagged[0]
-        out = (
-            run_in_tmp
-            / "demo"
-            / "church-vertical"
-            / prospect["slug"]
-            / "PITCH.md"
-        )
+        out = run_in_tmp / "demo" / "church-vertical" / prospect["slug"] / "PITCH.md"
         content = out.read_text(encoding="utf-8")
         assert "**Flags:**" not in content
 
@@ -159,13 +128,7 @@ class TestMain:
         if not t2:
             pytest.skip("no tier 2 prospects in current table")
         prospect = t2[0]
-        out = (
-            run_in_tmp
-            / "demo"
-            / "church-vertical"
-            / prospect["slug"]
-            / "PITCH.md"
-        )
+        out = run_in_tmp / "demo" / "church-vertical" / prospect["slug"] / "PITCH.md"
         content = out.read_text(encoding="utf-8")
         assert "*(Tier 2)*" in content
 
@@ -174,13 +137,7 @@ class TestMain:
         knows what to replace later."""
         gcp.main()
         prospect = gcp.PROSPECTS[0]
-        out = (
-            run_in_tmp
-            / "demo"
-            / "church-vertical"
-            / prospect["slug"]
-            / "PITCH.md"
-        )
+        out = run_in_tmp / "demo" / "church-vertical" / prospect["slug"] / "PITCH.md"
         content = out.read_text(encoding="utf-8")
         assert "{{SERMON_TITLE}}" in content
         assert "{{BEST_CLIP_TITLE}}" in content

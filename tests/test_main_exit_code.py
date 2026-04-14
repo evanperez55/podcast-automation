@@ -5,6 +5,7 @@ exceptions, printed a traceback, but then fell through to implicit exit
 code 0 — so the batch runner (and CI, and humans checking $?) treated
 real pipeline failures as successes.
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -30,7 +31,7 @@ def test_main_propagates_exception_as_nonzero_exit(tmp_path):
         "import runpy\n"
         "# Re-run main module's __main__ block with a patched main()\n"
         "exec(compile(open('main.py').read(), 'main.py', 'exec'), {'__name__': '__main__', 'main': broken})\n",
-        encoding='utf-8',
+        encoding="utf-8",
     )
 
     result = subprocess.run(

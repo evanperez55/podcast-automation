@@ -1,4 +1,5 @@
 """Tests for scripts/organize_output.py — episode file organizer."""
+
 from __future__ import annotations
 
 from pathlib import Path

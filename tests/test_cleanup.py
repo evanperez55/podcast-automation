@@ -1,9 +1,9 @@
 """Tests for pipeline/cleanup.py — GPU resource teardown."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from pipeline.cleanup import release_gpu_resources
 

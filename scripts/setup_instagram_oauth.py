@@ -110,7 +110,7 @@ def main():
         print("\nStep 2: After authorizing, you'll be redirected to a URL like:")
         print(f"  {REDIRECT_URI}?code=AQB...")
         print("\nStep 3: Run this script again with the redirect URL:")
-        print("  uv run scripts/setup_instagram_oauth.py \"<paste_redirect_url>\"")
+        print('  uv run scripts/setup_instagram_oauth.py "<paste_redirect_url>"')
         sys.exit(0)
 
     # Step 2: Exchange code for short-lived token

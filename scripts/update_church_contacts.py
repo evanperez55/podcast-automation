@@ -1,6 +1,7 @@
 """One-time script: inject resolved contact emails into church PITCH.md files
 and outreach tracker.
 """
+
 from __future__ import annotations
 
 import re

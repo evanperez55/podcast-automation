@@ -3,6 +3,8 @@
 import re
 import sys
 
+from cli_commands import activate_client as _activate_client
+from cli_commands import handle_client_command as _handle_client_command
 from pipeline import (
     run_with_notification,
     run_upload_scheduled,
@@ -52,10 +54,6 @@ def _parse_flags():
         "demo_mode": "--demo" in raw,
         "client_name": client_name,
     }
-
-
-from cli_commands import activate_client as _activate_client
-from cli_commands import handle_client_command as _handle_client_command
 
 
 def main():

@@ -481,9 +481,7 @@ class YouTubeUploader:
 
         try:
             # Safety check: verify the video is a test upload
-            video = (
-                self.youtube.videos().list(part="snippet", id=video_id).execute()
-            )
+            video = self.youtube.videos().list(part="snippet", id=video_id).execute()
             items = video.get("items", [])
             if not items:
                 logger.error("Video not found: %s", video_id)
@@ -592,9 +590,13 @@ def create_episode_metadata(
         description += f"{clip_info.get('description', '')}\n\n"
         description += f"From Episode #{episode_number} of {podcast_name}\n"
         if full_episode_url:
-            description += f"Watch the full episode and find more: {full_episode_url}\n\n"
+            description += (
+                f"Watch the full episode and find more: {full_episode_url}\n\n"
+            )
         else:
-            description += f"Find all episodes: youtube.com/{Config.YOUTUBE_CHANNEL_HANDLE}\n\n"
+            description += (
+                f"Find all episodes: youtube.com/{Config.YOUTUBE_CHANNEL_HANDLE}\n\n"
+            )
         description += social_captions.get("youtube", episode_summary)
     else:
         # For full episodes

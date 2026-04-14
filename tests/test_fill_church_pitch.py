@@ -1,9 +1,9 @@
 """Tests for scripts/fill_church_pitch.py — Wave C pitch filler."""
+
 from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
 
 import pytest
 
@@ -18,7 +18,9 @@ from scripts import fill_church_pitch as fcp
 class TestFormatters:
     def test_fmt_mmss_rounds_to_int_seconds(self):
         assert fcp.fmt_mmss(45) == "0:45"
-        assert fcp.fmt_mmss(45.7) == "0:45"  # rounds down to int, no floating formatting
+        assert (
+            fcp.fmt_mmss(45.7) == "0:45"
+        )  # rounds down to int, no floating formatting
 
     def test_fmt_mmss_handles_over_one_minute(self):
         assert fcp.fmt_mmss(65) == "1:05"
@@ -74,25 +76,23 @@ def fake_prospect(tmp_path, monkeypatch):
             },
         ],
     }
-    (ep_dir / "foo_analysis.json").write_text(
-        json.dumps(analysis), encoding="utf-8"
-    )
+    (ep_dir / "foo_analysis.json").write_text(json.dumps(analysis), encoding="utf-8")
 
     # Pitch skeleton
     pitch_dir = tmp_path / "demo" / "church-vertical" / slug
     pitch_dir.mkdir(parents=True)
     skeleton = (
-        '# Test - Outreach Pitch\n\n'
+        "# Test - Outreach Pitch\n\n"
         '**Episode referenced:** "{{SERMON_TITLE}}" *(processed TBD)*\n'
-        '**Drive folder:** Upload from `output/test-slug/{{EP_DIR}}/`\n\n'
+        "**Drive folder:** Upload from `output/test-slug/{{EP_DIR}}/`\n\n"
         'Subject: Made these from your "{{SERMON_TITLE}}" sermon\n\n'
         'Lead: "{{BEST_CLIP_TITLE}}" ({{CLIP_TIMESTAMP}}). {{WHY_THIS_CLIP_WORKS}}\n\n'
-        'Context: {{SPECIFIC_MOMENT_REFERENCE}}\n\n'
-        '- {{NUM_CLIPS}} vertical clips\n\n'
-        '1. {{CLIP_1_TITLE}} ({{CLIP_1_DURATION}})\n'
-        '2. {{CLIP_2_TITLE}} ({{CLIP_2_DURATION}})\n'
-        '3. {{CLIP_3_TITLE}} ({{CLIP_3_DURATION}})\n\n'
-        '- [ ] Process latest episode: `uv run main.py --client test-slug latest`\n'
+        "Context: {{SPECIFIC_MOMENT_REFERENCE}}\n\n"
+        "- {{NUM_CLIPS}} vertical clips\n\n"
+        "1. {{CLIP_1_TITLE}} ({{CLIP_1_DURATION}})\n"
+        "2. {{CLIP_2_TITLE}} ({{CLIP_2_DURATION}})\n"
+        "3. {{CLIP_3_TITLE}} ({{CLIP_3_DURATION}})\n\n"
+        "- [ ] Process latest episode: `uv run main.py --client test-slug latest`\n"
     )
     (pitch_dir / "PITCH.md").write_text(skeleton, encoding="utf-8")
 
@@ -117,7 +117,9 @@ class TestMain:
         assert "5:00-5:30" in pitch
 
     def test_lead_clip_flag_selects_different_clip(self, fake_prospect, monkeypatch):
-        monkeypatch.setattr(sys, "argv", ["fill", fake_prospect["slug"], "--lead-clip", "2"])
+        monkeypatch.setattr(
+            sys, "argv", ["fill", fake_prospect["slug"], "--lead-clip", "2"]
+        )
         fcp.main()
         pitch = (fake_prospect["pitch_dir"] / "PITCH.md").read_text(encoding="utf-8")
         # Clip 2 is the lead now
@@ -125,7 +127,9 @@ class TestMain:
         assert "10:00-11:30" in pitch
 
     def test_invalid_lead_clip_returns_error(self, fake_prospect, monkeypatch, capsys):
-        monkeypatch.setattr(sys, "argv", ["fill", fake_prospect["slug"], "--lead-clip", "99"])
+        monkeypatch.setattr(
+            sys, "argv", ["fill", fake_prospect["slug"], "--lead-clip", "99"]
+        )
         rc = fcp.main()
         assert rc == 1
         err = capsys.readouterr().err

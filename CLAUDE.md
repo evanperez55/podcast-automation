@@ -51,10 +51,11 @@ Automated production pipeline: transcription, AI content analysis, auto-censorsh
 - cuDNN DLLs manually copied — may break on venv rebuild
 
 ## Testing
-- 518+ tests, shared fixtures in `tests/conftest.py`
-- Convention: `tests/test_<module>.py` with `class Test<ClassName>` grouping
-- Pre-commit hook: ruff lint + ruff format (`.githooks/pre-commit`)
+- 1500+ tests, shared fixtures in `tests/conftest.py`
+- Convention: `tests/test_<module>.py` with `class Test<ClassName>` grouping (pipeline steps use `test_<name>_step.py`)
+- Pre-commit hook: ruff lint + ruff format + pytest (`.githooks/pre-commit`) — test failures block commit
 - All new features must respect `--dry-run`, `--test`, `--auto-approve` modes
+- **Every new source file needs a matching test file.** Exceptions (already documented): `main.py` (thin CLI dispatcher — covered by `test_main_exit_code.py`), `logger.py` (stdlib logging wrapper — no logic to test), `generate_logo.py` (one-shot DALL-E script), `setup_dropbox_oauth.py` / `setup_google_docs.py` / `setup_instagram.py` / `setup_youtube_auth.py` (interactive browser OAuth — tested manually per integration), `__init__.py` files (re-exports only), `scripts/archive/*` (dead code). Anything else added without a test should be flagged at review time.
 
 ## Gotchas
 - FFmpeg must be installed separately (default path: `C:\ffmpeg\bin\ffmpeg.exe`)

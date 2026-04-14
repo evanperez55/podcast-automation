@@ -1,10 +1,10 @@
 """Tests for scripts/autoresearch_metric.py — composite test/coverage score."""
+
 from __future__ import annotations
 
 import subprocess
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from scripts import autoresearch_metric as arm
 

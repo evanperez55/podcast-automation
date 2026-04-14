@@ -1,8 +1,7 @@
 """Tests for diarize.py — speaker diarization using WhisperX + pyannote."""
 
-import json
 from pathlib import Path
-from unittest.mock import patch, Mock, MagicMock, mock_open
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -40,8 +39,16 @@ class TestDiarize:
     @patch("diarize.json.dump")
     @patch("diarize.Config")
     def test_diarize_happy_path_cpu(
-        self, mock_config, mock_json_dump, mock_open_fn, mock_mkdir,
-        mock_exists, mock_gc, mock_torch, mock_diarize_pipeline, mock_whisperx
+        self,
+        mock_config,
+        mock_json_dump,
+        mock_open_fn,
+        mock_mkdir,
+        mock_exists,
+        mock_gc,
+        mock_torch,
+        mock_diarize_pipeline,
+        mock_whisperx,
     ):
         """Full diarization pipeline runs on CPU and produces output file."""
         from diarize import diarize
@@ -66,8 +73,20 @@ class TestDiarize:
         mock_whisperx.load_align_model.return_value = (mock_align_model, {})
         mock_whisperx.align.return_value = {
             "segments": [
-                {"start": 0, "end": 5, "text": "Hello", "words": [{"word": "Hello"}], "speaker": "SPEAKER_00"},
-                {"start": 5, "end": 10, "text": "World", "words": [{"word": "World"}], "speaker": "SPEAKER_01"},
+                {
+                    "start": 0,
+                    "end": 5,
+                    "text": "Hello",
+                    "words": [{"word": "Hello"}],
+                    "speaker": "SPEAKER_00",
+                },
+                {
+                    "start": 5,
+                    "end": 10,
+                    "text": "World",
+                    "words": [{"word": "World"}],
+                    "speaker": "SPEAKER_01",
+                },
             ]
         }
 
@@ -88,7 +107,9 @@ class TestDiarize:
         result = diarize("test_audio.wav", num_speakers=2, model_size="tiny")
 
         assert result == Path("test_audio_diarized.json")
-        mock_whisperx.load_model.assert_called_once_with("tiny", "cpu", compute_type="int8")
+        mock_whisperx.load_model.assert_called_once_with(
+            "tiny", "cpu", compute_type="int8"
+        )
         mock_json_dump.assert_called_once()
         output_data = mock_json_dump.call_args[0][0]
         assert output_data["num_speakers"] == 2
@@ -125,8 +146,16 @@ class TestDiarize:
     @patch("diarize.json.dump")
     @patch("diarize.Config")
     def test_diarize_custom_output_path(
-        self, mock_config, mock_json_dump, mock_open_fn, mock_mkdir,
-        mock_exists, mock_gc, mock_torch, mock_diarize_pipeline, mock_whisperx
+        self,
+        mock_config,
+        mock_json_dump,
+        mock_open_fn,
+        mock_mkdir,
+        mock_exists,
+        mock_gc,
+        mock_torch,
+        mock_diarize_pipeline,
+        mock_whisperx,
     ):
         """Custom output_path is used instead of default."""
         from diarize import diarize
@@ -157,8 +186,16 @@ class TestDiarize:
     @patch("diarize.json.dump")
     @patch("diarize.Config")
     def test_diarize_unknown_speaker_handled(
-        self, mock_config, mock_json_dump, mock_open_fn, mock_mkdir,
-        mock_exists, mock_gc, mock_torch, mock_diarize_pipeline, mock_whisperx
+        self,
+        mock_config,
+        mock_json_dump,
+        mock_open_fn,
+        mock_mkdir,
+        mock_exists,
+        mock_gc,
+        mock_torch,
+        mock_diarize_pipeline,
+        mock_whisperx,
     ):
         """Segments without speaker label are grouped under UNKNOWN."""
         from diarize import diarize
@@ -169,9 +206,14 @@ class TestDiarize:
         mock_model = MagicMock()
         mock_whisperx.load_model.return_value = mock_model
         mock_whisperx.load_audio.return_value = "audio"
-        mock_model.transcribe.return_value = {"segments": [{"text": "hi"}], "language": "en"}
+        mock_model.transcribe.return_value = {
+            "segments": [{"text": "hi"}],
+            "language": "en",
+        }
         mock_whisperx.load_align_model.return_value = (MagicMock(), {})
-        mock_whisperx.align.return_value = {"segments": [{"start": 0, "end": 5, "text": "hi"}]}
+        mock_whisperx.align.return_value = {
+            "segments": [{"start": 0, "end": 5, "text": "hi"}]
+        }
         mock_diarize_pipeline.return_value.return_value = "segs"
         mock_whisperx.assign_word_speakers.return_value = {
             "segments": [{"start": 0, "end": 5, "text": "hi"}]  # no "speaker" key

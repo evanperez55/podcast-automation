@@ -1416,26 +1416,53 @@ class TestClientIsolation:
     # Attributes that activate_client mutates via setattr — must be
     # saved/restored so one test doesn't pollute the next.
     _SAVED_ATTRS = [
-        "PODCAST_NAME", "WEBSITE_ENABLED", "PAGES_ENABLED",
-        "WEBSITE_GITHUB_REPO", "GITHUB_PAGES_REPO", "SITE_BASE_URL",
-        "WEBSITE_URL", "YOUTUBE_CHANNEL_HANDLE", "DISCORD_WEBHOOK_URL",
-        "NAMES_TO_REMOVE", "WORDS_TO_CENSOR", "EPISODE_SOURCE",
-        "RSS_FEED_URL", "RSS_EPISODE_INDEX", "OUTPUT_DIR", "DOWNLOAD_DIR",
-        "CLIPS_DIR", "TOPIC_DATA_DIR", "GITHUB_TOKEN",
-        "GITHUB_PAGES_BRANCH", "WEBSITE_GITHUB_BRANCH",
+        "PODCAST_NAME",
+        "WEBSITE_ENABLED",
+        "PAGES_ENABLED",
+        "WEBSITE_GITHUB_REPO",
+        "GITHUB_PAGES_REPO",
+        "SITE_BASE_URL",
+        "WEBSITE_URL",
+        "YOUTUBE_CHANNEL_HANDLE",
+        "DISCORD_WEBHOOK_URL",
+        "NAMES_TO_REMOVE",
+        "WORDS_TO_CENSOR",
+        "EPISODE_SOURCE",
+        "RSS_FEED_URL",
+        "RSS_EPISODE_INDEX",
+        "OUTPUT_DIR",
+        "DOWNLOAD_DIR",
+        "CLIPS_DIR",
+        "TOPIC_DATA_DIR",
+        "GITHUB_TOKEN",
+        "GITHUB_PAGES_BRANCH",
+        "WEBSITE_GITHUB_BRANCH",
         # Dropbox credentials
-        "DROPBOX_ACCESS_TOKEN", "DROPBOX_APP_KEY", "DROPBOX_APP_SECRET",
-        "DROPBOX_REFRESH_TOKEN", "DROPBOX_FOLDER_PATH",
-        "DROPBOX_FINISHED_FOLDER", "DROPBOX_EDITED_FOLDER",
+        "DROPBOX_ACCESS_TOKEN",
+        "DROPBOX_APP_KEY",
+        "DROPBOX_APP_SECRET",
+        "DROPBOX_REFRESH_TOKEN",
+        "DROPBOX_FOLDER_PATH",
+        "DROPBOX_FINISHED_FOLDER",
+        "DROPBOX_EDITED_FOLDER",
         # Social media credentials
-        "YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET",
-        "TWITTER_API_KEY", "TWITTER_API_SECRET",
-        "TWITTER_ACCESS_TOKEN", "TWITTER_ACCESS_SECRET",
-        "INSTAGRAM_ACCESS_TOKEN", "INSTAGRAM_ACCOUNT_ID",
-        "TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET", "TIKTOK_ACCESS_TOKEN",
-        "BLUESKY_HANDLE", "BLUESKY_APP_PASSWORD",
-        "REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET",
-        "REDDIT_USERNAME", "REDDIT_PASSWORD",
+        "YOUTUBE_CLIENT_ID",
+        "YOUTUBE_CLIENT_SECRET",
+        "TWITTER_API_KEY",
+        "TWITTER_API_SECRET",
+        "TWITTER_ACCESS_TOKEN",
+        "TWITTER_ACCESS_SECRET",
+        "INSTAGRAM_ACCESS_TOKEN",
+        "INSTAGRAM_ACCOUNT_ID",
+        "TIKTOK_CLIENT_KEY",
+        "TIKTOK_CLIENT_SECRET",
+        "TIKTOK_ACCESS_TOKEN",
+        "BLUESKY_HANDLE",
+        "BLUESKY_APP_PASSWORD",
+        "REDDIT_CLIENT_ID",
+        "REDDIT_CLIENT_SECRET",
+        "REDDIT_USERNAME",
+        "REDDIT_PASSWORD",
     ]
 
     @pytest.fixture(autouse=True)
@@ -1507,7 +1534,9 @@ website:
         )
         monkeypatch.setattr(Config, "PAGES_ENABLED", True)
         monkeypatch.setattr(
-            Config, "GITHUB_PAGES_REPO", "fakeproblemspodcast/fakeproblemspodcast.github.io"
+            Config,
+            "GITHUB_PAGES_REPO",
+            "fakeproblemspodcast/fakeproblemspodcast.github.io",
         )
 
         from client_config import activate_client
@@ -1539,7 +1568,9 @@ website:
             tmp_path, monkeypatch, self.ISOLATION_CLIENT_YAML, "isolation-test"
         )
         monkeypatch.setattr(
-            Config, "GITHUB_PAGES_REPO", "fakeproblemspodcast/fakeproblemspodcast.github.io"
+            Config,
+            "GITHUB_PAGES_REPO",
+            "fakeproblemspodcast/fakeproblemspodcast.github.io",
         )
 
         from client_config import activate_client

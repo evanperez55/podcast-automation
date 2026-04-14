@@ -1,9 +1,9 @@
 """Tests for scripts/process_church_batch.py — sequential pipeline runner."""
+
 from __future__ import annotations
 
 import json
 import subprocess
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -97,7 +97,15 @@ class TestRunOne:
             pcb.run_one("foo-church")
 
         cmd = mock_run.call_args.args[0]
-        assert cmd == ["uv", "run", "main.py", "--client", "foo-church", "latest", "--auto-approve"]
+        assert cmd == [
+            "uv",
+            "run",
+            "main.py",
+            "--client",
+            "foo-church",
+            "latest",
+            "--auto-approve",
+        ]
         # Must enforce a timeout so hung pipelines don't stall the batch forever
         assert mock_run.call_args.kwargs["timeout"] == pcb.PER_PROSPECT_TIMEOUT_SEC
 

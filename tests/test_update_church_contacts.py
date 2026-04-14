@@ -1,8 +1,7 @@
 """Tests for scripts/update_church_contacts.py — email injection into pitch files + tracker."""
+
 from __future__ import annotations
 
-import sqlite3
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest

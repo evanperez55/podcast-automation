@@ -38,6 +38,9 @@ clips/
 demo/
 historical_ep/
 assets/*.wav
+# Generated website pages — deployed directly to GitHub Pages via PyGithub,
+# not tracked in this repo.
+website_output/
 
 # API credentials
 *.json

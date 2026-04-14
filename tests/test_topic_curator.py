@@ -3,7 +3,6 @@
 import json
 import pytest
 from unittest.mock import patch, Mock, mock_open
-from pathlib import Path
 
 from topic_curator import TopicCurator
 

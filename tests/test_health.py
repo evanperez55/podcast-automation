@@ -1,9 +1,8 @@
 """Tests for pipeline/health.py — credential health-check CLI command."""
+
 from __future__ import annotations
 
 import pickle
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -76,7 +75,9 @@ class TestYouTubeToken:
         out = capsys.readouterr().out
         assert "Token loaded successfully" in out
 
-    def test_expired_token_with_refresh_token(self, empty_config, fake_yt_token, capsys):
+    def test_expired_token_with_refresh_token(
+        self, empty_config, fake_yt_token, capsys
+    ):
         """Expired but has refresh_token → OK (can refresh)."""
         with fake_yt_token.open("wb") as f:
             pickle.dump(_FakeCreds(expired=True, refresh_token="xyz"), f)
@@ -84,7 +85,9 @@ class TestYouTubeToken:
         out = capsys.readouterr().out
         assert "refresh token available" in out
 
-    def test_expired_token_without_refresh_token(self, empty_config, fake_yt_token, capsys):
+    def test_expired_token_without_refresh_token(
+        self, empty_config, fake_yt_token, capsys
+    ):
         """Expired with no refresh_token → ERROR."""
         with fake_yt_token.open("wb") as f:
             pickle.dump(_FakeCreds(expired=True, refresh_token=None), f)
@@ -108,7 +111,12 @@ class TestYouTubeToken:
 
 class TestTwitterCredentials:
     def test_all_four_keys_present(self, empty_config, capsys, monkeypatch):
-        for k in ["TWITTER_API_KEY", "TWITTER_API_SECRET", "TWITTER_ACCESS_TOKEN", "TWITTER_ACCESS_SECRET"]:
+        for k in [
+            "TWITTER_API_KEY",
+            "TWITTER_API_SECRET",
+            "TWITTER_ACCESS_TOKEN",
+            "TWITTER_ACCESS_SECRET",
+        ]:
             monkeypatch.setattr(empty_config, k, "value")
         health_check()
         out = capsys.readouterr().out
@@ -198,5 +206,12 @@ class TestOutputFormat:
     def test_all_platforms_appear_in_output(self, empty_config, capsys):
         health_check()
         out = capsys.readouterr().out
-        for platform in ["YouTube", "Twitter", "Bluesky", "Discord", "Dropbox", "OpenAI"]:
+        for platform in [
+            "YouTube",
+            "Twitter",
+            "Bluesky",
+            "Discord",
+            "Dropbox",
+            "OpenAI",
+        ]:
             assert platform in out, f"{platform} row missing from output"

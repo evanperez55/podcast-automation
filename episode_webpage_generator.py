@@ -5,7 +5,6 @@ JSON-LD structured data, Open Graph / Twitter Card meta tags, and full transcrip
 with chapter navigation. Also generates and merges sitemap XML.
 """
 
-import os
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Optional

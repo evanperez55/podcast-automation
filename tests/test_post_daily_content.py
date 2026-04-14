@@ -2,7 +2,7 @@
 
 import json
 import pytest
-from unittest.mock import patch, Mock, MagicMock, mock_open
+from unittest.mock import patch, Mock, mock_open
 from pathlib import Path
 
 from post_daily_content import post_daily, _save_log
@@ -94,7 +94,7 @@ class TestPostDailyPosting:
             with patch(
                 "post_daily_content.TwitterUploader",
                 create=True,
-            ) as mock_tw_cls:
+            ):
                 # The import happens inside the function, so we patch the module import
                 pass
 

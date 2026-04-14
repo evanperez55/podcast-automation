@@ -61,7 +61,9 @@ class TestExtractTargetWord:
 
     def test_finds_name_in_context(self, content_editor):
         """Test finding configured names in context."""
-        result = content_editor._extract_target_word("some reason", "then Host1 said...")
+        result = content_editor._extract_target_word(
+            "some reason", "then Host1 said..."
+        )
         assert result == "Host1"
 
     def test_returns_none_for_unknown(self, content_editor):

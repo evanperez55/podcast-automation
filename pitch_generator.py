@@ -70,7 +70,9 @@ class PitchGenerator:
         prospect = prospect_data["prospect"]
 
         # Load research report if available for richer context
-        research_path = Config.BASE_DIR / "output" / client_slug / "prospect_research.md"
+        research_path = (
+            Config.BASE_DIR / "output" / client_slug / "prospect_research.md"
+        )
         research_excerpt = ""
         if research_path.exists():
             research_excerpt = research_path.read_text(encoding="utf-8")[:500]

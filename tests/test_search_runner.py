@@ -1,10 +1,10 @@
 """Tests for pipeline/search_runner.py — search + episode listing commands."""
+
 from __future__ import annotations
 
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from pipeline import search_runner
 
@@ -13,8 +13,16 @@ class TestRunSearch:
     def test_prints_results(self, capsys):
         fake_index = MagicMock()
         fake_index.search.return_value = [
-            {"episode_number": 5, "title": "Lobster Talk", "snippet": "lobsters are..."},
-            {"episode_number": 12, "title": "More Lobsters", "snippet": "still lobsters"},
+            {
+                "episode_number": 5,
+                "title": "Lobster Talk",
+                "snippet": "lobsters are...",
+            },
+            {
+                "episode_number": 12,
+                "title": "More Lobsters",
+                "snippet": "still lobsters",
+            },
         ]
         with patch.object(search_runner, "EpisodeSearchIndex", return_value=fake_index):
             search_runner.run_search("lobster")
@@ -98,9 +106,7 @@ class TestListEpisodesByNumber:
                 },
             ),
         ]
-        result = search_runner.list_episodes_by_number(
-            components={"dropbox": fake}
-        )
+        result = search_runner.list_episodes_by_number(components={"dropbox": fake})
 
         assert len(result) == 2
         out = capsys.readouterr().out

@@ -6,7 +6,6 @@ content calendar to produce a complete, up-to-date landing page.
 """
 
 import json
-import os
 from html import escape
 from pathlib import Path
 from typing import Any, Dict, List, Optional

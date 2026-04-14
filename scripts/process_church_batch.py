@@ -10,6 +10,7 @@ Usage:
 Status can be polled via:
     output/church_batch/status.json
 """
+
 from __future__ import annotations
 
 import json

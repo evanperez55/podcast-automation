@@ -1,7 +1,5 @@
 """Tests for YouTube video downloader module."""
 
-import sys
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -19,7 +17,11 @@ class TestYouTubeVideoDownloaderInit:
 
     def test_init_disabled_no_ytdlp(self):
         """Downloader is disabled when yt-dlp is not importable."""
-        real_import = __builtins__.__import__ if hasattr(__builtins__, "__import__") else __import__
+        real_import = (
+            __builtins__.__import__
+            if hasattr(__builtins__, "__import__")
+            else __import__
+        )
 
         def mock_import(name, *args, **kwargs):
             if name == "yt_dlp":
@@ -149,9 +151,7 @@ class TestDownloadLatest:
     def test_returns_none_on_download_failure(self, mock_ydl_cls, tmp_path):
         """Returns None when video download fails."""
         list_ydl = _make_mock_ydl(
-            extract_return={
-                "entries": [{"id": "abc", "title": "Test", "url": None}]
-            }
+            extract_return={"entries": [{"id": "abc", "title": "Test", "url": None}]}
         )
         dl_ydl = _make_mock_ydl(extract_side_effect=Exception("Download failed"))
         mock_ydl_cls.side_effect = [list_ydl, dl_ydl]

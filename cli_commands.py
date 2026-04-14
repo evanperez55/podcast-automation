@@ -4,6 +4,7 @@ Extracted from main.py to keep the CLI entry point thin. All of these commands
 touch client configuration, outreach tracking, prospect research, or pitch
 generation — they don't need the full pipeline runtime.
 """
+
 from __future__ import annotations
 
 import sys

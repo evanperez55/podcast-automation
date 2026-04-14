@@ -4,6 +4,7 @@ The main() flow is interactive (user pastes a browser callback URL) and
 not fully testable without a real OAuth dance, but the pure token-exchange
 helpers and the URL-argument parsing are testable in isolation.
 """
+
 from __future__ import annotations
 
 import sys
@@ -107,7 +108,9 @@ class TestMainArgumentParsing:
                 sio.main()
         ex.assert_called_once_with("AUTHCODE123")
 
-    def test_strips_trailing_hash_underscore_instagram_adds(self, fake_creds, monkeypatch):
+    def test_strips_trailing_hash_underscore_instagram_adds(
+        self, fake_creds, monkeypatch
+    ):
         """Instagram appends '#_' to the code — strip before exchanging."""
         monkeypatch.setattr(sys, "argv", ["setup", "AUTHCODE123#_"])
         with patch.object(sio, "exchange_code_for_token", return_value=None) as ex:

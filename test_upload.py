@@ -50,9 +50,11 @@ def run_test_upload(keep=False, yes=False):
     """
     if not TEST_CLIP.exists():
         print(f"Error: Test clip not found at {TEST_CLIP}")
-        print("Generate it with: ffmpeg -f lavfi -i 'color=c=black:s=1080x1920:d=3' "
-              "-f lavfi -i 'anullsrc' -t 3 -c:v libx264 -c:a aac -shortest "
-              "-y assets/test_clip.mp4")
+        print(
+            "Generate it with: ffmpeg -f lavfi -i 'color=c=black:s=1080x1920:d=3' "
+            "-f lavfi -i 'anullsrc' -t 3 -c:v libx264 -c:a aac -shortest "
+            "-y assets/test_clip.mp4"
+        )
         return {}
 
     print("=" * 60)
@@ -141,7 +143,9 @@ def run_test_upload(keep=False, yes=False):
             tid = tweet_result["tweet_id"]
             results["twitter"] = {"status": "success", "tweet_id": tid}
             print(f"  OK - tweet_id: {tid}")
-            print("  (manual delete required — Twitter API doesn't support delete at this tier)")
+            print(
+                "  (manual delete required — Twitter API doesn't support delete at this tier)"
+            )
         else:
             results["twitter"] = {"status": "failed", "error": "post returned None"}
             print("  FAILED - post returned None")
@@ -164,7 +168,9 @@ def run_test_upload(keep=False, yes=False):
                 permalink = ig_result.get("permalink", "")
                 results["instagram"] = {"status": "success", "media_id": media_id}
                 print(f"  OK - {permalink or media_id}")
-                print("  (manual delete required — Instagram API doesn't support media deletion)")
+                print(
+                    "  (manual delete required — Instagram API doesn't support media deletion)"
+                )
             else:
                 results["instagram"] = {
                     "status": "failed",
@@ -224,9 +230,7 @@ def run_test_upload(keep=False, yes=False):
     print("=" * 60)
     for platform, result in results.items():
         status = result.get("status", "unknown")
-        icon = {"success": "OK", "failed": "FAIL", "skipped": "SKIP"}.get(
-            status, "?"
-        )
+        icon = {"success": "OK", "failed": "FAIL", "skipped": "SKIP"}.get(status, "?")
         print(f"  [{icon:4}] {platform}")
     print()
 
@@ -257,7 +261,9 @@ def run_test_upload(keep=False, yes=False):
 
         if failed_cleanups:
             print()
-            print(f"WARNING: {len(failed_cleanups)} platform(s) still have test content:")
+            print(
+                f"WARNING: {len(failed_cleanups)} platform(s) still have test content:"
+            )
             for p in failed_cleanups:
                 r = results.get(p.lower(), {})
                 # Print the ID so they can manually delete

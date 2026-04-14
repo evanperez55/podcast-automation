@@ -79,9 +79,7 @@ class InstagramUploader:
                 logger.debug("Instagram token OK (%s days left)", days_left)
                 return
 
-            logger.info(
-                "Instagram token expires in %s days — refreshing", days_left
-            )
+            logger.info("Instagram token expires in %s days — refreshing", days_left)
 
             if new_token != self.access_token:
                 self.access_token = new_token

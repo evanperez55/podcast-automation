@@ -1,8 +1,7 @@
 """Tests for extract_speaker_clips.py — speaker clip extraction from diarized transcripts."""
 
 import json
-from pathlib import Path
-from unittest.mock import patch, Mock, MagicMock, mock_open
+from unittest.mock import patch
 
 import pytest
 
@@ -23,8 +22,18 @@ SAMPLE_DATA = {
     },
     "segments": [
         {"start": 0, "end": 15, "text": "Hello and welcome", "speaker": "SPEAKER_00"},
-        {"start": 16, "end": 30, "text": "Thanks for having me", "speaker": "SPEAKER_01"},
-        {"start": 31, "end": 50, "text": "Let us talk about stuff", "speaker": "SPEAKER_00"},
+        {
+            "start": 16,
+            "end": 30,
+            "text": "Thanks for having me",
+            "speaker": "SPEAKER_01",
+        },
+        {
+            "start": 31,
+            "end": 50,
+            "text": "Let us talk about stuff",
+            "speaker": "SPEAKER_00",
+        },
         {"start": 51, "end": 55, "text": "Sure thing", "speaker": "SPEAKER_01"},
     ],
 }
@@ -133,8 +142,12 @@ class TestExtractClips:
         output_dir = tmp_path / "clips"
 
         result = extract_clips(
-            SAMPLE_DATA, "SPEAKER_00", str(audio_file), str(output_dir),
-            min_duration=5.0, merge_gap=2.0,
+            SAMPLE_DATA,
+            "SPEAKER_00",
+            str(audio_file),
+            str(output_dir),
+            min_duration=5.0,
+            merge_gap=2.0,
         )
 
         assert len(result) > 0
@@ -148,8 +161,12 @@ class TestExtractClips:
 
         # All segments are short (< 100s min_duration)
         result = extract_clips(
-            SAMPLE_DATA, "SPEAKER_01", str(audio_file), str(tmp_path / "out"),
-            min_duration=100.0, merge_gap=2.0,
+            SAMPLE_DATA,
+            "SPEAKER_01",
+            str(audio_file),
+            str(tmp_path / "out"),
+            min_duration=100.0,
+            merge_gap=2.0,
         )
 
         assert result == []
@@ -158,7 +175,9 @@ class TestExtractClips:
     def test_extract_clips_missing_audio_exits(self, tmp_path):
         """Exits when audio file does not exist."""
         with pytest.raises(SystemExit):
-            extract_clips(SAMPLE_DATA, "SPEAKER_00", str(tmp_path / "nope.wav"), str(tmp_path))
+            extract_clips(
+                SAMPLE_DATA, "SPEAKER_00", str(tmp_path / "nope.wav"), str(tmp_path)
+            )
 
     def test_extract_clips_invalid_speaker_exits(self, tmp_path):
         """Exits when speaker ID is not in the transcript."""
