@@ -14,6 +14,7 @@ Status can be polled via:
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -57,6 +58,13 @@ def run_one(slug: str) -> dict:
     start = time.monotonic()
     started_at = now_iso()
 
+    # B011 diagnostic: stderr is redirected to a file, which block-buffers
+    # Python's log output. Force PYTHONUNBUFFERED=1 so any faulthandler
+    # traceback (STATUS_STACK_BUFFER_OVERRUN from cuDNN/ctranslate2 during
+    # late-pipeline teardown) actually reaches the log before the process dies.
+    child_env = os.environ.copy()
+    child_env["PYTHONUNBUFFERED"] = "1"
+
     with log_path.open("w", encoding="utf-8") as logf:
         logf.write(f"=== {slug} started at {started_at} ===\n")
         logf.write(f"CMD: {' '.join(cmd)}\n\n")
@@ -68,6 +76,7 @@ def run_one(slug: str) -> dict:
                 stderr=subprocess.STDOUT,
                 timeout=PER_PROSPECT_TIMEOUT_SEC,
                 check=False,
+                env=child_env,
             )
             rc = proc.returncode
             status = "success" if rc == 0 else "failed"

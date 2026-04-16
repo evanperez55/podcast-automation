@@ -109,6 +109,21 @@ class TestRunOne:
         # Must enforce a timeout so hung pipelines don't stall the batch forever
         assert mock_run.call_args.kwargs["timeout"] == pcb.PER_PROSPECT_TIMEOUT_SEC
 
+    def test_forces_pythonunbuffered_so_crash_tracebacks_reach_log(self, batch_in_tmp):
+        """B011 diagnostic: subprocess stderr is redirected to a log file, which
+        block-buffers Python log output. If the pipeline crashes natively
+        (STATUS_STACK_BUFFER_OVERRUN), any faulthandler traceback must reach the
+        log file — that requires PYTHONUNBUFFERED=1 in the child env."""
+        fake_proc = MagicMock(returncode=0)
+        with patch.object(subprocess, "run", return_value=fake_proc) as mock_run:
+            pcb.run_one("foo-church")
+
+        env = mock_run.call_args.kwargs.get("env")
+        assert env is not None, (
+            "run_one must pass an explicit env so PYTHONUNBUFFERED sticks"
+        )
+        assert env.get("PYTHONUNBUFFERED") == "1"
+
 
 # ---------------------------------------------------------------------------
 # write_status()
