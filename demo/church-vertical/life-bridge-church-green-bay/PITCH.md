@@ -4,7 +4,7 @@
 **Slug:** life-bridge-church-green-bay
 **Contact:** Pastor (via general) / **EMAIL: lbccgb@gmail.com**
 **Contact notes:** VERIFY podcast match: search result was for 'Life Bridge Christian Church Green Bay' (lifebridgegb.org) — iTunes feed is 'Life Bridge Sermons Podcast' by 'Life Bridge Studios'. Likely same entity; confirm before sending. Phone: 920-494-4042.
-**Episode referenced:** "Why Resurrected Life Means Slowing Down Your Anger" *(processed TBD)*
+**Episode referenced:** "Why Resurrected Life Means Slowing Down Your Anger" *(processed 2026-04-13)*
 **Drive folder:** Upload from `output/life-bridge-church-green-bay/ep_117/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
 **Angle chosen:** time_saving

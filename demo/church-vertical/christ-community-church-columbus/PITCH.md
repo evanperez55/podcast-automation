@@ -4,7 +4,7 @@
 **Slug:** christ-community-church-columbus
 **Contact:** Kelli Wommack (via comms team) / **EMAIL: communications@ccclive.org**
 **Contact notes:** Communications inbox — IDEAL target for this pitch. Phone: 706-565-7240.
-**Episode referenced:** "Why Following Jesus Means Saying No to Yourself" *(processed TBD)*
+**Episode referenced:** "Why Following Jesus Means Saying No to Yourself" *(processed 2026-04-13)*
 **Drive folder:** Upload from `output/christ-community-church-columbus/ep_18933019/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
 **Angle chosen:** growth_seo

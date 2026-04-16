@@ -4,8 +4,8 @@
 **Slug:** harbor-rock-tabernacle
 **Contact:** Pastor Paul Rhoads (Lead Pastor) / **EMAIL: paul@harborrock.org**
 **Contact notes:** DIRECT — lead pastor's email. Phone: 262-633-3206. Also info@harborrock.org available as fallback.
-**Episode referenced:** "{{SERMON_TITLE}}" *(processed TBD)*
-**Drive folder:** Upload from `output/harbor-rock-tabernacle/{{EP_DIR}}/`
+**Episode referenced:** "Why the Tomb Was Empty but the Crowd Wasn't" *(processed 2026-04-13)*
+**Drive folder:** Upload from `output/harbor-rock-tabernacle/ep_773/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
 **Angle chosen:** growth_seo
 
@@ -14,25 +14,25 @@
 
 ## Email
 
-**Subject:** Made these from your "{{SERMON_TITLE}}" sermon - took 5 minutes
+**Subject:** Made these from your "Why the Tomb Was Empty but the Crowd Wasn't" sermon - took 5 minutes
 
 Hey there,
 
-I listened to "{{SERMON_TITLE}}" this week - {{SPECIFIC_MOMENT_REFERENCE}}. That's the kind of teaching that deserves to reach people beyond Sunday morning at Harbor Rock Tabernacle.
+I listened to "Why the Tomb Was Empty but the Crowd Wasn't" this week - the part that grabbed me was "If even Jesus’ closest friends doubted his resurrection, your doubts are just part of the journey—not a failure.". That's the kind of teaching that deserves to reach people beyond Sunday morning at Harbor Rock Tabernacle.
 
 I ran it through my automation pipeline and here's what came out in about 5 minutes - no manual editing:
 
 [GOOGLE DRIVE LINK]
 
 Inside you'll find:
-- {{NUM_CLIPS}} vertical clips with burned-in subtitles (ready for YouTube Shorts / Instagram Reels)
+- 5 vertical clips with burned-in subtitles (ready for YouTube Shorts / Instagram Reels)
 - A devotional-style blog post with full scripture references
 - Social captions written per platform (YouTube, Instagram, Facebook, Twitter)
 - Chapter markers for the full sermon
 - A complete searchable transcript
 - Thumbnail and quote cards ready to post
 
-The clip I'd lead with is "{{BEST_CLIP_TITLE}}" ({{CLIP_TIMESTAMP}}). {{WHY_THIS_CLIP_WORKS}}.
+The clip I'd lead with is "No Witnesses at the Greatest Moment Ever" (4:28-5:05). This clip highlights a striking and little-considered aspect of the resurrection: that no witnesses were there, underscoring the personal nature of salvation. The hook "Nobody was there when Jesus rose" works in the first 2 seconds.
 
 Here's why this matters for Harbor Rock Tabernacle: Harbor Rock has 815 sermons on Podomatic - that is one of the deepest church podcast archives I have seen in Wisconsin. All of that teaching is currently locked inside audio files Google cannot search. Converting that archive to transcript pages + a backlog of YouTube Shorts would transform your digital presence overnight, without recording a single new sermon.
 
@@ -49,17 +49,17 @@ https://neurovai.org | evan@neurovai.org
 
 ## Follow-Up Email (send 4-5 days later if no response)
 
-**Subject:** Re: Made these from your "{{SERMON_TITLE}}" sermon
+**Subject:** Re: Made these from your "Why the Tomb Was Empty but the Crowd Wasn't" sermon
 
 Hey there,
 
 Quick follow-up - I know church weeks are busy. Here are the clips in case the link got buried:
 
-1. {{CLIP_1_TITLE}} ({{CLIP_1_DURATION}}): [direct link]
-2. {{CLIP_2_TITLE}} ({{CLIP_2_DURATION}}): [direct link]
-3. {{CLIP_3_TITLE}} ({{CLIP_3_DURATION}}): [direct link]
-4. {{CLIP_4_TITLE}} ({{CLIP_4_DURATION}}): [direct link]
-5. {{CLIP_5_TITLE}} ({{CLIP_5_DURATION}}): [direct link]
+1. No Witnesses at the Greatest Moment Ever (0:37): [direct link]
+2. Even the Closest Disciples Doubted (0:30): [direct link]
+3. 5 Reasons Why People Doubt Jesus (0:27): [direct link]
+4. 3 Unshakable Facts About the Resurrection (0:57): [direct link]
+5. The Stone Rolled Away: A Symbol of Freedom (0:50): [direct link]
 
 These are ready to post - just download and upload to YouTube Shorts or Instagram Reels. No editing needed.
 
@@ -73,7 +73,7 @@ Evan
 
 ## Pre-Send Checklist
 
-- [ ] Process latest episode: `uv run main.py --client harbor-rock-tabernacle latest --auto-approve`
+- [x] Episode processed: ep_773
 - [ ] Read `output/harbor-rock-tabernacle/<ep_dir>/*_analysis.json` and pick lead clip
 - [ ] Fill in all `{{}}` placeholders above using analysis output
 - [x] Contact email resolved: paul@harborrock.org

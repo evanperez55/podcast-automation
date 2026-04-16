@@ -4,7 +4,7 @@
 **Slug:** metro-tab-church
 **Contact:** Dr. Steve Ball (via info) / **EMAIL: info@metrotab.net**
 **Contact notes:** General info inbox. Phone: 423-894-3377. May need to ask for comms director by name in the email.
-**Episode referenced:** "Why Your Prayer Might Be the Ultimate Power Move" *(processed TBD)*
+**Episode referenced:** "Why Your Prayer Might Be the Ultimate Power Move" *(processed 2026-04-13)*
 **Drive folder:** Upload from `output/metro-tab-church/ep_342/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
 **Angle chosen:** growth_seo

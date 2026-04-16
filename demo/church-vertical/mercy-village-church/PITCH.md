@@ -4,7 +4,7 @@
 **Slug:** mercy-village-church
 **Contact:** Pastor (via general info) / **EMAIL: info@mercyvillage.church**
 **Contact notes:** Small-town church, stewardship angle still applies. Phone: 304-410-0371.
-**Episode referenced:** "Why Your Heart Sometimes Just Won't Burn for Scripture" *(processed TBD)*
+**Episode referenced:** "Why Your Heart Sometimes Just Won't Burn for Scripture" *(processed 2026-04-13)*
 **Drive folder:** Upload from `output/mercy-village-church/ep_aHR0cHM6Ly9jZG4uc3Vic3BsYXNoLmNvbS9hdWRpb3MvQkIyTVY3LzcyNDcwMGYxLWNjNzYtNDVjOC05MjFkLTc1ZGNiY2M2YzY0ZS9hdWRpby5tcDM_20260413_205016/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
 **Angle chosen:** stewardship_subsplash

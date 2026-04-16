@@ -4,7 +4,7 @@
 **Slug:** the-crossings-church-collinsville
 **Contact:** Pastor / Admin team / **EMAIL: admin@crossingscollinsville.com**
 **Contact notes:** Site appears active despite Oct 2025 stale feed — restart angle is live. Phone: 636-442-2778.
-**Episode referenced:** "Why Your Faith Can't Be Just a Feeling" *(processed TBD)*
+**Episode referenced:** "Why Your Faith Can't Be Just a Feeling" *(processed 2026-04-13)*
 **Drive folder:** Upload from `output/the-crossings-church-collinsville/ep_2025/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
 **Angle chosen:** restart

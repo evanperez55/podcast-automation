@@ -4,7 +4,7 @@
 **Slug:** faith-bible-church-edmond
 **Contact:** Dr. Mark Hitchcock (Senior Pastor, via general church inbox) / **EMAIL: fbc@faithbibleok.com**
 **Contact notes:** Pastor is Mark Hitchcock — notable prophecy teacher + DTS faculty. Staff pages at /our-staff and /our-elders may have direct addresses. Phone: 405-340-1000.
-**Episode referenced:** "Why Spiritual Armor Beats Roman Armor Every Time" *(processed TBD)*
+**Episode referenced:** "Why Spiritual Armor Beats Roman Armor Every Time" *(processed 2026-04-13)*
 **Drive folder:** Upload from `output/faith-bible-church-edmond/ep_aHR0cHM6Ly9jZG4uc3Vic3BsYXNoLmNvbS9hdWRpb3MvOVc1VkNGL2VmNGY3ZDc1LWM1YWItNDVlMC1iNzYzLWExNzIxZDZhNDA5Ny9hdWRpby5tcDM_20260413_212532/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
 **Angle chosen:** seo_vs_pulpit

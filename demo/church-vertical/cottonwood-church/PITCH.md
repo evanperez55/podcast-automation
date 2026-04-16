@@ -4,8 +4,8 @@
 **Slug:** cottonwood-church
 **Contact:** Pastor (via guest services — weak) / **EMAIL: guestservices@cottonwood.org**
 **Contact notes:** RESIZE FLAG: Cottonwood hosts 'Answers with Bayless Conley' broadcast — this is a LARGE church/media operation, not mid-size ICP. They likely already have professional media staff and Pulpit AI. Consider deprioritizing or pitching at a higher price tier. Phone: 714-947-5300.
-**Episode referenced:** "{{SERMON_TITLE}}" *(processed TBD)*
-**Drive folder:** Upload from `output/cottonwood-church/{{EP_DIR}}/`
+**Episode referenced:** "Who Am I? The Identity That Refuses 'No' as an Answer" *(processed 2026-04-13)*
+**Drive folder:** Upload from `output/cottonwood-church/ep_aHR0cHM6Ly9jZG4uc3Vic3BsYXNoLmNvbS9hdWRpb3MvSDhCSlROLzRlNjViOGQ4LTA2ZDItNDc1Yi05ZmFkLTczZDcyNzU0NmFmZC9hdWRpby5tcDM_20260413_204010/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
 **Angle chosen:** seo_vs_pulpit
 **Flags:**
@@ -15,25 +15,25 @@
 
 ## Email
 
-**Subject:** Made these from your "{{SERMON_TITLE}}" sermon - took 5 minutes
+**Subject:** Made these from your "Who Am I? The Identity That Refuses 'No' as an Answer" sermon - took 5 minutes
 
 Hey there,
 
-I listened to "{{SERMON_TITLE}}" this week - {{SPECIFIC_MOMENT_REFERENCE}}. That's the kind of teaching that deserves to reach people beyond Sunday morning at Cottonwood Church.
+I listened to "Who Am I? The Identity That Refuses 'No' as an Answer" this week - the part that grabbed me was "If your faith doesn’t unsettle your comfort zone, you might be missing the point.". That's the kind of teaching that deserves to reach people beyond Sunday morning at Cottonwood Church.
 
 I ran it through my automation pipeline and here's what came out in about 5 minutes - no manual editing:
 
 [GOOGLE DRIVE LINK]
 
 Inside you'll find:
-- {{NUM_CLIPS}} vertical clips with burned-in subtitles (ready for YouTube Shorts / Instagram Reels)
+- 5 vertical clips with burned-in subtitles (ready for YouTube Shorts / Instagram Reels)
 - A devotional-style blog post with full scripture references
 - Social captions written per platform (YouTube, Instagram, Facebook, Twitter)
 - Chapter markers for the full sermon
 - A complete searchable transcript
 - Thumbnail and quote cards ready to post
 
-The clip I'd lead with is "{{BEST_CLIP_TITLE}}" ({{CLIP_TIMESTAMP}}). {{WHY_THIS_CLIP_WORKS}}.
+The clip I'd lead with is "You Are Who God Says You Are" (4:41-5:28). This clip captures the core message of identity rooted in God’s love, a powerful and foundational scripture moment. The hook "What if your worth was declared by God?" works in the first 2 seconds.
 
 Here's why this matters for Cottonwood Church: Cottonwood has been on the podcast since 2010 - 156 sermons and counting. You are on Subsplash, which means you may already use Pulpit AI for clip generation. If so, great - I am not here to replace it. What I add that Pulpit does not: searchable transcript pages on your website. Every archived sermon becomes a Google-indexable piece of content - the difference between 'we have a podcast' and 'Orange County searches for Bible questions and finds Cottonwood.'
 
@@ -50,17 +50,17 @@ https://neurovai.org | evan@neurovai.org
 
 ## Follow-Up Email (send 4-5 days later if no response)
 
-**Subject:** Re: Made these from your "{{SERMON_TITLE}}" sermon
+**Subject:** Re: Made these from your "Who Am I? The Identity That Refuses 'No' as an Answer" sermon
 
 Hey there,
 
 Quick follow-up - I know church weeks are busy. Here are the clips in case the link got buried:
 
-1. {{CLIP_1_TITLE}} ({{CLIP_1_DURATION}}): [direct link]
-2. {{CLIP_2_TITLE}} ({{CLIP_2_DURATION}}): [direct link]
-3. {{CLIP_3_TITLE}} ({{CLIP_3_DURATION}}): [direct link]
-4. {{CLIP_4_TITLE}} ({{CLIP_4_DURATION}}): [direct link]
-5. {{CLIP_5_TITLE}} ({{CLIP_5_DURATION}}): [direct link]
+1. You Are Who God Says You Are (0:47): [direct link]
+2. God Won't Take No for an Answer (0:49): [direct link]
+3. Finding Joy in Your Treasure (0:46): [direct link]
+4. Brokenness Is Strength, Not Weakness (0:50): [direct link]
+5. You Are a Gift — Not Just a Resource (0:35): [direct link]
 
 These are ready to post - just download and upload to YouTube Shorts or Instagram Reels. No editing needed.
 
@@ -74,7 +74,7 @@ Evan
 
 ## Pre-Send Checklist
 
-- [ ] Process latest episode: `uv run main.py --client cottonwood-church latest --auto-approve`
+- [x] Episode processed: ep_aHR0cHM6Ly9jZG4uc3Vic3BsYXNoLmNvbS9hdWRpb3MvSDhCSlROLzRlNjViOGQ4LTA2ZDItNDc1Yi05ZmFkLTczZDcyNzU0NmFmZC9hdWRpby5tcDM_20260413_204010
 - [ ] Read `output/cottonwood-church/<ep_dir>/*_analysis.json` and pick lead clip
 - [ ] Fill in all `{{}}` placeholders above using analysis output
 - [x] Contact email resolved: guestservices@cottonwood.org (church website or Apple Podcasts listing)
