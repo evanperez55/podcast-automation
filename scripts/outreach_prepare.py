@@ -94,10 +94,10 @@ def inject_drive_link(body: str, url: str) -> str:
 # already has the original audio on their platform, so uploading it is mostly
 # deadweight for cold outreach.
 INCLUDE_PATTERNS = [
-    "*_subtitle.mp4",      # vertical clips with burned-in captions
-    "*_thumbnail.png",     # episode thumbnail
-    "quote_card_*.png",    # quote cards
-    "*_blog_post.md",      # blog post
+    "*_subtitle.mp4",  # vertical clips with burned-in captions
+    "*_thumbnail.png",  # episode thumbnail
+    "quote_card_*.png",  # quote cards
+    "*_blog_post.md",  # blog post
 ]
 
 # Filename patterns to EXCLUDE even if they match INCLUDE (internal artifacts).
@@ -135,7 +135,9 @@ def _find_latest_ep_dir(slug: str) -> Path:
     slug_root = OUTPUT_ROOT / slug
     if not slug_root.exists():
         raise FileNotFoundError(f"No output directory for {slug}: {slug_root}")
-    ep_dirs = [d for d in slug_root.iterdir() if d.is_dir() and d.name.startswith("ep_")]
+    ep_dirs = [
+        d for d in slug_root.iterdir() if d.is_dir() and d.name.startswith("ep_")
+    ]
     if not ep_dirs:
         raise FileNotFoundError(f"No ep_* directories under {slug_root}")
     return max(ep_dirs, key=lambda d: d.stat().st_mtime)
@@ -169,11 +171,17 @@ def prepare_one(
     drive=None,
     gmail=None,
     dry_run: bool = False,
+    drive_link: Optional[str] = None,
 ) -> dict:
     """Do one prospect end-to-end. Returns {draft_id, drive_link, pitch_path}.
 
     `drive` and `gmail` are injected for testability. In real CLI use, the
     main() wrapper instantiates DriveUploader + GmailSender.
+
+    If `drive_link` is provided, the Drive upload is skipped and the given
+    link is used directly. Use this to recover from a partial failure where
+    the upload succeeded but the Gmail draft did not (e.g. Gmail API quota
+    or enablement propagation) — avoids re-uploading the demo package.
     """
     pitch_path = DEMO_ROOT / slug / "PITCH.md"
     if not pitch_path.exists():
@@ -182,21 +190,22 @@ def prepare_one(
     parsed = parse_pitch(pitch_path)
     logger.info("Parsed pitch for %s: to=%s", slug, parsed["email"])
 
-    ep_dir = _find_latest_ep_dir(slug)
-    logger.info("Using ep_dir: %s", ep_dir)
-
-    if dry_run:
-        drive_link = "https://drive.google.com/DRY_RUN"
+    if drive_link:
+        logger.info("Using existing Drive link, skipping upload: %s", drive_link)
     else:
-        # Stage assets into a clean temp dir then upload as a folder
-        import tempfile
+        ep_dir = _find_latest_ep_dir(slug)
+        logger.info("Using ep_dir: %s", ep_dir)
 
-        with tempfile.TemporaryDirectory() as td:
-            staging = Path(td) / f"{slug}-demo"
-            _stage_assets(ep_dir, staging)
-            drive_link = drive.upload_folder(
-                staging, folder_name=f"{slug} - Demo"
-            )
+        if dry_run:
+            drive_link = "https://drive.google.com/DRY_RUN"
+        else:
+            # Stage assets into a clean temp dir then upload as a folder
+            import tempfile
+
+            with tempfile.TemporaryDirectory() as td:
+                staging = Path(td) / f"{slug}-demo"
+                _stage_assets(ep_dir, staging)
+                drive_link = drive.upload_folder(staging, folder_name=f"{slug} - Demo")
 
     body_with_link = inject_drive_link(parsed["body"], drive_link)
 
@@ -223,19 +232,35 @@ def main() -> int:
         action="store_true",
         help="Parse + log only. No Drive upload, no Gmail draft.",
     )
+    ap.add_argument(
+        "--drive-link",
+        default=None,
+        help="Skip Drive upload and use this existing folder URL. Use when a "
+        "prior run uploaded to Drive but failed at the Gmail step.",
+    )
     args = ap.parse_args()
 
     if args.dry_run:
         drive = None
         gmail = _make_dry_run_gmail()
     else:
-        from drive_uploader import DriveUploader
         from gmail_sender import GmailSender
 
-        drive = DriveUploader()
         gmail = GmailSender()
+        if args.drive_link:
+            drive = None  # not needed when reusing an existing link
+        else:
+            from drive_uploader import DriveUploader
 
-    result = prepare_one(args.slug, drive=drive, gmail=gmail, dry_run=args.dry_run)
+            drive = DriveUploader()
+
+    result = prepare_one(
+        args.slug,
+        drive=drive,
+        gmail=gmail,
+        dry_run=args.dry_run,
+        drive_link=args.drive_link,
+    )
 
     print()
     print("=" * 60)

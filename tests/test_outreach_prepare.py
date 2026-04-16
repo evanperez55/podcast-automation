@@ -12,7 +12,7 @@ Given a prospect slug, this script:
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -202,15 +202,17 @@ class TestPrepareOne:
 
     def test_full_flow_creates_draft_with_drive_link(self, tmp_path, monkeypatch):
         """prepare_one → Drive folder created, uploaded, link injected, Gmail draft made."""
-        pitch_path = self._write_pitch(tmp_path)
-        ep_dir = self._write_ep(tmp_path)
+        self._write_pitch(tmp_path)
+        self._write_ep(tmp_path)
 
         # Point the orchestrator's filesystem lookups at tmp_path
         monkeypatch.setattr(op, "DEMO_ROOT", tmp_path / "demo" / "church-vertical")
         monkeypatch.setattr(op, "OUTPUT_ROOT", tmp_path / "output")
 
         fake_drive = MagicMock()
-        fake_drive.upload_folder.return_value = "https://drive.google.com/drive/folders/abc"
+        fake_drive.upload_folder.return_value = (
+            "https://drive.google.com/drive/folders/abc"
+        )
         fake_gmail = MagicMock()
         fake_gmail.create_draft.return_value = "draft-1"
 
@@ -236,8 +238,8 @@ class TestPrepareOne:
         assert "[GOOGLE DRIVE LINK]" not in gmail_kwargs["body"]
 
     def test_dry_run_skips_both_network_calls(self, tmp_path, monkeypatch):
-        pitch_path = self._write_pitch(tmp_path)
-        ep_dir = self._write_ep(tmp_path)
+        self._write_pitch(tmp_path)
+        self._write_ep(tmp_path)
 
         monkeypatch.setattr(op, "DEMO_ROOT", tmp_path / "demo" / "church-vertical")
         monkeypatch.setattr(op, "OUTPUT_ROOT", tmp_path / "output")
@@ -264,3 +266,31 @@ class TestPrepareOne:
             op.prepare_one(
                 "nonexistent", drive=MagicMock(), gmail=MagicMock(), dry_run=True
             )
+
+    def test_existing_drive_link_skips_upload(self, tmp_path, monkeypatch):
+        """Recovery path: if the Drive upload already happened on a prior run,
+        pass drive_link= to skip re-upload and only create the Gmail draft."""
+        self._write_pitch(tmp_path)
+        self._write_ep(tmp_path)
+        monkeypatch.setattr(op, "DEMO_ROOT", tmp_path / "demo" / "church-vertical")
+        monkeypatch.setattr(op, "OUTPUT_ROOT", tmp_path / "output")
+
+        fake_drive = MagicMock()
+        fake_gmail = MagicMock()
+        fake_gmail.create_draft.return_value = "draft-99"
+
+        existing_link = "https://drive.google.com/drive/folders/PRE_EXISTING"
+        result = op.prepare_one(
+            "test-slug",
+            drive=fake_drive,
+            gmail=fake_gmail,
+            dry_run=False,
+            drive_link=existing_link,
+        )
+
+        # Upload MUST be skipped — the whole point of the flag is recovery
+        fake_drive.upload_folder.assert_not_called()
+        assert result["drive_link"] == existing_link
+        # Draft was created with the pre-existing link injected into the body
+        gmail_kwargs = fake_gmail.create_draft.call_args.kwargs
+        assert existing_link in gmail_kwargs["body"]
