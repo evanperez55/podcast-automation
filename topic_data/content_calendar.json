@@ -433,5 +433,130 @@
         }
       }
     }
+  },
+  "ep_31": {
+    "episode_number": 31,
+    "release_date": "2026-04-16T20:58:30.145428",
+    "planned_at": "2026-04-16T20:58:30.146427",
+    "slots": {
+      "teaser": {
+        "slot_type": "teaser",
+        "day_offset": -1,
+        "scheduled_at": "2026-04-15T10:00:00",
+        "platforms": [
+          "twitter"
+        ],
+        "clip_index": null,
+        "content": {
+          "caption": "If you want your work calls to stop, just never say hi \u2014 save us all the wasted breath."
+        },
+        "status": "failed",
+        "uploaded_at": null,
+        "upload_results": {},
+        "error": "twitter: Twitter API credentials not configured in .env file.\nPlease follow the setup instructions:\n1. Apply for Twitter Developer access at https://developer.twitter.com\n2. Create a project and app\n3. Get API keys and access tokens\n4. Add credentials to .env file:\n   - TWITTER_API_KEY\n   - TWITTER_API_SECRET\n   - TWITTER_ACCESS_TOKEN\n   - TWITTER_ACCESS_SECRET\n\nNote: You need Elevated access for media uploads",
+        "retry_count": 1
+      },
+      "episode": {
+        "slot_type": "episode",
+        "day_offset": 0,
+        "scheduled_at": "2026-04-16T14:00:00",
+        "platforms": [
+          "youtube",
+          "twitter"
+        ],
+        "clip_index": null,
+        "content": {
+          "title": "Episode 31",
+          "video_path": "C:\\Users\\evanp\\projects\\podcast-automation\\output\\ep_31\\ep_31_raw_20260416_203450_episode.mp4",
+          "youtube_url": "https://www.youtube.com/watch?v=RQtHunNEN_4",
+          "youtube_video_id": "RQtHunNEN_4"
+        },
+        "status": "partial",
+        "uploaded_at": "2026-04-16T21:37:29.351523",
+        "upload_results": {
+          "youtube": {
+            "video_id": "abc123",
+            "url": "https://youtube.com/abc123"
+          },
+          "twitter": {
+            "error": "Twitter API credentials not configured in .env file.\nPlease follow the setup instructions:\n1. Apply for Twitter Developer access at https://developer.twitter.com\n2. Create a project and app\n3. Get API keys and access tokens\n4. Add credentials to .env file:\n   - TWITTER_API_KEY\n   - TWITTER_API_SECRET\n   - TWITTER_ACCESS_TOKEN\n   - TWITTER_ACCESS_SECRET\n\nNote: You need Elevated access for media uploads"
+          }
+        }
+      },
+      "clip_3": {
+        "slot_type": "clip_3",
+        "day_offset": 1,
+        "scheduled_at": "2026-04-17T14:00:00",
+        "platforms": [
+          "youtube",
+          "twitter",
+          "bluesky",
+          "instagram"
+        ],
+        "clip_index": 2,
+        "content": {
+          "caption": "Men aren\u2019t the problem, statistics say",
+          "clip_path": "C:\\Users\\evanp\\projects\\podcast-automation\\output\\ep_31\\clips\\ep_31_raw_20260416_202215_censored_clip_03_subtitle.mp4",
+          "youtube_url": "https://www.youtube.com/watch?v=7MxUeN-7O8c",
+          "youtube_video_id": "7MxUeN-7O8c",
+          "clip_title": "Gay Divorce Rates Prove Women Are The Problem",
+          "instagram_video_url": "https://www.dropbox.com/scl/fi/evlhk1i2mfzuybmjgqpb4/ep_31_raw_20260416_202215_censored_clip_03_subtitle.mp4?rlkey=wsoii5o23utn3kkzpuyappnt6&dl=1"
+        },
+        "status": "pending",
+        "uploaded_at": null,
+        "upload_results": {}
+      },
+      "quote_1": {
+        "slot_type": "quote_1",
+        "day_offset": 2,
+        "scheduled_at": "2026-04-18T10:00:00",
+        "platforms": [
+          "twitter",
+          "bluesky"
+        ],
+        "clip_index": null,
+        "content": {
+          "quote_text": "Men run the world, baby.",
+          "timestamp": "01:19:40"
+        },
+        "status": "pending",
+        "uploaded_at": null,
+        "upload_results": {}
+      },
+      "quote_2": {
+        "slot_type": "quote_2",
+        "day_offset": 4,
+        "scheduled_at": "2026-04-20T10:00:00",
+        "platforms": [
+          "twitter",
+          "bluesky"
+        ],
+        "clip_index": null,
+        "content": {
+          "quote_text": "If you make it past ten years, you're good. Like, I don't think there's a breaking point.",
+          "timestamp": "01:03:34"
+        },
+        "status": "pending",
+        "uploaded_at": null,
+        "upload_results": {}
+      },
+      "quote_3": {
+        "slot_type": "quote_3",
+        "day_offset": 6,
+        "scheduled_at": "2026-04-22T10:00:00",
+        "platforms": [
+          "twitter",
+          "bluesky"
+        ],
+        "clip_index": null,
+        "content": {
+          "quote_text": "It's just like, why, what? Why are you saying hi to me? I'm here.",
+          "timestamp": "01:31:27"
+        },
+        "status": "pending",
+        "uploaded_at": null,
+        "upload_results": {}
+      }
+    }
   }
 }
