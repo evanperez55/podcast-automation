@@ -15,36 +15,29 @@
 
 ## Email
 
-**Subject:** Made these from your "Why Your Faith Can't Be Just a Feeling" sermon - took 5 minutes
+**Subject:** A few things I made from Sunday's sermon at The Crossings
 
-Hey there,
+Hi,
 
-I listened to "Why Your Faith Can't Be Just a Feeling" this week - the reframe that faith isn't a feeling, it's loyalty — that lands harder than 90% of the James chapter 2 teaching that's out there. That's the kind of teaching that deserves to reach people beyond Sunday morning at The Crossings Church.
+I came across The Crossings' feed while looking for teaching podcasts to listen to this week, and ended up on "Why Your Faith Can't Be Just a Feeling." The reframe that faith isn't a feeling, it's loyalty — that lands harder than a lot of the James 2 teaching that's out there.
 
-I ran it through my automation pipeline and here's what came out in about 5 minutes - no manual editing:
+Quick context on who I am: I'm Evan, based in Milwaukee — I built a system that takes a sermon recording and turns it into clips, a blog post, captions, and a full transcript. I've been running it for a comedy podcast I host, and it adapted well to long-form teaching. I'm reaching out to 10 churches this month to see if it's useful — no pitch past this email, the files below are yours either way.
 
 [GOOGLE DRIVE LINK]
 
-Inside you'll find:
-- 5 vertical clips with burned-in subtitles (ready for YouTube Shorts / Instagram Reels)
-- A devotional-style blog post with full scripture references
-- Social captions written per platform (YouTube, Instagram, Facebook, Twitter)
+Inside:
+- 5 short vertical clips with burned-in captions (for folks in your congregation who mostly scroll socials)
+- A devotional-style blog post with verified scripture references
+- Social captions written per platform
 - Chapter markers for the full sermon
-- A complete searchable transcript
-- Thumbnail and quote cards ready to post
+- A searchable transcript of the whole sermon
+- Thumbnail and quote cards
 
-The clip I'd lead with is "Faith Isn't What You Think It Is" (8:00-8:30). It's 30 seconds, self-contained, and flips a cliché ('faith is just a feeling') into a Biblical counter-thesis. Perfect Shorts material — hook in the first word, payoff in under 30 seconds.
+The clip I'd lead with is "Faith Isn't What You Think It Is" at 8:00–8:30 — 30 seconds, self-contained, flips a cliché into a biblical counter-thesis. Hook in the first word.
 
-Here's why this matters for The Crossings Church: I noticed your podcast feed has not published since October 2025 - I do not know if that is an intentional pause or a capacity issue, but either way this might land at a useful moment. The reason churches stop publishing is almost never lack of sermons; it is the hours of post-production work that piles up until no one has time. My pipeline makes that 5 minutes instead of 4-6 hours - so if you want to restart, the bottleneck goes away.
+One honest note: I noticed the podcast feed hasn't published since October 2025. No assumptions there — could be an intentional pause, could be capacity. Either way, the reason most churches stop publishing isn't the sermons themselves, it's the post-production pile-up. If that's the bottleneck and you want to pick it back up, I can keep doing this ongoing — transcripts people can search midweek, short clips, a weekly blog post. You may already have someone on this; if so, this is just a free asset for them. The files are yours, and I'll delete my copies after you confirm you have them if you'd rather I not keep anything.
 
-**The math:** 52 sermons/year = 52 blog posts, 260+ clips, 52 transcript pages, and hundreds of social posts. Doing this manually takes 4-6 hours per sermon. My pipeline does it in 5 minutes.
-
-I'd like to process your next 4 sermons completely free. No strings - you keep everything. If you like the output, we talk about automating the whole thing. If not, you've got a month of free content for The Crossings Church.
-
-Would it be easier to jump on a 10-minute call this week, or should I just send the next batch when it's ready?
-
-Evan Perez
-https://neurovai.org | evan@neurovai.org
+If there's a 10-minute window sometime in the next couple weeks to talk, I'd love it. Otherwise I'll just send the next batch when it's ready — no follow-up pressure.
 
 ---
 

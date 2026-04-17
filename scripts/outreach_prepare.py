@@ -242,6 +242,7 @@ def prepare_one(
         subject=parsed["subject"],
         body=body_with_link,
         dry_run=dry_run,
+        include_signature=True,
     )
 
     return {

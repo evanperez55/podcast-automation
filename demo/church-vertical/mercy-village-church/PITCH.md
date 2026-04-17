@@ -15,36 +15,29 @@
 
 ## Email
 
-**Subject:** Made these from your "Why Your Heart Sometimes Just Won't Burn for Scripture" sermon - took 5 minutes
+**Subject:** A few things I made from Sunday's sermon at Mercy Village
 
-Hey there,
+Hi,
 
-I listened to "Why Your Heart Sometimes Just Won't Burn for Scripture" this week - the part that grabbed me was "Most of us read the Bible like it’s a textbook, but it’s actually one epic story — stop treating it like facts and start living it like a movie.". That's the kind of teaching that deserves to reach people beyond Sunday morning at Mercy Village Church.
+I came across Mercy Village's feed while looking for teaching podcasts to listen to this week, and ended up on "Why Your Heart Sometimes Just Won't Burn for Scripture." The reframe — that the Bible is an epic story, not a textbook, and that most of us read it the wrong way — was what stuck with me.
 
-I ran it through my automation pipeline and here's what came out in about 5 minutes - no manual editing:
+Quick context on who I am: I'm Evan, based in Milwaukee — I built a system that takes a sermon recording and turns it into clips, a blog post, captions, and a full transcript. I've been running it for a comedy podcast I host, and it adapted well to long-form teaching. I'm reaching out to 10 churches this month to see if it's useful — no pitch past this email, the files below are yours either way.
 
 [GOOGLE DRIVE LINK]
 
-Inside you'll find:
-- 5 vertical clips with burned-in subtitles (ready for YouTube Shorts / Instagram Reels)
-- A devotional-style blog post with full scripture references
-- Social captions written per platform (YouTube, Instagram, Facebook, Twitter)
+Inside:
+- 5 short vertical clips with burned-in captions (for folks in your congregation who mostly scroll socials)
+- A devotional-style blog post with verified scripture references
+- Social captions written per platform
 - Chapter markers for the full sermon
-- A complete searchable transcript
-- Thumbnail and quote cards ready to post
+- A searchable transcript of the whole sermon
+- Thumbnail and quote cards
 
-The clip I'd lead with is "Why Your Heart Feels Cold Reading the Bible" (8:59-10:38). This clip reveals the core problem many face with scripture — distance and discouragement — framed through a relatable biblical story, making it accessible and impactful. The hook "Why doesn’t your heart burn reading the Bible?" works in the first 2 seconds.
+The clip I'd lead with is "Why Your Heart Feels Cold Reading the Bible" at 8:59–10:38 — the hook question works immediately, and the biblical story that follows makes the abstraction concrete.
 
-Here's why this matters for Mercy Village Church: Mercy Village describes itself as a small-town church - and small-town churches almost never have a dedicated media team, even when they have 267 sermons worth of teaching sitting on Subsplash. You are already recording every sermon and paying for Subsplash hosting; right now that investment produces one podcast episode per week. This pipeline turns the same recording into 5+ clips, a devotional blog post, a searchable transcript, and per-platform social captions - same input, 15x the output.
+Most small-town churches don't have a dedicated media team even when they've got years of teaching already recorded. If that's your situation, this takes the same Sunday recording you already make and turns it into clips, a blog post, and a searchable transcript — no extra work for anyone on your staff. You may already have someone on this; if so, this is just a free asset for them. The files are yours, and I'll delete my copies after you confirm you have them if you'd rather I not keep anything.
 
-**The math:** 52 sermons/year = 52 blog posts, 260+ clips, 52 transcript pages, and hundreds of social posts. Doing this manually takes 4-6 hours per sermon. My pipeline does it in 5 minutes.
-
-I'd like to process your next 4 sermons completely free. No strings - you keep everything. If you like the output, we talk about automating the whole thing. If not, you've got a month of free content for Mercy Village Church.
-
-Would it be easier to jump on a 10-minute call this week, or should I just send the next batch when it's ready?
-
-Evan Perez
-https://neurovai.org | evan@neurovai.org
+If there's a 10-minute window sometime in the next couple weeks to talk, I'd love it. Otherwise I'll just send the next batch when it's ready — no follow-up pressure.
 
 ---
 

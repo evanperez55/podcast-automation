@@ -14,36 +14,29 @@
 
 ## Email
 
-**Subject:** Made these from your "Why Following Jesus Means Saying No to Yourself" sermon - took 5 minutes
+**Subject:** For Kelli — a few things I made from Sunday's sermon
 
 Hey Kelli,
 
-I listened to "Why Following Jesus Means Saying No to Yourself" this week - the Matthew 16 reframe — 'taking up your cross sounds intense, here's why' — was a memorable way to get people past the cliché phrase to the actual teaching. That's the kind of teaching that deserves to reach people beyond Sunday morning at Christ Community Church.
+I came across Christ Community's feed while looking for teaching podcasts to listen to this week, and ended up on "Why Following Jesus Means Saying No to Yourself." The Matthew 16 reframe — cutting past "take up your cross" as a cliché into what the phrase actually demands of a person — is the part I kept thinking about after it was over.
 
-I ran it through my automation pipeline and here's what came out in about 5 minutes - no manual editing:
+Quick context on who I am: I'm Evan, based in Milwaukee — I built a system that takes a sermon recording and turns it into clips, a blog post, captions, and a full transcript. I've been running it for a comedy podcast I host, and it adapted well to long-form teaching. I'm reaching out to 10 churches this month to see if it's useful — no pitch past this email, the files below are yours either way.
 
 [GOOGLE DRIVE LINK]
 
-Inside you'll find:
-- 5 vertical clips with burned-in subtitles (ready for YouTube Shorts / Instagram Reels)
-- A devotional-style blog post with full scripture references
-- Social captions written per platform (YouTube, Instagram, Facebook, Twitter)
+Inside:
+- 5 short vertical clips with burned-in captions (for folks in your congregation who mostly scroll socials)
+- A devotional-style blog post with verified scripture references
+- Social captions written per platform
 - Chapter markers for the full sermon
-- A complete searchable transcript
-- Thumbnail and quote cards ready to post
+- A searchable transcript of the whole sermon
+- Thumbnail and quote cards
 
-The clip I'd lead with is "Taking Up Your Cross: What Does It Really Mean?" (10:03-10:44). It's 42 seconds, self-contained, and the hook reframes a phrase most Christians have heard a hundred times. That's the kind of clip that stops someone mid-scroll.
+The clip I'd lead with is "Taking Up Your Cross: What Does It Really Mean?" at 10:03–10:44 — 42 seconds, self-contained, and it reframes a phrase most Christians have heard a hundred times. Good midweek clip for anyone who keeps scrolling past the word "cross."
 
-Here's why this matters for Christ Community Church: Christ Community has 584 sermons in your Buzzsprout archive - that is an enormous back catalog and you just went through a pastoral transition. Fresh leadership + legacy content = the perfect window to relaunch the digital strategy. Every archived sermon becomes a searchable transcript page; every new Sunday becomes 5 clips.
+If you ever wanted every sermon to keep working through the week — transcripts people can search midweek, short clips for anyone who doesn't have 45 minutes, a weekly blog post — I can keep doing this for Christ Community ongoing. You may already have someone on this; if so, this is just a free asset for them. The files are yours, and I'll delete my copies after you confirm you have them if you'd rather I not keep anything.
 
-**The math:** 52 sermons/year = 52 blog posts, 260+ clips, 52 transcript pages, and hundreds of social posts. Doing this manually takes 4-6 hours per sermon. My pipeline does it in 5 minutes.
-
-I'd like to process your next 4 sermons completely free. No strings - you keep everything. If you like the output, we talk about automating the whole thing. If not, you've got a month of free content for Christ Community Church.
-
-Would it be easier to jump on a 10-minute call this week, or should I just send the next batch when it's ready?
-
-Evan Perez
-https://neurovai.org | evan@neurovai.org
+If there's a 10-minute window sometime in the next couple weeks to talk about whether this would be useful ongoing, I'd love it. Otherwise I'll just send the next batch when it's ready — no follow-up pressure.
 
 ---
 

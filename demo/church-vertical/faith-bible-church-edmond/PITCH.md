@@ -15,36 +15,29 @@
 
 ## Email
 
-**Subject:** Made these from your "Why Spiritual Armor Beats Roman Armor Every Time" sermon - took 5 minutes
+**Subject:** For Dr. Hitchcock — a few things I made from Sunday's sermon
 
-Hey there,
+Hey Dr. Hitchcock,
 
-I listened to "Why Spiritual Armor Beats Roman Armor Every Time" this week - the part that grabbed me was "If you think spiritual warfare is just a metaphor, you’ve already lost the battle.". That's the kind of teaching that deserves to reach people beyond Sunday morning at Faith Bible Church.
+I came across Faith Bible's feed while looking for teaching podcasts to listen to this week, and ended up on "Why Spiritual Armor Beats Roman Armor Every Time." The way you refused to let spiritual warfare stay metaphorical — treating it as a live, present-tense battle — was the part that stuck.
 
-I ran it through my automation pipeline and here's what came out in about 5 minutes - no manual editing:
+Quick context on who I am: I'm Evan, based in Milwaukee — I built a system that takes a sermon recording and turns it into clips, a blog post, captions, and a full transcript. I've been running it for a comedy podcast I host, and it adapted well to long-form teaching. I'm reaching out to 10 churches this month to see if it's useful — no pitch past this email, the files below are yours either way.
 
 [GOOGLE DRIVE LINK]
 
-Inside you'll find:
-- 5 vertical clips with burned-in subtitles (ready for YouTube Shorts / Instagram Reels)
-- A devotional-style blog post with full scripture references
-- Social captions written per platform (YouTube, Instagram, Facebook, Twitter)
+Inside:
+- 5 short vertical clips with burned-in captions (for folks in your congregation who mostly scroll socials)
+- A devotional-style blog post with verified scripture references
+- Social captions written per platform
 - Chapter markers for the full sermon
-- A complete searchable transcript
-- Thumbnail and quote cards ready to post
+- A searchable transcript of the whole sermon
+- Thumbnail and quote cards
 
-The clip I'd lead with is "We're Paratroopers Behind Enemy Lines" (35:50-36:49). Conveys the urgent, unseen battle all believers face, blending cultural references and scripture to make spiritual warfare tangible. The hook "What if life is a battlefield?" works in the first 2 seconds.
+The clip I'd lead with is "We're Paratroopers Behind Enemy Lines" at 35:50–36:49 — the "What if life is a battlefield?" hook works in the first 2 seconds, and the paratrooper metaphor carries the rest.
 
-Here's why this matters for Faith Bible Church: Faith Bible has 1,091 sermons on Subsplash - that is one of the deepest podcast archives of any church in Oklahoma. If you are already using Pulpit AI (Subsplash's clip tool), great - I am not here to replace it. What I do that Pulpit does not: searchable transcript pages on your website. Every sermon becomes a Google-indexable piece of content answering the exact question someone in Edmond is searching at 2am.
+One thing worth noting: if you're already using a clip tool, no worries — the thing most of those don't produce is a searchable transcript page on your own site. Those are what put your teaching in front of the person in Edmond searching scripture questions at 2am. You may already have someone on this; if so, this is just a free asset for them. The files are yours, and I'll delete my copies after you confirm you have them if you'd rather I not keep anything.
 
-**The math:** 52 sermons/year = 52 blog posts, 260+ clips, 52 transcript pages, and hundreds of social posts. Doing this manually takes 4-6 hours per sermon. My pipeline does it in 5 minutes.
-
-I'd like to process your next 4 sermons completely free. No strings - you keep everything. If you like the output, we talk about automating the whole thing. If not, you've got a month of free content for Faith Bible Church.
-
-Would it be easier to jump on a 10-minute call this week, or should I just send the next batch when it's ready?
-
-Evan Perez
-https://neurovai.org | evan@neurovai.org
+If there's a 10-minute window sometime in the next couple weeks to talk about whether this would be useful ongoing, I'd love it. Otherwise I'll just send the next batch when it's ready — no follow-up pressure.
 
 ---
 

@@ -21,6 +21,7 @@ from config import Config
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/gmail.settings.basic",
     "https://www.googleapis.com/auth/drive.file",
 ]
 
@@ -60,8 +61,10 @@ def main() -> int:
     print(f"[OK] Token saved: {TOKEN_PATH}")
     print()
     print("Smoke test your setup:")
-    print("  uv run python -c \"from gmail_sender import GmailSender; GmailSender()\"")
-    print("  uv run python -c \"from drive_uploader import DriveUploader; DriveUploader()\"")
+    print('  uv run python -c "from gmail_sender import GmailSender; GmailSender()"')
+    print(
+        '  uv run python -c "from drive_uploader import DriveUploader; DriveUploader()"'
+    )
     return 0
 
 

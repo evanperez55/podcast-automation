@@ -8,7 +8,6 @@ cold outreach — one bad merge-field would otherwise go out to 10 prospects.
 from __future__ import annotations
 
 import base64
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -59,9 +58,8 @@ class TestGmailSenderInit:
         token_path.write_text("{}")
         monkeypatch.setattr("gmail_sender.GmailSender.TOKEN_PATH", token_path)
 
-        fake_creds = MagicMock(
-            valid=False, expired=True, refresh_token="refresh-abc"
-        )
+        fake_creds = MagicMock(valid=False, expired=True, refresh_token="refresh-abc")
+
         # After refresh, treat as valid
         def refresh_side_effect(_request):
             fake_creds.valid = True
@@ -144,9 +142,7 @@ class TestCreateDraft:
             resp=resp, content=b'{"error": {"message": "boom"}}'
         )
 
-        result = sender.create_draft(
-            to="pastor@example.com", subject="Test", body="Hi"
-        )
+        result = sender.create_draft(to="pastor@example.com", subject="Test", body="Hi")
         assert result is None
 
     def test_dry_run_skips_api_call(self, sender):
@@ -170,9 +166,7 @@ class TestCreateDraft:
         }
 
         body = "Paragraph one.\n\nParagraph two.\n\n- bullet 1\n- bullet 2"
-        sender.create_draft(
-            to="x@example.com", subject="Test", body=body
-        )
+        sender.create_draft(to="x@example.com", subject="Test", body=body)
 
         call_kwargs = sender.service.users().drafts().create.call_args_list[-1].kwargs
         raw = call_kwargs["body"]["message"]["raw"]
@@ -183,3 +177,153 @@ class TestCreateDraft:
         assert "Paragraph two." in body_text
         assert "- bullet 1" in body_text
         assert "\n\n" in body_text  # paragraph breaks survive
+
+
+class TestGetSignature:
+    """Fetches the user's real Gmail signature via gmail.settings.basic scope.
+
+    Needed so API-created drafts don't lose the sender's actual signature
+    (Gmail UI auto-inserts signature on compose, but NOT on drafts created
+    via the API — so we have to inject it ourselves).
+    """
+
+    @pytest.fixture
+    def sender(self, tmp_path, monkeypatch):
+        token_path = tmp_path / "token.json"
+        token_path.write_text("{}")
+        monkeypatch.setattr("gmail_sender.GmailSender.TOKEN_PATH", token_path)
+
+        fake_creds = MagicMock(valid=True, expired=False)
+        with (
+            patch(
+                "gmail_sender.Credentials.from_authorized_user_file",
+                return_value=fake_creds,
+            ),
+            patch("gmail_sender.build"),
+        ):
+            from gmail_sender import GmailSender
+
+            s = GmailSender()
+        s.service = MagicMock()
+        return s
+
+    def test_returns_default_signature_as_plain_text(self, sender):
+        """sendAs.list returns multiple aliases; pick the one with isDefault=True."""
+        sender.service.users().settings().sendAs().list().execute.return_value = {
+            "sendAs": [
+                {
+                    "sendAsEmail": "other@example.com",
+                    "isDefault": False,
+                    "signature": "<p>Other Alias</p>",
+                },
+                {
+                    "sendAsEmail": "evan@neurovai.org",
+                    "isDefault": True,
+                    "signature": (
+                        "Evan Perez<br>Founder, Neurova<br>"
+                        '<a href="https://neurovai.org">neurovai.org</a>'
+                    ),
+                },
+            ]
+        }
+
+        sig = sender.get_signature()
+        assert "Evan Perez" in sig
+        assert "Founder, Neurova" in sig
+        assert "neurovai.org" in sig
+        # HTML tags must be stripped — the email body is plain text
+        assert "<br>" not in sig
+        assert "<a href" not in sig
+        # Line breaks from <br> preserved as \n
+        assert "Evan Perez\nFounder, Neurova" in sig
+
+    def test_returns_empty_string_when_signature_missing(self, sender):
+        """No aliases configured → return empty string, don't crash."""
+        sender.service.users().settings().sendAs().list().execute.return_value = {
+            "sendAs": [{"sendAsEmail": "evan@neurovai.org", "isDefault": True}]
+        }
+        assert sender.get_signature() == ""
+
+    def test_returns_empty_on_api_error(self, sender):
+        """gmail.settings.basic scope missing → graceful degrade, not crash.
+        Outreach should still create a draft even if we can't get the signature."""
+        from googleapiclient.errors import HttpError
+
+        resp = MagicMock(status=403, reason="Forbidden")
+        sender.service.users().settings().sendAs().list().execute.side_effect = (
+            HttpError(resp=resp, content=b'{"error":{"message":"insufficient scope"}}')
+        )
+        assert sender.get_signature() == ""
+
+
+class TestCreateDraftWithSignature:
+    """create_draft supports auto-appending the user's Gmail signature."""
+
+    @pytest.fixture
+    def sender(self, tmp_path, monkeypatch):
+        token_path = tmp_path / "token.json"
+        token_path.write_text("{}")
+        monkeypatch.setattr("gmail_sender.GmailSender.TOKEN_PATH", token_path)
+
+        fake_creds = MagicMock(valid=True, expired=False)
+        with (
+            patch(
+                "gmail_sender.Credentials.from_authorized_user_file",
+                return_value=fake_creds,
+            ),
+            patch("gmail_sender.build"),
+        ):
+            from gmail_sender import GmailSender
+
+            s = GmailSender()
+        s.service = MagicMock()
+        return s
+
+    def _decode_body(self, sender) -> str:
+        import email as _email_lib
+
+        call_kwargs = sender.service.users().drafts().create.call_args_list[-1].kwargs
+        raw = call_kwargs["body"]["message"]["raw"]
+        decoded = base64.urlsafe_b64decode(raw).decode("utf-8")
+        return (
+            _email_lib.message_from_string(decoded)
+            .get_payload(decode=True)
+            .decode("utf-8")
+        )
+
+    def test_include_signature_appends_fetched_signature(self, sender):
+        sender.service.users().drafts().create().execute.return_value = {"id": "d-1"}
+        sender.service.users().settings().sendAs().list().execute.return_value = {
+            "sendAs": [
+                {
+                    "sendAsEmail": "evan@neurovai.org",
+                    "isDefault": True,
+                    "signature": "Evan Perez<br>Founder, Neurova",
+                }
+            ]
+        }
+
+        sender.create_draft(
+            to="p@ex.com",
+            subject="S",
+            body="Hey,\n\nBody text.",
+            include_signature=True,
+        )
+
+        body = self._decode_body(sender)
+        assert "Body text." in body
+        assert "Evan Perez" in body
+        assert "Founder, Neurova" in body
+        # Signature must appear AFTER the body, not before
+        assert body.index("Body text.") < body.index("Evan Perez")
+
+    def test_include_signature_false_omits_signature(self, sender):
+        """Default path: no signature injected — caller controls."""
+        sender.service.users().drafts().create().execute.return_value = {"id": "d-2"}
+
+        sender.create_draft(to="p@ex.com", subject="S", body="Hey,\n\nBody text.")
+
+        body = self._decode_body(sender)
+        assert "Body text." in body
+        # sendAs was never called because include_signature defaults to False
+        sender.service.users().settings().sendAs().list().execute.assert_not_called()

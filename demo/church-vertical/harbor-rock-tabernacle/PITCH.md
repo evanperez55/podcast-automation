@@ -14,36 +14,29 @@
 
 ## Email
 
-**Subject:** Made these from your "Why the Tomb Was Empty but the Crowd Wasn't" sermon - took 5 minutes
+**Subject:** For Pastor Paul — a few things I made from Sunday's sermon
 
-Hey there,
+Hey Paul,
 
-I listened to "Why the Tomb Was Empty but the Crowd Wasn't" this week - the part that grabbed me was "If even Jesus’ closest friends doubted his resurrection, your doubts are just part of the journey—not a failure.". That's the kind of teaching that deserves to reach people beyond Sunday morning at Harbor Rock Tabernacle.
+I came across Harbor Rock's feed while looking for teaching podcasts to listen to this week, and ended up on "Why the Tomb Was Empty but the Crowd Wasn't." The line that even Jesus' closest friends doubted the resurrection — and that doubt is part of the journey rather than a failure of faith — was what stuck with me.
 
-I ran it through my automation pipeline and here's what came out in about 5 minutes - no manual editing:
+Quick context on who I am: I'm Evan, based in Milwaukee — I built a system that takes a sermon recording and turns it into clips, a blog post, captions, and a full transcript. I've been running it for a comedy podcast I host, and it adapted well to long-form teaching. I'm reaching out to 10 churches this month to see if it's useful — no pitch past this email, the files below are yours either way.
 
 [GOOGLE DRIVE LINK]
 
-Inside you'll find:
-- 5 vertical clips with burned-in subtitles (ready for YouTube Shorts / Instagram Reels)
-- A devotional-style blog post with full scripture references
-- Social captions written per platform (YouTube, Instagram, Facebook, Twitter)
+Inside:
+- 5 short vertical clips with burned-in captions (for folks in your congregation who mostly scroll socials)
+- A devotional-style blog post with verified scripture references
+- Social captions written per platform
 - Chapter markers for the full sermon
-- A complete searchable transcript
-- Thumbnail and quote cards ready to post
+- A searchable transcript of the whole sermon
+- Thumbnail and quote cards
 
-The clip I'd lead with is "No Witnesses at the Greatest Moment Ever" (4:28-5:05). This clip highlights a striking and little-considered aspect of the resurrection: that no witnesses were there, underscoring the personal nature of salvation. The hook "Nobody was there when Jesus rose" works in the first 2 seconds.
+The clip I'd lead with is "No Witnesses at the Greatest Moment Ever" at 4:28–5:05 — the "nobody was there when Jesus rose" hook is unusual enough to stop the scroll, and the clip turns it toward the personal nature of salvation.
 
-Here's why this matters for Harbor Rock Tabernacle: Harbor Rock has 815 sermons on Podomatic - that is one of the deepest church podcast archives I have seen in Wisconsin. All of that teaching is currently locked inside audio files Google cannot search. Converting that archive to transcript pages + a backlog of YouTube Shorts would transform your digital presence overnight, without recording a single new sermon.
+If you ever wanted every sermon to keep working through the week — transcripts people can search midweek, short clips for anyone who doesn't have 45 minutes, a weekly blog post — I can keep doing this for Harbor Rock ongoing. You may already have someone on this; if so, this is just a free asset for them. The files are yours, and I'll delete my copies after you confirm you have them if you'd rather I not keep anything.
 
-**The math:** 52 sermons/year = 52 blog posts, 260+ clips, 52 transcript pages, and hundreds of social posts. Doing this manually takes 4-6 hours per sermon. My pipeline does it in 5 minutes.
-
-I'd like to process your next 4 sermons completely free. No strings - you keep everything. If you like the output, we talk about automating the whole thing. If not, you've got a month of free content for Harbor Rock Tabernacle.
-
-Would it be easier to jump on a 10-minute call this week, or should I just send the next batch when it's ready?
-
-Evan Perez
-https://neurovai.org | evan@neurovai.org
+If there's a 10-minute window sometime in the next couple weeks to talk, I'd love it. Otherwise I'll just send the next batch when it's ready — no follow-up pressure.
 
 ---
 

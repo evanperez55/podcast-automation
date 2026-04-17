@@ -7,7 +7,6 @@ pasting into an outreach email.
 
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -56,9 +55,7 @@ class TestCreateFolder:
 
         assert fid == "fld-1"
         call_kwargs = uploader.service.files().create.call_args_list[-1].kwargs
-        assert (
-            call_kwargs["body"]["mimeType"] == "application/vnd.google-apps.folder"
-        )
+        assert call_kwargs["body"]["mimeType"] == "application/vnd.google-apps.folder"
         assert call_kwargs["body"]["name"] == "Redeemer City Church - Demo"
         # No parent → no "parents" key
         assert "parents" not in call_kwargs["body"]
