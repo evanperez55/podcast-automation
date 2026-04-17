@@ -82,40 +82,68 @@ class WebsiteGenerator:
         return episodes
 
     def _collect_youtube_ids(self) -> Dict[str, Dict[str, str]]:
-        """Read content calendar for YouTube video IDs per episode.
+        """Collect YouTube video IDs per episode, keyed for the template loop.
 
-        Returns dict like: {"ep_30": {"episode": "NV54Ilj0zGE", "clip_3": "F6S7FjljtGU", ...}}
+        Returns dict like: {"ep_30": {"episode": "NV54I...", "clip_1": "F6S7...", "clip_2": ..., "clip_3": ...}}
+
+        Primary source: output/ep_N/platform_ids.json
+          {"youtube": "<main_id>", "youtube_clips": ["id1", "id2", "id3"], ...}
+        Clip IDs are in best_clips order (index 0 = clip_1 on the landing page).
+
+        Fallback: content_calendar.json slots (for older episodes predating
+        platform_ids.json clip tracking). Uses content.youtube_video_id as
+        source of truth, upload_results.youtube.video_id as secondary.
         """
+        result: Dict[str, Dict[str, str]] = {}
+
+        # --- Primary: per-episode platform_ids.json ---
+        if self.output_dir.exists():
+            for ep_dir in self.output_dir.iterdir():
+                if not ep_dir.is_dir() or not ep_dir.name.startswith("ep_"):
+                    continue
+                platform_ids_path = ep_dir / "platform_ids.json"
+                if not platform_ids_path.exists():
+                    continue
+                try:
+                    with open(platform_ids_path, encoding="utf-8") as f:
+                        pids = json.load(f)
+                except (json.JSONDecodeError, OSError):
+                    continue
+                ids: Dict[str, str] = {}
+                if pids.get("youtube"):
+                    ids["episode"] = pids["youtube"]
+                for i, clip_id in enumerate(pids.get("youtube_clips") or []):
+                    if clip_id:
+                        ids[f"clip_{i + 1}"] = clip_id
+                if ids:
+                    result[ep_dir.name] = ids
+
+        # --- Fallback: content_calendar.json slots ---
         calendar_path = Path("topic_data/content_calendar.json")
-        if not calendar_path.exists():
-            return {}
+        if calendar_path.exists():
+            try:
+                with open(calendar_path, encoding="utf-8") as f:
+                    calendar = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                calendar = {}
+            for ep_id, ep_data in calendar.items():
+                ids = result.setdefault(ep_id, {})
+                for slot_key, slot in ep_data.get("slots", {}).items():
+                    # Only fill if platform_ids.json didn't already supply this key.
+                    if slot_key in ids:
+                        continue
+                    content = slot.get("content", {})
+                    vid_id = content.get("youtube_video_id", "")
+                    if not vid_id:
+                        upload_results = slot.get("upload_results", {})
+                        yt_result = upload_results.get("youtube", {})
+                        if isinstance(yt_result, dict):
+                            vid_id = yt_result.get("video_id", "") or ""
+                    if vid_id:
+                        ids[slot_key] = vid_id
 
-        try:
-            with open(calendar_path, encoding="utf-8") as f:
-                calendar = json.load(f)
-        except (json.JSONDecodeError, OSError):
-            return {}
-
-        result = {}
-        for ep_id, ep_data in calendar.items():
-            ids = {}
-            for slot_key, slot in ep_data.get("slots", {}).items():
-                # Source of truth: content.youtube_video_id is written by the
-                # distribute step on every successful upload. upload_results
-                # is a secondary fallback for older entries that never got
-                # the content field set.
-                content = slot.get("content", {})
-                vid_id = content.get("youtube_video_id", "")
-                if not vid_id:
-                    upload_results = slot.get("upload_results", {})
-                    yt_result = upload_results.get("youtube", {})
-                    if isinstance(yt_result, dict):
-                        vid_id = yt_result.get("video_id", "") or ""
-                if vid_id:
-                    ids[slot_key] = vid_id
-            if ids:
-                result[ep_id] = ids
-        return result
+        # Drop empty episode entries that got setdefault'd but never populated
+        return {k: v for k, v in result.items() if v}
 
     # ------------------------------------------------------------------
     # HTML Generation

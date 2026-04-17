@@ -197,6 +197,115 @@ class TestCollectYoutubeIds:
 
         assert result["ep_29"]["episode"] == "fallback_vid"
 
+    def test_reads_clip_ids_from_platform_ids_json(
+        self, generator, monkeypatch, tmp_path
+    ):
+        """Clip YouTube IDs come from output/ep_N/platform_ids.json, indexed 0..N.
+
+        This decouples clip-video lookup from the content calendar's
+        staggered-posting slot names (clip_3, clip_4, ...) which only
+        cover a subset of clips and use day-offset, not clip-index.
+        """
+        monkeypatch.chdir(tmp_path)
+        ep_dir = tmp_path / "output" / "ep_31"
+        ep_dir.mkdir(parents=True)
+        (ep_dir / "platform_ids.json").write_text(
+            json.dumps(
+                {
+                    "youtube": "MAIN_ep31",
+                    "youtube_clips": ["clip_ONE", "clip_TWO", "clip_THREE"],
+                    "twitter": "999",
+                }
+            ),
+            encoding="utf-8",
+        )
+        generator.output_dir = tmp_path / "output"
+
+        result = generator._collect_youtube_ids()
+
+        assert result["ep_31"]["episode"] == "MAIN_ep31"
+        assert result["ep_31"]["clip_1"] == "clip_ONE"
+        assert result["ep_31"]["clip_2"] == "clip_TWO"
+        assert result["ep_31"]["clip_3"] == "clip_THREE"
+
+    def test_platform_ids_takes_precedence_over_calendar(
+        self, generator, monkeypatch, tmp_path
+    ):
+        """When platform_ids.json exists, it wins over calendar entries."""
+        monkeypatch.chdir(tmp_path)
+        ep_dir = tmp_path / "output" / "ep_31"
+        ep_dir.mkdir(parents=True)
+        (ep_dir / "platform_ids.json").write_text(
+            json.dumps({"youtube": "PID_MAIN", "youtube_clips": ["PID_CLIP1"]}),
+            encoding="utf-8",
+        )
+        generator.output_dir = tmp_path / "output"
+
+        cal_dir = tmp_path / "topic_data"
+        cal_dir.mkdir()
+        (cal_dir / "content_calendar.json").write_text(
+            json.dumps(
+                {
+                    "ep_31": {
+                        "slots": {
+                            "episode": {
+                                "content": {"youtube_video_id": "CAL_MAIN"},
+                                "upload_results": {},
+                            },
+                            "clip_1": {
+                                "content": {"youtube_video_id": "CAL_CLIP1"},
+                                "upload_results": {},
+                            },
+                        }
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        result = generator._collect_youtube_ids()
+
+        assert result["ep_31"]["episode"] == "PID_MAIN"
+        assert result["ep_31"]["clip_1"] == "PID_CLIP1"
+
+    def test_calendar_fills_gaps_when_platform_ids_missing_a_clip(
+        self, generator, monkeypatch, tmp_path
+    ):
+        """If platform_ids.json lacks a slot, calendar fills the gap."""
+        monkeypatch.chdir(tmp_path)
+        ep_dir = tmp_path / "output" / "ep_31"
+        ep_dir.mkdir(parents=True)
+        (ep_dir / "platform_ids.json").write_text(
+            json.dumps(
+                {"youtube": "PID_MAIN", "youtube_clips": ["PID_CLIP1"]}  # only clip 1
+            ),
+            encoding="utf-8",
+        )
+        generator.output_dir = tmp_path / "output"
+
+        cal_dir = tmp_path / "topic_data"
+        cal_dir.mkdir()
+        (cal_dir / "content_calendar.json").write_text(
+            json.dumps(
+                {
+                    "ep_31": {
+                        "slots": {
+                            "clip_3": {
+                                "content": {"youtube_video_id": "CAL_CLIP3"},
+                                "upload_results": {},
+                            },
+                        }
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        result = generator._collect_youtube_ids()
+
+        assert result["ep_31"]["clip_1"] == "PID_CLIP1"
+        assert result["ep_31"]["clip_3"] == "CAL_CLIP3"
+
 
 class TestGenerateHtml:
     """Tests for generate_html."""

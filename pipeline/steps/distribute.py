@@ -518,6 +518,14 @@ def _upload_to_social_media(
             full_ep = youtube_results.get("full_episode") or {}
             if full_ep.get("video_id"):
                 platform_ids["youtube"] = full_ep["video_id"]
+            # All Shorts clip video IDs (indexed 0..N, matches best_clips order).
+            # Website generator reads these directly — decouples from the
+            # staggered-posting calendar slot names (clip_3, clip_4, ...)
+            # which only cover a subset of clips.
+            clip_entries = youtube_results.get("clips") or []
+            clip_ids = [c.get("video_id", "") for c in clip_entries]
+            if any(clip_ids):
+                platform_ids["youtube_clips"] = clip_ids
         if twitter_results and isinstance(twitter_results, list) and twitter_results:
             if twitter_results[0].get("tweet_id"):
                 platform_ids["twitter"] = twitter_results[0]["tweet_id"]
