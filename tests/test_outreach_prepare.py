@@ -171,6 +171,52 @@ class TestCollectDemoAssets:
         assert "foo_20260413_censored.mp3" not in names
         assert "foo_clip_01.wav" not in names
 
+    def test_keeps_only_latest_run_when_multiple_timestamps_present(self, tmp_path):
+        """Some ep_dirs accumulate outputs from multiple processing runs (e.g.
+        B011 reruns left 4 copies of everything in one directory). Prospects
+        must see only the latest run — otherwise they get 10 clips instead of 5."""
+        ep = tmp_path / "ep_multi"
+        clips = ep / "clips"
+        clips.mkdir(parents=True)
+
+        # OLD run (20260413_195245) + NEW run (20260413_220958) side by side
+        (clips / "foo_20260413_195245_censored_clip_01_subtitle.mp4").write_bytes(
+            b"old"
+        )
+        (clips / "foo_20260413_195245_censored_clip_02_subtitle.mp4").write_bytes(
+            b"old"
+        )
+        (clips / "foo_20260413_220958_censored_clip_01_subtitle.mp4").write_bytes(
+            b"new"
+        )
+        (clips / "foo_20260413_220958_censored_clip_02_subtitle.mp4").write_bytes(
+            b"new"
+        )
+        (ep / "ep18933019_20260413_195245_blog_post.md").write_text("old blog")
+        (ep / "ep18933019_20260413_220958_blog_post.md").write_text("new blog")
+        (ep / "foo_20260413_195245_thumbnail.png").write_bytes(b"old")
+        (ep / "foo_20260413_220958_thumbnail.png").write_bytes(b"new")
+        # Quote cards have no timestamp — last write wins, only one set exists
+        (ep / "quote_card_1.png").write_bytes(b"img")
+        (ep / "quote_card_2.png").write_bytes(b"img")
+
+        assets = op.collect_demo_assets(ep)
+        names = {a.name for a in assets}
+
+        # OLD timestamp files must be filtered out
+        assert "foo_20260413_195245_censored_clip_01_subtitle.mp4" not in names
+        assert "ep18933019_20260413_195245_blog_post.md" not in names
+        assert "foo_20260413_195245_thumbnail.png" not in names
+
+        # NEW timestamp files are kept
+        assert "foo_20260413_220958_censored_clip_01_subtitle.mp4" in names
+        assert "ep18933019_20260413_220958_blog_post.md" in names
+        assert "foo_20260413_220958_thumbnail.png" in names
+
+        # Timestamp-free files (quote cards) are always kept
+        assert "quote_card_1.png" in names
+        assert "quote_card_2.png" in names
+
 
 # ---------------------------------------------------------------------------
 # End-to-end orchestration

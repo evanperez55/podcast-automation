@@ -110,21 +110,49 @@ EXCLUDE_PATTERNS = [
     "*_raw_snapshot.wav",
 ]
 
+# Pipeline timestamp stamp baked into output filenames: _YYYYMMDD_HHMMSS_
+_TIMESTAMP_RE = re.compile(r"_(\d{8}_\d{6})_")
+
+
+def _latest_run_timestamp(ep_dir: Path) -> Optional[str]:
+    """Scan ep_dir filenames for the most recent processing-run timestamp.
+
+    Episode output dirs sometimes accumulate multiple runs (B011 reruns,
+    manual re-processes) side-by-side. Return the lexicographically greatest
+    stamp found, or None if no timestamped files exist.
+    """
+    stamps = set()
+    for f in ep_dir.rglob("*"):
+        m = _TIMESTAMP_RE.search(f.name)
+        if m:
+            stamps.add(m.group(1))
+    return max(stamps) if stamps else None
+
 
 def collect_demo_assets(ep_dir: Path) -> List[Path]:
-    """Return user-facing asset paths under `ep_dir` (recursing into clips/)."""
+    """Return user-facing asset paths under `ep_dir` (recursing into clips/).
+
+    When multiple processing runs coexist in one ep_dir, only files stamped
+    with the latest timestamp are returned. Files without a timestamp
+    (quote_card_*.png) are always kept — they're regenerated in place each
+    run, so only the latest set ever exists on disk.
+    """
     candidates: List[Path] = []
     for pattern in INCLUDE_PATTERNS:
         candidates.extend(ep_dir.rglob(pattern))
 
-    # Dedup while preserving order
+    latest_ts = _latest_run_timestamp(ep_dir)
+
     seen = set()
     result = []
     for p in candidates:
         if p in seen:
             continue
-        # Skip if matches any exclude
         if any(p.match(bad) for bad in EXCLUDE_PATTERNS):
+            continue
+        # If the file carries a timestamp, it must match the latest run
+        m = _TIMESTAMP_RE.search(p.name)
+        if m and latest_ts and m.group(1) != latest_ts:
             continue
         seen.add(p)
         result.append(p)
