@@ -682,5 +682,35 @@ class TestFormatChaptersNonStandard:
         assert "5:30 Topic 1" in result
 
 
+class TestDeleteVideo:
+    """Tests for delete_video + the force-flag bypass on the [TEST] guard."""
+
+    def _make_uploader_with_mock_client(self, title: str):
+        """Build an uploader whose youtube client returns the given video title."""
+        uploader = YouTubeUploader.__new__(YouTubeUploader)
+        uploader.youtube = Mock()
+        list_call = uploader.youtube.videos().list.return_value
+        list_call.execute.return_value = {"items": [{"snippet": {"title": title}}]}
+        return uploader
+
+    def test_delete_video_refuses_non_test_by_default(self):
+        """Without force, production video (no [TEST] in title) is not deleted."""
+        uploader = self._make_uploader_with_mock_client("Real Episode #31 - Foo")
+
+        result = uploader.delete_video("abc123")
+
+        assert result is False
+        uploader.youtube.videos().delete.assert_not_called()
+
+    def test_delete_video_force_bypasses_test_guard(self):
+        """force=True deletes production video and logs a warning."""
+        uploader = self._make_uploader_with_mock_client("Real Episode #31 - Foo")
+
+        result = uploader.delete_video("abc123", force=True)
+
+        assert result is True
+        uploader.youtube.videos().delete.assert_called_once_with(id="abc123")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

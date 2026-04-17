@@ -224,14 +224,16 @@ class BlueskyUploader:
             logger.error("Failed to post to Bluesky: %s", e)
             return None
 
-    def delete_post(self, post_uri: str) -> bool:
+    def delete_post(self, post_uri: str, force: bool = False) -> bool:
         """Delete a post from Bluesky.
 
         Safety: verifies the post text contains '[TEST]' before deleting
-        to prevent accidental deletion of real content.
+        to prevent accidental deletion of real content. Pass force=True to
+        bypass the [TEST] check (e.g. deliberate re-post of production post).
 
         Args:
             post_uri: The AT Protocol URI of the post (e.g. at://did/collection/rkey).
+            force: Skip the [TEST] text guard. Logs a warning when used.
 
         Returns:
             True if successful, False otherwise.
@@ -263,11 +265,17 @@ class BlueskyUploader:
                 record = check_resp.json().get("value", {})
                 text = record.get("text", "")
                 if "[TEST]" not in text:
-                    logger.error(
-                        "Refusing to delete post %s — text does not contain [TEST]",
+                    if not force:
+                        logger.error(
+                            "Refusing to delete post %s — text does not contain [TEST]",
+                            post_uri,
+                        )
+                        return False
+                    logger.warning(
+                        "FORCE-deleting production Bluesky post %s (text: %r)",
                         post_uri,
+                        text[:80],
                     )
-                    return False
         except requests.RequestException:
             logger.error("Cannot verify post %s before deletion — aborting", post_uri)
             return False

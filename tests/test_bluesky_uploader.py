@@ -528,5 +528,58 @@ class TestPostWithImage:
         assert result is None
 
 
+class TestDeletePostForce:
+    """Tests for the force-flag bypass on delete_post's [TEST] guard."""
+
+    @patch("uploaders.bluesky_uploader.requests.post")
+    @patch("uploaders.bluesky_uploader.requests.get")
+    @patch.object(BlueskyUploader, "_authenticate")
+    @patch("uploaders.bluesky_uploader.Config")
+    def test_delete_post_refuses_non_test_by_default(
+        self, mock_config, mock_auth, mock_get, mock_post
+    ):
+        """Without force, production post (no [TEST]) is not deleted."""
+        mock_config.BLUESKY_HANDLE = "test.bsky.social"
+        mock_config.BLUESKY_APP_PASSWORD = "xxxx"
+        mock_get.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {"value": {"text": "Real episode promo"}},
+        )
+        uploader = BlueskyUploader()
+        uploader.session = MOCK_SESSION
+
+        result = uploader.delete_post("at://did:plc:abc/app.bsky.feed.post/rkey123")
+
+        assert result is False
+        mock_post.assert_not_called()
+
+    @patch("uploaders.bluesky_uploader.requests.post")
+    @patch("uploaders.bluesky_uploader.requests.get")
+    @patch.object(BlueskyUploader, "_authenticate")
+    @patch("uploaders.bluesky_uploader.Config")
+    def test_delete_post_force_bypasses_test_guard(
+        self, mock_config, mock_auth, mock_get, mock_post
+    ):
+        """force=True deletes production post and logs a warning."""
+        mock_config.BLUESKY_HANDLE = "test.bsky.social"
+        mock_config.BLUESKY_APP_PASSWORD = "xxxx"
+        mock_get.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {"value": {"text": "Real episode promo (no TEST marker)"}},
+        )
+        delete_response = MagicMock(status_code=200)
+        delete_response.raise_for_status = MagicMock()
+        mock_post.return_value = delete_response
+        uploader = BlueskyUploader()
+        uploader.session = MOCK_SESSION
+
+        result = uploader.delete_post(
+            "at://did:plc:abc/app.bsky.feed.post/rkey123", force=True
+        )
+
+        assert result is True
+        mock_post.assert_called_once()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

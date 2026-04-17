@@ -369,15 +369,17 @@ class TwitterUploader:
             logger.error("Failed to get user info: %s", e)
             return None
 
-    def delete_tweet(self, tweet_id: str) -> bool:
+    def delete_tweet(self, tweet_id: str, force: bool = False) -> bool:
         """
         Delete a tweet.
 
         Safety: verifies the tweet text contains '[TEST]' before deleting
-        to prevent accidental deletion of real content.
+        to prevent accidental deletion of real content. Pass force=True to
+        bypass the [TEST] check (e.g. deliberate re-post of production tweet).
 
         Args:
             tweet_id: ID of tweet to delete
+            force: Skip the [TEST] text guard. Logs a warning when used.
 
         Returns:
             True if successful, False otherwise
@@ -388,11 +390,17 @@ class TwitterUploader:
             if tweet.data:
                 text = tweet.data.text or ""
                 if "[TEST]" not in text:
-                    logger.error(
-                        "Refusing to delete tweet %s — text does not contain [TEST]",
+                    if not force:
+                        logger.error(
+                            "Refusing to delete tweet %s — text does not contain [TEST]",
+                            tweet_id,
+                        )
+                        return False
+                    logger.warning(
+                        "FORCE-deleting production tweet %s (text: %r)",
                         tweet_id,
+                        text[:80],
                     )
-                    return False
 
             self.client.delete_tweet(tweet_id)
             logger.info("Deleted tweet %s", tweet_id)

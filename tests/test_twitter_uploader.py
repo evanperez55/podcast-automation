@@ -845,6 +845,31 @@ class TestDeleteTweet:
     @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
     @patch("uploaders.twitter_uploader.tweepy.API")
     @patch("uploaders.twitter_uploader.tweepy.Client")
+    def test_delete_tweet_force_bypasses_test_guard(
+        self, mock_client_class, mock_api_class
+    ):
+        """force=True deletes non-[TEST] tweets and logs a warning."""
+        uploader = TwitterUploader()
+
+        mock_client = Mock()
+        mock_tweet_data = Mock()
+        mock_tweet_data.text = "Real episode announcement (no TEST marker)"
+        mock_tweet_response = Mock()
+        mock_tweet_response.data = mock_tweet_data
+        mock_client.get_tweet.return_value = mock_tweet_response
+        uploader.client = mock_client
+
+        result = uploader.delete_tweet("12345", force=True)
+
+        assert result is True
+        mock_client.delete_tweet.assert_called_once_with("12345")
+
+    @patch.object(Config, "TWITTER_API_KEY", "valid_key")
+    @patch.object(Config, "TWITTER_API_SECRET", "valid_secret")
+    @patch.object(Config, "TWITTER_ACCESS_TOKEN", "valid_token")
+    @patch.object(Config, "TWITTER_ACCESS_SECRET", "valid_token_secret")
+    @patch("uploaders.twitter_uploader.tweepy.API")
+    @patch("uploaders.twitter_uploader.tweepy.Client")
     def test_delete_tweet_tweepy_exception(self, mock_client_class, mock_api_class):
         """TweepyException in delete returns False."""
         import tweepy

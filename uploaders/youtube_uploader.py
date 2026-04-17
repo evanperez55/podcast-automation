@@ -463,14 +463,16 @@ class YouTubeUploader:
             logger.error("Failed to set privacy for %s: %s", video_id, e)
             return False
 
-    def delete_video(self, video_id: str) -> bool:
+    def delete_video(self, video_id: str, force: bool = False) -> bool:
         """Delete a video from YouTube.
 
         Safety: verifies the video title contains '[TEST]' before deleting
-        to prevent accidental deletion of real content.
+        to prevent accidental deletion of real content. Pass force=True to
+        bypass the [TEST] check (e.g. deliberate re-upload of production video).
 
         Args:
             video_id: YouTube video ID to delete.
+            force: Skip the [TEST] title guard. Logs a warning when used.
 
         Returns:
             True if successful, False otherwise.
@@ -489,12 +491,18 @@ class YouTubeUploader:
 
             title = items[0].get("snippet", {}).get("title", "")
             if "[TEST]" not in title:
-                logger.error(
-                    "Refusing to delete video %s — title %r does not contain [TEST]",
+                if not force:
+                    logger.error(
+                        "Refusing to delete video %s — title %r does not contain [TEST]",
+                        video_id,
+                        title,
+                    )
+                    return False
+                logger.warning(
+                    "FORCE-deleting production YouTube video %s (title: %r)",
                     video_id,
                     title,
                 )
-                return False
 
             self.youtube.videos().delete(id=video_id).execute()
             logger.info("Deleted YouTube video %s", video_id)
