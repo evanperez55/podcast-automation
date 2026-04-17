@@ -119,6 +119,24 @@ def run_audio(
 
     ctx.censored_audio = censored_audio
 
+    # Step 4.3: Denoise audio (remove constant hiss/hum before normalization)
+    from config import Config  # noqa: PLC0415
+
+    if Config.DENOISE_ENABLED:
+        print("STEP 4.3: DENOISING AUDIO (RNNoise)")
+        print("-" * 60)
+        if state and state.is_step_completed("denoise"):
+            outputs = state.get_step_outputs("denoise")
+            censored_audio = Path(outputs["denoised_audio"])
+            logger.info("[RESUME] Skipping denoise (already completed)")
+        else:
+            censored_audio = components["audio_processor"].denoise_audio(censored_audio)
+            if state:
+                state.complete_step("denoise", {"denoised_audio": str(censored_audio)})
+        print()
+
+    ctx.censored_audio = censored_audio
+
     # Step 4.5: Normalize audio
     print("STEP 4.5: NORMALIZING AUDIO")
     print("-" * 60)

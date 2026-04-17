@@ -1297,6 +1297,111 @@ class TestNormalizeAudioEdgeCases:
             )
 
 
+class TestDenoiseAudio:
+    """Tests for denoise_audio (FFmpeg arnndn RNNoise filter)."""
+
+    def test_denoise_raises_on_missing_audio(self, audio_processor, tmp_path):
+        """FileNotFoundError raised when input audio path does not exist."""
+        missing = tmp_path / "nonexistent.wav"
+
+        with pytest.raises(FileNotFoundError, match="Audio file not found"):
+            audio_processor.denoise_audio(missing)
+
+    def test_denoise_raises_on_missing_model(
+        self, audio_processor, tmp_path, monkeypatch
+    ):
+        """FileNotFoundError raised when the RNNoise model file is missing."""
+        audio_file = tmp_path / "input.wav"
+        audio_file.write_bytes(b"fake wav")
+        monkeypatch.setattr(
+            Config, "DENOISE_MODEL_PATH", str(tmp_path / "missing.rnnn")
+        )
+
+        with pytest.raises(FileNotFoundError, match="RNNoise model not found"):
+            audio_processor.denoise_audio(audio_file)
+
+    @patch("audio_processor.subprocess.run")
+    def test_denoise_invokes_arnndn_with_model_path(
+        self, mock_run, audio_processor, tmp_path, monkeypatch
+    ):
+        """FFmpeg invocation must use -af arnndn=m=<model_path>."""
+        audio_file = tmp_path / "input.wav"
+        audio_file.write_bytes(b"fake wav")
+        model_path = tmp_path / "sh.rnnn"
+        model_path.write_bytes(b"fake model")
+        monkeypatch.setattr(Config, "DENOISE_MODEL_PATH", str(model_path))
+        output_path = tmp_path / "denoised.wav"
+
+        mock_run.return_value = Mock(returncode=0, stderr="")
+
+        audio_processor.denoise_audio(audio_file, output_path=output_path)
+
+        assert mock_run.call_count == 1
+        cmd = mock_run.call_args[0][0]
+        cmd_str = " ".join(str(a) for a in cmd)
+        assert "arnndn" in cmd_str
+        assert f"m={model_path}" in cmd_str
+        assert str(audio_file) in cmd_str
+        assert str(output_path) in cmd_str
+
+    @patch("audio_processor.subprocess.run")
+    def test_denoise_returns_output_path(
+        self, mock_run, audio_processor, tmp_path, monkeypatch
+    ):
+        """denoise_audio returns the output_path when provided."""
+        audio_file = tmp_path / "input.wav"
+        audio_file.write_bytes(b"fake wav")
+        model_path = tmp_path / "sh.rnnn"
+        model_path.write_bytes(b"fake model")
+        monkeypatch.setattr(Config, "DENOISE_MODEL_PATH", str(model_path))
+        output_path = tmp_path / "denoised.wav"
+
+        mock_run.return_value = Mock(returncode=0, stderr="")
+
+        result = audio_processor.denoise_audio(audio_file, output_path=output_path)
+
+        assert result == output_path
+
+    @patch("audio_processor.subprocess.run")
+    def test_denoise_in_place_replaces_original(
+        self, mock_run, audio_processor, tmp_path, monkeypatch
+    ):
+        """When output_path is None, denoised audio overwrites the input path."""
+        audio_file = tmp_path / "input.wav"
+        audio_file.write_bytes(b"original wav")
+        model_path = tmp_path / "sh.rnnn"
+        model_path.write_bytes(b"fake model")
+        monkeypatch.setattr(Config, "DENOISE_MODEL_PATH", str(model_path))
+
+        def fake_run(cmd, **kwargs):
+            # Simulate FFmpeg producing the intermediate output file
+            out_path = Path(cmd[-1])
+            out_path.write_bytes(b"denoised wav")
+            return Mock(returncode=0, stderr="")
+
+        mock_run.side_effect = fake_run
+
+        result = audio_processor.denoise_audio(audio_file)
+
+        assert result == audio_file
+        assert audio_file.read_bytes() == b"denoised wav"
+
+    @patch("audio_processor.subprocess.run")
+    def test_denoise_raises_on_ffmpeg_failure(
+        self, mock_run, audio_processor, tmp_path, monkeypatch
+    ):
+        """RuntimeError raised when FFmpeg arnndn returns non-zero."""
+        audio_file = tmp_path / "input.wav"
+        audio_file.write_bytes(b"fake wav")
+        model_path = tmp_path / "sh.rnnn"
+        model_path.write_bytes(b"fake model")
+        monkeypatch.setattr(Config, "DENOISE_MODEL_PATH", str(model_path))
+        mock_run.return_value = Mock(returncode=1, stderr="arnndn: bad model format")
+
+        with pytest.raises(RuntimeError, match="arnndn failed"):
+            audio_processor.denoise_audio(audio_file, output_path=tmp_path / "out.wav")
+
+
 class TestApplyCensorshipEdgeCases:
     """Tests for apply_censorship edge cases: missing file, default output path."""
 

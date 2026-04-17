@@ -299,6 +299,13 @@ class Config:
     CLIP_FADE_MS = int(os.getenv("CLIP_FADE_MS", "100"))
     LUFS_TARGET = float(os.getenv("LUFS_TARGET", "-16"))
 
+    # Noise Reduction (RNNoise via FFmpeg arnndn — removes constant hiss/hum)
+    DENOISE_ENABLED = os.getenv("DENOISE_ENABLED", "true").lower() == "true"
+    DENOISE_MODEL_PATH = os.getenv(
+        "DENOISE_MODEL_PATH",
+        str(Path(__file__).parent / "assets" / "rnnoise" / "sh.rnnn"),
+    )
+
     # Clip Settings
     CLIP_MIN_DURATION = 15  # seconds
     CLIP_MAX_DURATION = int(os.getenv("CLIP_MAX_DURATION", "60"))  # seconds

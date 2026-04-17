@@ -15,6 +15,7 @@ KNOWN_CHECKPOINT_KEYS = {
     "transcribe",
     "analyze",
     "censor",
+    "denoise",
     "normalize",
     "create_clips",
     "subtitles",

@@ -31,12 +31,87 @@ def _make_components():
     transcriber.transcribe.return_value = {"segments": [], "words": []}
     audio_processor = Mock()
     audio_processor.apply_censorship.return_value = Path("/fake/censored.wav")
+    audio_processor.denoise_audio.return_value = Path("/fake/denoised.wav")
     audio_processor.normalize_audio.return_value = Path("/fake/normalized.wav")
     audio_processor.convert_to_mp3.return_value = Path("/fake/episode.mp3")
     return {
         "transcriber": transcriber,
         "audio_processor": audio_processor,
     }
+
+
+class TestRunAudioDenoise:
+    """Tests for the denoise step (4.3) gated by Config.DENOISE_ENABLED."""
+
+    def test_denoise_called_when_enabled(self, tmp_path, monkeypatch):
+        """denoise_audio is invoked between censor and normalize when enabled."""
+        from config import Config
+
+        monkeypatch.setattr(Config, "DENOISE_ENABLED", True)
+        ctx = _make_ctx(tmp_path)
+        components = _make_components()
+
+        with patch("pipeline.steps.audio.subprocess.run"):
+            run_audio(ctx, components, state=None)
+
+        components["audio_processor"].denoise_audio.assert_called_once()
+        # Must run before normalize (normalize's input is denoise's output)
+        denoise_result = components["audio_processor"].denoise_audio.return_value
+        components["audio_processor"].normalize_audio.assert_called_once_with(
+            denoise_result
+        )
+
+    def test_denoise_skipped_when_disabled(self, tmp_path, monkeypatch):
+        """denoise_audio is NOT called when DENOISE_ENABLED=False."""
+        from config import Config
+
+        monkeypatch.setattr(Config, "DENOISE_ENABLED", False)
+        ctx = _make_ctx(tmp_path)
+        components = _make_components()
+
+        with patch("pipeline.steps.audio.subprocess.run"):
+            run_audio(ctx, components, state=None)
+
+        components["audio_processor"].denoise_audio.assert_not_called()
+        # Normalize still runs, with censor's output directly
+        censor_result = components["audio_processor"].apply_censorship.return_value
+        components["audio_processor"].normalize_audio.assert_called_once_with(
+            censor_result
+        )
+
+    def test_denoise_resume_loads_from_state(self, tmp_path, monkeypatch):
+        """When denoise step is checkpointed, skip the ffmpeg call and reload path."""
+        from config import Config
+
+        monkeypatch.setattr(Config, "DENOISE_ENABLED", True)
+        ctx = _make_ctx(tmp_path)
+        components = _make_components()
+
+        state = Mock()
+
+        def is_completed(step):
+            return step in ("censor", "denoise")
+
+        state.is_step_completed.side_effect = is_completed
+
+        def get_outputs(step):
+            if step == "censor":
+                return {
+                    "censored_audio": "/fake/censored.wav",
+                    "raw_snapshot_path": None,
+                }
+            if step == "denoise":
+                return {"denoised_audio": "/fake/denoised_checkpoint.wav"}
+            return {}
+
+        state.get_step_outputs.side_effect = get_outputs
+
+        run_audio(ctx, components, state=state)
+
+        components["audio_processor"].denoise_audio.assert_not_called()
+        components["audio_processor"].normalize_audio.assert_called_once_with(
+            Path("/fake/denoised_checkpoint.wav")
+        )
 
 
 class TestRunAudioResumeTranscribe:
