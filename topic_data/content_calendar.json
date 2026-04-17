@@ -450,9 +450,17 @@
         "content": {
           "caption": "If you want your work calls to stop, just never say hi \u2014 save us all the wasted breath."
         },
-        "status": "failed",
-        "uploaded_at": null,
-        "upload_results": {},
+        "status": "uploaded",
+        "uploaded_at": "2026-04-17T15:58:07.298525",
+        "upload_results": {
+          "twitter": {
+            "tweet_id": "2045230343976800595",
+            "tweet_url": "https://twitter.com/i/web/status/2045230343976800595",
+            "text": "If you want your work calls to stop, just never say hi \u2014 save us all the wasted breath.",
+            "media_count": 0,
+            "status": "success"
+          }
+        },
         "error": "twitter: Twitter API credentials not configured in .env file.\nPlease follow the setup instructions:\n1. Apply for Twitter Developer access at https://developer.twitter.com\n2. Create a project and app\n3. Get API keys and access tokens\n4. Add credentials to .env file:\n   - TWITTER_API_KEY\n   - TWITTER_API_SECRET\n   - TWITTER_ACCESS_TOKEN\n   - TWITTER_ACCESS_SECRET\n\nNote: You need Elevated access for media uploads",
         "retry_count": 1
       },
@@ -471,15 +479,19 @@
           "youtube_url": "https://www.youtube.com/watch?v=RQtHunNEN_4",
           "youtube_video_id": "RQtHunNEN_4"
         },
-        "status": "partial",
-        "uploaded_at": "2026-04-16T21:37:29.351523",
+        "status": "uploaded",
+        "uploaded_at": "2026-04-17T15:58:09.208390",
         "upload_results": {
           "youtube": {
             "video_id": "abc123",
             "url": "https://youtube.com/abc123"
           },
           "twitter": {
-            "error": "Twitter API credentials not configured in .env file.\nPlease follow the setup instructions:\n1. Apply for Twitter Developer access at https://developer.twitter.com\n2. Create a project and app\n3. Get API keys and access tokens\n4. Add credentials to .env file:\n   - TWITTER_API_KEY\n   - TWITTER_API_SECRET\n   - TWITTER_ACCESS_TOKEN\n   - TWITTER_ACCESS_SECRET\n\nNote: You need Elevated access for media uploads"
+            "tweet_id": "2045230352008974736",
+            "tweet_url": "https://twitter.com/i/web/status/2045230352008974736",
+            "text": "https://www.youtube.com/watch?v=RQtHunNEN_4",
+            "media_count": 0,
+            "status": "success"
           }
         }
       },
@@ -502,9 +514,32 @@
           "clip_title": "Gay Divorce Rates Prove Women Are The Problem",
           "instagram_video_url": "https://www.dropbox.com/scl/fi/evlhk1i2mfzuybmjgqpb4/ep_31_raw_20260416_202215_censored_clip_03_subtitle.mp4?rlkey=wsoii5o23utn3kkzpuyappnt6&dl=1"
         },
-        "status": "pending",
-        "uploaded_at": null,
-        "upload_results": {}
+        "status": "uploaded",
+        "uploaded_at": "2026-04-17T15:59:53.327201",
+        "upload_results": {
+          "youtube": {
+            "status": "made_public",
+            "video_id": "7MxUeN-7O8c"
+          },
+          "twitter": {
+            "tweet_id": "2045230360254939339",
+            "tweet_url": "https://twitter.com/i/web/status/2045230360254939339",
+            "text": "Men aren\u2019t the problem, statistics say\n\nhttps://www.youtube.com/watch?v=7MxUeN-7O8c",
+            "media_count": 0,
+            "status": "success"
+          },
+          "bluesky": {
+            "post_uri": "at://did:plc:tqwk5oc74cw7yqcqfsbpuirf/app.bsky.feed.post/3mjppjaad4u2q",
+            "post_url": "https://bsky.app/profile/fakeproblemspod.bsky.social/post/3mjppjaad4u2q",
+            "text": "Men aren\u2019t the problem, statistics say",
+            "status": "success"
+          },
+          "instagram": {
+            "id": "18048248219566422",
+            "permalink": "https://www.instagram.com/reel/DXPtEzTiqxy/",
+            "status": "success"
+          }
+        }
       },
       "quote_1": {
         "slot_type": "quote_1",
