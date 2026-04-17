@@ -141,7 +141,7 @@ class ContentComplianceChecker:
         )
 
         response = self.client.chat.completions.create(
-            model="gpt-4o",
+            model=Config.OPENAI_COMPLIANCE_MODEL,
             max_tokens=4000,
             temperature=0.1,  # deterministic classification
             messages=[

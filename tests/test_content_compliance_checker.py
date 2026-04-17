@@ -195,6 +195,50 @@ class TestCheckTranscript:
             or "00:00:00" in user_message["content"]
         )
 
+    def test_uses_compliance_model_from_config(self, tmp_path):
+        """Compliance checker reads model from Config.OPENAI_COMPLIANCE_MODEL.
+
+        Default must NOT be gpt-4o — its 30k TPM tier-1 limit can't fit a
+        full-episode transcript in one request (regression guard for the
+        ep31 RateLimitError on Apr 16 2026).
+        """
+        from config import Config
+
+        with patch("content_compliance_checker.openai.OpenAI"):
+            checker = ContentComplianceChecker()
+            mock_client = make_mock_client(SAMPLE_EMPTY_RESPONSE)
+            checker.client = mock_client
+
+            checker.check_transcript(
+                transcript_data=SAMPLE_TRANSCRIPT,
+                episode_output_dir=tmp_path,
+                episode_number=31,
+            )
+
+        call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+        assert call_kwargs["model"] == Config.OPENAI_COMPLIANCE_MODEL
+        assert Config.OPENAI_COMPLIANCE_MODEL != "gpt-4o"
+
+    def test_compliance_model_env_override(self, tmp_path, monkeypatch):
+        """OPENAI_COMPLIANCE_MODEL env var overrides the model at call time."""
+        from config import Config
+
+        monkeypatch.setattr(Config, "OPENAI_COMPLIANCE_MODEL", "gpt-4.1-mini")
+
+        with patch("content_compliance_checker.openai.OpenAI"):
+            checker = ContentComplianceChecker()
+            mock_client = make_mock_client(SAMPLE_EMPTY_RESPONSE)
+            checker.client = mock_client
+
+            checker.check_transcript(
+                transcript_data=SAMPLE_TRANSCRIPT,
+                episode_output_dir=tmp_path,
+                episode_number=31,
+            )
+
+        call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+        assert call_kwargs["model"] == "gpt-4.1-mini"
+
 
 # ---------------------------------------------------------------------------
 # TestDisabled

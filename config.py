@@ -324,6 +324,9 @@ class Config:
     # OpenAI Model Settings
     OPENAI_ANALYSIS_MODEL = os.getenv("OPENAI_ANALYSIS_MODEL", "gpt-4.1-mini")
     OPENAI_BLOG_MODEL = os.getenv("OPENAI_BLOG_MODEL", "gpt-4.1-mini")
+    # Compliance uses mini by default: gpt-4o tier-1 TPM (30k) is too tight
+    # for full-episode transcripts (~30k+ tokens per request).
+    OPENAI_COMPLIANCE_MODEL = os.getenv("OPENAI_COMPLIANCE_MODEL", "gpt-4o-mini")
 
     # NVENC Parallel Encoding Sessions (default 3, newer drivers support 5)
     MAX_NVENC_SESSIONS = int(os.getenv("MAX_NVENC_SESSIONS", "3"))
