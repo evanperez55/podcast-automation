@@ -100,15 +100,19 @@ class WebsiteGenerator:
         for ep_id, ep_data in calendar.items():
             ids = {}
             for slot_key, slot in ep_data.get("slots", {}).items():
+                # Source of truth: content.youtube_video_id is written by the
+                # distribute step on every successful upload. upload_results
+                # is a secondary fallback for older entries that never got
+                # the content field set.
                 content = slot.get("content", {})
                 vid_id = content.get("youtube_video_id", "")
+                if not vid_id:
+                    upload_results = slot.get("upload_results", {})
+                    yt_result = upload_results.get("youtube", {})
+                    if isinstance(yt_result, dict):
+                        vid_id = yt_result.get("video_id", "") or ""
                 if vid_id:
                     ids[slot_key] = vid_id
-                # Also check upload_results for episode-level YouTube
-                upload_results = slot.get("upload_results", {})
-                yt_result = upload_results.get("youtube", {})
-                if isinstance(yt_result, dict) and yt_result.get("video_id"):
-                    ids[slot_key] = yt_result["video_id"]
             if ids:
                 result[ep_id] = ids
         return result

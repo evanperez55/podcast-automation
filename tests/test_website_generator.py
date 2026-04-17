@@ -140,6 +140,63 @@ class TestCollectYoutubeIds:
         assert result["ep_30"]["episode"] == "abc123"
         assert result["ep_30"]["clip_1"] == "def456"
 
+    def test_content_youtube_id_overrides_stale_upload_results(
+        self, generator, monkeypatch, tmp_path
+    ):
+        """content.youtube_video_id is source of truth over upload_results.
+
+        Regression guard: when an episode is re-published (e.g. denoised
+        rerun), the distribute step updates content.youtube_video_id but
+        may not rewrite upload_results.youtube.video_id. The fresh content
+        field must win so the website embeds the new video, not a stale
+        one from an earlier test/upload.
+        """
+        monkeypatch.chdir(tmp_path)
+        cal_dir = tmp_path / "topic_data"
+        cal_dir.mkdir()
+        calendar = {
+            "ep_31": {
+                "slots": {
+                    "episode": {
+                        "content": {"youtube_video_id": "NEW_ID_xyz"},
+                        "upload_results": {"youtube": {"video_id": "stale_abc123"}},
+                    },
+                }
+            }
+        }
+        (cal_dir / "content_calendar.json").write_text(
+            json.dumps(calendar), encoding="utf-8"
+        )
+
+        result = generator._collect_youtube_ids()
+
+        assert result["ep_31"]["episode"] == "NEW_ID_xyz"
+
+    def test_falls_back_to_upload_results_when_content_empty(
+        self, generator, monkeypatch, tmp_path
+    ):
+        """When content.youtube_video_id is empty/missing, use upload_results."""
+        monkeypatch.chdir(tmp_path)
+        cal_dir = tmp_path / "topic_data"
+        cal_dir.mkdir()
+        calendar = {
+            "ep_29": {
+                "slots": {
+                    "episode": {
+                        "content": {},
+                        "upload_results": {"youtube": {"video_id": "fallback_vid"}},
+                    },
+                }
+            }
+        }
+        (cal_dir / "content_calendar.json").write_text(
+            json.dumps(calendar), encoding="utf-8"
+        )
+
+        result = generator._collect_youtube_ids()
+
+        assert result["ep_29"]["episode"] == "fallback_vid"
+
 
 class TestGenerateHtml:
     """Tests for generate_html."""
