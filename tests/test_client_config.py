@@ -1825,6 +1825,73 @@ content:
         assert Config.YOUTUBE_CLIENT_SECRET == "client-yt-secret"
         assert Config.TWITTER_API_KEY == "client-tw-key"
 
+    # --- Default client (fake-problems) bypasses isolation ---
+    # fake-problems.yaml is gitignored and uses null for all credentials
+    # (falling through to env vars). Isolation would wipe those env-var-backed
+    # creds from Config, leaving Dropbox/social uninitialized. The default
+    # client is the podcast's own infrastructure — it should NOT be isolated
+    # from itself.
+
+    FAKE_PROBLEMS_MINIMAL_YAML = """
+client_name: "fake-problems"
+podcast_name: "Fake Problems Podcast"
+content:
+  names_to_remove: []
+"""
+
+    def test_default_client_preserves_dropbox_credentials(self, tmp_path, monkeypatch):
+        """activate_client('fake-problems') must NOT wipe env-var Dropbox creds."""
+        self._setup_client(
+            tmp_path, monkeypatch, self.FAKE_PROBLEMS_MINIMAL_YAML, "fake-problems"
+        )
+        monkeypatch.setattr(Config, "DROPBOX_ACCESS_TOKEN", "fp-access-token")
+        monkeypatch.setattr(Config, "DROPBOX_APP_KEY", "fp-app-key")
+        monkeypatch.setattr(Config, "DROPBOX_APP_SECRET", "fp-app-secret")
+        monkeypatch.setattr(Config, "DROPBOX_REFRESH_TOKEN", "fp-refresh-token")
+
+        from client_config import activate_client
+
+        activate_client("fake-problems")
+
+        assert Config.DROPBOX_ACCESS_TOKEN == "fp-access-token"
+        assert Config.DROPBOX_APP_KEY == "fp-app-key"
+        assert Config.DROPBOX_APP_SECRET == "fp-app-secret"
+        assert Config.DROPBOX_REFRESH_TOKEN == "fp-refresh-token"
+
+    def test_default_client_preserves_social_credentials(self, tmp_path, monkeypatch):
+        """activate_client('fake-problems') must NOT wipe env-var social creds."""
+        self._setup_client(
+            tmp_path, monkeypatch, self.FAKE_PROBLEMS_MINIMAL_YAML, "fake-problems"
+        )
+        monkeypatch.setattr(Config, "YOUTUBE_CLIENT_ID", "fp-yt-id")
+        monkeypatch.setattr(Config, "TWITTER_API_KEY", "fp-tw-key")
+        monkeypatch.setattr(Config, "INSTAGRAM_ACCESS_TOKEN", "fp-ig-token")
+        monkeypatch.setattr(Config, "TIKTOK_CLIENT_KEY", "fp-tt-key")
+
+        from client_config import activate_client
+
+        activate_client("fake-problems")
+
+        assert Config.YOUTUBE_CLIENT_ID == "fp-yt-id"
+        assert Config.TWITTER_API_KEY == "fp-tw-key"
+        assert Config.INSTAGRAM_ACCESS_TOKEN == "fp-ig-token"
+        assert Config.TIKTOK_CLIENT_KEY == "fp-tt-key"
+
+    def test_default_client_uses_root_output_directories(self, tmp_path, monkeypatch):
+        """activate_client('fake-problems') uses root output/ dirs, not output/fake-problems/."""
+        self._setup_client(
+            tmp_path, monkeypatch, self.FAKE_PROBLEMS_MINIMAL_YAML, "fake-problems"
+        )
+
+        from client_config import activate_client
+
+        activate_client("fake-problems")
+
+        # Must NOT append /fake-problems suffix to default dirs
+        assert "fake-problems" not in str(Config.OUTPUT_DIR)
+        assert "fake-problems" not in str(Config.DOWNLOAD_DIR)
+        assert "fake-problems" not in str(Config.CLIPS_DIR)
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

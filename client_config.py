@@ -219,6 +219,9 @@ def apply_client_config(overrides: dict) -> None:
     logger.info("Applied %d client config overrides", applied)
 
 
+_DEFAULT_CLIENT = "fake-problems"
+
+
 def activate_client(client_name: str) -> dict:
     """Load and apply a client config, including output directory isolation.
 
@@ -227,6 +230,15 @@ def activate_client(client_name: str) -> dict:
     """
     overrides = load_client_config(client_name)
     apply_client_config(overrides)
+
+    # The default client IS the Fake Problems infrastructure — it should not
+    # be isolated from itself. Its yaml uses null creds that fall through to
+    # env vars, and its outputs go to the repo-root output/ dirs.
+    if client_name == _DEFAULT_CLIENT:
+        logger.info(
+            "Using client config: %s (default — isolation skipped)", client_name
+        )
+        return overrides
 
     # --- Client isolation: disable Fake Problems infrastructure ---
     # Unless the client YAML explicitly provides its own config for each
