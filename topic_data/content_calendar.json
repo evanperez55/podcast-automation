@@ -554,9 +554,23 @@
           "quote_text": "Men run the world, baby.",
           "timestamp": "01:19:40"
         },
-        "status": "pending",
-        "uploaded_at": null,
-        "upload_results": {}
+        "status": "uploaded",
+        "uploaded_at": "2026-04-18T15:40:03.629716",
+        "upload_results": {
+          "twitter": {
+            "tweet_id": "2045588183224574228",
+            "tweet_url": "https://twitter.com/i/web/status/2045588183224574228",
+            "text": "Men run the world, baby.",
+            "media_count": 0,
+            "status": "success"
+          },
+          "bluesky": {
+            "post_uri": "at://did:plc:tqwk5oc74cw7yqcqfsbpuirf/app.bsky.feed.post/3mjs6xpxep22q",
+            "post_url": "https://bsky.app/profile/fakeproblemspod.bsky.social/post/3mjs6xpxep22q",
+            "text": "Men run the world, baby.",
+            "status": "success"
+          }
+        }
       },
       "quote_2": {
         "slot_type": "quote_2",
