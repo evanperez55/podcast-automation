@@ -585,9 +585,23 @@
           "quote_text": "If you make it past ten years, you're good. Like, I don't think there's a breaking point.",
           "timestamp": "01:03:34"
         },
-        "status": "pending",
-        "uploaded_at": null,
-        "upload_results": {}
+        "status": "uploaded",
+        "uploaded_at": "2026-04-20T15:59:24.566023",
+        "upload_results": {
+          "twitter": {
+            "tweet_id": "2046317829285192013",
+            "tweet_url": "https://twitter.com/i/web/status/2046317829285192013",
+            "text": "If you make it past ten years, you're good. Like, I don't think there's a breaking point.",
+            "media_count": 0,
+            "status": "success"
+          },
+          "bluesky": {
+            "post_uri": "at://did:plc:tqwk5oc74cw7yqcqfsbpuirf/app.bsky.feed.post/3mjxay5zjxu24",
+            "post_url": "https://bsky.app/profile/fakeproblemspod.bsky.social/post/3mjxay5zjxu24",
+            "text": "If you make it past ten years, you're good. Like, I don't think there's a breaking point.",
+            "status": "success"
+          }
+        }
       },
       "quote_3": {
         "slot_type": "quote_3",
