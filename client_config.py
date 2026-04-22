@@ -222,6 +222,46 @@ def apply_client_config(overrides: dict) -> None:
 _DEFAULT_CLIENT = "fake-problems"
 
 
+def resolve_client_logo_or_raise(default_logo_path, module: str = "generator"):
+    """Return the logo path to use, hard-failing if misconfigured.
+
+    Non-default clients (anything other than `fake-problems`) MUST supply
+    their own branding.logo_path via clients/<slug>.yaml. If they don't,
+    this raises ValueError instead of silently falling back to the bundled
+    Fake Problems logo (which was the source of a cross-client branding
+    bleed where every prospect client had `FAKE PROBLEMS` burned into
+    their thumbnail and clip backgrounds).
+
+    For the default Fake Problems client (Config.IS_DEFAULT_CLIENT is True),
+    the bundled default_logo_path is used when no explicit override is set.
+
+    Args:
+        default_logo_path: Fallback path when running as the default client
+            (typically Config.ASSETS_DIR / "podcast_logo.png").
+        module: Name of the caller for error messages (e.g. "ThumbnailGenerator").
+
+    Returns:
+        Path to the logo file to use.
+
+    Raises:
+        ValueError: When the current run is a non-default client and no
+            valid CLIENT_LOGO_PATH is configured.
+    """
+    if Config.CLIENT_LOGO_PATH and Path(Config.CLIENT_LOGO_PATH).exists():
+        return Path(Config.CLIENT_LOGO_PATH)
+
+    if not getattr(Config, "IS_DEFAULT_CLIENT", True):
+        raise ValueError(
+            f"{module}: no valid CLIENT_LOGO_PATH for non-default client "
+            f"(PODCAST_NAME={Config.PODCAST_NAME!r}). Add "
+            f"`branding:\n  logo_path: clients/<slug>/logo.png` to the "
+            f"client's YAML and place a logo file there. This check exists "
+            f"to prevent cross-client branding bleed."
+        )
+
+    return Path(default_logo_path)
+
+
 def activate_client(client_name: str) -> dict:
     """Load and apply a client config, including output directory isolation.
 
@@ -235,6 +275,7 @@ def activate_client(client_name: str) -> dict:
     # be isolated from itself. Its yaml uses null creds that fall through to
     # env vars, and its outputs go to the repo-root output/ dirs.
     if client_name == _DEFAULT_CLIENT:
+        Config.IS_DEFAULT_CLIENT = True
         logger.info(
             "Using client config: %s (default — isolation skipped)", client_name
         )
@@ -301,6 +342,13 @@ def activate_client(client_name: str) -> dict:
         Config.CLIPS_DIR = Config.BASE_DIR / "clips" / client_name
     if "TOPIC_DATA_DIR" not in overrides:
         Config.TOPIC_DATA_DIR = Config.BASE_DIR / "topic_data" / client_name
+
+    # Mark this run as non-default so content-baking modules can hard-fail
+    # when CLIENT_LOGO_PATH is missing — prevents the Fake Problems logo
+    # from silently leaking into client thumbnails and clip backgrounds.
+    # (Validation tools like validate_client() don't bake content, so they
+    # don't need to fail here — the check lives at the generator boundary.)
+    Config.IS_DEFAULT_CLIENT = False
 
     logger.info("Using client config: %s", client_name)
     return overrides

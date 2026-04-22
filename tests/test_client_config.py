@@ -338,8 +338,14 @@ class TestActivateClient:
         monkeypatch.setattr(Config, "TOPIC_DATA_DIR", Config.TOPIC_DATA_DIR)
         clients_dir = tmp_path / "clients"
         clients_dir.mkdir()
+        acme_dir = clients_dir / "acme"
+        acme_dir.mkdir()
+        logo_path = acme_dir / "logo.png"
+        logo_path.write_bytes(b"\x89PNG\r\n\x1a\n")
         (clients_dir / "acme.yaml").write_text(
-            'client_name: "acme"\npodcast_name: "Acme Show"\ncontent:\n  names_to_remove: []\n'
+            'client_name: "acme"\npodcast_name: "Acme Show"\n'
+            "content:\n  names_to_remove: []\n"
+            f"branding:\n  logo_path: {logo_path}\n"
         )
 
         from client_config import activate_client
@@ -1502,10 +1508,24 @@ website:
 """
 
     def _setup_client(self, tmp_path, monkeypatch, yaml_content, name):
-        """Helper: write client YAML, set BASE_DIR, return path."""
+        """Helper: write client YAML + logo file, set BASE_DIR, return path.
+
+        A logo file is created and branding.logo_path is injected into the
+        YAML unless the fixture already provides one. This satisfies the
+        activate_client() validation that requires non-default clients to
+        supply their own logo (prevents cross-client branding bleed).
+        """
         monkeypatch.setattr(Config, "BASE_DIR", tmp_path)
         clients_dir = tmp_path / "clients"
         clients_dir.mkdir(exist_ok=True)
+        client_sub = clients_dir / name
+        client_sub.mkdir(exist_ok=True)
+        logo_path = client_sub / "logo.png"
+        logo_path.write_bytes(b"\x89PNG\r\n\x1a\n")  # minimal PNG-ish stub
+        if "branding" not in yaml_content:
+            yaml_content = (
+                yaml_content.rstrip() + f"\nbranding:\n  logo_path: {logo_path}\n"
+            )
         (clients_dir / f"{name}.yaml").write_text(yaml_content)
 
     def test_activate_client_disables_website(self, tmp_path, monkeypatch):
@@ -1891,6 +1911,67 @@ content:
         assert "fake-problems" not in str(Config.OUTPUT_DIR)
         assert "fake-problems" not in str(Config.DOWNLOAD_DIR)
         assert "fake-problems" not in str(Config.CLIPS_DIR)
+
+
+class TestResolveClientLogo:
+    """resolve_client_logo_or_raise() enforces branding isolation at the
+    generator boundary. Non-default clients without a valid CLIENT_LOGO_PATH
+    must raise instead of silently falling back to the Fake Problems logo.
+    """
+
+    def test_returns_client_logo_when_configured(self, tmp_path, monkeypatch):
+        """When CLIENT_LOGO_PATH is set and the file exists, it is returned
+        regardless of default/non-default client status."""
+        logo = tmp_path / "client_logo.png"
+        logo.write_bytes(b"\x89PNG\r\n\x1a\n")
+        monkeypatch.setattr(Config, "CLIENT_LOGO_PATH", str(logo))
+        monkeypatch.setattr(Config, "IS_DEFAULT_CLIENT", False)
+
+        from client_config import resolve_client_logo_or_raise
+
+        result = resolve_client_logo_or_raise(tmp_path / "default.png")
+        assert result == logo
+
+    def test_raises_for_non_default_client_without_logo(self, tmp_path, monkeypatch):
+        """Non-default client with no CLIENT_LOGO_PATH must raise ValueError
+        (prevents cross-client branding bleed via the default Fake Problems logo)."""
+        monkeypatch.setattr(Config, "CLIENT_LOGO_PATH", None)
+        monkeypatch.setattr(Config, "IS_DEFAULT_CLIENT", False)
+        monkeypatch.setattr(Config, "PODCAST_NAME", "Some Other Client")
+
+        from client_config import resolve_client_logo_or_raise
+
+        with pytest.raises(ValueError, match="CLIENT_LOGO_PATH"):
+            resolve_client_logo_or_raise(
+                tmp_path / "default.png", module="ThumbnailGenerator"
+            )
+
+    def test_raises_for_non_default_client_with_nonexistent_logo(
+        self, tmp_path, monkeypatch
+    ):
+        """Non-default client with a CLIENT_LOGO_PATH pointing at a missing
+        file must also raise (treats stale config the same as missing)."""
+        monkeypatch.setattr(Config, "CLIENT_LOGO_PATH", str(tmp_path / "missing.png"))
+        monkeypatch.setattr(Config, "IS_DEFAULT_CLIENT", False)
+        monkeypatch.setattr(Config, "PODCAST_NAME", "Some Other Client")
+
+        from client_config import resolve_client_logo_or_raise
+
+        with pytest.raises(ValueError, match="CLIENT_LOGO_PATH"):
+            resolve_client_logo_or_raise(tmp_path / "default.png")
+
+    def test_falls_back_to_default_for_default_client(self, tmp_path, monkeypatch):
+        """Default Fake Problems client uses the bundled default logo when
+        no client override is set."""
+        default_logo = tmp_path / "podcast_logo.png"
+        default_logo.write_bytes(b"\x89PNG\r\n\x1a\n")
+        monkeypatch.setattr(Config, "CLIENT_LOGO_PATH", None)
+        monkeypatch.setattr(Config, "IS_DEFAULT_CLIENT", True)
+
+        from client_config import resolve_client_logo_or_raise
+
+        result = resolve_client_logo_or_raise(default_logo)
+        assert result == Path(default_logo)
 
 
 if __name__ == "__main__":

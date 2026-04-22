@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from client_config import resolve_client_logo_or_raise
 from config import Config
 from logger import logger
 
@@ -18,10 +19,9 @@ class ThumbnailGenerator:
         self.badge_color = os.getenv("THUMBNAIL_BADGE_COLOR", "#e94560")
         self.width = 1280
         self.height = 720
-        if Config.CLIENT_LOGO_PATH and Path(Config.CLIENT_LOGO_PATH).exists():
-            self.logo_path = Path(Config.CLIENT_LOGO_PATH)
-        else:
-            self.logo_path = Config.ASSETS_DIR / "podcast_logo.png"
+        self.logo_path = resolve_client_logo_or_raise(
+            Config.ASSETS_DIR / "podcast_logo.png", module="ThumbnailGenerator"
+        )
 
     def generate_thumbnail(
         self, episode_title: str, episode_number: int, output_path: str
@@ -51,7 +51,12 @@ class ThumbnailGenerator:
             return None
 
     def _create_background(self, width: int, height: int):
-        """Create the background image, using the logo if available.
+        """Create the background image: solid bg_color with a centered logo.
+
+        The logo is aspect-fit (not stretched) into the lower 55% of the canvas,
+        which sits below the 45% dark overlay zone where the title renders.
+        This prevents wide/narrow logos from being distorted and prevents
+        cross-client branding bleed when a logo is missing or misconfigured.
 
         Args:
             width: Image width in pixels.
@@ -62,16 +67,24 @@ class ThumbnailGenerator:
         """
         from PIL import Image
 
+        image = Image.new("RGBA", (width, height), self.bg_color)
+
         try:
             if self.logo_path.exists():
-                logo = Image.open(str(self.logo_path))
-                logo = logo.resize((width, height))
-                # Ensure RGBA so we can composite later
-                return logo.convert("RGBA")
+                logo = Image.open(str(self.logo_path)).convert("RGBA")
+                max_w = int(width * 0.65)
+                max_h = int(height * 0.45)
+                try:
+                    resample = Image.Resampling.LANCZOS
+                except AttributeError:
+                    resample = Image.LANCZOS
+                logo.thumbnail((max_w, max_h), resample)
+                x = (width - logo.width) // 2
+                y = int(height * 0.45) + (int(height * 0.55) - logo.height) // 2
+                image.paste(logo, (x, y), logo)
         except Exception as e:
-            logger.warning("Could not load logo, using solid background: %s", e)
+            logger.warning("Could not composite logo, using solid background: %s", e)
 
-        image = Image.new("RGBA", (width, height), self.bg_color)
         return image
 
     def _overlay_title_text(self, image, title: str):

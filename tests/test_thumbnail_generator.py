@@ -30,7 +30,12 @@ from thumbnail_generator import ThumbnailGenerator  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch):
-    """Remove thumbnail-related env vars so each test starts from defaults."""
+    """Remove thumbnail-related env vars so each test starts from defaults.
+
+    Also resets Config.IS_DEFAULT_CLIENT and Config.CLIENT_LOGO_PATH because
+    other test modules (e.g., test_client_config isolation tests) may have
+    flipped them as a side-effect of activating non-default client configs.
+    """
     for key in (
         "THUMBNAIL_FONT",
         "THUMBNAIL_BG_COLOR",
@@ -38,6 +43,10 @@ def _clean_env(monkeypatch):
         "THUMBNAIL_BADGE_COLOR",
     ):
         monkeypatch.delenv(key, raising=False)
+    from config import Config
+
+    monkeypatch.setattr(Config, "IS_DEFAULT_CLIENT", True)
+    monkeypatch.setattr(Config, "CLIENT_LOGO_PATH", None)
 
 
 @pytest.fixture
@@ -158,25 +167,36 @@ class TestGenerateThumbnailError:
 # 5. test_create_background_with_logo
 # ---------------------------------------------------------------------------
 class TestCreateBackgroundWithLogo:
-    def test_loads_and_resizes_logo(self, tmp_path, pil_mocks):
+    def test_centers_logo_on_solid_background(self, tmp_path, pil_mocks):
+        """Logo should be composited (aspect-preserving) onto a solid bg,
+        not stretched across the full canvas. This prevents wide/narrow
+        logos from being distorted and ensures consistent demo quality."""
         gen = ThumbnailGenerator()
         gen.logo_path = tmp_path / "podcast_logo.png"
         gen.logo_path.write_bytes(b"\x89PNG")  # minimal placeholder
 
         MockImage = pil_mocks["Image"]
+        mock_bg = MagicMock()
+        MockImage.new.return_value = mock_bg
+
         mock_logo = MagicMock()
-        mock_resized = MagicMock()
-        mock_logo.resize.return_value = mock_resized
         mock_converted = MagicMock()
-        mock_resized.convert.return_value = mock_converted
+        mock_converted.width = 400
+        mock_converted.height = 200
+        mock_logo.convert.return_value = mock_converted
         MockImage.open.return_value = mock_logo
 
         result = gen._create_background(1280, 720)
 
+        MockImage.new.assert_called_once_with("RGBA", (1280, 720), gen.bg_color)
         MockImage.open.assert_called_once_with(str(gen.logo_path))
-        mock_logo.resize.assert_called_once_with((1280, 720))
-        mock_resized.convert.assert_called_once_with("RGBA")
-        assert result is mock_converted
+        mock_logo.convert.assert_called_once_with("RGBA")
+        # Logo gets thumbnail() applied (aspect-fit, NOT stretched)
+        assert mock_converted.thumbnail.call_count == 1
+        # Logo gets pasted onto the solid background
+        assert mock_bg.paste.call_count == 1
+        # Verify the result is the composited bg (not the logo itself)
+        assert result is mock_bg
 
 
 # ---------------------------------------------------------------------------

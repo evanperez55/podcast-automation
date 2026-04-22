@@ -12,6 +12,7 @@ from typing import List, Dict, Optional
 
 import pysubs2
 
+from client_config import resolve_client_logo_or_raise
 from config import Config
 from logger import logger
 from subtitle_generator import SubtitleGenerator
@@ -90,10 +91,9 @@ class SubtitleClipGenerator:
     def __init__(self):
         self.enabled = os.getenv("USE_SUBTITLE_CLIPS", "true").lower() == "true"
         self.ffmpeg_path = Config.FFMPEG_PATH
-        if Config.CLIENT_LOGO_PATH and Path(Config.CLIENT_LOGO_PATH).exists():
-            self.logo_path = Path(Config.CLIENT_LOGO_PATH)
-        else:
-            self.logo_path = Config.ASSETS_DIR / "podcast_logo.png"
+        self.logo_path = resolve_client_logo_or_raise(
+            Config.ASSETS_DIR / "podcast_logo.png", module="SubtitleClipGenerator"
+        )
         self.font_size = int(os.getenv("SUBTITLE_FONT_SIZE", "72"))
         self.font_color = os.getenv("SUBTITLE_FONT_COLOR", "white")
         self.accent_color = os.getenv("SUBTITLE_ACCENT_COLOR", "0x00e0ff")
@@ -214,8 +214,12 @@ class SubtitleClipGenerator:
                 backcolor=pysubs2.Color(0, 0, 0, 160),
                 outline=4,
                 shadow=2,
-                alignment=pysubs2.Alignment.MIDDLE_CENTER,
-                marginv=0,
+                # Hook sits in the top band so it never lands on the centered
+                # client logo (which clip backgrounds place in the middle of
+                # the canvas via aspect-fit). 150px from the top gives enough
+                # clearance from the top edge while staying well above logo.
+                alignment=pysubs2.Alignment.TOP_CENTER,
+                marginv=150,
             )
             subs.styles["Hook"] = hook_style
             hook_event = pysubs2.SSAEvent(

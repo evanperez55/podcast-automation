@@ -3,6 +3,7 @@
 import subprocess
 from pathlib import Path
 from typing import Optional, List
+from client_config import resolve_client_logo_or_raise
 from config import Config
 from logger import logger
 from video_utils import get_h264_encoder_args, disable_nvenc_and_get_fallback_args
@@ -20,12 +21,14 @@ class VideoConverter:
         """
         if logo_path:
             self.logo_path = logo_path
-        elif Config.CLIENT_LOGO_PATH and Path(Config.CLIENT_LOGO_PATH).exists():
-            self.logo_path = str(Config.CLIENT_LOGO_PATH)
         else:
-            self.logo_path = str(Config.ASSETS_DIR / "podcast_logo.jpg")
+            self.logo_path = str(
+                resolve_client_logo_or_raise(
+                    Config.ASSETS_DIR / "podcast_logo.jpg", module="VideoConverter"
+                )
+            )
 
-        # Verify logo exists
+        # Verify logo exists (explicit constructor arg may still point at a stale path)
         if not Path(self.logo_path).exists():
             raise FileNotFoundError(
                 f"Logo file not found: {self.logo_path}\n"

@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from client_config import resolve_client_logo_or_raise
 from config import Config
 from logger import logger
 
@@ -19,10 +20,9 @@ class QuoteCardGenerator:
         self.font_path = os.getenv("THUMBNAIL_FONT", None)
         self.width = 1080
         self.height = 1080
-        if Config.CLIENT_LOGO_PATH and Path(Config.CLIENT_LOGO_PATH).exists():
-            self.logo_path = Path(Config.CLIENT_LOGO_PATH)
-        else:
-            self.logo_path = Config.ASSETS_DIR / "podcast_logo.png"
+        self.logo_path = resolve_client_logo_or_raise(
+            Config.ASSETS_DIR / "podcast_logo.png", module="QuoteCardGenerator"
+        )
 
     def generate_quote_card(
         self,

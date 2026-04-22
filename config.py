@@ -345,6 +345,11 @@ class Config:
     CLIPS_DIR = BASE_DIR / "clips"
     ASSETS_DIR = BASE_DIR / "assets"
     CLIENT_LOGO_PATH = None  # Set by client config; None = use default logo
+    # True when running the default (Fake Problems) client; activate_client()
+    # flips this to False for any other client so content-baking modules
+    # can hard-fail if CLIENT_LOGO_PATH is missing — prevents the Fake
+    # Problems logo from leaking into other clients' thumbnails / clips.
+    IS_DEFAULT_CLIENT = True
 
     @classmethod
     def create_directories(cls):

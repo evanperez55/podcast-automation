@@ -41,6 +41,13 @@ tiktok:
 discord:
   webhook_url: null
 
+# --- Branding (REQUIRED for non-default clients) ---
+# The pipeline hard-fails if this logo is missing or the file doesn't exist.
+# Place the church's logo PNG at the path below. The logo is composited onto
+# thumbnails and appears as the background of vertical clip videos.
+branding:
+  logo_path: clients/your-church-name/logo.png
+
 # --- Content settings tuned for sermons ---
 content:
   num_clips: 5

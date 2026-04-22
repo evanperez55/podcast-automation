@@ -10,6 +10,7 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional
 
+from client_config import resolve_client_logo_or_raise
 from config import Config
 from logger import logger
 from video_utils import get_h264_encoder_args
@@ -23,10 +24,9 @@ class AudiogramGenerator:
         self.bg_color = os.getenv("AUDIOGRAM_BG_COLOR", "0x1a1a2e")
         self.wave_color = os.getenv("AUDIOGRAM_WAVE_COLOR", "0xe94560")
         self.ffmpeg_path = Config.FFMPEG_PATH
-        if Config.CLIENT_LOGO_PATH and Path(Config.CLIENT_LOGO_PATH).exists():
-            self.logo_path = Path(Config.CLIENT_LOGO_PATH)
-        else:
-            self.logo_path = Config.ASSETS_DIR / "podcast_logo.png"
+        self.logo_path = resolve_client_logo_or_raise(
+            Config.ASSETS_DIR / "podcast_logo.png", module="AudiogramGenerator"
+        )
 
     def create_audiogram(
         self,
