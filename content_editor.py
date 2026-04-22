@@ -6,6 +6,76 @@ from audio_clip_scorer import AudioClipScorer
 from config import Config
 from logger import logger
 
+
+_SENTENCE_TERMINATORS = (".", "!", "?")
+
+
+def snap_clip_boundary_to_words(
+    start_seconds: float,
+    end_seconds: float,
+    words: list,
+) -> tuple:
+    """Snap LLM clip boundaries to nearest word edges (preferring sentence ends).
+
+    The LLM returns raw timestamps that often land mid-word or mid-sentence,
+    which produces clips that start or end on a half-uttered phrase. This
+    helper snaps the start to the first word that begins at or after the LLM
+    start (no backward cut into a prior word) and the end to the last word
+    that ends at or before the LLM end, preferring words terminated by
+    sentence punctuation (`.`, `!`, `?`) when available.
+
+    If snapping would collapse the clip below 1s (e.g., sparse words in the
+    window), the original LLM times are returned unchanged.
+
+    Args:
+        start_seconds: LLM-proposed clip start in seconds.
+        end_seconds: LLM-proposed clip end in seconds.
+        words: List of word dicts `{"word": str, "start": float, "end": float}`
+            from the transcript. Order must be ascending by start time.
+
+    Returns:
+        (snapped_start, snapped_end) tuple in seconds.
+    """
+    if not words or end_seconds <= start_seconds:
+        return start_seconds, end_seconds
+
+    # --- Snap start: first word whose start >= LLM start ---
+    start_word = next(
+        (
+            w
+            for w in words
+            if w.get("start") is not None and w["start"] >= start_seconds
+        ),
+        None,
+    )
+    snapped_start = start_word["start"] if start_word else start_seconds
+
+    # --- Snap end: last word ending <= LLM end, preferring sentence terminator ---
+    candidates = [
+        w
+        for w in words
+        if w.get("end") is not None and snapped_start <= w["end"] <= end_seconds
+    ]
+    if not candidates:
+        return start_seconds, end_seconds  # sparse window, don't force-snap
+
+    terminator = next(
+        (
+            w
+            for w in reversed(candidates)
+            if w.get("word") and w["word"].rstrip()[-1:] in _SENTENCE_TERMINATORS
+        ),
+        None,
+    )
+    snapped_end = (terminator or candidates[-1])["end"]
+
+    # Guard: don't collapse the clip to a fragment
+    if snapped_end - snapped_start < 1.0:
+        return start_seconds, end_seconds
+
+    return snapped_start, snapped_end
+
+
 # JSON Schema for OpenAI Structured Outputs (strict mode)
 _ANALYSIS_SCHEMA = {
     "name": "episode_analysis",
@@ -704,6 +774,17 @@ Please respond with ONLY valid JSON in this exact format:
                     clip["start_seconds"] = self._timestamp_to_seconds(clip["start"])
                 if "end" in clip:
                     clip["end_seconds"] = self._timestamp_to_seconds(clip["end"])
+                # Snap start/end to nearest word boundaries so clips don't
+                # start or end mid-word. Prefers sentence-terminating
+                # punctuation for the end boundary when available.
+                if "start_seconds" in clip and "end_seconds" in clip and self._words:
+                    snapped_start, snapped_end = snap_clip_boundary_to_words(
+                        clip["start_seconds"],
+                        clip["end_seconds"],
+                        self._words,
+                    )
+                    clip["start_seconds"] = snapped_start
+                    clip["end_seconds"] = snapped_end
 
             for chapter in analysis.get("chapters", []):
                 if "start_timestamp" in chapter:

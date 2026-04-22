@@ -1,11 +1,13 @@
 """Regenerate branded artifacts (thumbnail + subtitle clip MP4s) for a client.
 
 Use this after wiring a client's branding.logo_path when the original pipeline
-run used the wrong (e.g., Fake Problems) logo. Only rebuilds the two surfaces
-that bake the logo pixel-for-pixel:
+run used the wrong (e.g., Fake Problems) logo. Only rebuilds the three
+surfaces that depend on the logo or on clip boundaries:
 
   1. <ep_dir>/<audio_stem>_<timestamp>_thumbnail.png
-  2. <ep_dir>/clips/*_censored_clip_*_subtitle.mp4
+  2. <ep_dir>/clips/*_censored_clip_*.wav  (re-sliced from censored.wav with
+     word-snapped boundaries so clips no longer start/end mid-sentence)
+  3. <ep_dir>/clips/*_censored_clip_*_subtitle.mp4
 
 Does NOT re-transcribe, re-analyze, re-censor, or re-render the full episode
 MP4 — those steps are expensive and their outputs don't carry the logo.
@@ -13,6 +15,7 @@ MP4 — those steps are expensive and their outputs don't carry the logo.
 Usage:
     uv run python scripts/regen_client_branding.py <slug>
     uv run python scripts/regen_client_branding.py --all-churches
+    uv run python scripts/regen_client_branding.py <slug> --skip-reslice
 """
 
 from __future__ import annotations
@@ -30,6 +33,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from client_config import activate_client  # noqa: E402
 from config import Config  # noqa: E402
+from content_editor import snap_clip_boundary_to_words  # noqa: E402
 from logger import logger  # noqa: E402
 
 CHURCH_SLUGS = [
@@ -71,7 +75,82 @@ def _find_file(ep_dir: Path, suffix: str, timestamp: str) -> Optional[Path]:
     return None
 
 
-def regen_one(slug: str) -> dict:
+def _reslice_clips_with_snap(
+    ep_dir: Path,
+    timestamp: str,
+    best_clips: list,
+    words: list,
+) -> int:
+    """Re-slice censored.wav into *_clip_NN.wav using word-snapped boundaries.
+
+    Overwrites the existing per-clip WAV files so downstream subtitle/video
+    renders pick up the cleaner boundaries. Returns count of WAVs re-sliced.
+    """
+    from audio_processor import AudioProcessor
+
+    censored = next(ep_dir.glob(f"*_{timestamp}_censored.wav"), None)
+    if censored is None:
+        logger.warning(
+            "No censored.wav found for reslicing under %s (timestamp %s)",
+            ep_dir,
+            timestamp,
+        )
+        return 0
+
+    clips_dir = ep_dir / "clips"
+    clip_wavs = sorted(clips_dir.glob(f"*_{timestamp}_censored_clip_*.wav"))
+    if not clip_wavs:
+        logger.warning("No existing clip WAVs under %s", clips_dir)
+        return 0
+
+    processor = AudioProcessor()
+    from pydub import AudioSegment
+
+    full_audio = AudioSegment.from_file(str(censored))
+
+    count = 0
+    for i, wav_path in enumerate(clip_wavs):
+        if i >= len(best_clips):
+            break
+        clip = best_clips[i]
+        start_s = clip.get("start_seconds")
+        end_s = clip.get("end_seconds")
+        if start_s is None or end_s is None:
+            logger.warning(
+                "Clip %d missing start_seconds/end_seconds; skipping reslice",
+                i + 1,
+            )
+            continue
+        snapped_start, snapped_end = snap_clip_boundary_to_words(start_s, end_s, words)
+        moved = abs(snapped_start - start_s) + abs(snapped_end - end_s)
+        logger.info(
+            "Clip %d: %.2f-%.2f -> %.2f-%.2f (moved %.2fs total)",
+            i + 1,
+            start_s,
+            end_s,
+            snapped_start,
+            snapped_end,
+            moved,
+        )
+        # Persist snapped boundaries back into analysis for future referenceand
+        # rendering correctness (subtitle_clip_generator uses start_seconds).
+        clip["start_seconds"] = snapped_start
+        clip["end_seconds"] = snapped_end
+
+        # Re-slice using the shared AudioProcessor helper (handles fades).
+        processor.extract_clip(
+            audio_file_path=str(censored),
+            start_seconds=snapped_start,
+            end_seconds=snapped_end,
+            output_path=str(wav_path),
+            _audio=full_audio,
+        )
+        count += 1
+
+    return count
+
+
+def regen_one(slug: str, skip_reslice: bool = False) -> dict:
     """Regenerate branded artifacts for one client. Returns a summary dict."""
     activate_client(slug)
     ep_dir = _latest_ep_dir(slug)
@@ -117,14 +196,24 @@ def regen_one(slug: str) -> dict:
     )
     thumb_ok = result is not None
 
-    # --- 2. Regenerate subtitle clip MP4s ---
+    # --- 2. Re-slice clip WAVs with word-snapped boundaries ---
+    best_clips = analysis.get("best_clips", [])
+    words = transcript_data.get("words", [])
+    resliced = 0
+    if not skip_reslice:
+        resliced = _reslice_clips_with_snap(ep_dir, ts, best_clips, words)
+        # Persist the snapped start_seconds/end_seconds back to analysis.json
+        # so future subtitle rendering runs see the refined values.
+        with open(analysis_path, "w", encoding="utf-8") as f:
+            json.dump(analysis, f, indent=2, ensure_ascii=False)
+        logger.info("Updated analysis.json with snapped clip boundaries")
+
+    # --- 3. Regenerate subtitle clip MP4s ---
     from subtitle_clip_generator import SubtitleClipGenerator
 
     scg = SubtitleClipGenerator()
     clips_dir = ep_dir / "clips"
     clip_wavs = sorted(clips_dir.glob(f"*_{ts}_censored_clip_*.wav"))
-    # Pair each wav with its best_clip (index matches: clip_01 → best_clips[0])
-    best_clips = analysis.get("best_clips", [])
     regen_clips = []
     for i, wav in enumerate(clip_wavs):
         clip_info = best_clips[i] if i < len(best_clips) else {}
@@ -144,6 +233,7 @@ def regen_one(slug: str) -> dict:
         "slug": slug,
         "status": "ok",
         "thumbnail": str(thumb_path) if thumb_ok else None,
+        "resliced_wavs": resliced,
         "subtitle_clips": len([c for c in regen_clips if c]),
         "subtitle_clips_total": len(clip_wavs),
         "ep_dir": str(ep_dir),
@@ -157,6 +247,11 @@ def main() -> int:
         "--all-churches",
         action="store_true",
         help="Regenerate artifacts for all 10 church outreach prospects.",
+    )
+    ap.add_argument(
+        "--skip-reslice",
+        action="store_true",
+        help="Skip re-slicing clip WAVs (use existing boundaries).",
     )
     args = ap.parse_args()
 
@@ -172,7 +267,7 @@ def main() -> int:
     for slug in targets:
         print(f"\n=== {slug} ===")
         try:
-            r = regen_one(slug)
+            r = regen_one(slug, skip_reslice=args.skip_reslice)
         except Exception as e:
             logger.exception("Regen failed for %s", slug)
             r = {"slug": slug, "status": "error", "error": str(e)}

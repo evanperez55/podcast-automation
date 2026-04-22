@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import Mock, patch
 
-from content_editor import ContentEditor
+from content_editor import ContentEditor, snap_clip_boundary_to_words
 
 
 @pytest.fixture
@@ -1286,3 +1286,90 @@ class TestTranscriptTruncation:
         text = content_editor._format_transcript_for_analysis(words, segments)
         # Verify the format works (doesn't crash)
         assert len(text) > 0
+
+
+class TestSnapClipBoundaryToWords:
+    """Verify LLM clip timestamps snap to word boundaries, preferring sentence ends."""
+
+    # Shared word list for tests: spans ~0-12s with several sentences.
+    # Words with trailing "." end a sentence.
+    WORDS = [
+        {"word": "So", "start": 0.5, "end": 0.8},
+        {"word": "today", "start": 0.9, "end": 1.2},
+        {"word": "we're", "start": 1.3, "end": 1.6},
+        {"word": "talking", "start": 1.7, "end": 2.1},
+        {"word": "about", "start": 2.2, "end": 2.5},
+        {"word": "something", "start": 2.6, "end": 3.1},
+        {"word": "weird.", "start": 3.2, "end": 3.7},
+        {"word": "Listen", "start": 4.0, "end": 4.4},
+        {"word": "to", "start": 4.5, "end": 4.6},
+        {"word": "this", "start": 4.7, "end": 4.9},
+        {"word": "story", "start": 5.0, "end": 5.4},
+        {"word": "carefully.", "start": 5.5, "end": 6.2},
+        {"word": "It", "start": 6.5, "end": 6.7},
+        {"word": "changes", "start": 6.8, "end": 7.2},
+        {"word": "everything", "start": 7.3, "end": 7.9},
+        {"word": "we", "start": 8.0, "end": 8.1},
+        {"word": "thought", "start": 8.2, "end": 8.5},
+        {"word": "we", "start": 8.6, "end": 8.7},
+        {"word": "knew?", "start": 8.8, "end": 9.3},
+        {"word": "Seriously", "start": 9.8, "end": 10.4},
+        {"word": "this", "start": 10.5, "end": 10.7},
+        {"word": "is", "start": 10.8, "end": 10.9},
+        {"word": "wild", "start": 11.0, "end": 11.5},
+    ]
+
+    def test_snaps_start_to_first_word_at_or_after(self):
+        """Start snaps forward to the first word that begins at or after LLM start."""
+        # LLM start 1.0s lands mid-gap between "So" and "today"
+        start, _ = snap_clip_boundary_to_words(1.0, 6.5, self.WORDS)
+        # Should snap forward to "today" at 0.9? No — "today".start=0.9 is < 1.0
+        # so snap to "we're" at 1.3
+        assert start == 1.3
+
+    def test_end_prefers_sentence_terminator(self):
+        """End snaps back to the nearest word ending in .!?  when present."""
+        # LLM end 4.2s: candidates ending <= 4.2 are words ending at 0.8, 1.2,
+        # 1.6, 2.1, 2.5, 3.1, 3.7 (weird.), plus 4.4 (Listen) is > 4.2 so excluded.
+        # Should prefer "weird." at end=3.7
+        _, end = snap_clip_boundary_to_words(0.5, 4.2, self.WORDS)
+        assert end == 3.7
+
+    def test_end_falls_back_to_last_word_when_no_terminator(self):
+        """When no sentence terminator lies in the window, snap to last word end."""
+        # LLM start 6.5 (after the "." at 3.7), LLM end 8.6 — words in window:
+        # "It".end=6.7, "changes".end=7.2, "everything".end=7.9, "we".end=8.1
+        # None end in .!?
+        # "thought" ends at 8.5 (we has two entries at 8.0-8.1 and 8.6-8.7)
+        # wait: "thought".end=8.5, "we".start=8.6 is >= LLM end=8.6? end_seconds
+        # check uses end <= end_seconds, "we".end=8.7 > 8.6 so excluded
+        # so candidates end with "thought" at 8.5
+        _, end = snap_clip_boundary_to_words(6.5, 8.6, self.WORDS)
+        assert end == 8.5
+
+    def test_question_mark_counts_as_sentence_terminator(self):
+        """Words ending in '?' are valid stop points (prefer them over non-terminator)."""
+        # LLM end 9.5 — candidates include "knew?" at 9.3 (ends in ?)
+        _, end = snap_clip_boundary_to_words(6.5, 9.5, self.WORDS)
+        assert end == 9.3
+
+    def test_returns_original_times_on_empty_words(self):
+        """Empty word list returns LLM times unchanged."""
+        assert snap_clip_boundary_to_words(1.0, 5.0, []) == (1.0, 5.0)
+
+    def test_returns_original_times_when_snapping_would_collapse(self):
+        """If snapping produces a clip < 1s, fall back to LLM times."""
+        # LLM 1.0 to 1.2: only one word ("today") ends at 1.2, snapped_start would
+        # be "we're" at 1.3 (first word start >= 1.0), but candidates need end<=1.2
+        # and >= snapped_start=1.3 — no candidates → return original
+        start, end = snap_clip_boundary_to_words(1.0, 1.2, self.WORDS)
+        assert (start, end) == (1.0, 1.2)
+
+    def test_handles_llm_end_past_last_word(self):
+        """LLM end past the last word picks the last word end."""
+        # LLM end 99.0 — no terminator past the last terminator "knew?" at 9.3
+        # wait there are more words after "knew?" — "Seriously", "this", "is", "wild"
+        # Last candidate is "wild" at end=11.5, no terminator after "knew?"
+        # reversed scan finds "knew?" at 9.3 FIRST going backwards from last — yes!
+        _, end = snap_clip_boundary_to_words(0.5, 99.0, self.WORDS)
+        assert end == 9.3  # terminator wins over later non-terminator words
