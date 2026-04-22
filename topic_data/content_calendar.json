@@ -616,9 +616,23 @@
           "quote_text": "It's just like, why, what? Why are you saying hi to me? I'm here.",
           "timestamp": "01:31:27"
         },
-        "status": "pending",
-        "uploaded_at": null,
-        "upload_results": {}
+        "status": "uploaded",
+        "uploaded_at": "2026-04-22T16:03:37.999545",
+        "upload_results": {
+          "twitter": {
+            "tweet_id": "2047043669518131367",
+            "tweet_url": "https://twitter.com/i/web/status/2047043669518131367",
+            "text": "It's just like, why, what? Why are you saying hi to me? I'm here.",
+            "media_count": 0,
+            "status": "success"
+          },
+          "bluesky": {
+            "post_uri": "at://did:plc:tqwk5oc74cw7yqcqfsbpuirf/app.bsky.feed.post/3mk4c5ko7sc2g",
+            "post_url": "https://bsky.app/profile/fakeproblemspod.bsky.social/post/3mk4c5ko7sc2g",
+            "text": "It's just like, why, what? Why are you saying hi to me? I'm here.",
+            "status": "success"
+          }
+        }
       }
     }
   }
