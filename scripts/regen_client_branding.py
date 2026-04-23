@@ -121,7 +121,9 @@ def _reslice_clips_with_snap(
                 i + 1,
             )
             continue
-        snapped_start, snapped_end = snap_clip_boundary_to_words(start_s, end_s, words)
+        snapped_start, snapped_end = snap_clip_boundary_to_words(
+            start_s, end_s, words, max_duration=Config.CLIP_MAX_DURATION
+        )
         moved = abs(snapped_start - start_s) + abs(snapped_end - end_s)
         logger.info(
             "Clip %d: %.2f-%.2f -> %.2f-%.2f (moved %.2fs total)",
@@ -150,7 +152,51 @@ def _reslice_clips_with_snap(
     return count
 
 
-def regen_one(slug: str, skip_reslice: bool = False) -> dict:
+def _re_analyze(ep_dir: Path, timestamp: str, analysis_path: Path) -> bool:
+    """Re-run ContentEditor.analyze_content using the existing transcript.
+
+    Useful when the LLM prompt has changed (e.g., new clip_max_duration
+    config) and we want the existing episode re-scored without re-doing
+    whisper transcription. Writes a new analysis.json over the existing
+    one. Returns True on success.
+    """
+    transcript_path = next(ep_dir.glob(f"*_{timestamp}_transcript.json"), None)
+    if not transcript_path:
+        logger.warning("No transcript.json for %s; cannot re-analyze", ep_dir)
+        return False
+    audio_path = next(ep_dir.glob(f"*_{timestamp}_censored.wav"), None)
+
+    with open(transcript_path, encoding="utf-8") as f:
+        transcript_data = json.load(f)
+
+    from content_editor import ContentEditor
+
+    editor = ContentEditor()
+    logger.info(
+        "Re-analyzing %s (model=%s, NUM_CLIPS=%d, range=%d-%ds)",
+        ep_dir.name,
+        editor.model,
+        Config.NUM_CLIPS,
+        Config.CLIP_MIN_DURATION,
+        Config.CLIP_MAX_DURATION,
+    )
+    analysis = editor.analyze_content(
+        transcript_data,
+        topic_context=None,
+        audio_path=audio_path,
+        engagement_context=None,
+    )
+    with open(analysis_path, "w", encoding="utf-8") as f:
+        json.dump(analysis, f, indent=2, ensure_ascii=False)
+    logger.info("Wrote fresh analysis to %s", analysis_path)
+    return True
+
+
+def regen_one(
+    slug: str,
+    skip_reslice: bool = False,
+    re_analyze: bool = False,
+) -> dict:
     """Regenerate branded artifacts for one client. Returns a summary dict."""
     activate_client(slug)
     ep_dir = _latest_ep_dir(slug)
@@ -170,6 +216,11 @@ def regen_one(slug: str, skip_reslice: bool = False) -> dict:
             "analysis": str(analysis_path),
             "transcript": str(transcript_path),
         }
+
+    # Optional re-analyze: re-call OpenAI with the current prompt/config
+    # (picks up new CLIP_MIN/MAX_DURATION, prompt template changes, etc.).
+    if re_analyze:
+        _re_analyze(ep_dir, ts, analysis_path)
 
     with open(analysis_path, encoding="utf-8") as f:
         analysis = json.load(f)
@@ -305,6 +356,11 @@ def main() -> int:
         action="store_true",
         help="Skip re-slicing clip WAVs (use existing boundaries).",
     )
+    ap.add_argument(
+        "--re-analyze",
+        action="store_true",
+        help="Re-call OpenAI to regenerate analysis.json with current prompt/config.",
+    )
     args = ap.parse_args()
 
     if args.all_churches:
@@ -319,7 +375,9 @@ def main() -> int:
     for slug in targets:
         print(f"\n=== {slug} ===")
         try:
-            r = regen_one(slug, skip_reslice=args.skip_reslice)
+            r = regen_one(
+                slug, skip_reslice=args.skip_reslice, re_analyze=args.re_analyze
+            )
         except Exception as e:
             logger.exception("Regen failed for %s", slug)
             r = {"slug": slug, "status": "error", "error": str(e)}

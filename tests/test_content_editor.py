@@ -3,7 +3,11 @@
 import pytest
 from unittest.mock import Mock, patch
 
-from content_editor import ContentEditor, snap_clip_boundary_to_words
+from content_editor import (
+    ContentEditor,
+    snap_clip_boundary_to_words,
+    _warn_on_duration_drift,
+)
 
 
 @pytest.fixture
@@ -1373,3 +1377,86 @@ class TestSnapClipBoundaryToWords:
         # reversed scan finds "knew?" at 9.3 FIRST going backwards from last — yes!
         _, end = snap_clip_boundary_to_words(0.5, 99.0, self.WORDS)
         assert end == 9.3  # terminator wins over later non-terminator words
+
+    def test_max_duration_clamps_end(self):
+        """When max_duration is set, snapped_end never exceeds start+max."""
+        # LLM proposes start=0.5, end=99 (wants entire transcript); max_duration=5s.
+        # Without cap: would snap to "knew?" at 9.3 (sentence terminator).
+        # With cap=5s: end is clamped to 5.5 (start+5) before the terminator
+        # search, so candidates end at "carefully." at 6.2 are OUT, "weird."
+        # at 3.7 is IN — pick that.
+        start, end = snap_clip_boundary_to_words(
+            0.5, 99.0, self.WORDS, max_duration=5.0
+        )
+        assert start == 0.5
+        assert end == 3.7  # terminator within 0.5 + 5.0 = 5.5 cap
+
+    def test_max_duration_no_op_when_llm_already_under_cap(self):
+        """When LLM end is already under start+max, cap has no effect."""
+        # LLM proposes 0.5 to 4.0; max_duration 90 — well over.
+        # Behavior must match the no-cap case.
+        start_capped, end_capped = snap_clip_boundary_to_words(
+            0.5, 4.0, self.WORDS, max_duration=90.0
+        )
+        start_uncapped, end_uncapped = snap_clip_boundary_to_words(0.5, 4.0, self.WORDS)
+        assert (start_capped, end_capped) == (start_uncapped, end_uncapped)
+
+
+class TestWarnOnDurationDrift:
+    """Post-LLM validation catches clips outside configured min/max window."""
+
+    def test_returns_offenders_outside_window(self, monkeypatch, caplog):
+        """Clips shorter than min or longer than max are flagged + logged."""
+        from config import Config
+
+        monkeypatch.setattr(Config, "CLIP_MIN_DURATION", 30)
+        monkeypatch.setattr(Config, "CLIP_MAX_DURATION", 90)
+
+        clips = [
+            {"start_seconds": 10.0, "end_seconds": 70.0, "suggested_title": "ok"},
+            {
+                "start_seconds": 100.0,
+                "end_seconds": 110.0,
+                "suggested_title": "too short",
+            },
+            {
+                "start_seconds": 200.0,
+                "end_seconds": 500.0,
+                "suggested_title": "too long",
+            },
+        ]
+
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="podcast_automation"):
+            offenders = _warn_on_duration_drift(clips)
+
+        assert len(offenders) == 2
+        titles = {o["suggested_title"] for o in offenders}
+        assert titles == {"too short", "too long"}
+        # Both offenders should have generated a warning
+        assert sum("drifted" in rec.message for rec in caplog.records) == 2
+
+    def test_no_offenders_when_all_in_range(self, monkeypatch):
+        """Every clip within range returns an empty offender list."""
+        from config import Config
+
+        monkeypatch.setattr(Config, "CLIP_MIN_DURATION", 30)
+        monkeypatch.setattr(Config, "CLIP_MAX_DURATION", 90)
+        clips = [
+            {"start_seconds": 0, "end_seconds": 45, "suggested_title": "a"},
+            {"start_seconds": 100, "end_seconds": 180, "suggested_title": "b"},
+        ]
+        assert _warn_on_duration_drift(clips) == []
+
+    def test_skips_clips_missing_seconds(self, monkeypatch):
+        """Clips without start_seconds / end_seconds are skipped silently."""
+        from config import Config
+
+        monkeypatch.setattr(Config, "CLIP_MIN_DURATION", 30)
+        monkeypatch.setattr(Config, "CLIP_MAX_DURATION", 90)
+        clips = [
+            {"start": "00:00:10", "end": "00:01:30"},  # no _seconds fields
+            {"start_seconds": 0, "end_seconds": 45},
+        ]
+        assert _warn_on_duration_drift(clips) == []

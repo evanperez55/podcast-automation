@@ -14,6 +14,7 @@ def snap_clip_boundary_to_words(
     start_seconds: float,
     end_seconds: float,
     words: list,
+    max_duration: float = None,
 ) -> tuple:
     """Snap LLM clip boundaries to nearest word edges (preferring sentence ends).
 
@@ -32,6 +33,11 @@ def snap_clip_boundary_to_words(
         end_seconds: LLM-proposed clip end in seconds.
         words: List of word dicts `{"word": str, "start": float, "end": float}`
             from the transcript. Order must be ascending by start time.
+        max_duration: Optional hard cap on clip length in seconds. When set,
+            the effective end is clamped to `snapped_start + max_duration`
+            BEFORE the terminator search, so the helper can never extend
+            a clip past the cap even if the LLM returned a boundary right
+            at the cap. Terminator preference is preserved within the cap.
 
     Returns:
         (snapped_start, snapped_end) tuple in seconds.
@@ -49,6 +55,13 @@ def snap_clip_boundary_to_words(
         None,
     )
     snapped_start = start_word["start"] if start_word else start_seconds
+
+    # Clamp the end to the max_duration cap (relative to snapped_start) so
+    # the terminator search can never pick a word that would extend the
+    # clip past the cap. Without this, a sentence ending ~5s past the LLM
+    # end would get picked as the "better" end and inflate the clip.
+    if max_duration is not None:
+        end_seconds = min(end_seconds, snapped_start + max_duration)
 
     # --- Snap end: last word ending <= LLM end, preferring sentence terminator ---
     candidates = [
@@ -74,6 +87,41 @@ def snap_clip_boundary_to_words(
         return start_seconds, end_seconds
 
     return snapped_start, snapped_end
+
+
+def _warn_on_duration_drift(best_clips: list) -> list:
+    """Log a warning for each clip outside Config.CLIP_MIN_DURATION/MAX_DURATION.
+
+    The LLM prompt instructs the model to stay within range, but models
+    drift — a church sermon pipeline saw a 297s clip slip through despite
+    a 45s configured max. This surfaces drift in the logs so it's visible
+    during review instead of silently shipping. Returns the list of
+    offending clip dicts (for test + metric collection).
+    """
+    min_dur = Config.CLIP_MIN_DURATION
+    max_dur = Config.CLIP_MAX_DURATION
+    offenders = []
+    for i, clip in enumerate(best_clips):
+        start = clip.get("start_seconds")
+        end = clip.get("end_seconds")
+        if start is None or end is None:
+            continue
+        dur = end - start
+        if dur < min_dur or dur > max_dur:
+            offenders.append(clip)
+            logger.warning(
+                "Clip %d duration %.1fs is outside configured [%d, %d]s window "
+                "(start=%.1f end=%.1f title=%r) — LLM drifted; consider "
+                "re-running analysis or tightening prompt.",
+                i + 1,
+                dur,
+                min_dur,
+                max_dur,
+                start,
+                end,
+                clip.get("suggested_title", "")[:60],
+            )
+    return offenders
 
 
 # JSON Schema for OpenAI Structured Outputs (strict mode)
@@ -551,15 +599,16 @@ GOOD: "turns out immortality is real, it just only applies to lobsters. link in 
 
    For each REAL instance, provide the timestamp and the exact quote containing the word.
 
-2. **IDENTIFY BEST MOMENTS FOR CLIPS (15-45 seconds, ideal 20-30s):**
+2. **IDENTIFY BEST MOMENTS FOR CLIPS ({Config.CLIP_MIN_DURATION}-{Config.CLIP_MAX_DURATION} seconds):**
    Find {Config.NUM_CLIPS} compelling moments that would make great YouTube Shorts.
-   PREFER 20-30 SECOND CLIPS — this is the sweet spot for YouTube Shorts virality.
-   Shorter, punchier clips outperform longer ones. Only go above 30s if the moment truly requires it.
+   Target the middle of the {Config.CLIP_MIN_DURATION}-{Config.CLIP_MAX_DURATION}s range.
+   Every clip MUST be between {Config.CLIP_MIN_DURATION} and {Config.CLIP_MAX_DURATION} seconds — this is a hard cap
+   for social-feed algorithm performance. Clips below {Config.CLIP_MIN_DURATION}s feel truncated;
+   clips above {Config.CLIP_MAX_DURATION}s drop sharply in watch-through rate. Never exceed the cap.
 
    **CRITICAL — SPREAD CLIPS ACROSS THE EPISODE:**
    Clips MUST be distributed across the full episode timeline. Divide the episode into
    {Config.NUM_CLIPS} equal time segments and pick ONE clip from each segment.
-   For example, in a 30-minute episode with 3 clips: one from 0-10min, one from 10-20min, one from 20-30min.
    NEVER cluster multiple clips within the same 5-minute window. The goal is to represent
    the full arc of the episode — beginning, middle, and end — so short-form viewers get a
    real taste of the whole show.
@@ -782,9 +831,15 @@ Please respond with ONLY valid JSON in this exact format:
                         clip["start_seconds"],
                         clip["end_seconds"],
                         self._words,
+                        max_duration=Config.CLIP_MAX_DURATION,
                     )
                     clip["start_seconds"] = snapped_start
                     clip["end_seconds"] = snapped_end
+
+            # Warn when any clip falls outside the configured duration window
+            # (the prompt already instructs the model to respect these, this
+            # catches drift instead of letting a 5-minute "clip" ship silently).
+            _warn_on_duration_drift(analysis.get("best_clips", []))
 
             for chapter in analysis.get("chapters", []):
                 if "start_timestamp" in chapter:

@@ -51,8 +51,8 @@ branding:
 # --- Content settings tuned for sermons ---
 content:
   num_clips: 5
-  clip_min_duration: 20
-  clip_max_duration: 45
+  clip_min_duration: 30
+  clip_max_duration: 90
   clip_selection_mode: content  # Use transcript content, not audio energy
   names_to_remove: []  # Add pastor names if they shouldn't appear in clips
   words_to_censor: []
