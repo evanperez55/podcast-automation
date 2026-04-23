@@ -363,6 +363,13 @@ class ContentEditor:
             # Validate/normalize analysis to ensure all expected keys exist
             analysis = self._validate_analysis(analysis)
 
+            # Retry if the LLM returned fewer clips than NUM_CLIPS. The model
+            # sometimes under-produces (B020, 2026-04-22: 3 clips when 8 asked,
+            # starved the whole downstream social calendar for ep_31). One or
+            # two focused retries asking for the missing clips is cheap
+            # insurance and recovers most cases.
+            analysis = self._retry_if_short_clips(analysis, voice, prompt)
+
             # DIRECT SEARCH: Find words to censor by searching transcript directly
             # This is more reliable than GPT-4 which can hallucinate
             direct_censor_timestamps = self._find_words_to_censor_directly(self._words)
@@ -391,6 +398,83 @@ class ContentEditor:
         except Exception as e:
             logger.error("OpenAI analysis error: %s", e)
             raise
+
+    def _retry_if_short_clips(self, analysis, voice_persona, prompt, max_retries=2):
+        """Re-call OpenAI when the returned best_clips count falls short.
+
+        The model sometimes decides "3 clips is enough" even when the prompt
+        asks for 8 (B020). One or two focused retries — with an instruction
+        naming the existing clips and asking for N more — usually recover.
+        Cost: worst case 3 total calls per episode (initial + 2 retries),
+        roughly 3x the baseline ~$0.02 per episode. Worth it vs shipping
+        a starved social calendar.
+
+        Args:
+            analysis: Parsed + validated analysis dict from the initial call.
+            voice_persona: Same system prompt used for the initial call.
+            prompt: Same user prompt used for the initial call.
+            max_retries: Max retry attempts (default 2).
+
+        Returns:
+            The best analysis produced so far (most clips seen across attempts).
+        """
+        best = analysis
+        for attempt in range(max_retries):
+            got = len(best.get("best_clips", []))
+            needed = Config.NUM_CLIPS
+            if got >= needed:
+                return best
+            missing = needed - got
+            existing_titles = [
+                c.get("suggested_title", "") or c.get("description", "")[:60]
+                for c in best.get("best_clips", [])
+            ]
+            retry_prompt = (
+                f"{prompt}\n\n"
+                f"IMPORTANT RETRY INSTRUCTION:\n"
+                f"Your previous response returned only {got} clips but I need "
+                f"exactly {needed}. Return the FULL analysis again with {needed} "
+                f"clips total. The {got} clips you identified were:\n"
+                + "\n".join(f"- {t}" for t in existing_titles if t)
+                + f"\n\nAdd {missing} MORE clips from parts of the episode NOT "
+                f"covered by the above. Spread them across unexplored segments "
+                f"of the timeline. Every other field (episode_title, chapters, "
+                f"etc.) can stay the same."
+            )
+            logger.info(
+                "Retry %d/%d: LLM returned %d clip(s), re-requesting %d total",
+                attempt + 1,
+                max_retries,
+                got,
+                needed,
+            )
+            try:
+                response = self._call_openai_with_retry(voice_persona, retry_prompt)
+                response_text = response.choices[0].message.content
+                new_analysis = self._parse_llm_response(response_text)
+                new_analysis = self._validate_analysis(new_analysis)
+            except Exception as e:
+                logger.warning(
+                    "Retry %d failed (%s) — keeping best-so-far with %d clip(s)",
+                    attempt + 1,
+                    e,
+                    got,
+                )
+                return best
+            new_count = len(new_analysis.get("best_clips", []))
+            if new_count > got:
+                logger.info(
+                    "Retry %d recovered: %d -> %d clip(s)", attempt + 1, got, new_count
+                )
+                best = new_analysis
+            else:
+                logger.warning(
+                    "Retry %d did not improve (%d clip(s)); stopping.",
+                    attempt + 1,
+                    new_count,
+                )
+                return best
+        return best
 
     def _call_openai_with_retry(self, voice_persona, prompt, max_retries=3):
         """Call OpenAI API with structured outputs and exponential backoff.

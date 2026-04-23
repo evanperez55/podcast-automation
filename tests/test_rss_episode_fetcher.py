@@ -444,5 +444,73 @@ class TestParseItunesDuration:
         assert _parse_itunes_duration("unknown") is None
 
 
+class TestCleanDownloadFilename:
+    """_clean_download_filename replaces encoded-URL filenames with a clean hash.
+
+    Regression guard for B022 (2026-04-22): Subsplash + anchor-cloudfront
+    feeds leak base64 or URL-encoded enclosure URLs into the download
+    filename, which then propagates into ep_dir and every derived asset.
+    """
+
+    def test_clean_filename_passes_through(self):
+        """A normal podcast URL keeps its original filename."""
+        from rss_episode_fetcher import _clean_download_filename
+
+        url = "https://feeds.example.com/audio/episode-042.mp3"
+        assert _clean_download_filename(url) == "episode-042.mp3"
+
+    def test_base64_filename_replaced(self):
+        """Subsplash-style base64-encoded filename → hash-based replacement."""
+        from rss_episode_fetcher import _clean_download_filename
+
+        url = (
+            "https://podcasts.subsplash.com/wdp33ry/play/"
+            "aHR0cHM6Ly9jZG4uc3Vic3BsYXNoLmNvbS9hdWRpb3MvOVc1VkNGLzFhMi5tcDM.mp3"
+        )
+        out = _clean_download_filename(url)
+        assert out.startswith("ep_")
+        assert out.endswith(".mp3")
+        assert "aHR0c" not in out
+        assert len(out) < 20
+
+    def test_url_encoded_filename_replaced(self):
+        """URL-encoded enclosure filename (anchor.fm to cloudfront) also cleaned."""
+        from rss_episode_fetcher import _clean_download_filename
+
+        url = (
+            "https://anchor.fm/s/ac7d788/play/"
+            "https%3A%2F%2Fd3ctxlq1ktw2nl.cloudfront.net%2Fstaging%2F"
+            "2026-3-13%2F0c4d6f58-cf76-476f-c815-1e6fcfdf3ed8.mp3"
+        )
+        out = _clean_download_filename(url)
+        assert out.startswith("ep_")
+        assert out.endswith(".mp3")
+        assert "%3A" not in out
+
+    def test_deterministic_hash(self):
+        """Same URL always produces the same filename (important for dedupe)."""
+        from rss_episode_fetcher import _clean_download_filename
+
+        url = (
+            "https://podcasts.subsplash.com/wdp33ry/play/"
+            "aHR0cHM6Ly9jZG4uc3Vic3BsYXNoLmNvbS9hdWRpb3MvOVc1VkNGLzFhMi5tcDM.mp3"
+        )
+        assert _clean_download_filename(url) == _clean_download_filename(url)
+
+    def test_overly_long_filename_replaced(self):
+        """Even non-base64 filenames get replaced if they exceed 60 chars."""
+        from rss_episode_fetcher import _clean_download_filename
+
+        url = (
+            "https://example.com/path/"
+            + ("this-is-a-really-long-filename-" * 3)
+            + ".mp3"
+        )
+        out = _clean_download_filename(url)
+        assert out.startswith("ep_")
+        assert out.endswith(".mp3")
+        assert len(out) < 20
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

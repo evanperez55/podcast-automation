@@ -1,5 +1,6 @@
 """RSS episode fetcher — parses podcast RSS feeds and downloads audio enclosures."""
 
+import hashlib
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -12,6 +13,42 @@ import requests
 from tqdm import tqdm
 
 from logger import logger
+
+
+def _clean_download_filename(url: str) -> str:
+    """Produce a clean on-disk filename for an RSS audio enclosure.
+
+    Subsplash and anchor.fm-to-cloudfront redirector URLs encode the real
+    audio path as a base64 or URL-encoded segment (e.g.
+    `...../aHR0cHM6Ly9jZG4uc3Vic3BsYXNoLmNvbS8....mp3`). Using that raw
+    `Path(url).name` as the on-disk filename leaks the ugly string into
+    every downstream artifact name (ep_dir, transcript.json, clip MP4s,
+    and eventually the Drive demo package a prospect sees).
+
+    Heuristics that flag a filename as "encoded URL, not a real name":
+      * Length > 60 chars
+      * Starts with `aHR0c` (the base64 prefix for `http` / `https`)
+      * Contains `%3A` (URL-encoded `:` found in `http%3A//...` forms)
+      * Contains no `.` before the extension (encoded strings often have
+        no real extension separator — but we can't easily test this)
+
+    When any heuristic trips, we replace the filename with
+    `ep_<sha1(url)[:8]>.<ext>` — deterministic, stable across reruns,
+    human-readable-enough.
+    """
+    parsed = urlparse(url)
+    original = Path(parsed.path).name
+    ext = Path(parsed.path).suffix or ".mp3"
+    looks_encoded = (
+        len(original) > 60
+        or original.startswith("aHR0c")
+        or "%3A" in original
+        or "%2F" in original
+    )
+    if looks_encoded:
+        short = hashlib.sha1(url.encode()).hexdigest()[:8]
+        return f"ep_{short}{ext}"
+    return original
 
 
 @dataclass
@@ -229,9 +266,10 @@ class RSSEpisodeFetcher:
         Raises:
             requests.HTTPError: If the server returns a 4xx/5xx response.
         """
-        # Strip query params to get a clean filename
-        parsed = urlparse(url)
-        filename = Path(parsed.path).name
+        # Strip query params; also replace encoded-URL filenames from
+        # Subsplash / anchor-cloudfront redirectors so downstream artifact
+        # names don't inherit the ugly base64/URL-encoded prefix (B022).
+        filename = _clean_download_filename(url)
         dest_path = Path(dest_dir) / filename
 
         if dest_path.exists():

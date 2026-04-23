@@ -1500,3 +1500,136 @@ class TestWarnOnCountShortfall:
         clips = [{"suggested_title": f"c{i}"} for i in range(3)]
         quotes = [{"quote": f"q{i}"} for i in range(5)]
         assert _warn_on_count_shortfall(clips, quotes) == []
+
+
+class TestRetryIfShortClips:
+    """LLM under-production triggers a focused re-prompt (B020 full closure)."""
+
+    def _mock_response(self, analysis):
+        """Build a mock OpenAI response wrapping the given analysis dict."""
+        import json
+
+        resp = Mock()
+        resp.choices = [Mock()]
+        resp.choices[0].message = Mock()
+        resp.choices[0].message.content = json.dumps(analysis)
+        return resp
+
+    def _minimal_analysis(self, clip_count):
+        """Minimal valid analysis with the requested number of clips."""
+        return {
+            "episode_title": "Test",
+            "censor_timestamps": [],
+            "best_clips": [
+                {
+                    "start": "00:00:10",
+                    "end": "00:00:40",
+                    "duration_seconds": 30,
+                    "description": f"desc {i}",
+                    "why_interesting": "x",
+                    "suggested_title": f"Title {i}",
+                    "hook_caption": "hook",
+                    "clip_hashtags": [],
+                }
+                for i in range(clip_count)
+            ],
+            "episode_summary": "",
+            "social_captions": {
+                "youtube": "",
+                "instagram": "",
+                "twitter": "",
+                "tiktok": "",
+            },
+            "show_notes": "",
+            "chapters": [],
+            "hot_take": "",
+            "best_quotes": [],
+        }
+
+    def test_retry_recovers_from_shortfall(self, content_editor, monkeypatch, caplog):
+        """When initial returns 3 but NUM_CLIPS=5, retry returns 5 → accepted."""
+        from config import Config
+
+        monkeypatch.setattr(Config, "NUM_CLIPS", 5)
+        initial = self._minimal_analysis(3)
+        recovered = self._minimal_analysis(5)
+
+        content_editor._words = []  # needed by _parse_llm_response
+        content_editor._call_openai_with_retry = Mock(
+            return_value=self._mock_response(recovered)
+        )
+
+        import logging
+
+        with caplog.at_level(logging.INFO, logger="podcast_automation"):
+            result = content_editor._retry_if_short_clips(initial, "voice", "prompt")
+
+        assert len(result["best_clips"]) == 5
+        assert content_editor._call_openai_with_retry.call_count == 1
+        assert any("Retry 1 recovered" in r.message for r in caplog.records)
+
+    def test_retry_stops_when_no_improvement(self, content_editor, monkeypatch):
+        """If retry returns same (or fewer) clips, stop — don't burn more calls."""
+        from config import Config
+
+        monkeypatch.setattr(Config, "NUM_CLIPS", 5)
+        initial = self._minimal_analysis(3)
+        no_improvement = self._minimal_analysis(3)  # same count
+
+        content_editor._words = []  # needed by _parse_llm_response
+        content_editor._call_openai_with_retry = Mock(
+            return_value=self._mock_response(no_improvement)
+        )
+
+        result = content_editor._retry_if_short_clips(initial, "voice", "prompt")
+        assert len(result["best_clips"]) == 3
+        # Should stop after the first retry since count didn't improve
+        assert content_editor._call_openai_with_retry.call_count == 1
+
+    def test_retry_not_called_when_count_meets_target(
+        self, content_editor, monkeypatch
+    ):
+        """No retry needed if the initial call already hit NUM_CLIPS."""
+        from config import Config
+
+        monkeypatch.setattr(Config, "NUM_CLIPS", 5)
+        initial = self._minimal_analysis(5)
+
+        content_editor._call_openai_with_retry = Mock()
+        result = content_editor._retry_if_short_clips(initial, "voice", "prompt")
+
+        assert len(result["best_clips"]) == 5
+        content_editor._call_openai_with_retry.assert_not_called()
+
+    def test_retry_caps_at_max_retries(self, content_editor, monkeypatch):
+        """Even if every retry improves by 1, we stop at max_retries."""
+        from config import Config
+
+        monkeypatch.setattr(Config, "NUM_CLIPS", 10)
+        responses = [
+            self._mock_response(self._minimal_analysis(5)),  # +2 from 3
+            self._mock_response(self._minimal_analysis(7)),  # +2 from 5
+        ]
+        content_editor._words = []  # needed by _parse_llm_response
+        content_editor._call_openai_with_retry = Mock(side_effect=responses)
+        initial = self._minimal_analysis(3)
+
+        result = content_editor._retry_if_short_clips(
+            initial, "voice", "prompt", max_retries=2
+        )
+        # Stopped at 7 because we capped at 2 retries
+        assert len(result["best_clips"]) == 7
+        assert content_editor._call_openai_with_retry.call_count == 2
+
+    def test_retry_handles_exception_gracefully(self, content_editor, monkeypatch):
+        """If a retry call itself raises, keep best-so-far instead of crashing."""
+        from config import Config
+
+        monkeypatch.setattr(Config, "NUM_CLIPS", 5)
+        content_editor._call_openai_with_retry = Mock(
+            side_effect=RuntimeError("api down")
+        )
+        initial = self._minimal_analysis(3)
+
+        result = content_editor._retry_if_short_clips(initial, "voice", "prompt")
+        assert len(result["best_clips"]) == 3  # unchanged
