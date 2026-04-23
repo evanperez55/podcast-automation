@@ -392,6 +392,35 @@ class TestGetH264EncoderArgs:
         assert "-cq" in args
         assert "-crf" not in args
 
+    @patch.object(Config, "USE_NVENC", False)
+    def test_libx264_sets_bt709_color_metadata(self):
+        """libx264 args tag output with consistent bt709 color metadata.
+
+        Without this, lavfi `color=` sources default to bt470m transfer,
+        producing a primaries/transfer mismatch that stalls Drive's
+        transcoder ("still processing" hangs).
+        """
+        args = get_h264_encoder_args()
+        assert "-color_primaries" in args
+        assert "-color_trc" in args
+        assert "-colorspace" in args
+        assert "-color_range" in args
+        for flag in ("-color_primaries", "-color_trc", "-colorspace"):
+            assert args[args.index(flag) + 1] == "bt709"
+        assert args[args.index("-color_range") + 1] == "tv"
+
+    @patch.object(Config, "USE_NVENC", True)
+    def test_nvenc_sets_bt709_color_metadata(self):
+        """NVENC args tag output with consistent bt709 color metadata."""
+        args = get_h264_encoder_args()
+        assert "-color_primaries" in args
+        assert "-color_trc" in args
+        assert "-colorspace" in args
+        assert "-color_range" in args
+        for flag in ("-color_primaries", "-color_trc", "-colorspace"):
+            assert args[args.index(flag) + 1] == "bt709"
+        assert args[args.index("-color_range") + 1] == "tv"
+
 
 class TestDetectNvenc:
     """Tests for _detect_nvenc()."""

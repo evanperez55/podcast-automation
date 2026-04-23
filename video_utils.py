@@ -22,6 +22,18 @@ _NVENC_PRESET_MAP = {"ultrafast": "p1", "fast": "p2", "medium": "p4", "slow": "p
 _probe_cache: dict = {}
 
 
+_BT709_COLOR_FLAGS = [
+    "-color_primaries",
+    "bt709",
+    "-color_trc",
+    "bt709",
+    "-colorspace",
+    "bt709",
+    "-color_range",
+    "tv",
+]
+
+
 def _libx264_args(preset="medium", crf=18, profile="high"):
     """Return libx264 software encoder args (fallback)."""
     args = [
@@ -33,6 +45,7 @@ def _libx264_args(preset="medium", crf=18, profile="high"):
         str(crf),
         "-pix_fmt",
         "yuv420p",
+        *_BT709_COLOR_FLAGS,
     ]
     if profile:
         args.extend(["-profile:v", profile])
@@ -66,6 +79,7 @@ def get_h264_encoder_args(preset="medium", crf=18, profile="high"):
             profile,
             "-pix_fmt",
             "yuv420p",
+            *_BT709_COLOR_FLAGS,
         ]
     else:
         return _libx264_args(preset, crf, profile)
