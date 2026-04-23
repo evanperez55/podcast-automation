@@ -18,6 +18,7 @@ tooling fighting you.
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -218,6 +219,112 @@ def _stage_assets(ep_dir: Path, staging_dir: Path) -> None:
         else:
             # quote_card_*.png etc — already clean
             shutil.copy2(asset, staging_dir / name)
+
+    # Derived files the email body promises but collect_demo_assets does not
+    # ship (analysis.json + transcript.json are excluded as internal JSON).
+    # We extract the prospect-facing pieces here.
+    analysis_path = next(ep_dir.glob("*_analysis.json"), None)
+    if analysis_path:
+        try:
+            analysis = json.loads(analysis_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            analysis = {}
+        _write_social_captions_md(analysis, staging_dir / "social_captions.md")
+        _write_chapters_md(analysis, staging_dir / "chapters.md")
+
+    transcript_path = next(ep_dir.glob("*_transcript.json"), None)
+    if transcript_path:
+        try:
+            transcript = json.loads(transcript_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            transcript = {}
+        _write_transcript_txt(transcript, staging_dir / "transcript.txt")
+
+
+_PLATFORM_LABELS = [
+    ("youtube", "YouTube (long-form description)"),
+    ("instagram", "Instagram"),
+    ("twitter", "Twitter / X"),
+    ("tiktok", "TikTok"),
+]
+
+
+def _write_social_captions_md(analysis: dict, dst: Path) -> None:
+    """Render analysis['social_captions'] as a copy/paste-ready markdown file.
+
+    Skips silently when no captions are available so older episodes that
+    pre-date the social-captions field don't ship an empty file.
+    """
+    captions = analysis.get("social_captions") or {}
+    sections = [
+        (label, captions[key].strip())
+        for key, label in _PLATFORM_LABELS
+        if captions.get(key) and captions[key].strip()
+    ]
+    if not sections:
+        return
+    parts = [
+        "# Social captions",
+        "",
+        "Copy/paste-ready captions for each platform. Tweak hashtags before posting.",
+        "",
+    ]
+    for label, body in sections:
+        parts.append(f"## {label}")
+        parts.append("")
+        parts.append(body)
+        parts.append("")
+    dst.write_text("\n".join(parts), encoding="utf-8")
+
+
+def _write_chapters_md(analysis: dict, dst: Path) -> None:
+    """Render analysis['chapters'] as a timestamped table-of-contents.
+
+    Output format is a markdown table — drops cleanly into YouTube
+    descriptions, podcast show notes, or a website episode page.
+    """
+    chapters = analysis.get("chapters") or []
+    rows = [
+        (str(c.get("start_timestamp", "00:00:00")), str(c.get("title", "")).strip())
+        for c in chapters
+        if c.get("title")
+    ]
+    if not rows:
+        return
+    parts = [
+        "# Chapters",
+        "",
+        "| Time | Chapter |",
+        "|------|---------|",
+    ]
+    parts.extend(f"| {ts} | {title} |" for ts, title in rows)
+    parts.append("")
+    dst.write_text("\n".join(parts), encoding="utf-8")
+
+
+def _write_transcript_txt(transcript: dict, dst: Path) -> None:
+    """Render transcript.json segments as a [HH:MM:SS]-prefixed readable text.
+
+    One line per segment so the prospect can search/scroll. Blank or
+    whitespace-only segments are dropped.
+    """
+    segments = transcript.get("segments") or []
+    lines = []
+    for seg in segments:
+        text = (seg.get("text") or "").strip()
+        if not text:
+            continue
+        lines.append(f"[{_seconds_to_hms(seg.get('start', 0.0))}] {text}")
+    if not lines:
+        return
+    dst.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _seconds_to_hms(seconds: float) -> str:
+    s = int(seconds)
+    h, rem = divmod(s, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
 
 
 def _clean_clip_name(asset: Path, existing_in_staging: list) -> str:

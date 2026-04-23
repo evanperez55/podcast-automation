@@ -11,6 +11,7 @@ Given a prospect slug, this script:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -344,3 +345,202 @@ class TestPrepareOne:
         # Draft was created with the pre-existing link injected into the body
         gmail_kwargs = fake_gmail.create_draft.call_args.kwargs
         assert existing_link in gmail_kwargs["body"]
+
+
+# ---------------------------------------------------------------------------
+# Staging writers — promised-but-missing artifacts (social/chapters/transcript)
+# ---------------------------------------------------------------------------
+
+
+class TestSocialCaptionsWriter:
+    """The PITCH.md email promises 'social captions written per platform' — the
+    data already lives in analysis.json["social_captions"]. The staging writer
+    surfaces it as a clean markdown file so the prospect can copy/paste."""
+
+    def test_writes_one_section_per_platform(self, tmp_path):
+        analysis = {
+            "social_captions": {
+                "youtube": "YT body",
+                "instagram": "IG body",
+                "twitter": "TW body",
+                "tiktok": "TT body",
+            }
+        }
+        out = tmp_path / "social_captions.md"
+        op._write_social_captions_md(analysis, out)
+        text = out.read_text(encoding="utf-8")
+        assert "YouTube" in text
+        assert "YT body" in text
+        assert "Instagram" in text
+        assert "IG body" in text
+        assert "Twitter" in text or "X" in text
+        assert "TW body" in text
+        assert "TikTok" in text
+        assert "TT body" in text
+
+    def test_skips_missing_or_empty_platforms(self, tmp_path):
+        analysis = {"social_captions": {"youtube": "YT only"}}
+        out = tmp_path / "social_captions.md"
+        op._write_social_captions_md(analysis, out)
+        text = out.read_text(encoding="utf-8")
+        assert "YT only" in text
+        # Headers for absent platforms must not appear (would imply empty content)
+        assert "TikTok" not in text
+        assert "Instagram" not in text
+
+    def test_no_file_when_no_captions(self, tmp_path):
+        out = tmp_path / "social_captions.md"
+        op._write_social_captions_md({}, out)
+        assert not out.exists(), "skip silently if no captions to write"
+
+
+class TestChaptersWriter:
+    """Chapters live in analysis.json['chapters'] as
+    {start_timestamp, title, start_seconds}. Output is a timestamped TOC
+    so the recipient can drop it into YouTube / show notes / podcast app."""
+
+    def test_writes_timestamp_and_title_per_chapter(self, tmp_path):
+        analysis = {
+            "chapters": [
+                {"start_timestamp": "00:00:00", "title": "Intro", "start_seconds": 0.0},
+                {
+                    "start_timestamp": "00:05:30",
+                    "title": "Acts 1 setup",
+                    "start_seconds": 330.0,
+                },
+                {
+                    "start_timestamp": "00:42:11",
+                    "title": "Closing prayer",
+                    "start_seconds": 2531.0,
+                },
+            ]
+        }
+        out = tmp_path / "chapters.md"
+        op._write_chapters_md(analysis, out)
+        text = out.read_text(encoding="utf-8")
+        assert "00:00:00" in text
+        assert "Intro" in text
+        assert "00:42:11" in text
+        assert "Closing prayer" in text
+
+    def test_no_file_when_no_chapters(self, tmp_path):
+        out = tmp_path / "chapters.md"
+        op._write_chapters_md({"chapters": []}, out)
+        assert not out.exists()
+
+
+class TestTranscriptWriter:
+    """transcript.json is whisper output (segments with start/end/text). The
+    PITCH email promises a 'searchable transcript of the whole sermon' — ship
+    it as a readable .txt with [HH:MM:SS] segment timestamps."""
+
+    def test_writes_timestamped_segments(self, tmp_path):
+        transcript = {
+            "segments": [
+                {"start": 0.0, "end": 5.2, "text": " Welcome to Redeemer."},
+                {"start": 5.2, "end": 12.8, "text": " Today we're in Acts 1."},
+                {"start": 330.0, "end": 335.0, "text": " Let's read together."},
+            ]
+        }
+        out = tmp_path / "transcript.txt"
+        op._write_transcript_txt(transcript, out)
+        text = out.read_text(encoding="utf-8")
+        # 0s → 00:00:00; 330s → 00:05:30
+        assert "[00:00:00]" in text
+        assert "[00:05:30]" in text
+        assert "Welcome to Redeemer." in text
+        assert "Let's read together." in text
+
+    def test_strips_blank_segments(self, tmp_path):
+        transcript = {
+            "segments": [
+                {"start": 0.0, "end": 1.0, "text": "  "},
+                {"start": 1.0, "end": 2.0, "text": " real text "},
+            ]
+        }
+        out = tmp_path / "transcript.txt"
+        op._write_transcript_txt(transcript, out)
+        text = out.read_text(encoding="utf-8")
+        assert "real text" in text
+        # No empty bracket lines
+        assert "[00:00:00] \n" not in text
+
+    def test_no_file_when_no_segments(self, tmp_path):
+        out = tmp_path / "transcript.txt"
+        op._write_transcript_txt({"segments": []}, out)
+        assert not out.exists()
+
+
+class TestStageAssetsIncludesNewFiles:
+    """End-to-end: _stage_assets reads analysis.json + transcript.json from
+    ep_dir and writes the three derived files into staging. This is the
+    contract the email body promises."""
+
+    def _make_ep_dir_with_data(self, tmp_path: Path) -> Path:
+        ep = tmp_path / "ep_42"
+        (ep / "clips").mkdir(parents=True)
+        # One clip + blog so the existing staging logic has something to copy
+        (ep / "clips" / "clip_01_subtitle.mp4").write_bytes(b"v")
+        (ep / "epX_20260423_blog_post.md").write_text("# blog", encoding="utf-8")
+        # Data sources for the new writers
+        (ep / "epX_20260423_analysis.json").write_text(
+            json.dumps(
+                {
+                    "social_captions": {
+                        "youtube": "YT desc",
+                        "twitter": "TW post",
+                    },
+                    "chapters": [
+                        {
+                            "start_timestamp": "00:00:00",
+                            "title": "Intro",
+                            "start_seconds": 0.0,
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        (ep / "epX_20260423_transcript.json").write_text(
+            json.dumps(
+                {"segments": [{"start": 0.0, "end": 1.5, "text": "hello world"}]}
+            ),
+            encoding="utf-8",
+        )
+        return ep
+
+    def test_staging_writes_social_chapters_transcript(self, tmp_path):
+        ep = self._make_ep_dir_with_data(tmp_path)
+        staging = tmp_path / "staging"
+        op._stage_assets(ep, staging)
+
+        assert (staging / "social_captions.md").exists(), (
+            "social_captions.md must be in Drive folder — promised in email"
+        )
+        assert (staging / "chapters.md").exists(), (
+            "chapters.md must be in Drive folder — promised in email"
+        )
+        assert (staging / "transcript.txt").exists(), (
+            "transcript.txt must be in Drive folder — promised in email"
+        )
+
+        # Contents are sane
+        assert "YT desc" in (staging / "social_captions.md").read_text(encoding="utf-8")
+        assert "Intro" in (staging / "chapters.md").read_text(encoding="utf-8")
+        assert "hello world" in (staging / "transcript.txt").read_text(encoding="utf-8")
+
+    def test_staging_skips_missing_data_sources_gracefully(self, tmp_path):
+        """If analysis.json / transcript.json are missing (older episode),
+        staging must not crash — just skip the derived files."""
+        ep = tmp_path / "ep_43"
+        (ep / "clips").mkdir(parents=True)
+        (ep / "clips" / "clip_01_subtitle.mp4").write_bytes(b"v")
+        (ep / "epY_blog_post.md").write_text("# blog", encoding="utf-8")
+        # Intentionally NO analysis.json / transcript.json
+
+        staging = tmp_path / "staging"
+        op._stage_assets(ep, staging)  # must not raise
+
+        assert not (staging / "social_captions.md").exists()
+        assert not (staging / "chapters.md").exists()
+        assert not (staging / "transcript.txt").exists()
