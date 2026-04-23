@@ -192,10 +192,45 @@ def _re_analyze(ep_dir: Path, timestamp: str, analysis_path: Path) -> bool:
     return True
 
 
+def _regen_episode_video(ep_dir: Path, timestamp: str) -> Optional[str]:
+    """Regenerate the full-episode horizontal MP4 with the active client logo.
+
+    The original pipeline bakes the logo as a static background via
+    video_converter.py; if the client-logo branding was wrong at the
+    original pipeline run time (B021), this file was FP-branded too.
+    Not uploaded to Drive (outreach_prepare excludes it), but lingered
+    wrong on disk. Call with the active client already activated.
+    Returns the output path on success, None on failure.
+    """
+    censored = next(ep_dir.glob(f"*_{timestamp}_censored.wav"), None)
+    if censored is None:
+        censored = next(ep_dir.glob(f"*_{timestamp}_censored.mp3"), None)
+    if censored is None:
+        logger.warning("No censored audio for episode MP4 regen under %s", ep_dir)
+        return None
+    stem = censored.stem.replace("_censored", "")
+    # Existing pipeline writes to <stem>_<ts>_episode.mp4 — but stem may
+    # already contain the timestamp. Look for an existing episode.mp4 and
+    # overwrite that filename instead of guessing.
+    existing = next(ep_dir.glob(f"*_{timestamp}_episode.mp4"), None)
+    output_path = existing or (ep_dir / f"{stem}_{timestamp}_episode.mp4")
+
+    from video_converter import VideoConverter
+
+    vc = VideoConverter()
+    result = vc.create_episode_video(
+        audio_path=str(censored),
+        output_path=str(output_path),
+        format_type="horizontal",
+    )
+    return result
+
+
 def regen_one(
     slug: str,
     skip_reslice: bool = False,
     re_analyze: bool = False,
+    regen_episode: bool = False,
 ) -> dict:
     """Regenerate branded artifacts for one client. Returns a summary dict."""
     activate_client(slug)
@@ -288,6 +323,13 @@ def regen_one(
     # outreach_prepare step picks up the pretty names.
     final_refreshed = _refresh_clips_final(clips_dir, regen_clips, best_clips)
 
+    # --- 5. Optional: regenerate the full-episode horizontal video ---
+    # Not shipped to prospects (excluded from Drive upload) but useful to
+    # keep on-disk assets consistent with the current client branding.
+    episode_video = None
+    if regen_episode:
+        episode_video = _regen_episode_video(ep_dir, ts)
+
     return {
         "slug": slug,
         "status": "ok",
@@ -296,6 +338,7 @@ def regen_one(
         "subtitle_clips": len([c for c in regen_clips if c]),
         "subtitle_clips_total": len(clip_wavs),
         "final_refreshed": final_refreshed,
+        "episode_video": episode_video,
         "ep_dir": str(ep_dir),
     }
 
@@ -361,6 +404,12 @@ def main() -> int:
         action="store_true",
         help="Re-call OpenAI to regenerate analysis.json with current prompt/config.",
     )
+    ap.add_argument(
+        "--regen-episode",
+        action="store_true",
+        help="Also regenerate the full-episode horizontal MP4 with the active logo "
+        "(expensive: minutes per client; not shipped to Drive).",
+    )
     args = ap.parse_args()
 
     if args.all_churches:
@@ -376,7 +425,10 @@ def main() -> int:
         print(f"\n=== {slug} ===")
         try:
             r = regen_one(
-                slug, skip_reslice=args.skip_reslice, re_analyze=args.re_analyze
+                slug,
+                skip_reslice=args.skip_reslice,
+                re_analyze=args.re_analyze,
+                regen_episode=args.regen_episode,
             )
         except Exception as e:
             logger.exception("Regen failed for %s", slug)
