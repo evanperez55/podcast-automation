@@ -132,13 +132,28 @@ def _latest_run_timestamp(ep_dir: Path) -> Optional[str]:
 def collect_demo_assets(ep_dir: Path) -> List[Path]:
     """Return user-facing asset paths under `ep_dir` (recursing into clips/).
 
+    Clip videos are preferred from clips/final/ (human-readable names like
+    `clip_01_topic_headline.mp4`) over the raw `*_subtitle.mp4` files, which
+    carry the ugly URL-encoded or base64-encoded episode ID prefix for RSS
+    feeds that don't expose clean episode IDs (e.g., Subsplash).
+
     When multiple processing runs coexist in one ep_dir, only files stamped
     with the latest timestamp are returned. Files without a timestamp
-    (quote_card_*.png) are always kept — they're regenerated in place each
-    run, so only the latest set ever exists on disk.
+    (quote_card_*.png, clips/final/*) are always kept — they're regenerated
+    in place each run, so only the latest set exists on disk.
     """
     candidates: List[Path] = []
-    for pattern in INCLUDE_PATTERNS:
+
+    # Clips: prefer clips/final/ with clean names; fall back to *_subtitle.mp4
+    final_dir = ep_dir / "clips" / "final"
+    final_clips = sorted(final_dir.glob("clip_*.mp4")) if final_dir.exists() else []
+    if final_clips:
+        candidates.extend(final_clips)
+    else:
+        candidates.extend(ep_dir.rglob("*_subtitle.mp4"))
+
+    # Non-clip user-facing assets
+    for pattern in ("*_thumbnail.png", "quote_card_*.png", "*_blog_post.md"):
         candidates.extend(ep_dir.rglob(pattern))
 
     latest_ts = _latest_run_timestamp(ep_dir)
@@ -150,7 +165,8 @@ def collect_demo_assets(ep_dir: Path) -> List[Path]:
             continue
         if any(p.match(bad) for bad in EXCLUDE_PATTERNS):
             continue
-        # If the file carries a timestamp, it must match the latest run
+        # If the file carries a timestamp, it must match the latest run.
+        # Clean final/clip_*.mp4 files have no timestamp by design.
         m = _TIMESTAMP_RE.search(p.name)
         if m and latest_ts and m.group(1) != latest_ts:
             continue
@@ -175,18 +191,43 @@ def _stage_assets(ep_dir: Path, staging_dir: Path) -> None:
     """Copy curated assets into a flat staging dir for Drive upload.
 
     We use a staging dir (instead of uploading ep_dir directly) because
-    ep_dir contains internal JSON we never want to ship.
+    ep_dir contains internal JSON we never want to ship. Asset names are
+    also normalized here so prospects don't see the ugly URL-encoded or
+    base64 episode prefix on filenames from Subsplash / direct-cloudfront
+    feeds.
     """
     import shutil
 
     staging_dir.mkdir(parents=True, exist_ok=True)
     clips_sub = staging_dir / "clips"
     for asset in collect_demo_assets(ep_dir):
-        if "clip" in asset.name.lower() and asset.suffix == ".mp4":
+        name = asset.name
+        if asset.suffix == ".mp4" and "clip" in name.lower():
+            # Clips from final/ already have clean names (clip_NN_topic.mp4);
+            # raw *_subtitle.mp4 files carry the ugly prefix — rename them.
             clips_sub.mkdir(exist_ok=True)
-            shutil.copy2(asset, clips_sub / asset.name)
+            if name.startswith("clip_"):
+                clean_name = name
+            else:
+                clean_name = _clean_clip_name(asset, list(clips_sub.iterdir()))
+            shutil.copy2(asset, clips_sub / clean_name)
+        elif name.endswith("_thumbnail.png"):
+            shutil.copy2(asset, staging_dir / "thumbnail.png")
+        elif name.endswith("_blog_post.md"):
+            shutil.copy2(asset, staging_dir / "blog_post.md")
         else:
-            shutil.copy2(asset, staging_dir / asset.name)
+            # quote_card_*.png etc — already clean
+            shutil.copy2(asset, staging_dir / name)
+
+
+def _clean_clip_name(asset: Path, existing_in_staging: list) -> str:
+    """Generate a clean `clip_NN.mp4` name for a raw *_subtitle.mp4 file.
+
+    Uses the count of already-staged clips to build the index. Keeps
+    output predictable for the prospect (clip_01.mp4, clip_02.mp4, ...).
+    """
+    existing_count = sum(1 for p in existing_in_staging if p.name.startswith("clip_"))
+    return f"clip_{existing_count + 1:02d}.mp4"
 
 
 # ---------------------------------------------------------------------------

@@ -229,6 +229,14 @@ def regen_one(slug: str, skip_reslice: bool = False) -> dict:
             "Regenerated subtitle clip %d/%d: %s", i + 1, len(clip_wavs), output_path
         )
 
+    # --- 4. Refresh clips/final/ with the new MP4 content (clean filenames) ---
+    # The original pipeline publishes clips into <ep>/clips/final/ with
+    # human-readable names like `clip_01_<slug>.mp4` (see pipeline/steps/video.py).
+    # Those copies got stale when we regenerated the raw *_subtitle.mp4 files
+    # above — refresh them here using the same naming convention so the
+    # outreach_prepare step picks up the pretty names.
+    final_refreshed = _refresh_clips_final(clips_dir, regen_clips, best_clips)
+
     return {
         "slug": slug,
         "status": "ok",
@@ -236,8 +244,38 @@ def regen_one(slug: str, skip_reslice: bool = False) -> dict:
         "resliced_wavs": resliced,
         "subtitle_clips": len([c for c in regen_clips if c]),
         "subtitle_clips_total": len(clip_wavs),
+        "final_refreshed": final_refreshed,
         "ep_dir": str(ep_dir),
     }
+
+
+def _refresh_clips_final(clips_dir: Path, regen_clips: list, best_clips: list) -> int:
+    """Copy regenerated *_subtitle.mp4 content into clips/final/ with clean names.
+
+    Matches the naming pattern used by pipeline/steps/video.py:
+        clip_{idx:02d}_{sanitized_title}.mp4
+
+    Overwrites existing same-named copies so Drive uploads pick up the
+    latest content. Returns count of clips refreshed.
+    """
+    import shutil
+
+    final_dir = clips_dir / "final"
+    final_dir.mkdir(exist_ok=True)
+    count = 0
+    for i, vpath in enumerate(regen_clips):
+        if not vpath or not Path(vpath).exists():
+            continue
+        title = "clip"
+        if i < len(best_clips):
+            title = best_clips[i].get("suggested_title", "clip")
+        safe_title = re.sub(r"[^\w\s-]", "", title).strip()
+        safe_title = re.sub(r"[\s]+", "_", safe_title).lower()[:50]
+        dest = final_dir / f"clip_{i + 1:02d}_{safe_title}.mp4"
+        shutil.copy2(str(vpath), str(dest))
+        count += 1
+    logger.info("Refreshed %d clip(s) in %s", count, final_dir)
+    return count
 
 
 def main() -> int:
