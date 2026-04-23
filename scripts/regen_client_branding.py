@@ -255,13 +255,27 @@ def _refresh_clips_final(clips_dir: Path, regen_clips: list, best_clips: list) -
     Matches the naming pattern used by pipeline/steps/video.py:
         clip_{idx:02d}_{sanitized_title}.mp4
 
-    Overwrites existing same-named copies so Drive uploads pick up the
-    latest content. Returns count of clips refreshed.
+    PURGES any existing clip_*.mp4 files first. Multi-run clients otherwise
+    accumulate stale clips from prior pipeline runs (where suggested_title
+    differed), which then leak into the Drive upload and show old FP-branded
+    content alongside the newly-branded clips. Returns count of clips refreshed.
     """
     import shutil
 
     final_dir = clips_dir / "final"
     final_dir.mkdir(exist_ok=True)
+
+    # Purge stale clip_*.mp4 leftover from previous pipeline runs with
+    # different suggested_title naming. Anything non-clip stays.
+    stale = sorted(final_dir.glob("clip_*.mp4"))
+    for p in stale:
+        try:
+            p.unlink()
+        except OSError as e:
+            logger.warning("Could not remove stale %s: %s", p, e)
+    if stale:
+        logger.info("Purged %d stale clip_*.mp4 from %s", len(stale), final_dir)
+
     count = 0
     for i, vpath in enumerate(regen_clips):
         if not vpath or not Path(vpath).exists():
