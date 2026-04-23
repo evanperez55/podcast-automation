@@ -89,6 +89,34 @@ def snap_clip_boundary_to_words(
     return snapped_start, snapped_end
 
 
+def _warn_on_count_shortfall(best_clips: list, best_quotes: list) -> list:
+    """Log a warning when the LLM returned fewer clips or quotes than asked.
+
+    B020: ep_31 came back with 3 clips when the prompt asked for 8 — no
+    error, no retry, and the pipeline shipped it silently (which then
+    starved the downstream social calendar). This surfaces shortfalls in
+    the logs so they're caught at analyze time. Returns a list of
+    `(label, expected, got)` tuples for test + metric collection.
+    """
+    targets = [
+        ("best_clips", Config.NUM_CLIPS, len(best_clips)),
+        # best_quotes has no config — we ask for 5 in the prompt; warn if <3
+        ("best_quotes", 3, len(best_quotes)),
+    ]
+    shortfalls = []
+    for label, expected, got in targets:
+        if got < expected:
+            shortfalls.append((label, expected, got))
+            logger.warning(
+                "%s shortfall: LLM returned %d when %d were expected — consider "
+                "retrying analysis or tightening prompt.",
+                label,
+                got,
+                expected,
+            )
+    return shortfalls
+
+
 def _warn_on_duration_drift(best_clips: list) -> list:
     """Log a warning for each clip outside Config.CLIP_MIN_DURATION/MAX_DURATION.
 
@@ -835,6 +863,14 @@ Please respond with ONLY valid JSON in this exact format:
                     )
                     clip["start_seconds"] = snapped_start
                     clip["end_seconds"] = snapped_end
+
+            # Warn when the LLM returned fewer clips / quotes than asked —
+            # otherwise an under-production (B020) ships silently and
+            # starves the downstream social calendar.
+            _warn_on_count_shortfall(
+                analysis.get("best_clips", []),
+                analysis.get("best_quotes", []),
+            )
 
             # Warn when any clip falls outside the configured duration window
             # (the prompt already instructs the model to respect these, this

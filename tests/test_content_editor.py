@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 from content_editor import (
     ContentEditor,
     snap_clip_boundary_to_words,
+    _warn_on_count_shortfall,
     _warn_on_duration_drift,
 )
 
@@ -1460,3 +1461,42 @@ class TestWarnOnDurationDrift:
             {"start_seconds": 0, "end_seconds": 45},
         ]
         assert _warn_on_duration_drift(clips) == []
+
+
+class TestWarnOnCountShortfall:
+    """LLM under-production (B020) surfaces as a WARN log instead of silent ship."""
+
+    def test_flags_clip_shortfall(self, monkeypatch, caplog):
+        """When the LLM returns fewer clips than Config.NUM_CLIPS, warn."""
+        from config import Config
+        import logging
+
+        monkeypatch.setattr(Config, "NUM_CLIPS", 5)
+        clips = [{"suggested_title": f"c{i}"} for i in range(3)]
+        quotes = [{"quote": f"q{i}"} for i in range(5)]
+
+        with caplog.at_level(logging.WARNING, logger="podcast_automation"):
+            shortfalls = _warn_on_count_shortfall(clips, quotes)
+
+        assert ("best_clips", 5, 3) in shortfalls
+        assert any("best_clips shortfall" in r.message for r in caplog.records)
+
+    def test_flags_quote_shortfall(self, monkeypatch):
+        """When best_quotes < 3, warn."""
+        from config import Config
+
+        monkeypatch.setattr(Config, "NUM_CLIPS", 5)
+        clips = [{"suggested_title": f"c{i}"} for i in range(5)]
+        quotes = [{"quote": "only one"}]
+        shortfalls = _warn_on_count_shortfall(clips, quotes)
+        labels = {s[0] for s in shortfalls}
+        assert "best_quotes" in labels
+
+    def test_no_shortfall_when_meeting_targets(self, monkeypatch):
+        """Equal counts → empty shortfall list."""
+        from config import Config
+
+        monkeypatch.setattr(Config, "NUM_CLIPS", 3)
+        clips = [{"suggested_title": f"c{i}"} for i in range(3)]
+        quotes = [{"quote": f"q{i}"} for i in range(5)]
+        assert _warn_on_count_shortfall(clips, quotes) == []
