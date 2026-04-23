@@ -241,6 +241,7 @@ def prepare_one(
     gmail=None,
     dry_run: bool = False,
     drive_link: Optional[str] = None,
+    skip_verify: bool = False,
 ) -> dict:
     """Do one prospect end-to-end. Returns {draft_id, drive_link, pitch_path}.
 
@@ -251,10 +252,30 @@ def prepare_one(
     link is used directly. Use this to recover from a partial failure where
     the upload succeeded but the Gmail draft did not (e.g. Gmail API quota
     or enablement propagation) — avoids re-uploading the demo package.
+
+    Before the upload, runs the pre-upload verification battery (filename
+    hygiene, clip count, duration window, logo-bleed fingerprint). Any ERROR
+    finding aborts the prepare. Pass `skip_verify=True` to bypass (e.g.,
+    for dry-run tests or when iterating on the verify script itself).
     """
     pitch_path = DEMO_ROOT / slug / "PITCH.md"
     if not pitch_path.exists():
         raise FileNotFoundError(f"PITCH.md not found: {pitch_path}")
+
+    # Pre-upload verification — blocks upload on any ERROR finding. Warnings
+    # (e.g., URL-encoded source filenames, which get masked at staging) are
+    # informational and don't block.
+    if not skip_verify and not dry_run and not drive_link:
+        from scripts.outreach_verify import verify_one
+
+        findings = verify_one(slug)
+        errors = [f for f in findings if f.level == "ERROR"]
+        if errors:
+            raise RuntimeError(
+                f"outreach_verify found {len(errors)} ERROR finding(s) for "
+                f"{slug}; aborting upload. Run "
+                f"`uv run python scripts/outreach_verify.py {slug}` for details."
+            )
 
     parsed = parse_pitch(pitch_path)
     logger.info("Parsed pitch for %s: to=%s", slug, parsed["email"])

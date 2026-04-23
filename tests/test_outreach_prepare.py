@@ -263,7 +263,11 @@ class TestPrepareOne:
         fake_gmail.create_draft.return_value = "draft-1"
 
         result = op.prepare_one(
-            "test-slug", drive=fake_drive, gmail=fake_gmail, dry_run=False
+            "test-slug",
+            drive=fake_drive,
+            gmail=fake_gmail,
+            dry_run=False,
+            skip_verify=True,  # test fixture doesn't include real clip assets
         )
 
         assert result["draft_id"] == "draft-1"
