@@ -544,3 +544,140 @@ class TestStageAssetsIncludesNewFiles:
         assert not (staging / "social_captions.md").exists()
         assert not (staging / "chapters.md").exists()
         assert not (staging / "transcript.txt").exists()
+
+
+# ---------------------------------------------------------------------------
+# Post-upload public-access smoke test
+# ---------------------------------------------------------------------------
+
+
+class TestVerifyDrivePublicAccess:
+    """After upload we hit the URL with no auth to catch Workspace-policy or
+    permission-race gaps that file-level perms wouldn't surface."""
+
+    def _mock_response(self, status=200, body=""):
+        from unittest.mock import MagicMock
+
+        m = MagicMock()
+        m.status_code = status
+        m.text = body
+        return m
+
+    def test_returns_none_on_truly_public_folder(self):
+        from unittest.mock import patch
+
+        with patch(
+            "requests.get",
+            return_value=self._mock_response(200, "<html>file list</html>"),
+        ):
+            assert (
+                op._verify_drive_public_access(
+                    "https://drive.google.com/drive/folders/abc"
+                )
+                is None
+            )
+
+    def test_returns_string_on_request_access_page(self):
+        from unittest.mock import patch
+
+        body = "<html>You need access. Request access</html>"
+        with patch("requests.get", return_value=self._mock_response(200, body)):
+            result = op._verify_drive_public_access(
+                "https://drive.google.com/drive/folders/locked"
+            )
+            assert result is not None
+            assert "request access" in result.lower()
+
+    def test_returns_string_on_404(self):
+        from unittest.mock import patch
+
+        with patch("requests.get", return_value=self._mock_response(404, "")):
+            result = op._verify_drive_public_access(
+                "https://drive.google.com/drive/folders/gone"
+            )
+            assert result is not None
+            assert "404" in result
+
+    def test_returns_none_on_network_error(self):
+        """Transient network failures must NOT false-fail (don't block uploads)."""
+        from unittest.mock import patch
+
+        with patch("requests.get", side_effect=ConnectionError("dns")):
+            result = op._verify_drive_public_access(
+                "https://drive.google.com/drive/folders/x"
+            )
+            assert result is None
+
+    def test_detects_you_need_permission_marker(self):
+        from unittest.mock import patch
+
+        body = "<html>You need permission to access</html>"
+        with patch("requests.get", return_value=self._mock_response(200, body)):
+            result = op._verify_drive_public_access("https://drive.google.com/x")
+            assert result is not None
+            assert "permission" in result.lower()
+
+
+# ---------------------------------------------------------------------------
+# --dry-run shows the staged tree
+# ---------------------------------------------------------------------------
+
+
+class TestDryRunPrintsStagedTree:
+    """In dry-run mode, prepare_one now stages to tmp + prints the file
+    tree so you can eyeball what would actually go to Drive."""
+
+    def _write_pitch(self, tmp_path: Path) -> Path:
+        pitch_dir = tmp_path / "demo" / "church-vertical" / "test-slug"
+        pitch_dir.mkdir(parents=True)
+        p = pitch_dir / "PITCH.md"
+        p.write_text(
+            "# Test - Outreach Pitch\n\n"
+            "**Contact:** X / **EMAIL: pastor@x.com**\n"
+            "\n---\n\n## Email\n\n"
+            "**Subject:** Subject here\n\n"
+            "Hey,\n\n[GOOGLE DRIVE LINK]\n\nEvan\n\n---\n\n## Follow-Up\n\nx\n"
+        )
+        return p
+
+    def _write_ep_dir(self, tmp_path: Path) -> Path:
+        ep = tmp_path / "output" / "test-slug" / "ep_42_20260423_120000"
+        (ep / "clips" / "final").mkdir(parents=True)
+        (ep / "clips" / "final" / "clip_01_topic.mp4").write_bytes(b"video")
+        (ep / "ep42_blog_post.md").write_text("# blog", encoding="utf-8")
+        return ep
+
+    def test_dry_run_prints_package_preview_header(self, tmp_path, monkeypatch, capsys):
+        from unittest.mock import MagicMock
+
+        self._write_pitch(tmp_path)
+        self._write_ep_dir(tmp_path)
+        monkeypatch.setattr(op, "DEMO_ROOT", tmp_path / "demo" / "church-vertical")
+        monkeypatch.setattr(op, "OUTPUT_ROOT", tmp_path / "output")
+
+        op.prepare_one(
+            "test-slug",
+            drive=MagicMock(),
+            gmail=MagicMock(),
+            dry_run=True,
+        )
+
+        out = capsys.readouterr().out
+        assert "PACKAGE PREVIEW" in out
+        assert "test-slug" in out
+        # The clip we staged should show up
+        assert "clip_01_topic.mp4" in out
+        assert "blog_post.md" in out
+
+    def test_dry_run_still_skips_upload(self, tmp_path, monkeypatch):
+        """The new tree-print behavior must not start uploading by mistake."""
+        from unittest.mock import MagicMock
+
+        self._write_pitch(tmp_path)
+        self._write_ep_dir(tmp_path)
+        monkeypatch.setattr(op, "DEMO_ROOT", tmp_path / "demo" / "church-vertical")
+        monkeypatch.setattr(op, "OUTPUT_ROOT", tmp_path / "output")
+
+        fake_drive = MagicMock()
+        op.prepare_one("test-slug", drive=fake_drive, gmail=MagicMock(), dry_run=True)
+        fake_drive.upload_folder.assert_not_called()

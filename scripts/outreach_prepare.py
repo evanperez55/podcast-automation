@@ -327,6 +327,64 @@ def _seconds_to_hms(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 
+def _print_staged_tree(slug: str, staging_dir: Path) -> None:
+    """Print the staged file tree for visual confirmation in --dry-run mode."""
+    print()
+    print("=" * 60)
+    print(f"PACKAGE PREVIEW: {slug}")
+    print("=" * 60)
+    print(f"  staging dir: {staging_dir}")
+    print()
+    files = sorted(p for p in staging_dir.rglob("*") if p.is_file())
+    total_bytes = 0
+    for p in files:
+        rel = p.relative_to(staging_dir)
+        size = p.stat().st_size
+        total_bytes += size
+        print(f"  {str(rel):60s} {_human_size(size):>10s}")
+    print()
+    print(f"  {len(files)} file(s), {_human_size(total_bytes)} total")
+    print()
+
+
+def _human_size(num_bytes: int) -> str:
+    for unit in ("B", "KB", "MB", "GB"):
+        if num_bytes < 1024:
+            return f"{num_bytes:.1f} {unit}" if unit != "B" else f"{num_bytes} B"
+        num_bytes /= 1024
+    return f"{num_bytes:.1f} TB"
+
+
+def _verify_drive_public_access(drive_url: str, timeout: float = 10.0) -> Optional[str]:
+    """Post-upload smoke test: hit the Drive URL with no auth, confirm public.
+
+    Drive serves a "Request access" / "You need permission" interstitial
+    when a folder is locked even though file-level perms claim otherwise
+    (Workspace policy, race conditions, partial permission propagation).
+    This catches that gap without needing an external test account.
+
+    Returns:
+        None if the folder is genuinely public-accessible
+        Error description string otherwise
+        None for transient network failures (don't false-fail on those)
+    """
+    try:
+        import requests
+
+        r = requests.get(drive_url, timeout=timeout, allow_redirects=True)
+    except Exception:
+        return None  # transient network issue — skip rather than false-fail
+    if r.status_code == 404:
+        return "HTTP 404 — folder not found at returned URL"
+    if r.status_code != 200:
+        return f"HTTP {r.status_code} on public access check"
+    body = r.text.lower()
+    for marker in ("request access", "you need permission", "you need access"):
+        if marker in body:
+            return f"Drive shows '{marker}' page — folder is NOT actually public"
+    return None
+
+
 def _clean_clip_name(asset: Path, existing_in_staging: list) -> str:
     """Generate a clean `clip_NN.mp4` name for a raw *_subtitle.mp4 file.
 
@@ -393,16 +451,34 @@ def prepare_one(
         ep_dir = _find_latest_ep_dir(slug)
         logger.info("Using ep_dir: %s", ep_dir)
 
+        import tempfile
+
         if dry_run:
+            # Stage anyway so we can show the prospect-facing tree as a preview.
+            with tempfile.TemporaryDirectory() as td:
+                staging = Path(td) / f"{slug}-demo"
+                _stage_assets(ep_dir, staging)
+                _print_staged_tree(slug, staging)
             drive_link = "https://drive.google.com/DRY_RUN"
         else:
-            # Stage assets into a clean temp dir then upload as a folder
-            import tempfile
-
             with tempfile.TemporaryDirectory() as td:
                 staging = Path(td) / f"{slug}-demo"
                 _stage_assets(ep_dir, staging)
                 drive_link = drive.upload_folder(staging, folder_name=f"{slug} - Demo")
+
+            # Post-upload smoke test: confirm the URL is actually publicly
+            # accessible (catches Workspace policy gaps + permission races
+            # without needing an external test account).
+            issue = _verify_drive_public_access(drive_link)
+            if issue:
+                logger.warning(
+                    "post-upload public-access check FAILED for %s: %s — "
+                    "verify in incognito before sending",
+                    slug,
+                    issue,
+                )
+            else:
+                logger.info("post-upload public-access check passed for %s", slug)
 
     body_with_link = inject_drive_link(parsed["body"], drive_link)
 

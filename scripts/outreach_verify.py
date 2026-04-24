@@ -167,6 +167,182 @@ def _latest_ep_dir(slug: str) -> Optional[Path]:
     return max(eps, key=lambda d: d.stat().st_mtime) if eps else None
 
 
+# ---------------------------------------------------------------------------
+# Color metadata check (B023 prevention)
+# ---------------------------------------------------------------------------
+
+
+def _check_clip_color_metadata(clip_path: Path) -> Optional[str]:
+    """Verify a clip's color VUI tags are all bt709.
+
+    Returns:
+        "OK"          — all three (transfer, primaries, space) are bt709
+        error string  — at least one field is wrong/unset (B023 condition)
+        None          — ffprobe couldn't run; skip the check rather than false-fail
+    """
+    ffprobe = Path(Config.FFMPEG_PATH).parent / "ffprobe.exe"
+    if not ffprobe.exists():
+        ffprobe = "ffprobe"
+    try:
+        r = subprocess.run(
+            [
+                str(ffprobe),
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=color_transfer,color_primaries,color_space",
+                "-of",
+                "json",
+                str(clip_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if r.returncode != 0:
+            return None
+        data = json.loads(r.stdout)
+        stream = (data.get("streams") or [{}])[0]
+        bad = []
+        for field in ("color_transfer", "color_primaries", "color_space"):
+            v = stream.get(field)
+            if v != "bt709":
+                bad.append(f"{field}={v or 'unspecified'}")
+        return "OK" if not bad else ", ".join(bad)
+    except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError):
+        return None
+
+
+# ---------------------------------------------------------------------------
+# PITCH ↔ PACKAGE parity check (2026-04-23 regression prevention)
+# ---------------------------------------------------------------------------
+
+
+# Maps regex (matched against a PITCH "Inside:" bullet) → (predicate, label).
+# Iterated in order; first match wins so each bullet is only scored once.
+_PITCH_PROMISE_CHECKS = [
+    (
+        re.compile(r"\bclips?\b", re.IGNORECASE),
+        lambda staged: any(p.startswith("clips/clip_") for p in staged),
+        "clips/clip_*.mp4",
+    ),
+    (
+        re.compile(r"\bblog post\b", re.IGNORECASE),
+        lambda staged: "blog_post.md" in staged,
+        "blog_post.md",
+    ),
+    (
+        re.compile(r"\bsocial captions?\b", re.IGNORECASE),
+        lambda staged: "social_captions.md" in staged,
+        "social_captions.md",
+    ),
+    (
+        re.compile(r"\bchapters?\b|\bchapter markers?\b", re.IGNORECASE),
+        lambda staged: "chapters.md" in staged,
+        "chapters.md",
+    ),
+    (
+        re.compile(r"\btranscript\b", re.IGNORECASE),
+        lambda staged: "transcript.txt" in staged,
+        "transcript.txt",
+    ),
+    (
+        re.compile(r"\bthumbnail\b", re.IGNORECASE),
+        lambda staged: "thumbnail.png" in staged,
+        "thumbnail.png",
+    ),
+    (
+        re.compile(r"\bquote cards?\b", re.IGNORECASE),
+        lambda staged: any(p.startswith("quote_card_") for p in staged),
+        "quote_card_*.png",
+    ),
+]
+
+
+def _extract_pitch_promises(pitch_path: Path) -> list:
+    """Pull bullet items from the 'Inside:' section of a PITCH.md.
+
+    Returns bullet text without the leading '- '. Empty list if the file
+    doesn't exist or has no Inside: section.
+    """
+    if not pitch_path.exists():
+        return []
+    try:
+        text = pitch_path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    m = re.search(
+        r"^Inside:\s*$\s*(.+?)(?=\n\s*\n|\Z)",
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    if not m:
+        return []
+    return re.findall(r"^\s*-\s+(.+?)\s*$", m.group(1), re.MULTILINE)
+
+
+def _check_pitch_parity(bullets: list, staged_files: set) -> list:
+    """For each bullet, verify the corresponding artifact exists in staging.
+
+    Returns a list of human-readable "missing" descriptions. Empty list
+    means every recognized promise is satisfied.
+    """
+    missing: list = []
+    for bullet in bullets:
+        for pattern, predicate, label in _PITCH_PROMISE_CHECKS:
+            if pattern.search(bullet):
+                if not predicate(staged_files):
+                    snippet = bullet[:50] + ("..." if len(bullet) > 50 else "")
+                    missing.append(f"{label} (promised by '{snippet}')")
+                break  # first match wins
+    return missing
+
+
+def _staged_files_for(ep_dir: Path) -> set:
+    """Predict the set of relative paths that would land in the staging dir.
+
+    Mirrors scripts/outreach_prepare.py:_stage_assets without copying anything,
+    so the parity check can run before any disk work.
+    """
+    out: set = set()
+
+    final_dir = ep_dir / "clips" / "final"
+    if final_dir.exists():
+        for clip in final_dir.glob("clip_*.mp4"):
+            out.add(f"clips/{clip.name}")
+
+    if next(ep_dir.glob("*_blog_post.md"), None):
+        out.add("blog_post.md")
+    if next(ep_dir.glob("*_thumbnail.png"), None):
+        out.add("thumbnail.png")
+    for qc in ep_dir.glob("quote_card_*.png"):
+        out.add(qc.name)
+
+    analysis_path = next(ep_dir.glob("*_analysis.json"), None)
+    if analysis_path:
+        try:
+            analysis = json.loads(analysis_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            analysis = {}
+        if analysis.get("social_captions"):
+            out.add("social_captions.md")
+        if analysis.get("chapters"):
+            out.add("chapters.md")
+
+    transcript_path = next(ep_dir.glob("*_transcript.json"), None)
+    if transcript_path:
+        try:
+            t = json.loads(transcript_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            t = {}
+        if t.get("segments"):
+            out.add("transcript.txt")
+
+    return out
+
+
 def verify_one(slug: str) -> List[Finding]:
     """Run all checks for one client slug. Returns list of Finding objects."""
     findings: List[Finding] = []
@@ -306,6 +482,43 @@ def verify_one(slug: str) -> List[Finding]:
                     tmp_frame.unlink()
                 except OSError:
                     pass
+
+    # Check 7: bt709 color metadata on every final clip (B023 prevention).
+    # ffprobe each one; flag if transfer/primaries/space don't all read bt709.
+    color_failures = []
+    for f in final_clips:
+        result = _check_clip_color_metadata(f)
+        if result is not None and result != "OK":
+            color_failures.append((f.name, result))
+    findings.append(
+        Finding(
+            "OK" if not color_failures else "ERROR",
+            "clip_color_metadata",
+            "all bt709"
+            if not color_failures
+            else f"{len(color_failures)} clip(s) with non-bt709 metadata: "
+            + "; ".join(f"{n} ({m})" for n, m in color_failures[:3]),
+        )
+    )
+
+    # Check 8: PITCH ↔ PACKAGE parity. Each artifact promised in the email
+    # body's "Inside:" bullet list must exist in the predicted staging set.
+    # Caught the missing social_captions/chapters/transcript files that
+    # forced two re-upload cycles 2026-04-23.
+    pitch_path = Config.BASE_DIR / "demo" / "church-vertical" / slug / "PITCH.md"
+    bullets = _extract_pitch_promises(pitch_path)
+    if bullets:
+        staged = _staged_files_for(ep_dir)
+        missing = _check_pitch_parity(bullets, staged)
+        findings.append(
+            Finding(
+                "OK" if not missing else "ERROR",
+                "pitch_parity",
+                "all promises satisfied"
+                if not missing
+                else f"{len(missing)} unmet: " + "; ".join(missing[:3]),
+            )
+        )
 
     return findings
 

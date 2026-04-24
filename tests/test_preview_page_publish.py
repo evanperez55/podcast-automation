@@ -186,3 +186,90 @@ class TestGitPush:
             output_dir=proj["output_dir"],
         )
         assert url.endswith(f"/{proj['slug']}/")
+
+
+# ---------------------------------------------------------------------------
+# render_locally / --open flag
+# ---------------------------------------------------------------------------
+
+
+class TestRenderLocally:
+    """--open / render_locally writes to a tmp dir for fast iteration —
+    no repo, no git, no push."""
+
+    @patch("scripts.preview_page_publish.generate_preview_page")
+    def test_writes_index_and_assets_to_target(self, mock_gen, tmp_path):
+        # Stub a tiny generator output
+        clip_src = tmp_path / "src_clip.mp4"
+        clip_src.write_bytes(b"video")
+        mock_gen.return_value = {
+            "html": "<html>preview</html>",
+            "assets": [{"src": clip_src, "dst_name": "clip_01.mp4"}],
+            "ep_dir": tmp_path,
+            "church_name": "Test",
+        }
+
+        target = tmp_path / "render"
+        index = pub.render_locally("test-slug", target)
+
+        assert index == target / "index.html"
+        assert index.read_text(encoding="utf-8") == "<html>preview</html>"
+        assert (target / "clip_01.mp4").exists()
+
+    @patch("scripts.preview_page_publish.subprocess.run")
+    def test_render_locally_does_not_run_git(self, mock_run, tmp_path):
+        with patch("scripts.preview_page_publish.generate_preview_page") as mock_gen:
+            mock_gen.return_value = {
+                "html": "<html></html>",
+                "assets": [],
+                "ep_dir": tmp_path,
+                "church_name": "Test",
+            }
+            pub.render_locally("test-slug", tmp_path / "render")
+        mock_run.assert_not_called()
+
+
+class TestOpenFlag:
+    """--open invokes webbrowser on the rendered file:// URL and skips
+    the entire publish/git pipeline."""
+
+    @patch("scripts.preview_page_publish.webbrowser.open")
+    @patch("scripts.preview_page_publish.generate_preview_page")
+    def test_open_flag_calls_webbrowser_with_file_uri(self, mock_gen, mock_browser):
+        mock_gen.return_value = {
+            "html": "<html>x</html>",
+            "assets": [],
+            "ep_dir": Path("."),
+            "church_name": "Test",
+        }
+        rc = pub.main(["test-slug", "--open"])
+        assert rc == 0
+        mock_browser.assert_called_once()
+        url = mock_browser.call_args.args[0]
+        assert url.startswith("file:///")
+        assert "test-slug" in url
+        assert url.endswith("index.html")
+
+    @patch("scripts.preview_page_publish.webbrowser.open")
+    @patch("scripts.preview_page_publish.subprocess.run")
+    @patch("scripts.preview_page_publish.generate_preview_page")
+    def test_open_flag_does_not_run_git_or_publish(
+        self, mock_gen, mock_subproc, mock_browser
+    ):
+        mock_gen.return_value = {
+            "html": "<html>x</html>",
+            "assets": [],
+            "ep_dir": Path("."),
+            "church_name": "Test",
+        }
+        pub.main(["test-slug", "--open"])
+        mock_subproc.assert_not_called()
+
+    def test_open_and_push_are_mutually_exclusive(self):
+        # argparse's mutually_exclusive_group raises SystemExit on conflict
+        with patch("scripts.preview_page_publish.generate_preview_page"):
+            try:
+                pub.main(["test-slug", "--open", "--push"])
+                assert False, "should have errored"
+            except SystemExit as e:
+                assert e.code != 0

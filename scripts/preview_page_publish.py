@@ -31,6 +31,8 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
+import webbrowser
 from pathlib import Path
 from typing import Optional
 
@@ -117,13 +119,36 @@ def _git_publish(repo_dir: Path, slug: str) -> None:
     run(["git", "-C", str(repo_dir), "push"])
 
 
+def render_locally(slug: str, target_dir: Path) -> Path:
+    """Render the preview page into `target_dir` and return the index.html path.
+
+    No git, no repo write, no push — for fast template iteration. Caller is
+    expected to point a browser at the returned path.
+    """
+    import shutil
+
+    result = generate_preview_page(slug)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    (target_dir / "index.html").write_text(result["html"], encoding="utf-8")
+    for asset in result["assets"]:
+        shutil.copy2(asset["src"], target_dir / asset["dst_name"])
+    return target_dir / "index.html"
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("slug", help="Prospect slug (matches clients/<slug>.yaml)")
-    ap.add_argument(
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument(
         "--push",
         action="store_true",
         help="git add + commit + push to deploy via Netlify",
+    )
+    mode.add_argument(
+        "--open",
+        action="store_true",
+        dest="open_local",
+        help="render to a tmp dir + open in default browser (no git, no repo write)",
     )
     ap.add_argument(
         "--repo-dir",
@@ -137,6 +162,24 @@ def main(argv: Optional[list[str]] = None) -> int:
         help=f"deployed base URL (default: {DEFAULT_BASE_URL})",
     )
     args = ap.parse_args(argv)
+
+    if args.open_local:
+        try:
+            tmp_dir = Path(tempfile.mkdtemp(prefix=f"preview-{args.slug}-"))
+            index = render_locally(args.slug, tmp_dir / args.slug)
+        except (FileNotFoundError, RuntimeError) as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 1
+        url = index.resolve().as_uri()
+        webbrowser.open(url)
+        print()
+        print("=" * 60)
+        print(f"LOCAL PREVIEW: {args.slug}")
+        print("=" * 60)
+        print(f"  Path: {index}")
+        print(f"  URL:  {url}")
+        print("  (opened in browser — no git, no deploy)")
+        return 0
 
     try:
         url = publish_preview_page(
