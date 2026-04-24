@@ -21,7 +21,7 @@ Environment:
     EPISODE_PREVIEWS_REPO  local path to the cloned previews repo
                            (default: ../episode-previews relative to project root)
     EPISODE_PREVIEW_BASE_URL  override the printed URL host
-                              (default: https://episodepreview.com)
+                              (default: https://episodespreview.com)
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ from logger import logger  # noqa: E402
 from scripts.preview_page_generator import generate_preview_page  # noqa: E402
 
 DEFAULT_REPO = _PROJECT_ROOT.parent / "episode-previews"
-DEFAULT_BASE_URL = "https://episodepreview.com"
+DEFAULT_BASE_URL = "https://episodespreview.com"
 
 
 def publish_preview_page(

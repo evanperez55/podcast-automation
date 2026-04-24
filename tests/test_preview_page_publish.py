@@ -46,7 +46,7 @@ class TestPublishLocally:
         url = pub.publish_preview_page(
             proj["slug"],
             repo_dir=repo,
-            base_url="https://episodepreview.com",
+            base_url="https://episodespreview.com",
             push=False,
             clients_dir=proj["clients_dir"],
             output_dir=proj["output_dir"],
@@ -56,7 +56,7 @@ class TestPublishLocally:
         assert (target / "index.html").exists()
         assert (target / "logo.png").exists()
         assert (target / "clip_01_topic.mp4").exists()
-        assert url == f"https://episodepreview.com/{proj['slug']}/"
+        assert url == f"https://episodespreview.com/{proj['slug']}/"
 
     def test_overwrites_previous_render(self, tmp_path):
         """Re-publishing the same slug must replace stale files, not pile them up."""
@@ -71,7 +71,7 @@ class TestPublishLocally:
         pub.publish_preview_page(
             proj["slug"],
             repo_dir=repo,
-            base_url="https://episodepreview.com",
+            base_url="https://episodespreview.com",
             push=False,
             clients_dir=proj["clients_dir"],
             output_dir=proj["output_dir"],
@@ -90,7 +90,7 @@ class TestPublishLocally:
         pub.publish_preview_page(
             proj["slug"],
             repo_dir=repo,
-            base_url="https://episodepreview.com",
+            base_url="https://episodespreview.com",
             push=False,
             clients_dir=proj["clients_dir"],
             output_dir=proj["output_dir"],
@@ -115,7 +115,7 @@ class TestGitPush:
         pub.publish_preview_page(
             proj["slug"],
             repo_dir=repo,
-            base_url="https://episodepreview.com",
+            base_url="https://episodespreview.com",
             push=True,
             clients_dir=proj["clients_dir"],
             output_dir=proj["output_dir"],
@@ -141,7 +141,7 @@ class TestGitPush:
         pub.publish_preview_page(
             proj["slug"],
             repo_dir=repo,
-            base_url="https://episodepreview.com",
+            base_url="https://episodespreview.com",
             push=True,
             clients_dir=proj["clients_dir"],
             output_dir=proj["output_dir"],
@@ -180,7 +180,7 @@ class TestGitPush:
         url = pub.publish_preview_page(
             proj["slug"],
             repo_dir=repo,
-            base_url="https://episodepreview.com",
+            base_url="https://episodespreview.com",
             push=True,
             clients_dir=proj["clients_dir"],
             output_dir=proj["output_dir"],
