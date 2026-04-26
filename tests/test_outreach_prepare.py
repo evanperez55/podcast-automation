@@ -97,6 +97,31 @@ class TestInjectDriveLink:
         assert "https://drive.google.com/xyz" in out
 
 
+class TestInjectPreviewLink:
+    def test_replaces_placeholder_with_url(self):
+        body = "Hey,\n\nLook:\n\n[PREVIEW URL]\n\nThanks"
+        out = op.inject_preview_link(body, "https://episodespreview.com/x/")
+        assert "https://episodespreview.com/x/" in out
+        assert "[PREVIEW URL]" not in out
+
+    def test_inserts_above_drive_link_when_no_preview_placeholder(self):
+        """No [PREVIEW URL] placeholder but a Drive placeholder exists —
+        preview line should land ABOVE the Drive link in the email so the
+        polished page is the first thing the prospect clicks."""
+        body = "Hey,\n\n[GOOGLE DRIVE LINK]\n\nThanks"
+        out = op.inject_preview_link(body, "https://episodespreview.com/x/")
+        assert "https://episodespreview.com/x/" in out
+        # Preview must appear before the Drive placeholder in the rendered body
+        assert out.index("episodespreview.com") < out.index("[GOOGLE DRIVE LINK]")
+
+    def test_prepends_when_no_placeholders_present(self):
+        """No placeholders at all — preview is inserted at the top of the body."""
+        body = "Hey,\n\nNo placeholders here.\n\nThanks"
+        out = op.inject_preview_link(body, "https://episodespreview.com/x/")
+        assert out.startswith("Preview")
+        assert "https://episodespreview.com/x/" in out
+
+
 # ---------------------------------------------------------------------------
 # Demo asset curation
 # ---------------------------------------------------------------------------
@@ -263,6 +288,10 @@ class TestPrepareOne:
         fake_gmail = MagicMock()
         fake_gmail.create_draft.return_value = "draft-1"
 
+        # Stub preview publishing — full preview flow has its own dedicated
+        # tests; here we just need it to not be the thing under test.
+        monkeypatch.setattr(op, "_publish_preview", lambda slug: None)
+
         result = op.prepare_one(
             "test-slug",
             drive=fake_drive,
@@ -318,6 +347,207 @@ class TestPrepareOne:
                 "nonexistent", drive=MagicMock(), gmail=MagicMock(), dry_run=True
             )
 
+    def test_preview_url_appears_above_drive_link_in_final_body(
+        self, tmp_path, monkeypatch
+    ):
+        """End-to-end ordering: in the final email body, the preview URL
+        must precede the Drive URL — the polished page is the lead, the
+        Drive folder is the backup. Regression test for the substitution
+        ordering bug where injecting Drive first would erase the only
+        anchor inject_preview_link could use to position itself."""
+        self._write_pitch(tmp_path)
+        self._write_ep(tmp_path)
+        monkeypatch.setattr(op, "DEMO_ROOT", tmp_path / "demo" / "church-vertical")
+        monkeypatch.setattr(op, "OUTPUT_ROOT", tmp_path / "output")
+
+        fake_drive = MagicMock()
+        fake_drive.upload_folder.return_value = (
+            "https://drive.google.com/drive/folders/abc"
+        )
+        fake_gmail = MagicMock()
+        fake_gmail.create_draft.return_value = "draft-order"
+
+        monkeypatch.setattr(
+            op,
+            "_publish_preview",
+            lambda slug: f"https://episodespreview.com/{slug}/",
+        )
+
+        op.prepare_one(
+            "test-slug",
+            drive=fake_drive,
+            gmail=fake_gmail,
+            dry_run=False,
+            skip_verify=True,
+        )
+
+        body = fake_gmail.create_draft.call_args.kwargs["body"]
+        preview_pos = body.index("episodespreview.com")
+        drive_pos = body.index("drive.google.com")
+        assert preview_pos < drive_pos, (
+            "preview URL must appear before Drive URL in the email body"
+        )
+
+    def test_publishes_preview_and_injects_url(self, tmp_path, monkeypatch):
+        """Default flow: prepare_one renders+pushes the preview page and
+        injects the URL into the email body alongside the Drive link."""
+        self._write_pitch(tmp_path)
+        self._write_ep(tmp_path)
+        monkeypatch.setattr(op, "DEMO_ROOT", tmp_path / "demo" / "church-vertical")
+        monkeypatch.setattr(op, "OUTPUT_ROOT", tmp_path / "output")
+
+        fake_drive = MagicMock()
+        fake_drive.upload_folder.return_value = (
+            "https://drive.google.com/drive/folders/abc"
+        )
+        fake_gmail = MagicMock()
+        fake_gmail.create_draft.return_value = "draft-2"
+
+        monkeypatch.setattr(
+            op,
+            "_publish_preview",
+            lambda slug: f"https://episodespreview.com/{slug}/",
+        )
+
+        result = op.prepare_one(
+            "test-slug",
+            drive=fake_drive,
+            gmail=fake_gmail,
+            dry_run=False,
+            skip_verify=True,
+        )
+
+        assert result["preview_url"] == "https://episodespreview.com/test-slug/"
+        body = fake_gmail.create_draft.call_args.kwargs["body"]
+        assert "https://episodespreview.com/test-slug/" in body
+        assert "https://drive.google.com/drive/folders/abc" in body
+
+    def test_preview_failure_falls_back_to_drive_only(self, tmp_path, monkeypatch):
+        """If preview publish fails (returns None), prepare_one continues
+        with a Drive-only package — must not lose the prospect to a
+        previews-repo issue."""
+        self._write_pitch(tmp_path)
+        self._write_ep(tmp_path)
+        monkeypatch.setattr(op, "DEMO_ROOT", tmp_path / "demo" / "church-vertical")
+        monkeypatch.setattr(op, "OUTPUT_ROOT", tmp_path / "output")
+
+        fake_drive = MagicMock()
+        fake_drive.upload_folder.return_value = (
+            "https://drive.google.com/drive/folders/abc"
+        )
+        fake_gmail = MagicMock()
+        fake_gmail.create_draft.return_value = "draft-3"
+
+        monkeypatch.setattr(op, "_publish_preview", lambda slug: None)
+
+        result = op.prepare_one(
+            "test-slug",
+            drive=fake_drive,
+            gmail=fake_gmail,
+            dry_run=False,
+            skip_verify=True,
+        )
+
+        assert result["preview_url"] is None
+        body = fake_gmail.create_draft.call_args.kwargs["body"]
+        assert "https://drive.google.com/drive/folders/abc" in body
+        # Still has Drive link; preview line/url must NOT appear
+        assert "episodespreview.com" not in body
+
+    def test_publish_preview_disabled_skips_render(self, tmp_path, monkeypatch):
+        """publish_preview=False short-circuits — _publish_preview not called."""
+        self._write_pitch(tmp_path)
+        self._write_ep(tmp_path)
+        monkeypatch.setattr(op, "DEMO_ROOT", tmp_path / "demo" / "church-vertical")
+        monkeypatch.setattr(op, "OUTPUT_ROOT", tmp_path / "output")
+
+        fake_drive = MagicMock()
+        fake_drive.upload_folder.return_value = (
+            "https://drive.google.com/drive/folders/abc"
+        )
+        fake_gmail = MagicMock()
+        fake_gmail.create_draft.return_value = "draft-4"
+
+        publish_calls = []
+        monkeypatch.setattr(
+            op,
+            "_publish_preview",
+            lambda slug: publish_calls.append(slug) or "should-not-appear",
+        )
+
+        result = op.prepare_one(
+            "test-slug",
+            drive=fake_drive,
+            gmail=fake_gmail,
+            dry_run=False,
+            skip_verify=True,
+            publish_preview=False,
+        )
+
+        assert publish_calls == [], "preview must not be rendered when disabled"
+        assert result["preview_url"] is None
+
+    def test_existing_preview_url_skips_publish(self, tmp_path, monkeypatch):
+        """preview_url= recovery: skip render+push, use the provided URL."""
+        self._write_pitch(tmp_path)
+        self._write_ep(tmp_path)
+        monkeypatch.setattr(op, "DEMO_ROOT", tmp_path / "demo" / "church-vertical")
+        monkeypatch.setattr(op, "OUTPUT_ROOT", tmp_path / "output")
+
+        fake_drive = MagicMock()
+        fake_drive.upload_folder.return_value = (
+            "https://drive.google.com/drive/folders/abc"
+        )
+        fake_gmail = MagicMock()
+        fake_gmail.create_draft.return_value = "draft-5"
+
+        publish_calls = []
+        monkeypatch.setattr(
+            op,
+            "_publish_preview",
+            lambda slug: publish_calls.append(slug) or "should-not-appear",
+        )
+
+        existing = "https://episodespreview.com/test-slug/"
+        result = op.prepare_one(
+            "test-slug",
+            drive=fake_drive,
+            gmail=fake_gmail,
+            dry_run=False,
+            skip_verify=True,
+            preview_url=existing,
+        )
+
+        assert publish_calls == [], "publish must be skipped when preview_url given"
+        assert result["preview_url"] == existing
+        body = fake_gmail.create_draft.call_args.kwargs["body"]
+        assert existing in body
+
+    def test_dry_run_does_not_publish_preview(self, tmp_path, monkeypatch):
+        """Dry-run must not push to the previews repo (no git side effects)."""
+        self._write_pitch(tmp_path)
+        self._write_ep(tmp_path)
+        monkeypatch.setattr(op, "DEMO_ROOT", tmp_path / "demo" / "church-vertical")
+        monkeypatch.setattr(op, "OUTPUT_ROOT", tmp_path / "output")
+
+        fake_gmail = MagicMock()
+        fake_gmail.create_draft.return_value = "DRY_RUN"
+
+        publish_calls = []
+        monkeypatch.setattr(
+            op,
+            "_publish_preview",
+            lambda slug: publish_calls.append(slug) or "should-not-appear",
+        )
+
+        op.prepare_one(
+            "test-slug",
+            drive=MagicMock(),
+            gmail=fake_gmail,
+            dry_run=True,
+        )
+        assert publish_calls == [], "dry-run must not touch the previews repo"
+
     def test_existing_drive_link_skips_upload(self, tmp_path, monkeypatch):
         """Recovery path: if the Drive upload already happened on a prior run,
         pass drive_link= to skip re-upload and only create the Gmail draft."""
@@ -329,6 +559,9 @@ class TestPrepareOne:
         fake_drive = MagicMock()
         fake_gmail = MagicMock()
         fake_gmail.create_draft.return_value = "draft-99"
+
+        # Stub preview publish so this recovery test stays focused on Drive.
+        monkeypatch.setattr(op, "_publish_preview", lambda slug: None)
 
         existing_link = "https://drive.google.com/drive/folders/PRE_EXISTING"
         result = op.prepare_one(

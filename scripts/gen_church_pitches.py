@@ -174,7 +174,9 @@ I listened to "{{{{SERMON_TITLE}}}}" this week - {{{{SPECIFIC_MOMENT_REFERENCE}}
 
 I ran it through my automation pipeline and here's what came out in about 5 minutes - no manual editing:
 
-[GOOGLE DRIVE LINK]
+[PREVIEW URL]
+
+Or grab the raw files here: [GOOGLE DRIVE LINK]
 
 Inside you'll find:
 - {{{{NUM_CLIPS}}}} vertical clips with burned-in subtitles (ready for YouTube Shorts / Instagram Reels)
@@ -230,7 +232,7 @@ Evan
 - [ ] Fill in all `{{{{}}}}` placeholders above using analysis output
 - [ ] Find {pastor_name} contact email ({contact_hint})
 - [ ] Upload clip `*_subtitle.mp4` files + blog post + thumbnail + quote cards to Google Drive
-- [ ] Get shareable Drive link, replace `[GOOGLE DRIVE LINK]` above
+- [ ] `outreach_prepare.py` substitutes both `[PREVIEW URL]` and `[GOOGLE DRIVE LINK]` automatically — no manual edit needed for either
 - [ ] Get per-clip direct links, replace `[direct link]` entries in follow-up
 - [ ] Update outreach tracker with email: `uv run main.py outreach update {slug} contact_email=<email>`
 - [ ] Send Tue-Thu morning (10am-2pm ET for best B2B open rates)

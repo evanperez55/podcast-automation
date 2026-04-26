@@ -43,6 +43,7 @@ OUTPUT_ROOT = Config.BASE_DIR / "output"
 EMAIL_PATTERN = re.compile(r"\*\*EMAIL:\s*([^\s*]+)\s*\*\*", re.IGNORECASE)
 SUBJECT_PATTERN = re.compile(r"^\s*\*\*Subject:\*\*\s*(.+?)\s*$", re.MULTILINE)
 DRIVE_LINK_PLACEHOLDER = "[GOOGLE DRIVE LINK]"
+PREVIEW_URL_PLACEHOLDER = "[PREVIEW URL]"
 
 
 def parse_pitch(pitch_path: Path) -> dict:
@@ -84,6 +85,25 @@ def inject_drive_link(body: str, url: str) -> str:
         return body.replace(DRIVE_LINK_PLACEHOLDER, url)
     # Fallback: prepend so prospect sees it above the fold
     return f"{body}\n\nDrive folder: {url}"
+
+
+def inject_preview_link(body: str, url: str) -> str:
+    """Replace the preview-URL placeholder, or insert near the top if missing.
+
+    The preview page is the "show, don't tell" hook — a hosted, branded page
+    with embedded clips. We want it to appear ABOVE the Drive link in the
+    email, since most prospects will click the polished page first.
+    """
+    if PREVIEW_URL_PLACEHOLDER in body:
+        return body.replace(PREVIEW_URL_PLACEHOLDER, url)
+    # Fallback: insert a "Preview:" line before any Drive link reference,
+    # or before the first blank line if no Drive link is present.
+    insert = f"Preview (clips embedded, no download needed): {url}"
+    if DRIVE_LINK_PLACEHOLDER in body:
+        return body.replace(
+            DRIVE_LINK_PLACEHOLDER, f"{insert}\n\n{DRIVE_LINK_PLACEHOLDER}"
+        )
+    return f"{insert}\n\n{body}"
 
 
 # ---------------------------------------------------------------------------
@@ -400,6 +420,33 @@ def _clean_clip_name(asset: Path, existing_in_staging: list) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _publish_preview(slug: str) -> Optional[str]:
+    """Render the preview page and push it to the previews repo.
+
+    Returns the public URL on success, None on any failure (caller logs and
+    continues without a preview URL — the Drive package alone is still a
+    valid send). Soft-failure is intentional: a transient git push error or
+    a missing previews repo should not lose the prospect.
+    """
+    try:
+        from scripts.preview_page_publish import (
+            DEFAULT_BASE_URL,
+            DEFAULT_REPO,
+            publish_preview_page,
+        )
+
+        return publish_preview_page(
+            slug, repo_dir=DEFAULT_REPO, base_url=DEFAULT_BASE_URL, push=True
+        )
+    except Exception as e:
+        logger.warning(
+            "preview page publish failed for %s: %s — sending Drive-only package",
+            slug,
+            e,
+        )
+        return None
+
+
 def prepare_one(
     slug: str,
     drive=None,
@@ -407,8 +454,10 @@ def prepare_one(
     dry_run: bool = False,
     drive_link: Optional[str] = None,
     skip_verify: bool = False,
+    publish_preview: bool = True,
+    preview_url: Optional[str] = None,
 ) -> dict:
-    """Do one prospect end-to-end. Returns {draft_id, drive_link, pitch_path}.
+    """Do one prospect end-to-end. Returns {draft_id, drive_link, preview_url, pitch_path}.
 
     `drive` and `gmail` are injected for testability. In real CLI use, the
     main() wrapper instantiates DriveUploader + GmailSender.
@@ -417,6 +466,10 @@ def prepare_one(
     link is used directly. Use this to recover from a partial failure where
     the upload succeeded but the Gmail draft did not (e.g. Gmail API quota
     or enablement propagation) — avoids re-uploading the demo package.
+
+    If `preview_url` is provided, the preview page render+push is skipped and
+    the given URL is used directly. If `publish_preview` is False, no preview
+    URL is generated or injected at all (Drive-only package).
 
     Before the upload, runs the pre-upload verification battery (filename
     hygiene, clip count, duration window, logo-bleed fingerprint). Any ERROR
@@ -480,7 +533,17 @@ def prepare_one(
             else:
                 logger.info("post-upload public-access check passed for %s", slug)
 
-    body_with_link = inject_drive_link(parsed["body"], drive_link)
+    if publish_preview and not preview_url and not dry_run:
+        preview_url = _publish_preview(slug)
+
+    # Order matters: inject preview FIRST so its placeholder fallback can find
+    # [GOOGLE DRIVE LINK] and insert the preview line above it. Once Drive is
+    # substituted, that anchor is gone and the fallback would prepend to the
+    # whole email instead.
+    body_with_link = parsed["body"]
+    if preview_url:
+        body_with_link = inject_preview_link(body_with_link, preview_url)
+    body_with_link = inject_drive_link(body_with_link, drive_link)
 
     draft_id = gmail.create_draft(
         to=parsed["email"],
@@ -494,6 +557,7 @@ def prepare_one(
         "slug": slug,
         "draft_id": draft_id,
         "drive_link": drive_link,
+        "preview_url": preview_url,
         "pitch_path": str(pitch_path),
     }
 
@@ -511,6 +575,18 @@ def main() -> int:
         default=None,
         help="Skip Drive upload and use this existing folder URL. Use when a "
         "prior run uploaded to Drive but failed at the Gmail step.",
+    )
+    ap.add_argument(
+        "--preview-url",
+        default=None,
+        help="Skip preview page render+push and use this existing URL. "
+        "Mirrors --drive-link for recovery from a partial failure.",
+    )
+    ap.add_argument(
+        "--no-preview",
+        action="store_true",
+        help="Don't render or include a preview page URL — Drive-only "
+        "package. Use when the previews repo isn't reachable.",
     )
     args = ap.parse_args()
 
@@ -534,6 +610,8 @@ def main() -> int:
         gmail=gmail,
         dry_run=args.dry_run,
         drive_link=args.drive_link,
+        publish_preview=not args.no_preview,
+        preview_url=args.preview_url,
     )
 
     print()
@@ -542,6 +620,8 @@ def main() -> int:
     print("=" * 60)
     print(f"  Draft ID:   {result['draft_id']}")
     print(f"  Drive link: {result['drive_link']}")
+    if result.get("preview_url"):
+        print(f"  Preview:    {result['preview_url']}")
     print(f"  Pitch:      {result['pitch_path']}")
     print()
     print("Next: open Gmail -> Drafts, review the draft, send manually.")
