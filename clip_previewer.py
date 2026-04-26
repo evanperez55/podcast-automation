@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -30,6 +31,15 @@ class ClipPreviewer:
         if self.auto_approve:
             logger.info("Auto-approving all %d clips", len(clip_paths))
             return list(range(len(clip_paths)))
+
+        # B018: refuse to call input() when stdin is not a TTY (background runs,
+        # batch runners, CI). Surface an actionable message instead of an
+        # uncaught EOFError mid-pipeline.
+        if not sys.stdin.isatty():
+            raise RuntimeError(
+                "Clip approval is interactive but stdin is not a TTY. "
+                "Re-run with --auto-approve, or run from a terminal."
+            )
 
         skipped: set[int] = set()
 

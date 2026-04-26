@@ -2,6 +2,8 @@
 
 from unittest.mock import patch
 
+import pytest
+
 from clip_previewer import ClipPreviewer
 
 CLIP_PATHS = ["/path/clip1.wav", "/path/clip2.wav", "/path/clip3.wav"]
@@ -32,23 +34,31 @@ class TestAutoApprove:
         assert result == [0, 1, 2]
 
 
+@pytest.fixture
+def fake_tty():
+    """Pretend stdin is a TTY so the B018 guard lets interactive tests run."""
+    with patch("clip_previewer.sys.stdin") as stdin:
+        stdin.isatty.return_value = True
+        yield stdin
+
+
 class TestInteractivePreview:
     @patch("builtins.input", return_value="A")
-    def test_approve_all_interactive(self, mock_input):
+    def test_approve_all_interactive(self, mock_input, fake_tty):
         """Typing 'A' approves all clips."""
         previewer = ClipPreviewer(auto_approve=False)
         result = previewer.preview_clips(CLIP_PATHS, CLIP_INFO)
         assert result == [0, 1, 2]
 
     @patch("builtins.input", return_value="Q")
-    def test_quit_returns_empty(self, mock_input):
+    def test_quit_returns_empty(self, mock_input, fake_tty):
         """Typing 'Q' quits and returns an empty list."""
         previewer = ClipPreviewer(auto_approve=False)
         result = previewer.preview_clips(CLIP_PATHS, CLIP_INFO)
         assert result == []
 
     @patch("builtins.input", side_effect=["S2", "A"])
-    def test_skip_and_approve(self, mock_input):
+    def test_skip_and_approve(self, mock_input, fake_tty):
         """Skipping clip 2 then approving returns [0, 2]."""
         previewer = ClipPreviewer(auto_approve=False)
         result = previewer.preview_clips(CLIP_PATHS, CLIP_INFO)
@@ -56,12 +66,31 @@ class TestInteractivePreview:
 
     @patch("builtins.input", side_effect=["P1", "A"])
     @patch("clip_previewer.subprocess.Popen")
-    def test_play_then_approve(self, mock_popen, mock_input):
+    def test_play_then_approve(self, mock_popen, mock_input, fake_tty):
         """Playing clip 1 then approving returns all indices."""
         previewer = ClipPreviewer(auto_approve=False)
         result = previewer.preview_clips(CLIP_PATHS, CLIP_INFO)
         assert result == [0, 1, 2]
         mock_popen.assert_called_once()
+
+
+class TestNonTTYGuard:
+    """B018: refuse to call input() when stdin is not a TTY."""
+
+    def test_non_tty_raises_actionable_error(self):
+        """Background runs (no TTY) get a clear error pointing at --auto-approve."""
+        with patch("clip_previewer.sys.stdin") as stdin:
+            stdin.isatty.return_value = False
+            previewer = ClipPreviewer(auto_approve=False)
+            with pytest.raises(RuntimeError, match="--auto-approve"):
+                previewer.preview_clips(CLIP_PATHS, CLIP_INFO)
+
+    def test_non_tty_with_auto_approve_still_works(self):
+        """auto_approve=True bypasses the TTY check entirely."""
+        with patch("clip_previewer.sys.stdin") as stdin:
+            stdin.isatty.return_value = False
+            previewer = ClipPreviewer(auto_approve=True)
+            assert previewer.preview_clips(CLIP_PATHS, CLIP_INFO) == [0, 1, 2]
 
 
 class TestParseIndex:

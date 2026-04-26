@@ -310,23 +310,45 @@ def _load_scored_topics():
 
 
 def _acquire_pipeline_lock():
-    """Acquire exclusive pipeline lock. Returns True if acquired, False if another run is active."""
+    """Acquire exclusive pipeline lock. Returns True if acquired, False if another run is active.
+
+    Uses O_CREAT|O_EXCL for atomic create — eliminates the TOCTOU race where two
+    processes both observed `not exists()` and both wrote their PIDs (B017).
+    """
     lock_path = Config.OUTPUT_DIR / ".pipeline_lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    if lock_path.exists():
+
+    for _ in range(2):
         try:
-            old_pid = int(lock_path.read_text().strip())
+            fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
             try:
-                os.kill(old_pid, 0)  # signal 0 = check existence
-                return False  # process is still running
+                os.write(fd, str(os.getpid()).encode())
+            finally:
+                os.close(fd)
+            return True
+        except FileExistsError:
+            try:
+                old_pid = int(lock_path.read_text().strip())
+            except (ValueError, OSError):
+                logger.warning("Invalid lock file, removing")
+                try:
+                    lock_path.unlink()
+                except OSError:
+                    pass
+                continue
+            try:
+                os.kill(old_pid, 0)
+                return False
             except OSError:
                 logger.warning(
                     "Stale lock file found (PID %d not running), removing", old_pid
                 )
-        except (ValueError, OSError):
-            logger.warning("Invalid lock file, removing")
-    lock_path.write_text(str(os.getpid()))
-    return True
+                try:
+                    lock_path.unlink()
+                except OSError:
+                    pass
+                continue
+    return False
 
 
 def _release_pipeline_lock():

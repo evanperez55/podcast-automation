@@ -1170,5 +1170,96 @@ class TestCollectEpisodeAnalytics:
         mock_collector.append_to_engagement_history.assert_called_once()
 
 
+# ---------------------------------------------------------------------------
+# _acquire_pipeline_lock / _release_pipeline_lock (B017)
+# ---------------------------------------------------------------------------
+class TestPipelineLock:
+    """Tests for atomic pipeline lock acquisition (B017)."""
+
+    def test_acquire_succeeds_when_no_lock(self, tmp_path, monkeypatch):
+        """First acquirer wins when no lock file exists."""
+        from pipeline import runner
+
+        monkeypatch.setattr(runner.Config, "OUTPUT_DIR", tmp_path)
+        assert runner._acquire_pipeline_lock() is True
+        assert (tmp_path / ".pipeline_lock").exists()
+        runner._release_pipeline_lock()
+
+    def test_acquire_fails_when_live_lock_exists(self, tmp_path, monkeypatch):
+        """Second acquirer is rejected while first holder is alive."""
+        import os
+
+        from pipeline import runner
+
+        monkeypatch.setattr(runner.Config, "OUTPUT_DIR", tmp_path)
+        (tmp_path / ".pipeline_lock").write_text(str(os.getpid()))
+        assert runner._acquire_pipeline_lock() is False
+        runner._release_pipeline_lock()
+
+    def test_acquire_clears_stale_lock(self, tmp_path, monkeypatch):
+        """A lock owned by a non-existent PID is treated as stale and reclaimed."""
+        from pipeline import runner
+
+        monkeypatch.setattr(runner.Config, "OUTPUT_DIR", tmp_path)
+        # PID that almost certainly doesn't exist
+        (tmp_path / ".pipeline_lock").write_text("999999")
+        assert runner._acquire_pipeline_lock() is True
+        runner._release_pipeline_lock()
+
+    def test_acquire_handles_invalid_lock_contents(self, tmp_path, monkeypatch):
+        """A lock file with non-numeric contents is treated as invalid and reclaimed."""
+        from pipeline import runner
+
+        monkeypatch.setattr(runner.Config, "OUTPUT_DIR", tmp_path)
+        (tmp_path / ".pipeline_lock").write_text("not-a-pid")
+        assert runner._acquire_pipeline_lock() is True
+        runner._release_pipeline_lock()
+
+    def test_acquire_is_atomic_under_simulated_race(self, tmp_path, monkeypatch):
+        """Two threads racing for the lock — exactly one acquires it.
+
+        Reproduces the B017 TOCTOU window: prior implementation could see
+        `not exists()` from both callers and both write their PID. With
+        O_CREAT|O_EXCL only one wins.
+        """
+        import threading
+
+        from pipeline import runner
+
+        monkeypatch.setattr(runner.Config, "OUTPUT_DIR", tmp_path)
+        results = []
+        barrier = threading.Barrier(8)
+
+        def acquire():
+            barrier.wait()
+            results.append(runner._acquire_pipeline_lock())
+
+        threads = [threading.Thread(target=acquire) for _ in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert sum(1 for r in results if r is True) == 1
+        runner._release_pipeline_lock()
+
+    def test_release_removes_lock(self, tmp_path, monkeypatch):
+        """Release deletes the lock file."""
+        from pipeline import runner
+
+        monkeypatch.setattr(runner.Config, "OUTPUT_DIR", tmp_path)
+        runner._acquire_pipeline_lock()
+        runner._release_pipeline_lock()
+        assert not (tmp_path / ".pipeline_lock").exists()
+
+    def test_release_is_idempotent(self, tmp_path, monkeypatch):
+        """Release on a missing lock file does not raise."""
+        from pipeline import runner
+
+        monkeypatch.setattr(runner.Config, "OUTPUT_DIR", tmp_path)
+        runner._release_pipeline_lock()  # no lock yet
+        runner._release_pipeline_lock()  # still no lock — should be a no-op
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
