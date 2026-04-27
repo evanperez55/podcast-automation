@@ -158,10 +158,14 @@ class RSSEpisodeFetcher:
         return self.fetch_episode(rss_url, index=0)
 
     def fetch_episode(self, rss_url: str, index: int = 0) -> EpisodeMeta:
-        """Fetch metadata for the episode at *index* (0 = most recent).
+        """Fetch metadata for the episode at *index* (0 = most recent with audio).
 
-        Entries are sorted by published_parsed descending before indexing so
-        that both oldest-first and newest-first feeds are handled uniformly.
+        Entries are sorted by published_parsed descending, then filtered to
+        only those carrying an audio enclosure, before indexing. Some feeds
+        (especially WordPress `/category/sermons/feed/` style) intermix
+        non-audio announcement posts with sermon audio; this skip-and-continue
+        behavior lets index=0 always land on the most recent actual sermon
+        rather than crashing on a vision-statement post that lacks audio.
 
         Args:
             rss_url: URL or local path to the RSS feed XML.
@@ -200,15 +204,36 @@ class RSSEpisodeFetcher:
             reverse=True,
         )
 
-        entry = sorted_entries[index]
-
-        # Require an audio enclosure
-        enclosures = getattr(entry, "enclosures", [])
-        if not enclosures:
-            raise ValueError(
-                f"No audio enclosure found in entry '{getattr(entry, 'title', '?')}'"
+        # Filter out non-audio entries before indexing. Some church feeds
+        # (e.g. parkchurch.org/category/sermons/feed/) interleave vision
+        # statements / blog posts that have no enclosure. Without this filter,
+        # index=0 would crash whenever the latest item happens to be one of
+        # those, even though there's a valid sermon at index=1.
+        audio_entries = [e for e in sorted_entries if getattr(e, "enclosures", None)]
+        skipped = len(sorted_entries) - len(audio_entries)
+        if skipped > 0:
+            skipped_titles = [
+                getattr(e, "title", "?")
+                for e in sorted_entries
+                if not getattr(e, "enclosures", None)
+            ]
+            logger.info(
+                "Skipped %d non-audio entries: %s",
+                skipped,
+                skipped_titles[:3],
             )
-        audio_url: str = enclosures[0]["url"]
+
+        if not audio_entries:
+            raise ValueError(f"No entries with audio enclosures in RSS feed: {rss_url}")
+
+        if index >= len(audio_entries):
+            raise ValueError(
+                f"Index {index} out of range — only {len(audio_entries)} "
+                f"audio entries available (total feed entries: {len(sorted_entries)})"
+            )
+
+        entry = audio_entries[index]
+        audio_url: str = entry.enclosures[0]["url"]
 
         # Episode number: iTunes tag first, then filename fallback
         itunes_episode_raw = entry.get("itunes_episode")

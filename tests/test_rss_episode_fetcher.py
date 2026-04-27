@@ -278,8 +278,10 @@ class TestFetchLatestErrors:
             with pytest.raises(ValueError, match="[Nn]o entries"):
                 fetcher.fetch_latest("https://example.com/empty-feed.xml")
 
-    def test_raises_when_no_enclosure(self, fetcher):
-        """fetch_latest raises ValueError when entry has no audio enclosure."""
+    def test_raises_when_no_audio_entries_at_all(self, fetcher):
+        """fetch_latest raises ValueError when EVERY entry lacks an enclosure
+        (e.g. a feed of pure announcement posts). The message refers to the
+        feed-level absence, not a single entry."""
         entry = _make_feed_entry(
             title="No Enclosure Episode",
             enclosure_url="https://example.com/audio/ep.mp3",
@@ -288,8 +290,88 @@ class TestFetchLatestErrors:
         entry.enclosures = []  # strip enclosures
         feed = _make_parsed_feed([entry])
         with patch("rss_episode_fetcher.feedparser.parse", return_value=feed):
-            with pytest.raises(ValueError, match="[Nn]o audio enclosure"):
+            with pytest.raises(ValueError, match="No entries with audio"):
                 fetcher.fetch_latest("https://example.com/feed.xml")
+
+    def test_skips_non_audio_entries_picks_next_with_audio(self, fetcher):
+        """Real-world case: WordPress /category/sermons/feed/ feeds that
+        intermix vision-statement / announcement posts (no audio) with
+        actual sermon audio. fetch_latest must skip the non-audio entry
+        and return the most recent entry that DOES have audio.
+
+        Regression: park-church-denver in batch2_wed/2026-04-27 — the latest
+        feed entry was 'Revisiting our Two-Year Vision for Park Church' with
+        no enclosure. Pre-fix, this crashed the entire pipeline at step 1.
+        """
+        # Newest entry has no audio (vision statement)
+        announcement = _make_feed_entry(
+            title="Vision Statement (no audio)",
+            enclosure_url="https://example.com/ignored.mp3",
+            pub_parsed=(2026, 4, 27, 10, 0, 0, 0, 0, 0),
+        )
+        announcement.enclosures = []  # strip
+        # Older entry IS a sermon
+        sermon = _make_feed_entry(
+            title="Actual Sermon",
+            enclosure_url="https://example.com/audio/sermon.mp3",
+            pub_parsed=(2026, 4, 20, 10, 0, 0, 0, 0, 0),
+        )
+        feed = _make_parsed_feed([announcement, sermon])
+        with patch("rss_episode_fetcher.feedparser.parse", return_value=feed):
+            meta = fetcher.fetch_latest("https://example.com/feed.xml")
+
+        assert meta.title == "Actual Sermon"
+        assert meta.audio_url == "https://example.com/audio/sermon.mp3"
+
+    def test_index_skips_non_audio_entries(self, fetcher):
+        """index=0/1 should index into the audio-only subset, not the raw
+        entry list. So if the feed is [announcement, sermon_A, sermon_B],
+        index=0 returns sermon_A and index=1 returns sermon_B."""
+        announcement = _make_feed_entry(
+            title="Announcement",
+            enclosure_url="https://example.com/ignored.mp3",
+            pub_parsed=(2026, 4, 27, 10, 0, 0, 0, 0, 0),
+        )
+        announcement.enclosures = []
+        sermon_a = _make_feed_entry(
+            title="Sermon A",
+            enclosure_url="https://example.com/audio/a.mp3",
+            pub_parsed=(2026, 4, 20, 10, 0, 0, 0, 0, 0),
+        )
+        sermon_b = _make_feed_entry(
+            title="Sermon B",
+            enclosure_url="https://example.com/audio/b.mp3",
+            pub_parsed=(2026, 4, 13, 10, 0, 0, 0, 0, 0),
+        )
+        feed = _make_parsed_feed([announcement, sermon_a, sermon_b])
+        with patch("rss_episode_fetcher.feedparser.parse", return_value=feed):
+            assert (
+                fetcher.fetch_episode("https://example.com/feed.xml", index=0).title
+                == "Sermon A"
+            )
+            assert (
+                fetcher.fetch_episode("https://example.com/feed.xml", index=1).title
+                == "Sermon B"
+            )
+
+    def test_index_out_of_range_raises_with_clear_message(self, fetcher):
+        """If the audio-only subset is smaller than the requested index,
+        the error must mention BOTH counts so the operator understands why."""
+        announcement = _make_feed_entry(
+            title="Announcement",
+            enclosure_url="https://example.com/ignored.mp3",
+            pub_parsed=(2026, 4, 27, 10, 0, 0, 0, 0, 0),
+        )
+        announcement.enclosures = []
+        sermon = _make_feed_entry(
+            title="Sermon",
+            enclosure_url="https://example.com/audio/s.mp3",
+            pub_parsed=(2026, 4, 20, 10, 0, 0, 0, 0, 0),
+        )
+        feed = _make_parsed_feed([announcement, sermon])
+        with patch("rss_episode_fetcher.feedparser.parse", return_value=feed):
+            with pytest.raises(ValueError, match="out of range"):
+                fetcher.fetch_episode("https://example.com/feed.xml", index=5)
 
 
 # ---------------------------------------------------------------------------
