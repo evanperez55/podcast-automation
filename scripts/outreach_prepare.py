@@ -457,6 +457,7 @@ def prepare_one(
     publish_preview: bool = True,
     preview_url: Optional[str] = None,
     autofill: bool = True,
+    folder_date: Optional[str] = None,
 ) -> dict:
     """Do one prospect end-to-end. Returns {draft_id, drive_link, preview_url, pitch_path}.
 
@@ -545,7 +546,13 @@ def prepare_one(
             with tempfile.TemporaryDirectory() as td:
                 staging = Path(td) / f"{slug}-demo"
                 _stage_assets(ep_dir, staging)
-                drive_link = drive.upload_folder(staging, folder_name=f"{slug} - Demo")
+                # Date prefix on Drive folder name makes batches sortable in Drive UI.
+                # Without folder_date, fall back to the legacy "<slug> - Demo" form
+                # so prior runs and existing tests don't break.
+                folder_name = (
+                    f"{folder_date} - {slug}" if folder_date else f"{slug} - Demo"
+                )
+                drive_link = drive.upload_folder(staging, folder_name=folder_name)
 
             # Post-upload smoke test: confirm the URL is actually publicly
             # accessible (catches Workspace policy gaps + permission races
@@ -623,7 +630,20 @@ def main() -> int:
         "analysis.json. Use when you've manually edited the PITCH and don't "
         "want the auto-fill to overwrite custom moment/why text.",
     )
+    ap.add_argument(
+        "--date-tag",
+        default=None,
+        help="Prefix the Drive folder name with this date, format 'YYYY-MM-DD' "
+        "or the literal 'today'. Makes batches sortable in Drive UI. Without "
+        "this flag, the legacy '<slug> - Demo' name is used.",
+    )
     args = ap.parse_args()
+
+    folder_date = args.date_tag
+    if folder_date == "today":
+        from datetime import date as _date
+
+        folder_date = _date.today().isoformat()
 
     if args.dry_run:
         drive = None
@@ -648,6 +668,7 @@ def main() -> int:
         publish_preview=not args.no_preview,
         preview_url=args.preview_url,
         autofill=not args.no_autofill,
+        folder_date=folder_date,
     )
 
     print()

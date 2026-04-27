@@ -317,6 +317,63 @@ class TestPrepareOne:
         assert "https://drive.google.com/drive/folders/abc" in gmail_kwargs["body"]
         assert "[GOOGLE DRIVE LINK]" not in gmail_kwargs["body"]
 
+    def test_folder_date_prefixes_drive_folder_name(self, tmp_path, monkeypatch):
+        """When folder_date is set, the Drive folder gets a date prefix so
+        batches sort cleanly in the Drive UI ('2026-04-29 - <slug>'). Without
+        folder_date, the legacy '<slug> - Demo' name is used (backward compat
+        for existing prospects)."""
+        self._write_pitch(tmp_path)
+        self._write_ep(tmp_path)
+        monkeypatch.setattr(op, "DEMO_ROOT", tmp_path / "demo" / "church-vertical")
+        monkeypatch.setattr(op, "OUTPUT_ROOT", tmp_path / "output")
+        monkeypatch.setattr(op, "_publish_preview", lambda slug: None)
+
+        fake_drive = MagicMock()
+        fake_drive.upload_folder.return_value = (
+            "https://drive.google.com/drive/folders/x"
+        )
+        fake_gmail = MagicMock()
+        fake_gmail.create_draft.return_value = "draft-fd"
+
+        op.prepare_one(
+            "test-slug",
+            drive=fake_drive,
+            gmail=fake_gmail,
+            dry_run=False,
+            skip_verify=True,
+            folder_date="2026-04-29",
+        )
+
+        upload_kwargs = fake_drive.upload_folder.call_args.kwargs
+        assert upload_kwargs["folder_name"] == "2026-04-29 - test-slug"
+
+    def test_no_folder_date_keeps_legacy_demo_suffix(self, tmp_path, monkeypatch):
+        """Backward compat: without folder_date, name is '<slug> - Demo'."""
+        self._write_pitch(tmp_path)
+        self._write_ep(tmp_path)
+        monkeypatch.setattr(op, "DEMO_ROOT", tmp_path / "demo" / "church-vertical")
+        monkeypatch.setattr(op, "OUTPUT_ROOT", tmp_path / "output")
+        monkeypatch.setattr(op, "_publish_preview", lambda slug: None)
+
+        fake_drive = MagicMock()
+        fake_drive.upload_folder.return_value = (
+            "https://drive.google.com/drive/folders/y"
+        )
+        fake_gmail = MagicMock()
+        fake_gmail.create_draft.return_value = "draft-legacy"
+
+        op.prepare_one(
+            "test-slug",
+            drive=fake_drive,
+            gmail=fake_gmail,
+            dry_run=False,
+            skip_verify=True,
+            # folder_date intentionally omitted
+        )
+
+        upload_kwargs = fake_drive.upload_folder.call_args.kwargs
+        assert upload_kwargs["folder_name"] == "test-slug - Demo"
+
     def test_dry_run_skips_both_network_calls(self, tmp_path, monkeypatch):
         self._write_pitch(tmp_path)
         self._write_ep(tmp_path)
