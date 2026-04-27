@@ -241,6 +241,47 @@ class TestVerifyOneIntegration:
     @patch("scripts.outreach_verify.activate_client")
     @patch("scripts.outreach_verify._latest_ep_dir")
     @patch("scripts.outreach_verify._check_clip_color_metadata", return_value="OK")
+    @patch("scripts.outreach_verify._get_duration", return_value=60.5)
+    def test_clip_duration_tolerance_accepts_minor_overshoot(
+        self, mock_dur, mock_color, mock_ep, mock_act, tmp_path
+    ):
+        """Encoding overshoot of <1s past the upper bound is real-world
+        (subtitle burn-in re-encode lands 0.1-0.5s past the requested cut).
+        Verify must accept it. Regression: park-church-denver clip 4 was
+        90.32s (just past the 90s cap) and pre-fix this blocked the entire
+        prepare batch. Test config uses max_duration=60, so 60.5 is the
+        analog of 90.5 in production."""
+        ep = self._seed(tmp_path)
+        mock_ep.return_value = ep
+        findings = ov.verify_one("redeemer-city-church-tampa")
+        duration_finding = next(
+            f for f in findings if f.check == "clip_duration_window"
+        )
+        assert duration_finding.level == "OK", (
+            f"60.5s clip should be within tolerance, got {duration_finding}"
+        )
+
+    @patch("scripts.outreach_verify.activate_client")
+    @patch("scripts.outreach_verify._latest_ep_dir")
+    @patch("scripts.outreach_verify._check_clip_color_metadata", return_value="OK")
+    @patch("scripts.outreach_verify._get_duration", return_value=62.5)
+    def test_clip_duration_rejects_significant_overshoot(
+        self, mock_dur, mock_color, mock_ep, mock_act, tmp_path
+    ):
+        """Tolerance is bounded — 62.5s exceeds [15, 60+1] in test config
+        (analog of 92s in production where the cap is 90s, hard YouTube
+        Shorts limit). Don't silently let it through."""
+        ep = self._seed(tmp_path)
+        mock_ep.return_value = ep
+        findings = ov.verify_one("redeemer-city-church-tampa")
+        duration_finding = next(
+            f for f in findings if f.check == "clip_duration_window"
+        )
+        assert duration_finding.level == "ERROR"
+
+    @patch("scripts.outreach_verify.activate_client")
+    @patch("scripts.outreach_verify._latest_ep_dir")
+    @patch("scripts.outreach_verify._check_clip_color_metadata", return_value="OK")
     @patch("scripts.outreach_verify._get_duration", return_value=60.0)
     def test_verify_one_includes_pitch_parity_when_pitch_exists(
         self, mock_dur, mock_color, mock_ep, mock_act, tmp_path, monkeypatch

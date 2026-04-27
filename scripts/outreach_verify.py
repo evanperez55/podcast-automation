@@ -415,14 +415,19 @@ def verify_one(slug: str) -> List[Finding]:
     )
 
     # Check 4: clip durations within [min, max]
+    # Allow a 1.0s tolerance to absorb encoding overshoot from subtitle burn-in
+    # (common for the H.264 re-encode pass to land 0.1-0.5s past the requested
+    # cut). Tolerance only applies to the upper bound — clips shorter than the
+    # min are a real quality issue, not encoding noise.
     min_dur = Config.CLIP_MIN_DURATION
     max_dur = Config.CLIP_MAX_DURATION
+    upper_tolerance = 1.0
     out_of_range = []
     for f in final_clips:
         d = _get_duration(f)
         if d is None:
             continue
-        if d < min_dur or d > max_dur:
+        if d < min_dur or d > max_dur + upper_tolerance:
             out_of_range.append((f.name, d))
     findings.append(
         Finding(

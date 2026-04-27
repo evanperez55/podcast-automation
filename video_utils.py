@@ -35,7 +35,17 @@ _BT709_COLOR_FLAGS = [
 
 
 def _libx264_args(preset="medium", crf=18, profile="high"):
-    """Return libx264 software encoder args (fallback)."""
+    """Return libx264 software encoder args (fallback).
+
+    Includes `-x264-params` with explicit colorprim/transfer/colormatrix —
+    without that, libx264 frequently writes 'unspecified' into the H.264 SPS
+    VUI even when `-color_primaries/-color_trc/-colorspace` are set on the
+    FFmpeg command line. The container-level flags only describe the source;
+    `-x264-params` writes them into the bitstream, which is what Drive
+    (and any HDR-aware transcoder) actually reads. See B023 regression
+    2026-04-27 — clips rendered through subtitle_clip_generator landed with
+    `unspecified` despite the encoder helper's bt709 flags being present.
+    """
     args = [
         "-c:v",
         "libx264",
@@ -46,6 +56,8 @@ def _libx264_args(preset="medium", crf=18, profile="high"):
         "-pix_fmt",
         "yuv420p",
         *_BT709_COLOR_FLAGS,
+        "-x264-params",
+        "colorprim=bt709:transfer=bt709:colormatrix=bt709",
     ]
     if profile:
         args.extend(["-profile:v", profile])

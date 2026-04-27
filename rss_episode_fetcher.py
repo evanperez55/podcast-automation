@@ -131,6 +131,119 @@ def _parse_itunes_duration(raw: Optional[str]) -> Optional[int]:
         return None
 
 
+def _lxml_fallback_parse(rss_url: str) -> Optional["_LxmlFakeFeed"]:
+    """Parse a malformed RSS feed via lxml's recover mode and return a
+    minimal feedparser-compatible shape.
+
+    Used when feedparser bozos with no entries on feeds that lxml can still
+    extract from (e.g., cornerstonebible.org sermons feed — strict feedparser
+    rejects it at byte 1326 but the actual <item> elements are well-formed).
+
+    Returns a _LxmlFakeFeed with .entries (each entry has .title,
+    .enclosures, .published_parsed, .get(itunes_episode|itunes_duration)),
+    or None if even lxml fails.
+    """
+    try:
+        from lxml import etree
+    except ImportError:
+        logger.warning("lxml not available — can't recover bozo feeds")
+        return None
+
+    try:
+        if rss_url.startswith(("http://", "https://")):
+            req = requests.Request(
+                "GET", rss_url, headers={"User-Agent": "Mozilla/5.0"}
+            )
+            session = requests.Session()
+            response = session.send(session.prepare_request(req), timeout=15)
+            response.raise_for_status()
+            raw = response.content
+        else:
+            raw = Path(rss_url).read_bytes()
+    except Exception as e:
+        logger.warning("lxml fallback fetch failed: %s", e)
+        return None
+
+    try:
+        parser = etree.XMLParser(recover=True, no_network=True)
+        root = etree.fromstring(raw, parser)
+    except Exception as e:
+        logger.warning("lxml fallback parse failed: %s", e)
+        return None
+
+    items = root.xpath(
+        "//item", namespaces={"itunes": "http://www.itunes.com/dtds/podcast-1.0.dtd"}
+    )
+    entries = [_LxmlFakeEntry(item) for item in items]
+    return _LxmlFakeFeed(entries)
+
+
+class _LxmlFakeEntry:
+    """Adapter that exposes a feedparser-like API over an lxml <item> element."""
+
+    _ITUNES_NS = "{http://www.itunes.com/dtds/podcast-1.0.dtd}"
+
+    def __init__(self, item) -> None:
+        self._item = item
+        title_el = item.find("title")
+        self.title = title_el.text if title_el is not None else "?"
+        self.enclosures = self._extract_enclosures()
+        self.published_parsed = self._parse_pubdate()
+
+    def _extract_enclosures(self) -> list:
+        out = []
+        for enc in self._item.findall("enclosure"):
+            url = enc.get("url")
+            if url:
+                out.append(
+                    {
+                        "url": url,
+                        "type": enc.get("type", ""),
+                        "length": enc.get("length", ""),
+                    }
+                )
+        return out
+
+    def _parse_pubdate(self):
+        from email.utils import parsedate_tz, parsedate
+
+        pd = self._item.find("pubDate")
+        if pd is None or not pd.text:
+            return None
+        # Try RFC 2822 with timezone first, then plain
+        for parser in (parsedate_tz, parsedate):
+            try:
+                parsed = parser(pd.text)
+                if parsed:
+                    # Truncate to 9 elements like feedparser's struct_time
+                    return tuple(parsed[:9])
+            except Exception:
+                continue
+        return None
+
+    # feedparser entries support both attribute access and dict-like .get
+    def get(self, key, default=None):
+        return getattr(self, key, default)
+
+    @property
+    def itunes_episode(self):
+        el = self._item.find(f"{self._ITUNES_NS}episode")
+        return el.text if el is not None else None
+
+    @property
+    def itunes_duration(self):
+        el = self._item.find(f"{self._ITUNES_NS}duration")
+        return el.text if el is not None else None
+
+
+class _LxmlFakeFeed:
+    """Minimal feedparser-style container holding _LxmlFakeEntry list."""
+
+    def __init__(self, entries: list) -> None:
+        self.entries = entries
+        self.bozo = 0  # we recovered, so caller treats this as clean
+
+
 class RSSEpisodeFetcher:
     """Fetch and download podcast episodes from a public RSS feed.
 
@@ -189,7 +302,17 @@ class RSSEpisodeFetcher:
             elif feed.entries:
                 logger.warning("RSS feed flagged bozo but has entries: %s", exc)
             else:
-                raise ValueError(f"RSS feed parse error (bozo): {exc}")
+                # feedparser gave up. Some valid feeds (e.g.
+                # cornerstonebible.org/category/sermons/feed/) trip its
+                # strict parser even though lxml's recover mode handles them
+                # cleanly. Fall back to lxml-based extraction before failing.
+                logger.warning(
+                    "RSS feed bozo with no entries — trying lxml recover fallback (%s)",
+                    exc,
+                )
+                feed = _lxml_fallback_parse(rss_url)
+                if feed is None or not feed.entries:
+                    raise ValueError(f"RSS feed parse error (bozo): {exc}")
 
         if not feed.entries:
             raise ValueError(f"No entries found in RSS feed: {rss_url}")

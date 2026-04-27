@@ -346,6 +346,23 @@ class TestGetH264EncoderArgs:
         assert "-profile:v" not in args
 
     @patch.object(Config, "USE_NVENC", False)
+    def test_libx264_writes_bt709_to_sps_via_x264_params(self):
+        """B023 regression: -color_primaries/-color_trc/-colorspace bt709 on
+        the FFmpeg command line are container-level metadata; libx264 does
+        NOT always copy them into the H.264 SPS VUI. The result was clips
+        with color_transfer=unspecified that hung Drive's transcoder. Fix:
+        emit -x264-params with explicit colorprim/transfer/colormatrix so
+        libx264 writes the correct values into the bitstream.
+
+        See open_b023_regression.md (resolved 2026-04-27) for context."""
+        args = get_h264_encoder_args()
+        assert "-x264-params" in args
+        idx = args.index("-x264-params")
+        assert "colorprim=bt709" in args[idx + 1]
+        assert "transfer=bt709" in args[idx + 1]
+        assert "colormatrix=bt709" in args[idx + 1]
+
+    @patch.object(Config, "USE_NVENC", False)
     def test_libx264_custom_preset(self):
         """Custom preset is passed through for libx264."""
         args = get_h264_encoder_args(preset="fast", crf=23)

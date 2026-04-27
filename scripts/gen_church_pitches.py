@@ -423,6 +423,47 @@ PROSPECTS = [
     },
 ]
 
+# Per-prospect contact email used to render `**EMAIL: ...**` in PITCH.md.
+# Slugs not in this dict get the literal `TBD` so the user can fill manually.
+# Source of truth — the contact_hint field on PROSPECTS often carries the same
+# address but in prose form ("info@example.org (from RSS)") that's not safe to
+# parse, so we maintain this dict explicitly. Add a slug here when you find a
+# real email; remove the entry when an address bounces.
+PROSPECT_EMAILS = {
+    # Original 10 (sent via Tue 4/21 batch — confirmed working addresses)
+    "redeemer-city-church-tampa": "office@redeemertampa.com",
+    "christ-community-church-columbus": "communications@ccclive.org",
+    "metro-tab-church": "info@metrotab.net",
+    "the-crossings-church-collinsville": "admin@crossingscollinsville.com",
+    "faith-bible-church-edmond": "fbc@faithbibleok.com",
+    "life-bridge-church-green-bay": "lbccgb@gmail.com",
+    "cottonwood-church": "guestservices@cottonwood.org",
+    "mercy-village-church": "info@mercyvillage.church",
+    "harbor-rock-tabernacle": "paul@harborrock.org",
+    "christ-community-church-johnson-city": "office@christcommunityjc.com",
+    # Batch 2 (added 2026-04-27 — 20 prospects for Wed/Thu sends)
+    "christ-community-franklin-tn": "info@christcommunity.org",
+    # north-village-church-austin: contact form only — no direct email known
+    "doxology-bible-church": "info@doxology.church",
+    "park-church-denver": "renew@parkchurchdenver.org",
+    "northside-church-of-christ-wichita": "office@northsidecoc.org",
+    "pacific-crossroads-church-la": "info@pacificcrossroads.org",
+    "cornerstone-fellowship-bible-church": "jonathand@cornerstonebible.org",
+    "coram-deo-bible-church": "info@cdbible.org",
+    "trinity-baptist-church-nashua": "admin@trinity-baptist.org",
+    "go-church": "marketing@mygochurch.com",
+    "the-tree-church-lancaster": "info@thetree.church",
+    "high-point-church-madison": "info@highpointchurch.org",
+    "north-wake-church": "tech@northwake.com",
+    "first-family-church-ankeny": "info@firstfamily.church",
+    "cornerstone-church-cefc": "cefc@cornerstonechurches.org",
+    "denton-church-of-christ": "podcast@dentonchurchofchrist.org",
+    "imago-dei-church-raleigh": "idcworship@gmail.com",
+    "faith-baptist-church-fbcnet": "webmaster@fbcnet.org",
+    "emergence-church-nj": "Steve.hawthorne@emergencenj.org",
+    "park-cities-presbyterian-dallas": "webmaster@pcpc.org",
+}
+
 ANGLE_RATIONALES = {
     "growth_seo": "Established archive with clear SEO/YouTube upside. Framing: maximize existing investment, not fill a gap.",
     "restart": "Podcast feed is stale - this pitch acknowledges the pause and frames automation as the unblocker rather than pretending to have missed the gap.",
@@ -435,7 +476,7 @@ TEMPLATE = """# {church_name} - Outreach Pitch
 
 **Prospect:** {church_name}{tier_note}
 **Slug:** {slug}
-**Contact:** {pastor_name} / **EMAIL: TBD** - check: {contact_hint}
+**Contact:** {pastor_name} / **EMAIL: {email}** - check: {contact_hint}
 **Episode referenced:** "{{{{SERMON_TITLE}}}}" *(processed TBD)*
 **Drive folder:** Upload from `output/{slug}/{{{{EP_DIR}}}}/`
 **Status:** Skeleton - needs (1) episode processed, (2) contact email found, (3) Drive link before sending
@@ -556,6 +597,7 @@ def main(force: bool = False) -> None:
             tier=p["tier"],
             tier_note=tier_note,
             angle_rationale=ANGLE_RATIONALES[p["angle"]],
+            email=PROSPECT_EMAILS.get(p["slug"], "TBD"),
         )
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(text, encoding="utf-8")

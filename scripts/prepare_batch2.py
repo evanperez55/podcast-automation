@@ -156,21 +156,45 @@ def main() -> int:
                 publish_preview=not args.no_preview,
                 folder_date=folder_date,
             )
-            state["results"].append(
-                {
-                    "slug": slug,
-                    "status": "prepared",
-                    "draft_id": result.get("draft_id"),
-                    "drive_link": result.get("drive_link"),
-                    "preview_url": result.get("preview_url"),
-                    "ts": now_iso(),
-                }
-            )
-            print(
-                f"  OK   draft={result.get('draft_id')}  "
-                f"drive={result.get('drive_link', '?')[:60]}",
-                flush=True,
-            )
+            # Distinguish "fully prepared" (Drive + Gmail draft both succeeded)
+            # from "Drive uploaded but Gmail draft failed silently". gmail_sender
+            # logs the HttpError and returns None on failure, so a None draft_id
+            # means the draft was NOT created — record it as a partial failure
+            # so the operator sees it instead of trusting a misleading "prepared".
+            draft_id = result.get("draft_id")
+            if draft_id is None and not args.dry_run:
+                state["results"].append(
+                    {
+                        "slug": slug,
+                        "status": "partial",
+                        "drive_link": result.get("drive_link"),
+                        "preview_url": result.get("preview_url"),
+                        "draft_id": None,
+                        "error": "drive_uploaded_but_gmail_draft_failed",
+                        "ts": now_iso(),
+                    }
+                )
+                print(
+                    f"  PARTIAL drive uploaded but Gmail draft failed "
+                    f"(see Gmail API error in log) — drive={result.get('drive_link', '?')[:60]}",
+                    flush=True,
+                )
+            else:
+                state["results"].append(
+                    {
+                        "slug": slug,
+                        "status": "prepared",
+                        "draft_id": draft_id,
+                        "drive_link": result.get("drive_link"),
+                        "preview_url": result.get("preview_url"),
+                        "ts": now_iso(),
+                    }
+                )
+                print(
+                    f"  OK   draft={draft_id}  "
+                    f"drive={result.get('drive_link', '?')[:60]}",
+                    flush=True,
+                )
         except Exception as e:
             tb = traceback.format_exc()
             state["results"].append(
@@ -192,14 +216,18 @@ def main() -> int:
     status_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
     prepared = sum(1 for r in state["results"] if r["status"] == "prepared")
+    partial = sum(1 for r in state["results"] if r["status"] == "partial")
     skipped = sum(1 for r in state["results"] if r["status"] == "skipped")
     failed = sum(1 for r in state["results"] if r["status"] == "failed")
     print(
         f"\nPrepare batch complete: {prepared} prepared, "
-        f"{skipped} skipped, {failed} failed (of {len(slugs)} total)",
+        f"{partial} partial, {skipped} skipped, {failed} failed "
+        f"(of {len(slugs)} total)",
         flush=True,
     )
-    return 0 if failed == 0 else 1
+    # Partial counts as a non-success (Drive uploaded but Gmail draft missing
+    # — operator needs to know to fix it, otherwise the prospect can't be sent).
+    return 0 if (failed == 0 and partial == 0) else 1
 
 
 if __name__ == "__main__":
