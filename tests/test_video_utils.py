@@ -369,6 +369,33 @@ class TestGetH264EncoderArgs:
         assert "fast" in args
         assert "23" in args
 
+    @patch.object(Config, "USE_NVENC", False)
+    def test_libx264_includes_h264_metadata_bsf(self):
+        """Belt-and-suspenders: even if -x264-params is enough on most builds,
+        the post-encode h264_metadata bsf rewrites SPS bytes deterministically
+        so we never ship clips with `unspecified` color metadata regardless
+        of encoder version. Same operation as remux_color_metadata.py."""
+        args = get_h264_encoder_args()
+        assert "-bsf:v" in args
+        idx = args.index("-bsf:v")
+        bsf_arg = args[idx + 1]
+        assert "h264_metadata" in bsf_arg
+        assert "colour_primaries=1" in bsf_arg
+        assert "transfer_characteristics=1" in bsf_arg
+        assert "matrix_coefficients=1" in bsf_arg
+
+    @patch.object(Config, "USE_NVENC", True)
+    def test_nvenc_includes_h264_metadata_bsf(self):
+        """NVENC was the actual broken path on 2026-04-27 — all 50 clips that
+        session were h264_nvenc-encoded and shipped with `unspecified`. The
+        SPS-rewrite bsf must apply equally to NVENC outputs."""
+        args = get_h264_encoder_args()
+        assert "h264_nvenc" in args
+        assert "-bsf:v" in args
+        idx = args.index("-bsf:v")
+        assert "h264_metadata" in args[idx + 1]
+        assert "colour_primaries=1" in args[idx + 1]
+
     @patch.object(Config, "USE_NVENC", True)
     def test_nvenc_default(self):
         """Returns NVENC args when USE_NVENC is True."""

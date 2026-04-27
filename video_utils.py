@@ -33,6 +33,17 @@ _BT709_COLOR_FLAGS = [
     "tv",
 ]
 
+# Belt-and-suspenders: rewrite the H.264 SPS VUI bytes via the h264_metadata
+# bitstream filter as a post-encode step. This guarantees bt709 SPS regardless
+# of whether libx264 or NVENC wrote the original metadata correctly. Same
+# operation as scripts/remux_color_metadata.py but inline at encode time so
+# we don't need a separate heal pass for every batch. Cheap (no re-encode,
+# just SPS byte rewrite) and works on any H.264 stream.
+_H264_METADATA_BSF = [
+    "-bsf:v",
+    "h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1:video_full_range_flag=0",
+]
+
 
 def _libx264_args(preset="medium", crf=18, profile="high"):
     """Return libx264 software encoder args (fallback).
@@ -92,9 +103,10 @@ def get_h264_encoder_args(preset="medium", crf=18, profile="high"):
             "-pix_fmt",
             "yuv420p",
             *_BT709_COLOR_FLAGS,
+            *_H264_METADATA_BSF,
         ]
     else:
-        return _libx264_args(preset, crf, profile)
+        return _libx264_args(preset, crf, profile) + _H264_METADATA_BSF
 
 
 def disable_nvenc_and_get_fallback_args(preset="medium", crf=18, profile="high"):
