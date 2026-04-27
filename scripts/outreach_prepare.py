@@ -456,6 +456,7 @@ def prepare_one(
     skip_verify: bool = False,
     publish_preview: bool = True,
     preview_url: Optional[str] = None,
+    autofill: bool = True,
 ) -> dict:
     """Do one prospect end-to-end. Returns {draft_id, drive_link, preview_url, pitch_path}.
 
@@ -479,6 +480,33 @@ def prepare_one(
     pitch_path = DEMO_ROOT / slug / "PITCH.md"
     if not pitch_path.exists():
         raise FileNotFoundError(f"PITCH.md not found: {pitch_path}")
+
+    # Auto-fill PITCH.md placeholders from the latest analysis.json. Idempotent:
+    # str.replace finds nothing on already-filled placeholders. Silent no-op when
+    # no episode is processed yet (caller may be doing manual prep).
+    if autofill:
+        from scripts.fill_church_pitch import fill as _fill_pitch
+
+        result = _fill_pitch(slug)
+        if result.get("ok"):
+            logger.info(
+                "autofill: %s sermon=%s lead=%s",
+                slug,
+                result.get("sermon_title", ""),
+                result.get("lead_clip_title", ""),
+            )
+            if result.get("leftover_placeholders"):
+                logger.warning(
+                    "autofill: %s — placeholders still unfilled: %s",
+                    slug,
+                    result["leftover_placeholders"],
+                )
+        else:
+            logger.info(
+                "autofill: %s skipped (reason=%s)",
+                slug,
+                result.get("reason", "unknown"),
+            )
 
     # Pre-upload verification — blocks upload on any ERROR finding. Warnings
     # (e.g., URL-encoded source filenames, which get masked at staging) are
@@ -588,6 +616,13 @@ def main() -> int:
         help="Don't render or include a preview page URL — Drive-only "
         "package. Use when the previews repo isn't reachable.",
     )
+    ap.add_argument(
+        "--no-autofill",
+        action="store_true",
+        help="Skip auto-filling PITCH.md placeholders from the latest "
+        "analysis.json. Use when you've manually edited the PITCH and don't "
+        "want the auto-fill to overwrite custom moment/why text.",
+    )
     args = ap.parse_args()
 
     if args.dry_run:
@@ -612,6 +647,7 @@ def main() -> int:
         drive_link=args.drive_link,
         publish_preview=not args.no_preview,
         preview_url=args.preview_url,
+        autofill=not args.no_autofill,
     )
 
     print()

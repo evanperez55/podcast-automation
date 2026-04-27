@@ -44,6 +44,128 @@ def fmt_timestamp_range(start: str, end: str) -> str:
     return f"{compact(start)}-{compact(end)}"
 
 
+class FillResult(dict):
+    """Status dict returned by fill(). Sentinel ok=False means filling did
+    not happen for an expected reason (no episode processed yet, no PITCH);
+    callers can choose to skip silently. ok=False with err=... is a real error."""
+
+
+def fill(
+    slug: str,
+    lead_clip: int = 1,
+    moment: str | None = None,
+    why: str | None = None,
+) -> FillResult:
+    """Fill template placeholders in a prospect's PITCH.md from latest analysis.
+
+    Returns a FillResult dict:
+      {ok: True, ep_dir, sermon_title, lead_clip_title, leftover_placeholders}
+      {ok: False, reason: 'no_episode' | 'no_analysis' | 'no_clips' | 'no_pitch' | 'lead_clip_out_of_range', err: str}
+
+    Idempotent — re-running on an already-filled PITCH is a no-op for placeholders
+    already replaced (str.replace finds nothing to replace). Safe to call from
+    outreach_prepare.py before each draft.
+    """
+    output_root = Path(f"output/{slug}")
+    if not output_root.exists():
+        return FillResult(
+            ok=False, reason="no_episode", err=f"No output directory at {output_root}"
+        )
+
+    ep_dirs = sorted(
+        [d for d in output_root.iterdir() if d.is_dir() and d.name.startswith("ep_")],
+        key=lambda d: d.stat().st_mtime,
+        reverse=True,
+    )
+    if not ep_dirs:
+        return FillResult(
+            ok=False, reason="no_episode", err=f"No processed episodes in {output_root}"
+        )
+    ep_dir = ep_dirs[0]
+
+    analysis_files = sorted(
+        ep_dir.glob("*_analysis.json"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if not analysis_files:
+        return FillResult(
+            ok=False, reason="no_analysis", err=f"No analysis.json in {ep_dir}"
+        )
+    analysis = json.loads(analysis_files[0].read_text(encoding="utf-8"))
+
+    sermon_title = analysis.get("episode_title", "")
+    clips = analysis.get("best_clips", [])
+    if not clips:
+        return FillResult(ok=False, reason="no_clips", err="no best_clips in analysis")
+
+    lead_idx = lead_clip - 1
+    if lead_idx < 0 or lead_idx >= len(clips):
+        return FillResult(
+            ok=False,
+            reason="lead_clip_out_of_range",
+            err=f"--lead-clip {lead_clip} out of range 1..{len(clips)}",
+        )
+    lead = clips[lead_idx]
+
+    derived_moment = moment or (
+        f'the part that grabbed me was "{analysis.get("hot_take", "").strip()}"'
+        if analysis.get("hot_take")
+        else f"the {lead.get('description', '').lower().rstrip('.')} section landed especially well"
+    )
+    derived_why = why or (
+        f'{lead.get("why_interesting", "").rstrip(".")}. The hook "{lead.get("hook_caption", "")}" works in the first 2 seconds'
+        if lead.get("why_interesting")
+        else "strong hook + clear payoff, works as a Short on its own"
+    )
+
+    pitch_path = Path(f"demo/church-vertical/{slug}/PITCH.md")
+    if not pitch_path.exists():
+        return FillResult(
+            ok=False, reason="no_pitch", err=f"No PITCH.md at {pitch_path}"
+        )
+    text = pitch_path.read_text(encoding="utf-8")
+
+    replacements = {
+        "{{SERMON_TITLE}}": sermon_title,
+        "{{SPECIFIC_MOMENT_REFERENCE}}": derived_moment,
+        "{{NUM_CLIPS}}": str(len(clips)),
+        "{{BEST_CLIP_TITLE}}": lead.get("suggested_title", ""),
+        "{{CLIP_TIMESTAMP}}": fmt_timestamp_range(lead["start"], lead["end"]),
+        "{{WHY_THIS_CLIP_WORKS}}": derived_why,
+        "{{EP_DIR}}": ep_dir.name,
+    }
+    for i, clip in enumerate(clips[:5], start=1):
+        replacements[f"{{{{CLIP_{i}_TITLE}}}}"] = clip.get("suggested_title", "")
+        replacements[f"{{{{CLIP_{i}_DURATION}}}}"] = fmt_mmss(
+            clip.get("duration_seconds", 0)
+        )
+    for i in range(len(clips) + 1, 6):
+        replacements[f"{{{{CLIP_{i}_TITLE}}}}"] = "(n/a)"
+        replacements[f"{{{{CLIP_{i}_DURATION}}}}"] = "--"
+
+    for placeholder, value in replacements.items():
+        text = text.replace(placeholder, value)
+
+    text = re.sub(
+        r"- \[ \] Process latest episode:[^\n]+",
+        f"- [x] Episode processed: {ep_dir.name}",
+        text,
+    )
+
+    pitch_path.write_text(text, encoding="utf-8")
+    leftover = sorted(set(re.findall(r"\{\{[A-Z_0-9]+\}\}", text)))
+
+    return FillResult(
+        ok=True,
+        ep_dir=ep_dir.name,
+        sermon_title=sermon_title,
+        lead_clip_title=lead.get("suggested_title", ""),
+        clip_timestamp=replacements["{{CLIP_TIMESTAMP}}"],
+        leftover_placeholders=leftover,
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("slug", help="Prospect slug (e.g. redeemer-city-church-tampa)")
@@ -65,110 +187,25 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    slug = args.slug
-    output_root = Path(f"output/{slug}")
-    if not output_root.exists():
-        print(f"ERROR: No output directory at {output_root}", file=sys.stderr)
-        return 1
-
-    ep_dirs = sorted(
-        [d for d in output_root.iterdir() if d.is_dir() and d.name.startswith("ep_")],
-        key=lambda d: d.stat().st_mtime,
-        reverse=True,
-    )
-    if not ep_dirs:
-        print(f"ERROR: No processed episodes in {output_root}", file=sys.stderr)
-        return 1
-    ep_dir = ep_dirs[0]
-    print(f"Using episode dir: {ep_dir}")
-
-    analysis_files = sorted(
-        ep_dir.glob("*_analysis.json"),
-        key=lambda p: p.stat().st_mtime,
-        reverse=True,
-    )
-    if not analysis_files:
-        print(f"ERROR: No analysis.json in {ep_dir}", file=sys.stderr)
-        return 1
-    analysis = json.loads(analysis_files[0].read_text(encoding="utf-8"))
-
-    sermon_title = analysis.get("episode_title", "")
-    clips = analysis.get("best_clips", [])
-    if not clips:
-        print("ERROR: no best_clips in analysis", file=sys.stderr)
-        return 1
-
-    lead_idx = args.lead_clip - 1
-    if lead_idx < 0 or lead_idx >= len(clips):
+    result = fill(args.slug, args.lead_clip, args.moment, args.why)
+    if not result.get("ok"):
         print(
-            f"ERROR: --lead-clip {args.lead_clip} out of range 1..{len(clips)}",
+            f"ERROR: {result.get('err', 'unknown')} (reason={result.get('reason')})",
             file=sys.stderr,
         )
         return 1
-    lead = clips[lead_idx]
 
-    moment = args.moment or (
-        f'the part that grabbed me was "{analysis.get("hot_take", "").strip()}"'
-        if analysis.get("hot_take")
-        else f"the {lead.get('description', '').lower().rstrip('.')} section landed especially well"
-    )
-    why_clip = args.why or (
-        f'{lead.get("why_interesting", "").rstrip(".")}. The hook "{lead.get("hook_caption", "")}" works in the first 2 seconds'
-        if lead.get("why_interesting")
-        else "strong hook + clear payoff, works as a Short on its own"
-    )
-
-    # Build the pitch file substitutions
-    pitch_path = Path(f"demo/church-vertical/{slug}/PITCH.md")
-    if not pitch_path.exists():
-        print(f"ERROR: No PITCH.md at {pitch_path}", file=sys.stderr)
-        return 1
-    text = pitch_path.read_text(encoding="utf-8")
-
-    replacements = {
-        "{{SERMON_TITLE}}": sermon_title,
-        "{{SPECIFIC_MOMENT_REFERENCE}}": moment,
-        "{{NUM_CLIPS}}": str(len(clips)),
-        "{{BEST_CLIP_TITLE}}": lead.get("suggested_title", ""),
-        "{{CLIP_TIMESTAMP}}": fmt_timestamp_range(lead["start"], lead["end"]),
-        "{{WHY_THIS_CLIP_WORKS}}": why_clip,
-        "{{EP_DIR}}": ep_dir.name,
-    }
-    # Per-clip entries (N=1..5)
-    for i, clip in enumerate(clips[:5], start=1):
-        replacements[f"{{{{CLIP_{i}_TITLE}}}}"] = clip.get("suggested_title", "")
-        replacements[f"{{{{CLIP_{i}_DURATION}}}}"] = fmt_mmss(
-            clip.get("duration_seconds", 0)
-        )
-
-    # If fewer than 5 clips, clear unused lines
-    for i in range(len(clips) + 1, 6):
-        replacements[f"{{{{CLIP_{i}_TITLE}}}}"] = "(n/a)"
-        replacements[f"{{{{CLIP_{i}_DURATION}}}}"] = "--"
-
-    for placeholder, value in replacements.items():
-        text = text.replace(placeholder, value)
-
-    # Also mark "Process latest episode" checkbox as done
-    text = re.sub(
-        r"- \[ \] Process latest episode:[^\n]+",
-        f"- [x] Episode processed: {ep_dir.name}",
-        text,
-    )
-
-    pitch_path.write_text(text, encoding="utf-8")
+    pitch_path = Path(f"demo/church-vertical/{args.slug}/PITCH.md")
     print(f"FILLED: {pitch_path}")
-    print(f"  Sermon: {sermon_title}")
-    print(f"  Lead clip: [{args.lead_clip}] {lead.get('suggested_title', '')}")
-    print(f"  Timestamp: {replacements['{{CLIP_TIMESTAMP}}']}")
-
-    # Surface any remaining placeholders so user sees what's still manual
-    leftover = re.findall(r"\{\{[A-Z_0-9]+\}\}", text)
-    if leftover:
-        print(f"\nRemaining placeholders (still need manual fill): {set(leftover)}")
+    print(f"  Sermon: {result['sermon_title']}")
+    print(f"  Lead clip: [{args.lead_clip}] {result['lead_clip_title']}")
+    print(f"  Timestamp: {result['clip_timestamp']}")
+    if result["leftover_placeholders"]:
+        print(
+            f"\nRemaining placeholders (still need manual fill): {result['leftover_placeholders']}"
+        )
     else:
         print("\nAll template placeholders filled.")
-
     return 0
 
 

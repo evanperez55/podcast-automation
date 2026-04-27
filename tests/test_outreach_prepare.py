@@ -580,6 +580,149 @@ class TestPrepareOne:
         assert existing_link in gmail_kwargs["body"]
 
 
+class TestAutofillIntegration:
+    """prepare_one should auto-fill PITCH.md placeholders from the latest
+    analysis.json before parsing. Saves the manual {{SERMON_TITLE}} fill-in
+    that previously took 5+ min per prospect at the 30/week cadence."""
+
+    def _write_skeleton_pitch(self, tmp_path: Path) -> Path:
+        """Pitch with unfilled placeholders that fill() should populate."""
+        pitch_dir = tmp_path / "demo" / "church-vertical" / "test-slug"
+        pitch_dir.mkdir(parents=True)
+        p = pitch_dir / "PITCH.md"
+        p.write_text(
+            "# Test - Outreach Pitch\n\n"
+            "**Contact:** X / **EMAIL: pastor@x.com**\n"
+            '**Episode referenced:** "{{SERMON_TITLE}}"\n'
+            "\n---\n\n## Email\n\n"
+            '**Subject:** Made these from your "{{SERMON_TITLE}}" sermon\n\n'
+            "Hey,\n\n"
+            'Lead clip: "{{BEST_CLIP_TITLE}}" ({{CLIP_TIMESTAMP}})\n\n'
+            "[GOOGLE DRIVE LINK]\n\n"
+            "Evan\n\n---\n\n## Follow-Up\n\nx\n"
+        )
+        return p
+
+    def _write_ep_with_analysis(self, tmp_path: Path) -> Path:
+        ep = tmp_path / "output" / "test-slug" / "ep_xyz_20260101_120000"
+        (ep / "clips").mkdir(parents=True)
+        (ep / "clips" / "clip_01_subtitle.mp4").write_bytes(b"v")
+        (ep / "blog_post.md").write_text("# blog")
+        analysis = {
+            "episode_title": "How To Find Joy In April",
+            "hot_take": "Joy is not a feeling.",
+            "best_clips": [
+                {
+                    "start": "00:12:00",
+                    "end": "00:12:45",
+                    "duration_seconds": 45,
+                    "suggested_title": "Joy Is A Choice",
+                    "hook_caption": "Joy is not what you think",
+                    "description": "the part about joy",
+                    "why_interesting": "redefines joy in 30 seconds",
+                }
+            ],
+        }
+        (ep / "xyz_analysis.json").write_text(json.dumps(analysis), encoding="utf-8")
+        return ep
+
+    def test_autofill_replaces_placeholders_before_draft(self, tmp_path, monkeypatch):
+        """Default autofill=True: sermon title + clip title land in the Gmail body."""
+        self._write_skeleton_pitch(tmp_path)
+        self._write_ep_with_analysis(tmp_path)
+
+        monkeypatch.setattr(op, "DEMO_ROOT", tmp_path / "demo" / "church-vertical")
+        monkeypatch.setattr(op, "OUTPUT_ROOT", tmp_path / "output")
+        monkeypatch.chdir(tmp_path)  # fill() resolves paths from cwd
+        monkeypatch.setattr(op, "_publish_preview", lambda slug: None)
+
+        fake_drive = MagicMock()
+        fake_drive.upload_folder.return_value = (
+            "https://drive.google.com/drive/folders/abc"
+        )
+        fake_gmail = MagicMock()
+        fake_gmail.create_draft.return_value = "draft-fill-1"
+
+        op.prepare_one(
+            "test-slug",
+            drive=fake_drive,
+            gmail=fake_gmail,
+            dry_run=False,
+            skip_verify=True,
+        )
+
+        gmail_kwargs = fake_gmail.create_draft.call_args.kwargs
+        # The {{SERMON_TITLE}} placeholder should have been replaced before
+        # parse_pitch read the body
+        assert "How To Find Joy In April" in gmail_kwargs["subject"]
+        assert "{{SERMON_TITLE}}" not in gmail_kwargs["body"]
+        assert "Joy Is A Choice" in gmail_kwargs["body"]
+        assert "12:00-12:45" in gmail_kwargs["body"]
+
+    def test_no_autofill_leaves_placeholders_intact(self, tmp_path, monkeypatch):
+        """autofill=False: PITCH.md is parsed as-is. Used when the operator
+        has hand-edited a pitch and doesn't want fill() to clobber custom
+        moment/why text."""
+        self._write_skeleton_pitch(tmp_path)
+        self._write_ep_with_analysis(tmp_path)
+
+        monkeypatch.setattr(op, "DEMO_ROOT", tmp_path / "demo" / "church-vertical")
+        monkeypatch.setattr(op, "OUTPUT_ROOT", tmp_path / "output")
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(op, "_publish_preview", lambda slug: None)
+
+        fake_drive = MagicMock()
+        fake_drive.upload_folder.return_value = (
+            "https://drive.google.com/drive/folders/abc"
+        )
+        fake_gmail = MagicMock()
+        fake_gmail.create_draft.return_value = "draft-no-fill"
+
+        op.prepare_one(
+            "test-slug",
+            drive=fake_drive,
+            gmail=fake_gmail,
+            dry_run=False,
+            skip_verify=True,
+            autofill=False,
+        )
+
+        gmail_kwargs = fake_gmail.create_draft.call_args.kwargs
+        # Placeholder-style braces still in the body since fill() was skipped
+        assert "{{SERMON_TITLE}}" in gmail_kwargs["subject"]
+        assert "{{BEST_CLIP_TITLE}}" in gmail_kwargs["body"]
+
+    def test_autofill_silent_when_no_analysis_yet(self, tmp_path, monkeypatch):
+        """If the pipeline hasn't run (no analysis.json), autofill is a no-op
+        and the existing PITCH.md is parsed as-is. Manual prep workflow."""
+        self._write_skeleton_pitch(tmp_path)
+        # Note: NO _write_ep_with_analysis — there's no ep_dir at all.
+        # But prepare_one with drive_link= bypasses _find_latest_ep_dir, so
+        # we use that path to keep the test focused on the autofill behavior.
+
+        monkeypatch.setattr(op, "DEMO_ROOT", tmp_path / "demo" / "church-vertical")
+        monkeypatch.setattr(op, "OUTPUT_ROOT", tmp_path / "output")
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(op, "_publish_preview", lambda slug: None)
+
+        fake_gmail = MagicMock()
+        fake_gmail.create_draft.return_value = "draft-no-ep"
+
+        # Should not raise — autofill silently skips on missing analysis
+        op.prepare_one(
+            "test-slug",
+            drive=None,
+            gmail=fake_gmail,
+            dry_run=False,
+            drive_link="https://drive.google.com/PRE_EXISTING",
+            autofill=True,
+        )
+
+        gmail_kwargs = fake_gmail.create_draft.call_args.kwargs
+        # Placeholders never got filled because there was no analysis
+        assert "{{SERMON_TITLE}}" in gmail_kwargs["subject"]
+
+
 # ---------------------------------------------------------------------------
 # Staging writers — promised-but-missing artifacts (social/chapters/transcript)
 # ---------------------------------------------------------------------------
