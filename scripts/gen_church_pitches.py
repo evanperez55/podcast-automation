@@ -141,6 +141,286 @@ PROSPECTS = [
         "tier": 2,
         "flags": [],
     },
+    # ===== Batch 2 added 2026-04-27 (20 prospects for Wed/Thu sends) =====
+    {
+        "slug": "christ-community-franklin-tn",
+        "church_name": "Christ Community Church",
+        "pastor_name": "Randy Lovelace",
+        "first_name": "Randy",
+        "city": "Franklin, TN",
+        "contact_hint": "christcommunity.org/contact, info@christcommunity.org guess, or Apple Podcasts listing id1382431493",
+        "ep_count": 477,
+        "angle": "seo_vs_pulpit",
+        "positioning": "Christ Community has 477 sermons archived on Simplecast - a decade of careful PCA Reformed teaching with 4.8/5 reviews from listeners. Franklin is an affluent, tech-engaged demographic that searches Google before they ever walk into a church; the same back catalog could become a searchable transcript library and a year-plus of YouTube Shorts without recording a single new sermon.",
+        "tier": 1,
+        "flags": ["PCA_REFORMED: tech-receptive but theologically careful"],
+    },
+    {
+        "slug": "north-village-church-austin",
+        "church_name": "North Village Church",
+        "pastor_name": "Michael Dennis",
+        "first_name": "Michael",
+        "city": "Austin, TX",
+        "contact_hint": "northvillagechurch.com/contact form, address 2203 W Anderson Ln Austin TX 78757",
+        "ep_count": 200,
+        "angle": "time_saving",
+        "positioning": "North Village launched the sermon podcast on Anchor and has been steadily publishing - exactly the stage where a content system pays back fastest. Most Austin nondenoms this size run social through a volunteer or comms-as-a-side-job. This pipeline turns 4-6 hours of post-production into 5 minutes, so whoever is currently doing this can keep doing it without burning out.",
+        "tier": 1,
+        "flags": [
+            "EP_COUNT_ESTIMATED: not directly verified, using ~200 as anchor.fm midsize default"
+        ],
+    },
+    {
+        "slug": "doxology-bible-church",
+        "church_name": "Doxology Bible Church",
+        "pastor_name": "Pastor",
+        "first_name": "there",
+        "city": "Fort Worth, TX",
+        "contact_hint": "doxology.church contact form, info@doxology.church (guess), or Buzzsprout listing 254230",
+        "ep_count": 1308,
+        "angle": "growth_seo",
+        "positioning": "Doxology Bible has 1,308 sermons on Buzzsprout - one of the deepest podcast archives of any church in the DFW metro. The 'one church, multiple unique congregations' model means each campus is teaching the same material to different audiences; that is a content-multiplication opportunity built into how you already operate. Transcript pages on doxology.church plus a YouTube Shorts catalog from your back-catalog would put 13 years of teaching in front of every Fort Worth Google search.",
+        "tier": 1,
+        "flags": [
+            "NEEDS_PASTOR_NAME",
+            "NEEDS_EMAIL: try info@doxology.church or contact form",
+        ],
+    },
+    {
+        "slug": "park-church-denver",
+        "church_name": "Park Church",
+        "pastor_name": "Pastor",
+        "first_name": "there",
+        "city": "Denver, CO",
+        "contact_hint": "renew@parkchurchdenver.org (from RSS), or parkchurch.org staff page",
+        "ep_count": 1273,
+        "angle": "growth_seo",
+        "positioning": "Park Church has 1,273 sermons on the website - one of the deepest church podcast archives in the Mountain West. All of that teaching currently lives in audio files Google cannot search. Converting that archive to transcript pages plus a YouTube Shorts catalog from the existing recordings would put Park Church in front of every Denver-area Google search for the questions you have already answered.",
+        "tier": 1,
+        "flags": [],
+    },
+    {
+        "slug": "northside-church-of-christ-wichita",
+        "church_name": "Northside Church of Christ",
+        "pastor_name": "Pastor",
+        "first_name": "there",
+        "city": "Wichita, KS",
+        "contact_hint": "office@northsidecoc.org (from RSS)",
+        "ep_count": 1207,
+        "angle": "growth_seo",
+        "positioning": "Northside has 1,207 sermons archived on Sermon.net - Churches of Christ rarely have the staff capacity to repurpose a content library that deep. Wichita is not flooded with church podcasts, so a transcript-page library on northsidecoc.org would dominate local search for almost any teaching topic. The clips and YouTube Shorts come essentially for free from the recordings already made.",
+        "tier": 2,
+        "flags": [
+            "COC_TRADITIONAL: Church of Christ tradition may be cautious about clip strategy"
+        ],
+    },
+    {
+        "slug": "pacific-crossroads-church-la",
+        "church_name": "Pacific Crossroads Church",
+        "pastor_name": "Alex Watlington",
+        "first_name": "Alex",
+        "city": "Los Angeles, CA",
+        "contact_hint": "info@pacificcrossroads.org (from RSS), pcc multi-site Santa Monica + Downtown LA",
+        "ep_count": 1035,
+        "angle": "growth_seo",
+        "positioning": "Pacific Crossroads has 1,035 sermons on Planning Center - Reformed teaching across two LA campuses (Santa Monica + Downtown) is exactly the kind of teaching that travels well in Shorts format. That archive currently reaches the people who already know to look. Converting it to transcript pages plus a clip library from existing recordings would put thoughtful Reformed teaching in front of search-driven LA seekers who today never find it.",
+        "tier": 1,
+        "flags": ["PCA_REFORMED: tech-receptive but theologically careful"],
+    },
+    {
+        "slug": "cornerstone-fellowship-bible-church",
+        "church_name": "Cornerstone Fellowship Bible Church",
+        "pastor_name": "Milton Vincent",
+        "first_name": "Milton",
+        "city": "Riverside, CA",
+        "contact_hint": "jonathand@cornerstonebible.org (from RSS)",
+        "ep_count": 995,
+        "angle": "growth_seo",
+        "positioning": "Cornerstone Fellowship has nearly 1,000 sermons in the archive - 30+ years of teaching from your pulpit. A Gospel Primer for Christians earned a national audience; the sermon library has not yet caught up to that reach. Transcript pages on cornerstonebible.org plus a clip catalog from the existing recordings would make the teaching as searchable and shareable as the book.",
+        "tier": 1,
+        "flags": [],
+    },
+    {
+        "slug": "coram-deo-bible-church",
+        "church_name": "Coram Deo Bible Church",
+        "pastor_name": "Pastor",
+        "first_name": "there",
+        "city": "Carmel, IN",
+        "contact_hint": "info@cdbible.org (from RSS), coramdeobible.church staff page",
+        "ep_count": 981,
+        "angle": "growth_seo",
+        "positioning": "Coram Deo has 981 sermons archived and you are publishing every week without missing a beat. Carmel is a tech-engaged demographic that uses Google before they ever walk into a church. Right now that 981-sermon library is not searchable on Google; converting it to transcript pages plus a YouTube Shorts catalog would put your teaching in front of everyone in the Indianapolis metro searching for an answer at 2am.",
+        "tier": 1,
+        "flags": [],
+    },
+    {
+        "slug": "trinity-baptist-church-nashua",
+        "church_name": "Trinity Baptist Church",
+        "pastor_name": "Pastor",
+        "first_name": "there",
+        "city": "Nashua, NH",
+        "contact_hint": "admin@trinity-baptist.org (from RSS)",
+        "ep_count": 934,
+        "angle": "growth_seo",
+        "positioning": "Trinity Baptist has 934 sermons archived - a deep teaching library for any New Hampshire church. The Northeast does not have many evangelical podcasts that come up in search; transcript pages from your existing archive plus a YouTube Shorts catalog would quietly dominate Google for every doctrinal topic you have already preached on, without recording a single new sermon.",
+        "tier": 1,
+        "flags": [],
+    },
+    {
+        "slug": "go-church",
+        "church_name": "GO Church",
+        "pastor_name": "Pastor",
+        "first_name": "there",
+        "city": "Atlanta, GA",
+        "contact_hint": "marketing@mygochurch.com (from RSS) - note: comms-aware church",
+        "ep_count": 891,
+        "angle": "growth_seo",
+        "positioning": "GO Church has 891 sermons across DC and Atlanta campuses - and the marketing@ email tells me you already think about content strategy. What this pipeline adds to what you are already doing: searchable transcript pages on mygochurch.com, plus 5x the per-platform output from each Sunday. If clips and blog posts already happen, this turns 4-6 hours per sermon into 5 minutes.",
+        "tier": 1,
+        "flags": [
+            "MARKETING_EMAIL: comms-aware church - tone must acknowledge their existing strategy, not assume they have nothing"
+        ],
+    },
+    {
+        "slug": "the-tree-church-lancaster",
+        "church_name": "The Tree Church",
+        "pastor_name": "Matthew Johnson",
+        "first_name": "Matthew",
+        "city": "Lancaster, OH",
+        "contact_hint": "info@thetree.church (from RSS), formerly Lancaster Community Church",
+        "ep_count": 873,
+        "angle": "growth_seo",
+        "positioning": "The Tree has 873 sermons archived going back to your Lancaster Community Church days - over a decade of teaching that lives mostly as audio. Lancaster is not crowded with church podcasts, so a transcript library on thetree.church would turn 'I am searching for a church in Lancaster' into 'I found a Tree Church sermon that answered my question.' Free for them, organic SEO for you.",
+        "tier": 2,
+        "flags": [],
+    },
+    {
+        "slug": "high-point-church-madison",
+        "church_name": "High Point Church",
+        "pastor_name": "Pastor",
+        "first_name": "there",
+        "city": "Madison, WI",
+        "contact_hint": "info@highpointchurch.org (from RSS)",
+        "ep_count": 858,
+        "angle": "growth_seo",
+        "positioning": "High Point has 858 sermons archived and you are still publishing every week. Madison is a high-density university town where most spiritual searching happens on Google before it ever happens in a building. Right now your archive is invisible to that search; converting it to transcript pages plus a YouTube Shorts catalog would put your teaching in front of UW students answering their own questions at 2am.",
+        "tier": 1,
+        "flags": [],
+    },
+    {
+        "slug": "north-wake-church",
+        "church_name": "North Wake Church",
+        "pastor_name": "Carson Cobb",
+        "first_name": "Carson",
+        "city": "Wake Forest, NC",
+        "contact_hint": "tech@northwake.com (from RSS)",
+        "ep_count": 855,
+        "angle": "growth_seo",
+        "positioning": "North Wake has 855 sermons in the archive - and the Branchcast hosting tells me y'all pay attention to platform choice. The Triangle is a tech-engaged region with strong organic search behavior; turning your archive into transcript pages on northwake.com plus a YouTube Shorts catalog would put your teaching where Wake County is actually looking. Same recordings, 5x the surface area.",
+        "tier": 1,
+        "flags": [],
+    },
+    {
+        "slug": "first-family-church-ankeny",
+        "church_name": "First Family Church",
+        "pastor_name": "Pastor",
+        "first_name": "there",
+        "city": "Ankeny, IA",
+        "contact_hint": "info@firstfamily.church (from RSS), 3-campus church (Ankeny, Carlisle, Lamoni)",
+        "ep_count": 837,
+        "angle": "growth_seo",
+        "positioning": "First Family has 837 sermons across three campuses (Ankeny, Carlisle, Lamoni) - and Iowa is exactly the market where a deep, searchable teaching library wins because nothing else in the state does it. Transcript pages on firstfamily.church plus YouTube Shorts from your back-catalog would put First Family in front of every Iowa Google search for the questions you have already answered.",
+        "tier": 1,
+        "flags": [],
+    },
+    {
+        "slug": "cornerstone-church-cefc",
+        "church_name": "Cornerstone Church",
+        "pastor_name": "Pastor",
+        "first_name": "there",
+        "city": "VERIFY_CITY",
+        "contact_hint": "cefc@cornerstonechurches.org (from RSS) - city not yet identified, check anchor.fm/cornerstonechurches feed metadata",
+        "ep_count": 798,
+        "angle": "growth_seo",
+        "positioning": "Cornerstone has 798 sermons on the podcast - and Anchor's free hosting suggests budget is a real constraint. That is exactly the case where automation pays back fastest: the same recordings you already produce become 5x the content output, with zero additional cost. Searchable transcripts plus a YouTube Shorts catalog without paying for new tools or new staff.",
+        "tier": 2,
+        "flags": [
+            "NEEDS_CITY: identify location before sending - check anchor.fm/cornerstonechurches metadata or website"
+        ],
+    },
+    {
+        "slug": "denton-church-of-christ",
+        "church_name": "Denton Church of Christ",
+        "pastor_name": "Pastor",
+        "first_name": "there",
+        "city": "Denton, TX",
+        "contact_hint": "podcast@dentonchurchofchrist.org (from RSS)",
+        "ep_count": 795,
+        "angle": "growth_seo",
+        "positioning": "Denton CoC has 795 sermons archived - one of the most consistent COC podcast archives in DFW. CoC churches rarely have the media bandwidth to multiply a content library that deep, and Denton is a college town where spiritual questions land on Google first. Transcript pages on dentonchurchofchrist.org plus a YouTube Shorts catalog from your back-catalog would put your teaching where UNT students are actually searching.",
+        "tier": 1,
+        "flags": ["COC_TRADITIONAL"],
+    },
+    {
+        "slug": "imago-dei-church-raleigh",
+        "church_name": "Imago Dei Church",
+        "pastor_name": "Tony Merida",
+        "first_name": "Tony",
+        "city": "Raleigh, NC",
+        "contact_hint": "idcworship@gmail.com (from RSS) - note: high-profile pastor, may use staff filter",
+        "ep_count": 766,
+        "angle": "growth_seo",
+        "positioning": "Imago Dei has 766 sermons archived from your teaching - and the Gospel Coalition audience already follows the writing. The teaching ministry has not caught up to that reach yet. Transcript pages on idcraleigh.com plus a YouTube Shorts catalog would turn the existing sermon library into the same kind of searchable, shareable resource the books already are - same teaching, where readers and seekers actually look.",
+        "tier": 1,
+        "flags": [
+            "NOTABLE_PASTOR: Tony Merida is published author + Gospel Coalition contributor - may use staff filter, expect slower reply"
+        ],
+    },
+    {
+        "slug": "faith-baptist-church-fbcnet",
+        "church_name": "Faith Baptist Church",
+        "pastor_name": "Pastor",
+        "first_name": "there",
+        "city": "VERIFY_CITY",
+        "contact_hint": "webmaster@fbcnet.org (from RSS) - location not yet confirmed, check fbcnet.org",
+        "ep_count": 850,
+        "angle": "seo_vs_pulpit",
+        "positioning": "Faith Baptist has 850 sermons on Subsplash - which means Pulpit AI for clip generation is probably already on the table. I am not pitching a Pulpit replacement. What this adds: searchable transcript pages on the church website that Pulpit does not produce. Every sermon becomes a Google-indexable piece of content for the doctrinal questions you have already preached on.",
+        "tier": 1,
+        "flags": [
+            "SUBSPLASH_HOST: position as SEO complement to Pulpit AI",
+            "NEEDS_CITY: verify location before sending",
+        ],
+    },
+    {
+        "slug": "emergence-church-nj",
+        "church_name": "Emergence Church",
+        "pastor_name": "Steve Hawthorne",
+        "first_name": "Steve",
+        "city": "New Jersey",
+        "contact_hint": "Steve.hawthorne@emergencenj.org (from RSS) - direct lead pastor email",
+        "ep_count": 791,
+        "angle": "seo_vs_pulpit",
+        "positioning": "Emergence has 791 sermons on Subsplash - so if Pulpit AI is already in the toolkit, great; I am not pitching a replacement. What this adds: searchable transcript pages on emergencenj.org. North Jersey runs on Google searches before church visits, and right now that 791-sermon archive is invisible to those searches. Transcripts plus a YouTube Shorts catalog from existing recordings turns that around.",
+        "tier": 1,
+        "flags": [
+            "SUBSPLASH_HOST: position as SEO complement to Pulpit AI",
+            "DIRECT_PASTOR_EMAIL: Steve.hawthorne@ is the lead pastor - high-value direct contact",
+        ],
+    },
+    {
+        "slug": "park-cities-presbyterian-dallas",
+        "church_name": "Park Cities Presbyterian Church",
+        "pastor_name": "Pastor",
+        "first_name": "there",
+        "city": "Dallas, TX",
+        "contact_hint": "webmaster@pcpc.org (from RSS), pcpc.org staff page for senior pastor",
+        "ep_count": 1057,
+        "angle": "growth_seo",
+        "positioning": "Park Cities has 1,057 sermons on the podcast - and PCA Reformed teaching in the Dallas affluent demographic finds a tech-engaged audience that searches before they show up. The archive is currently invisible to that search; converting it to transcript pages on pcpc.org plus a YouTube Shorts catalog from existing recordings would put a decade of careful exposition in front of every DFW search for the doctrinal questions you have already answered.",
+        "tier": 1,
+        "flags": ["PCA_REFORMED: tech-receptive but theologically careful"],
+    },
 ]
 
 ANGLE_RATIONALES = {
@@ -250,8 +530,14 @@ Evan
 """
 
 
-def main() -> None:
+def main(force: bool = False) -> None:
     for p in PROSPECTS:
+        out = Path(f"demo/church-vertical/{p['slug']}/PITCH.md")
+        if out.exists() and not force:
+            print(
+                f"SKIP (exists): {out} - pass --force to overwrite hand-edited content"
+            )
+            continue
         flags_md = ""
         if p["flags"]:
             flags_md = "**Flags:**\n" + "\n".join(f"- {f}" for f in p["flags"])
@@ -271,10 +557,12 @@ def main() -> None:
             tier_note=tier_note,
             angle_rationale=ANGLE_RATIONALES[p["angle"]],
         )
-        out = Path(f"demo/church-vertical/{p['slug']}/PITCH.md")
+        out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(text, encoding="utf-8")
         print(f"WROTE: {out}")
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    main(force="--force" in sys.argv)
